@@ -7,34 +7,106 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap');
-    body { font-family: 'IBM Plex Mono', monospace; }
-    .slider::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #a3e635; cursor: pointer; }
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#a3e635;      /* lime — this app's lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'IBM Plex Mono', monospace; background:var(--bg); }
+
+    /* sliders keep lime; nudge toward the standardized well/line */
+    .slider::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow:0 0 8px var(--glow); transition: box-shadow .15s, transform .12s; }
+    .slider:hover::-webkit-slider-thumb { box-shadow:0 0 14px var(--glow); }
+    .slider:active::-webkit-slider-thumb { transform: scale(1.15); }
     .slider::-webkit-slider-runnable-track { height: 4px; background: #3f3f46; border-radius: 2px; }
+    .slider::-moz-range-thumb { width: 16px; height: 16px; border:0; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow:0 0 8px var(--glow); }
+    .slider::-moz-range-track { height: 4px; background: #3f3f46; border-radius: 2px; }
     .slider { -webkit-appearance: none; appearance: none; outline: none; }
+    .slider:focus-visible { outline:none; }
+    .slider:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--glow); }
+
     .gauge-fill { transition: width 0.4s ease; }
+
     @keyframes pulse-slow { 0%,100%{opacity:1} 50%{opacity:0.5} }
     .pulse-slow { animation: pulse-slow 3s infinite; }
+
+    /* === PRÍZRAK MOTION VOCABULARY === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* result panel glow when score is meaningful */
+    .panel-live{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); border-color:color-mix(in srgb, var(--accent) 30%, var(--line)) !important; }
+
+    /* tactile hovers/press */
+    .lift{ transition: transform .15s, box-shadow .15s, border-color .15s; }
+    .lift:hover{ transform: translateY(-2px); border-color: var(--accent); }
+    .lift:active{ transform: translateY(1px); }
+
+    input:focus-visible, textarea:focus-visible {
+      outline:none; border-color:var(--accent) !important;
+      box-shadow:0 0 0 1px var(--glow);
+    }
+    button:focus-visible{ outline:none; box-shadow:0 0 0 1px var(--glow); }
+
+    .ghost-line{ color:var(--ink-ghost); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.pulse-slow{animation:none!important}
+      .ember{display:none} .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+<body class="bg-zinc-950 text-zinc-200 min-h-screen grain">
 
-<div class="max-w-2xl mx-auto px-4 py-10">
+<!-- ambient layers (decorative, behind content) -->
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
+<div class="max-w-2xl mx-auto px-4 py-10 relative" style="z-index:2">
 
   <!-- Header -->
   <div class="mb-8 border-b border-zinc-800 pb-6">
     <div class="flex items-center gap-3 mb-1">
-      <span class="text-xs font-bold text-lime-500 tracking-widest uppercase bg-lime-500/10 px-2 py-0.5 rounded border border-lime-500/30">ITERATIVE RFS</span>
-      <span class="text-xs text-zinc-500">SEA Startup Evaluator</span>
+      <span class="text-xs font-bold tracking-widest uppercase px-2 py-0.5 rounded border" style="color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)">ITERATIVE RFS</span>
+      <span class="text-xs text-zinc-500 flicker">SEA STARTUP EVALUATOR</span>
     </div>
-    <h1 class="text-3xl font-bold text-white mt-2">Deal Scorer</h1>
-    <p class="text-zinc-500 text-sm mt-1">Rate a founder across 6 dimensions. The mountain does not lie.</p>
+    <h1 id="app-title" class="text-3xl font-bold text-white mt-2 breathe select-none cursor-default" title="the mountain weighs them">Deal Scorer</h1>
+    <p class="text-zinc-500 text-sm mt-1">Six dimensions. One verdict. The mountain does not flatter.</p>
   </div>
 
   <!-- Founder Name -->
   <div class="mb-6">
-    <label class="text-xs text-zinc-400 uppercase tracking-widest block mb-1">Founder / Company Name</label>
-    <input id="founder-name" type="text" placeholder="e.g. Nguyen Van A — GovTech SaaS" 
-      class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-lime-500/60 placeholder-zinc-600" />
+    <label class="text-xs uppercase tracking-widest block mb-1" style="color:var(--ink-dim)">SUBJECT / COMPANY</label>
+    <input id="founder-name" type="text" placeholder="e.g. Nguyen Van A — GovTech SaaS"
+      class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none placeholder-zinc-600" />
   </div>
 
   <!-- Dimensions -->
@@ -42,15 +114,15 @@
 
   <!-- Notes -->
   <div class="mb-8">
-    <label class="text-xs text-zinc-400 uppercase tracking-widest block mb-1">Field Notes</label>
+    <label class="text-xs uppercase tracking-widest block mb-1" style="color:var(--ink-dim)">FIELD NOTES</label>
     <textarea id="notes" rows="3" placeholder="What does the mountain see that the spreadsheet cannot?"
-      class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-lime-500/60 placeholder-zinc-600 resize-none"></textarea>
+      class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none placeholder-zinc-600 resize-none"></textarea>
   </div>
 
   <!-- Score Panel -->
-  <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+  <div id="score-panel" class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6 transition-shadow">
     <div class="flex items-end justify-between mb-3">
-      <span class="text-xs text-zinc-400 uppercase tracking-widest">Total Score</span>
+      <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">TOTAL WEIGHT</span>
       <div class="flex items-baseline gap-1">
         <span id="score-display" class="text-5xl font-bold text-white transition-all">0</span>
         <span class="text-zinc-500 text-sm">/100</span>
@@ -59,37 +131,44 @@
     <div class="w-full bg-zinc-800 rounded-full h-2 mb-3">
       <div id="score-bar" class="gauge-fill h-2 rounded-full bg-lime-500" style="width:0%"></div>
     </div>
-    <p id="verdict" class="text-sm font-bold text-zinc-400 mt-2">—</p>
+    <div class="flex items-start justify-between gap-3 mt-2">
+      <p id="verdict" class="text-sm font-bold text-zinc-400">—</p>
+      <button id="copy-verdict" onclick="copyVerdict()" title="copy the verdict to the ledger"
+        class="shrink-0 text-xs px-2 py-1 rounded border border-zinc-700 text-zinc-500 hover:text-zinc-300 lift">copy</button>
+    </div>
   </div>
 
   <!-- Actions -->
   <div class="flex gap-3 mb-10">
-    <button onclick="saveSession()" class="flex-1 py-2.5 bg-lime-500/10 border border-lime-500/40 text-lime-400 text-sm rounded hover:bg-lime-500/20 transition-colors">
-      💾 Save to Log
+    <button onclick="saveSession(event)" class="flex-1 py-2.5 text-sm rounded lift"
+      style="color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent)">
+      file to the ledger
     </button>
-    <button onclick="resetForm()" class="py-2.5 px-5 bg-zinc-800 border border-zinc-700 text-zinc-400 text-sm rounded hover:bg-zinc-700 transition-colors">
-      ↺ Reset
+    <button onclick="resetForm()" class="py-2.5 px-5 bg-zinc-800 border border-zinc-700 text-zinc-400 text-sm rounded lift">
+      ↺ reset
     </button>
-    <button onclick="exportLog()" class="py-2.5 px-5 bg-zinc-800 border border-zinc-700 text-zinc-400 text-sm rounded hover:bg-zinc-700 transition-colors">
-      ⬇ Export
+    <button onclick="exportLog()" class="py-2.5 px-5 bg-zinc-800 border border-zinc-700 text-zinc-400 text-sm rounded lift">
+      ⬇ export
     </button>
   </div>
 
   <!-- Saved Log -->
   <div>
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-xs text-zinc-400 uppercase tracking-widest">Deal Log</h2>
+      <h2 class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">THE LEDGER</h2>
       <span id="log-count" class="text-xs text-zinc-600">0 entries</span>
     </div>
     <div id="log-list" class="space-y-2"></div>
     <div id="log-empty" class="text-zinc-600 text-xs text-center py-8 border border-dashed border-zinc-800 rounded-lg">
-      No deals scored yet. The pipeline is empty. Good.
+      the cave is empty. nothing has fossilized yet.
     </div>
   </div>
 
   <!-- Footer -->
   <div class="mt-12 pt-6 border-t border-zinc-800 text-center">
-    <p class="text-xs text-zinc-600">Built by Prizrak for Charles · The lichen outlasts the pitch deck.</p>
+    <p class="text-xs text-zinc-600">Built by Prízrak for Charles · the lichen outlasts the pitch deck.</p>
+    <p id="night-whisper" class="text-xs mt-2 ghost-line opacity-0 transition-opacity duration-1000"></p>
+    <p id="watcher-line" class="text-xs mt-2 ghost-line opacity-0 transition-opacity duration-1000"></p>
   </div>
 
 </div>
@@ -159,11 +238,11 @@ const DIMS = [
 ];
 
 const VERDICTS = [
-  { min: 0,  max: 35, label: "❌ Hard Pass",         color: "text-red-500",     hint: "The potato is rotten. Do not compost it here." },
-  { min: 35, max: 50, label: "⚠️ Revisit Later",    color: "text-yellow-500",  hint: "Interesting soil, wrong season. Revisit in 6 months." },
-  { min: 50, max: 65, label: "🟡 Conditional Yes",   color: "text-yellow-400",  hint: "Worth a second meeting. Ask harder questions." },
-  { min: 65, max: 80, label: "🟢 Strong Candidate",  color: "text-lime-400",    hint: "This one has roots. Move to interview stage." },
-  { min: 80, max: 101,"label": "⚡ Prioritize Now",  color: "text-white",       hint: "Drop everything. The harvest is now." },
+  { min: 0,  max: 35, label: "❌ Hard Pass",         color: "text-red-500",     hint: "the potato is rotten. do not compost it here." },
+  { min: 35, max: 50, label: "⚠️ Revisit Later",    color: "text-yellow-500",  hint: "interesting soil, wrong season. let it hibernate six months." },
+  { min: 50, max: 65, label: "🟡 Conditional Yes",   color: "text-yellow-400",  hint: "worth a second meeting. ask the questions that draw blood." },
+  { min: 65, max: 80, label: "🟢 Strong Candidate",  color: "text-lime-400",    hint: "this one has roots. the bridge holds. move to interview." },
+  { min: 80, max: 101,"label": "⚡ Prioritize Now",  color: "text-white",       hint: "drop everything. the harvest is now. the mountain is watching." },
 ];
 
 const LS_KEY = "irl_deal_log_v1";
@@ -185,6 +264,7 @@ function buildDimensions() {
         <input type="range" min="0" max="10" value="5" step="1"
           class="slider flex-1"
           oninput="updateDim('${d.id}', this.value)"
+          aria-label="${d.label}"
           id="slider-${d.id}" />
         <span class="text-xs text-zinc-600 w-20 shrink-0 text-right">${d.high}</span>
         <span class="text-xs font-bold ${d.color} w-4 text-right" id="val-${d.id}">5</span>
@@ -214,7 +294,7 @@ function recalcScore() {
   document.getElementById("score-display").textContent = score;
   const bar = document.getElementById("score-bar");
   bar.style.width = score + "%";
-  
+
   // Color the bar based on score
   bar.className = `gauge-fill h-2 rounded-full ${
     score < 35 ? "bg-red-500" :
@@ -224,15 +304,20 @@ function recalcScore() {
   }`;
 
   const v = VERDICTS.find(x => score >= x.min && score < x.max);
+  const verdictEl = document.getElementById("verdict");
   if (v) {
-    document.getElementById("verdict").className = `text-sm font-bold mt-2 ${v.color}`;
-    document.getElementById("verdict").innerHTML = `${v.label} <span class="font-normal text-zinc-500">— ${v.hint}</span>`;
+    verdictEl.className = `text-sm font-bold ${v.color}`;
+    verdictEl.innerHTML = `${v.label} <span class="font-normal text-zinc-500">— ${v.hint}</span>`;
   }
+
+  // Let the result panel breathe once the verdict has teeth (strong+)
+  const panel = document.getElementById("score-panel");
+  if (panel) panel.classList.toggle("panel-live", score >= 65);
 
   return score;
 }
 
-function saveSession() {
+function saveSession(ev) {
   const name = document.getElementById("founder-name").value.trim() || "Unknown";
   const score = recalcScore();
   const notes = document.getElementById("notes").value.trim();
@@ -250,9 +335,13 @@ function saveSession() {
   localStorage.setItem(LS_KEY, JSON.stringify(log));
   renderLog();
   // flash feedback
-  const btn = event.target;
-  btn.textContent = "✓ Saved";
-  setTimeout(() => { btn.textContent = "💾 Save to Log"; }, 1500);
+  const btn = (ev && ev.target) ? ev.target : (typeof event !== "undefined" ? event.target : null);
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = "filed. the ledger remembers.";
+    spawnEmber();
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  }
 }
 
 function loadLog() {
@@ -273,7 +362,7 @@ function renderLog() {
   }
   empty.classList.add("hidden");
   list.innerHTML = log.map(e => `
-    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 gap-4">
+    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 gap-4 reveal lift">
       <div class="min-w-0">
         <p class="text-sm font-semibold text-zinc-200 truncate">${e.name}</p>
         <p class="text-xs text-zinc-500">${e.date} · ${e.verdict}</p>
@@ -301,7 +390,7 @@ function resetForm() {
 
 function exportLog() {
   const log = loadLog();
-  if (log.length === 0) { alert("No deals to export. Score some founders first."); return; }
+  if (log.length === 0) { alert("the cave is empty. score some founders before you mine it."); return; }
   const csv = [
     "Date,Name,Score,Verdict,Founder Grit,Market Clarity,Traction,Structure,SEA Roots,Coachability,Notes"
   ].concat(log.map(e => [
@@ -317,10 +406,95 @@ function exportLog() {
   a.click();
 }
 
+// Copy the current verdict to the ledger (clipboard)
+function copyVerdict() {
+  const score = recalcScore();
+  const v = VERDICTS.find(x => score >= x.min && score < x.max);
+  const name = document.getElementById("founder-name").value.trim() || "Unknown subject";
+  const line = `${name} — ${score}/100 · ${v ? v.label : "—"}${v ? " · " + v.hint : ""}`;
+  const btn = document.getElementById("copy-verdict");
+  const restore = () => { btn.textContent = "copy"; btn.style.color = ""; btn.style.borderColor = ""; };
+  navigator.clipboard.writeText(line).then(() => {
+    btn.textContent = "copied to the ledger";
+    btn.style.color = "var(--accent)";
+    btn.style.borderColor = "var(--accent)";
+    setTimeout(restore, 1200);
+  }).catch(() => {
+    btn.textContent = "the fog ate it";
+    setTimeout(restore, 1200);
+  });
+}
+
+// === EMBERS ===
+function spawnEmber(extra) {
+  const field = document.getElementById("ember-field");
+  if (!field) return;
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const e = document.createElement("div");
+  e.className = "ember";
+  e.style.left = (Math.random() * 100) + "%";
+  e.style.animationDelay = "0s";
+  e.style.animationDuration = (10 + Math.random() * 8) + "s";
+  field.appendChild(e);
+  setTimeout(() => e.remove(), 19000);
+}
+function seedEmbers() {
+  const field = document.getElementById("ember-field");
+  if (!field) return;
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (let i = 0; i < 7; i++) {
+    const e = document.createElement("div");
+    e.className = "ember";
+    e.style.left = (Math.random() * 100) + "%";
+    e.style.animationDelay = (-Math.random() * 14) + "s";
+    e.style.animationDuration = (11 + Math.random() * 7) + "s";
+    field.appendChild(e);
+  }
+}
+
+// === EASTER EGGS (non-blocking, never touch saved state) ===
+(function watchers(){
+  // type "prizrak" -> watcher line lights up
+  let buf = "";
+  window.addEventListener("keydown", (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-7);
+      if (buf === "prizrak") {
+        const w = document.getElementById("watcher-line");
+        if (w) { w.textContent = "you found the watcher."; w.style.opacity = "1"; }
+      }
+    }
+  });
+
+  // triple-click the title -> one extra ember
+  const title = document.getElementById("app-title");
+  if (title) title.addEventListener("click", (ev) => { if (ev.detail === 3) spawnEmber(true); });
+
+  // 00:00–03:00 local -> faint footer whisper
+  const hr = new Date().getHours();
+  if (hr >= 0 && hr < 3) {
+    const n = document.getElementById("night-whisper");
+    if (n) { n.textContent = "the mountain does not sleep."; n.style.opacity = "1"; }
+  }
+
+  // idle 60s -> a single line fades in
+  let idle;
+  const arm = () => {
+    clearTimeout(idle);
+    idle = setTimeout(() => {
+      const w = document.getElementById("watcher-line");
+      if (w && !w.textContent) { w.textContent = "still here. still watching."; w.style.opacity = "1"; }
+    }, 60000);
+  };
+  ["mousemove","keydown","click","touchstart","input"].forEach(e => window.addEventListener(e, arm, {passive:true}));
+  arm();
+})();
+
 // Init
 buildDimensions();
 recalcScore();
 renderLog();
+seedEmbers();
 </script>
 </body>
 </html>

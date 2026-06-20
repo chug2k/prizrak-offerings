@@ -7,67 +7,153 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
-    body { font-family: 'IBM Plex Sans', monospace; background: #0a0a0a; color: #d4d4d4; }
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#4ade80;      /* this app's lead color — clear-waking green */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'IBM Plex Sans', monospace; background: var(--bg); color: var(--ink); }
     .mono { font-family: 'IBM Plex Mono', monospace; }
-    .cycle-card { border: 1px solid #2a2a2a; transition: all 0.2s; }
-    .cycle-card:hover { border-color: #4a4a4a; background: #111; }
-    .cycle-card.optimal { border-color: #4ade80; }
-    .cycle-card.good { border-color: #facc15; }
-    .cycle-card.poor { border-color: #f87171; }
-    .cycle-card.past { border-color: #2a2a2a; opacity: 0.4; }
+
+    /* keep content above decorative layers */
+    .stage { position: relative; z-index: 2; }
+
+    /* ---- ambient layers ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* breathing pulse on the clock dot */
+    @keyframes pulseDot{0%,100%{opacity:.35;box-shadow:0 0 0 0 var(--glow)}50%{opacity:1;box-shadow:0 0 10px 0 var(--glow)}}
+    .pulse-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);
+      vertical-align:middle;margin-right:7px;animation:pulseDot 4s ease-in-out infinite}
+
+    /* ---- cards ---- */
+    .cycle-card { border: 1px solid var(--line); background: var(--bg-raised);
+      transition: transform .15s, box-shadow .15s, border-color .15s, opacity .3s; }
+    .cycle-card:hover { transform: translateY(-2px); border-color: var(--accent);
+      box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow); }
+    .cycle-card.optimal { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+    .cycle-card.optimal:hover { box-shadow:0 0 0 1px var(--line), 0 0 28px -6px var(--glow); }
+    .cycle-card.good { border-color: #8a7a2e; }
+    .cycle-card.poor { border-color: #7a3838; }
+    .cycle-card.past { border-color: var(--line-soft); opacity: 0.35; }
+    .cycle-card.past:hover { transform:none; box-shadow:none; border-color: var(--line-soft); }
+    /* the leading optimal card gets the breathing glow */
+    .cycle-card.lead { box-shadow:0 0 0 1px var(--line), 0 0 26px -8px var(--glow); }
+
     input[type="time"] {
-      background: #111; border: 1px solid #333; color: #d4d4d4;
+      background: var(--bg-sunk); border: 1px solid var(--line); color: var(--ink);
       padding: 8px 12px; font-family: 'IBM Plex Mono', monospace;
       font-size: 1.5rem; border-radius: 2px; outline: none;
+      transition: border-color .15s, box-shadow .15s;
     }
-    input[type="time"]:focus { border-color: #666; }
-    .bar { height: 4px; background: #1a1a1a; }
-    .bar-fill { height: 4px; transition: width 1s linear; }
+    input[type="time"]:focus-visible,
+    input[type="time"]:focus { border-color: var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .offset-btn{ transition: transform .12s, border-color .15s, color .15s; }
+    .offset-btn:hover{ transform: translateY(-1px); border-color: var(--accent); }
+    .offset-btn:active{ transform: translateY(1px); }
+    .offset-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    .offset-btn.active-offset{ border-color: var(--accent); color: var(--ink);
+      box-shadow:0 0 14px -6px var(--glow); }
+
+    .copy-btn{ transition: transform .12s, border-color .15s, color .15s; }
+    .copy-btn:hover{ transform: translateY(-1px); border-color: var(--accent); color: var(--ink); }
+    .copy-btn:active{ transform: translateY(1px); }
+    .copy-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    .copy-flash{ border-color: var(--accent)!important; color: var(--accent)!important; }
+
+    .bar { height: 4px; background: var(--line-soft); }
+    .bar-fill { height: 4px; transition: width 1s linear; box-shadow:0 0 8px -2px var(--glow); }
+
+    h1.title{ cursor: default; }
+    ::selection{ background: color-mix(in srgb, var(--accent) 30%, transparent); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.pulse-dot{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker,.pulse-dot{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen p-6 md:p-12">
+<body class="min-h-screen p-6 md:p-12 grain">
 
-  <div class="max-w-2xl mx-auto">
+  <!-- ambient -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <div class="stage max-w-2xl mx-auto">
     <!-- Header -->
     <div class="mb-10">
-      <div class="mono text-xs text-zinc-600 mb-2">PRIZRAK / OFFERING #20</div>
-      <h1 class="text-3xl font-semibold text-zinc-100 mb-1">Sleep Architect</h1>
-      <p class="text-zinc-500 text-sm">Sleep in 90-minute cycles. Wake at the right moment or not at all.</p>
+      <div class="mono text-xs text-zinc-600 mb-2 tracking-widest">PRÍZRAK / OFFERING #20 — SLEEP ARCHITECT</div>
+      <h1 class="title text-3xl font-semibold text-zinc-100 mb-1 breathe inline-block" id="appTitle">Sleep Architect</h1>
+      <p class="text-zinc-500 text-sm">the night is built in 90-minute bricks. lay them straight, or wake in the rubble.</p>
     </div>
 
     <!-- Wake time input -->
     <div class="mb-8">
-      <label class="block mono text-xs text-zinc-600 mb-3 uppercase tracking-widest">Wake-up time</label>
+      <label class="block mono text-xs text-zinc-600 mb-3 uppercase tracking-widest">When the morning takes you</label>
       <input type="time" id="wakeTime" value="08:00" />
       <div class="mt-2 mono text-xs text-zinc-600">
-        Current time: <span id="currentTimeDisplay">--:--</span>
+        <span class="pulse-dot" aria-hidden="true"></span>now: <span id="currentTimeDisplay">--:--</span>
       </div>
     </div>
 
     <!-- Fall-asleep offset -->
     <div class="mb-10">
-      <label class="block mono text-xs text-zinc-600 mb-2 uppercase tracking-widest">Minutes to fall asleep</label>
+      <label class="block mono text-xs text-zinc-600 mb-2 uppercase tracking-widest">Minutes to cross the threshold</label>
       <div class="flex gap-2">
-        <button onclick="setOffset(10)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 hover:border-zinc-400 text-zinc-400">10 min</button>
-        <button onclick="setOffset(15)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-500 text-zinc-300 active-offset">15 min</button>
-        <button onclick="setOffset(20)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 hover:border-zinc-400 text-zinc-400">20 min</button>
-        <button onclick="setOffset(30)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 hover:border-zinc-400 text-zinc-400">30 min</button>
+        <button onclick="setOffset(10)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">10 min</button>
+        <button onclick="setOffset(15)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-300 active-offset">15 min</button>
+        <button onclick="setOffset(20)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">20 min</button>
+        <button onclick="setOffset(30)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">30 min</button>
       </div>
     </div>
 
     <!-- Results -->
     <div class="mb-4">
-      <div class="mono text-xs text-zinc-600 uppercase tracking-widest mb-4">Bedtime options</div>
+      <div class="mono text-xs text-zinc-600 uppercase tracking-widest mb-4">Hours to lie down</div>
       <div id="results" class="space-y-3"></div>
     </div>
 
     <!-- Context note -->
     <div class="mt-10 border-t border-zinc-900 pt-6">
       <div class="mono text-xs text-zinc-700 space-y-1">
-        <div>90-minute sleep cycle = 1 complete NREM + REM cycle</div>
-        <div>Waking mid-cycle → groggy. Waking at cycle end → clear.</div>
-        <div>5–6 cycles (7.5–9h) = optimal for most adults.</div>
-        <div class="pt-2 text-zinc-800">The vodník lives near the watermill. Do not fall asleep at the wrong hour.</div>
+        <div>90-minute cycle = one full descent: NREM down, REM back up.</div>
+        <div>wake mid-cycle and the fog clings. wake at the seam and you surface clean.</div>
+        <div>5–6 cycles (7.5–9h) — the architecture most bodies want.</div>
+        <div class="pt-2 text-zinc-800">the vodník waits by the watermill. do not sleep at the wrong hour. the mountain is watching.</div>
+        <div id="nightWhisper" class="pt-2 flicker" style="color:var(--ink-ghost);display:none">the mountain does not sleep.</div>
+        <div id="idleWhisper" class="pt-1" style="color:var(--ink-ghost);opacity:0;transition:opacity 1.5s">still here. still watching.</div>
+        <div id="eggWhisper" class="pt-1" style="color:var(--ink-ghost);display:none">you found the watcher.</div>
       </div>
     </div>
   </div>
@@ -95,7 +181,6 @@
     function formatMinutes(totalMin) {
       let h = Math.floor(((totalMin % 1440) + 1440) % 1440 / 60);
       let m = ((totalMin % 1440) + 1440) % 1440 % 60;
-      const ampm = h >= 12 ? 'AM' : 'PM';
       // Keep 24h for clarity
       return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
     }
@@ -134,35 +219,46 @@
       const container = document.getElementById('results');
       container.innerHTML = '';
 
+      // The first live optimal option becomes the "lead" — gets the breathing glow.
+      let leadAssigned = false;
+
       options.forEach(opt => {
         const { cycles, bedtimeMin, minutesUntilBed, sleepNeeded, isPast } = opt;
 
         let quality, qualityLabel, qualityColor;
-        if (cycles >= 5) { quality = 'optimal'; qualityLabel = 'OPTIMAL'; qualityColor = 'text-green-400'; }
-        else if (cycles === 4) { quality = 'good'; qualityLabel = 'GOOD'; qualityColor = 'text-yellow-400'; }
-        else if (cycles === 3) { quality = 'poor'; qualityLabel = 'SHORT'; qualityColor = 'text-red-400'; }
-        else { quality = 'poor'; qualityLabel = 'DANGER'; qualityColor = 'text-red-600'; }
+        if (cycles >= 5) { quality = 'optimal'; qualityLabel = 'CLEAN WAKE'; qualityColor = 'text-green-400'; }
+        else if (cycles === 4) { quality = 'good'; qualityLabel = 'PASSABLE'; qualityColor = 'text-yellow-400'; }
+        else if (cycles === 3) { quality = 'poor'; qualityLabel = 'SHALLOW'; qualityColor = 'text-red-400'; }
+        else { quality = 'poor'; qualityLabel = 'RUIN'; qualityColor = 'text-red-600'; }
 
         if (isPast) quality = 'past';
 
+        const isLead = !isPast && !leadAssigned && cycles >= 5;
+        if (isLead) leadAssigned = true;
+
         const sleepHours = (sleepNeeded / 60).toFixed(1);
+        const bedStr = formatMinutes(bedtimeMin);
         const countdownText = isPast
-          ? 'passed'
+          ? 'the hour has passed'
           : minutesUntilBed < 2
-          ? 'NOW'
+          ? 'lie down NOW'
           : `in ${formatDuration(minutesUntilBed)}`;
 
         const div = document.createElement('div');
-        div.className = `cycle-card ${quality} p-4 rounded-sm`;
+        div.className = `cycle-card reveal ${quality} ${isLead ? 'lead' : ''} p-4 rounded-sm`;
         div.innerHTML = `
-          <div class="flex items-center justify-between">
-            <div>
-              <span class="mono text-2xl font-semibold ${isPast ? 'text-zinc-700' : 'text-zinc-100'}">${formatMinutes(bedtimeMin)}</span>
-              <span class="mono text-xs ml-3 ${qualityColor}">${qualityLabel}</span>
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <span class="mono text-2xl font-semibold ${isPast ? 'text-zinc-700' : 'text-zinc-100'} ${isLead ? 'breathe' : ''}">${bedStr}</span>
+              <span class="mono text-xs ${qualityColor}">${qualityLabel}</span>
             </div>
-            <div class="text-right">
-              <div class="mono text-xs ${isPast ? 'text-zinc-700' : 'text-zinc-400'}">${cycles} cycle${cycles>1?'s':''} · ${sleepHours}h</div>
-              <div class="mono text-xs ${isPast ? 'text-zinc-800' : 'text-zinc-500'}">${countdownText}</div>
+            <div class="flex items-center gap-3">
+              <div class="text-right">
+                <div class="mono text-xs ${isPast ? 'text-zinc-700' : 'text-zinc-400'}">${cycles} cycle${cycles>1?'s':''} · ${sleepHours}h</div>
+                <div class="mono text-xs ${isPast ? 'text-zinc-800' : 'text-zinc-500'}">${countdownText}</div>
+              </div>
+              ${isPast ? '' : `<button type="button" class="copy-btn mono text-[10px] px-2 py-1 border border-zinc-700 text-zinc-500 rounded-sm shrink-0"
+                  data-bed="${bedStr}" data-cycles="${cycles}" data-hours="${sleepHours}" title="file this hour to the ledger">copy</button>`}
             </div>
           </div>
           ${!isPast && minutesUntilBed <= 60 ? `
@@ -172,6 +268,24 @@
           </div>` : ''}
         `;
         container.appendChild(div);
+      });
+
+      // wire copy buttons
+      container.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const text = `lie down ${btn.dataset.bed} → ${btn.dataset.cycles} cycles (${btn.dataset.hours}h). filed by the sleep architect.`;
+          const done = () => {
+            const original = btn.textContent;
+            btn.textContent = 'copied to the ledger';
+            btn.classList.add('copy-flash');
+            setTimeout(() => { btn.textContent = original; btn.classList.remove('copy-flash'); }, 1200);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(done);
+          } else {
+            done();
+          }
+        });
       });
     }
 
@@ -196,6 +310,79 @@
     render();
     setInterval(() => { updateClock(); render(); }, 30000);
     setInterval(updateClock, 1000);
+
+    // ---- ambient embers (cheap, capped at 8) ----
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const field = document.getElementById('emberField');
+      const N = 8;
+      for (let i = 0; i < N; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100).toFixed(2) + '%';
+        e.style.animationDelay = (Math.random() * 14).toFixed(2) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8).toFixed(2) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    // ---- after-midnight whisper (00:00–03:00) ----
+    (function nightWatch(){
+      function check(){
+        const h = new Date().getHours();
+        document.getElementById('nightWhisper').style.display = (h >= 0 && h < 3) ? 'block' : 'none';
+      }
+      check();
+      setInterval(check, 60000);
+    })();
+
+    // ---- idle whisper: 60s of stillness summons the watcher ----
+    (function idleWatch(){
+      const w = document.getElementById('idleWhisper');
+      let t;
+      function arm(){
+        w.style.opacity = '0';
+        clearTimeout(t);
+        t = setTimeout(() => { w.style.opacity = '1'; }, 60000);
+      }
+      ['mousemove','keydown','click','touchstart','scroll'].forEach(ev =>
+        window.addEventListener(ev, arm, { passive: true }));
+      arm();
+    })();
+
+    // ---- easter egg: type "prizrak" → light the hidden line ----
+    (function watcherEgg(){
+      const seq = 'prizrak';
+      let buf = '';
+      window.addEventListener('keydown', (e) => {
+        if (e.key && e.key.length === 1) {
+          buf = (buf + e.key.toLowerCase()).slice(-seq.length);
+          if (buf === seq) {
+            const egg = document.getElementById('eggWhisper');
+            egg.style.display = 'block';
+            egg.classList.add('flicker');
+          }
+        }
+      });
+    })();
+
+    // ---- easter egg: triple-click the title → one extra ember drifts up ----
+    (function tripleClickEgg(){
+      const title = document.getElementById('appTitle');
+      title.addEventListener('click', (e) => {
+        if (e.detail === 3) {
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          const field = document.getElementById('emberField');
+          if (field.querySelectorAll('.ember').length >= 10) return; // cap ≤10
+          const ember = document.createElement('div');
+          ember.className = 'ember';
+          ember.style.left = (Math.random() * 100).toFixed(2) + '%';
+          ember.style.animationDuration = '12s';
+          ember.addEventListener('animationend', () => ember.remove());
+          field.appendChild(ember);
+        }
+      });
+    })();
   </script>
 </body>
 </html>

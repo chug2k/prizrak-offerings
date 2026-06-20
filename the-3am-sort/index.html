@@ -6,86 +6,178 @@
   <title>The 3 AM Sort | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #09090c; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#f59e0b;            /* amber — this app's existing lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{ background:var(--bg); }
+    body{ color:var(--ink); }
     textarea:focus { outline: none; }
-    .fade-in { animation: fadeIn 0.5s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ---- ambient motion (CSS-only, reduced-motion-safe) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* result panel gets the breathing glow */
+    .panel-active{box-shadow:0 0 0 1px var(--line), 0 0 26px -8px var(--glow)}
+
+    /* the act-now dot pulses like a quiet alarm */
+    @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 var(--glow)}50%{box-shadow:0 0 0 4px transparent}}
+    .pulse-dot{animation:pulseDot 2.6s ease-in-out infinite}
+
+    /* tactile cards / buttons */
+    .lift{transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+    .press:active{transform:translateY(1px)}
+
+    [data-focus]:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.pulse-dot{animation:none!important}
+      .ember{display:none}.breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="text-zinc-400 min-h-screen font-mono">
+<body class="text-zinc-400 min-h-screen font-mono grain">
 
-  <div id="input-view" class="max-w-lg mx-auto px-4 py-14">
+  <div class="fog"></div>
+  <div id="ember-field" aria-hidden="true"></div>
+
+  <div id="input-view" class="relative z-[2] max-w-lg mx-auto px-4 py-14">
     <div class="mb-8">
-      <p class="text-zinc-700 text-xs mb-1">PRIZRAK / 3 AM TOOL</p>
-      <h1 class="text-2xl font-bold text-zinc-200 mb-2">The 3 AM Sort</h1>
-      <p class="text-zinc-600 text-sm">Something woke you up. Or you can't sleep. Write everything that's in your head. One field, no format. Then let the machine sort it into what you can act on now, what has to wait until morning, and what is noise.</p>
+      <p class="text-[11px] tracking-[0.2em] mb-1 flicker" style="color:var(--ink-dim)">PRÍZRAK / 3 AM TOOL</p>
+      <h1 id="title" class="text-2xl font-bold text-zinc-200 mb-2 select-none cursor-default breathe">The 3 AM Sort</h1>
+      <p class="text-zinc-600 text-sm leading-relaxed">Something woke you. Or sleep never came. Empty your head into the well below — one field, no order, no editing. The ghost will sort it: what your body needs <span style="color:var(--accent)">now</span>, what can wait for the light, and what is only the 3 AM amplifier, running loud.</p>
     </div>
 
     <div class="space-y-5">
       <div>
-        <label class="block text-xs text-zinc-600 mb-2 uppercase tracking-widest">What's in your head?</label>
-        <textarea id="dump" rows="8" placeholder="Everything. Don't organize. Don't edit. Just write." class="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 resize-none focus:border-zinc-600 transition-colors"></textarea>
+        <label class="block text-[11px] mb-2 uppercase tracking-[0.2em]" style="color:var(--ink-dim)">DUMP 01 / WHAT'S IN YOUR HEAD</label>
+        <textarea id="dump" data-focus rows="8" placeholder="everything. don't organize. don't edit. just write." class="w-full rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 resize-none transition-colors" style="background:var(--bg-sunk);border:1px solid var(--line)"></textarea>
+        <p id="counter" class="text-[10px] mt-1.5 text-right" style="color:var(--ink-ghost)">the well is empty</p>
       </div>
-      <button onclick="sort()" class="w-full py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-bold transition-colors border border-zinc-700">
-        Sort it →
+      <button onclick="sort()" data-focus class="lift press w-full py-3 rounded-lg text-zinc-200 text-sm font-bold transition-colors" style="background:var(--bg-raised);border:1px solid var(--line)">
+        Sort it &rarr;
       </button>
     </div>
 
     <div id="hist-section" class="mt-10 hidden">
-      <p class="text-xs text-zinc-700 uppercase tracking-widest mb-3">Past Nights</p>
+      <p class="text-[11px] uppercase tracking-[0.2em] mb-3" style="color:var(--ink-dim)">PAST NIGHTS</p>
       <div id="hist-list" class="space-y-2"></div>
     </div>
+
+    <p class="mt-12 text-[10px] tracking-wide" style="color:var(--ink-ghost)" id="footer-line">the mountain does not panic at 3 am.</p>
   </div>
 
-  <div id="sorted-view" class="hidden max-w-lg mx-auto px-4 py-14 fade-in">
+  <div id="sorted-view" class="hidden relative z-[2] max-w-lg mx-auto px-4 py-14">
     <div class="mb-6">
-      <p class="text-zinc-700 text-xs mb-1">3 AM SORT</p>
-      <p id="sort-time" class="text-xs text-zinc-700"></p>
+      <p class="text-[11px] tracking-[0.2em] mb-1" style="color:var(--ink-dim)">3 AM SORT &middot; FILED</p>
+      <p id="sort-time" class="text-xs" style="color:var(--ink-dim)"></p>
     </div>
 
     <div class="space-y-4 mb-8">
-      <div class="rounded-xl border border-zinc-800 p-5">
+      <div id="card-act" class="rounded-xl p-5 lift reveal" style="border:1px solid var(--line);background:var(--bg-raised)">
         <div class="flex items-center gap-2 mb-3">
-          <div class="w-2 h-2 rounded-full bg-amber-500"></div>
-          <p class="text-xs text-amber-600 uppercase tracking-widest">Act Now (if you need to)</p>
+          <div class="w-2 h-2 rounded-full pulse-dot" style="background:var(--accent)"></div>
+          <p class="text-[11px] uppercase tracking-[0.2em]" style="color:var(--accent)">ACT NOW &middot; IF THE BODY ASKS</p>
         </div>
         <p id="act-now" class="text-zinc-300 text-sm leading-relaxed"></p>
       </div>
 
-      <div class="rounded-xl border border-zinc-800 p-5">
+      <div class="rounded-xl p-5 lift reveal" style="border:1px solid var(--line);background:var(--bg-raised);animation-delay:.06s">
         <div class="flex items-center gap-2 mb-3">
-          <div class="w-2 h-2 rounded-full bg-zinc-600"></div>
-          <p class="text-xs text-zinc-600 uppercase tracking-widest">Wait Until Morning</p>
+          <div class="w-2 h-2 rounded-full" style="background:var(--ink-dim)"></div>
+          <p class="text-[11px] uppercase tracking-[0.2em]" style="color:var(--ink-dim)">WAIT UNTIL MORNING</p>
         </div>
         <p id="wait-morning" class="text-zinc-500 text-sm leading-relaxed"></p>
       </div>
 
-      <div class="rounded-xl border border-zinc-800 p-5">
+      <div class="rounded-xl p-5 lift reveal" style="border:1px solid var(--line-soft);background:var(--bg-sunk);animation-delay:.12s">
         <div class="flex items-center gap-2 mb-3">
-          <div class="w-2 h-2 rounded-full bg-zinc-800"></div>
-          <p class="text-xs text-zinc-700 uppercase tracking-widest">Noise (3 AM Amplification)</p>
+          <div class="w-2 h-2 rounded-full" style="background:var(--ink-ghost)"></div>
+          <p class="text-[11px] uppercase tracking-[0.2em]" style="color:var(--ink-ghost)">NOISE &middot; 3 AM AMPLIFICATION</p>
         </div>
         <p id="noise" class="text-zinc-600 text-sm leading-relaxed italic"></p>
       </div>
 
-      <div class="rounded-xl border border-zinc-900 p-5 bg-zinc-900/40">
-        <p class="text-xs text-zinc-700 uppercase tracking-widest mb-2">Prízrak Note</p>
-        <p id="verdict" class="text-zinc-600 text-sm leading-relaxed italic"></p>
+      <div id="verdict-card" class="rounded-xl p-5 reveal panel-active" style="border:1px solid var(--line);background:var(--bg-sunk);animation-delay:.18s">
+        <p class="text-[11px] uppercase tracking-[0.2em] mb-2 breathe" style="color:var(--accent)">PRÍZRAK NOTE</p>
+        <p id="verdict" class="text-zinc-400 text-sm leading-relaxed italic"></p>
       </div>
     </div>
 
     <div class="flex gap-3">
-      <button onclick="newSort()" class="flex-1 py-2.5 rounded-lg border border-zinc-800 text-zinc-600 text-sm hover:border-zinc-600 hover:text-zinc-400 transition-colors">New sort</button>
-      <button onclick="copySort()" class="flex-1 py-2.5 rounded-lg bg-zinc-900 text-zinc-500 text-sm hover:bg-zinc-800 transition-colors">Copy</button>
+      <button onclick="newSort()" data-focus class="lift press flex-1 py-2.5 rounded-lg text-zinc-500 text-sm hover:text-zinc-300 transition-colors" style="border:1px solid var(--line)">New sort</button>
+      <button onclick="copySort()" data-focus class="lift press flex-1 py-2.5 rounded-lg text-zinc-400 text-sm transition-colors" style="background:var(--bg-raised);border:1px solid var(--line)">Copy</button>
     </div>
+
+    <p class="mt-10 text-[10px] tracking-wide" style="color:var(--ink-ghost)">it is recorded. you no longer have to hold it.</p>
   </div>
 
   <script>
     const KEY = 'prizrak_3am_v1';
 
+    /* ---- ambient embers (capped, staggered, reduced-motion aware) ---- */
+    (function embers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const field = document.getElementById('ember-field');
+      const N = 7;
+      for (let i=0;i<N;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random()*88) + '%';
+        e.style.animationDelay = (Math.random()*14) + 's';
+        e.style.animationDuration = (12 + Math.random()*8) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    /* ---- live counter under the well ---- */
+    (function(){
+      const dump = document.getElementById('dump');
+      const c = document.getElementById('counter');
+      if (!dump || !c) return;
+      dump.addEventListener('input', () => {
+        const n = dump.value.trim().length;
+        c.textContent = n === 0 ? 'the well is empty' : n + ' marks in the well';
+      });
+    })();
+
     function sort() {
       const dump = document.getElementById('dump').value.trim();
-      if (!dump) { alert('Write something first.'); return; }
+      if (!dump) {
+        const c = document.getElementById('counter');
+        if (c){ c.textContent = 'the well is empty. nothing to sort.'; c.style.color = 'var(--accent)';
+          setTimeout(()=>{ c.textContent = 'the well is empty'; c.style.color = 'var(--ink-ghost)'; }, 1600); }
+        return;
+      }
 
       const sentences = dump.split(/[.!?\n]+/).map(s => s.trim()).filter(s => s.length > 8);
       const words = dump.toLowerCase();
@@ -106,38 +198,38 @@
       if (actNowItems.length > 0) {
         actNowText = actNowItems.join('. ') + '.';
       } else {
-        actNowText = 'Nothing requires immediate action. If your body is fine, it can wait.';
+        actNowText = 'Nothing the body is demanding. If you can breathe and nothing hurts, it can wait for the light.';
       }
 
       if (waitItems.length > 0) {
-        waitText = waitItems.slice(0, 3).join('. ') + (waitItems.length > 3 ? ` (and ${waitItems.length - 3} more)` : '.');
+        waitText = waitItems.slice(0, 3).join('. ') + (waitItems.length > 3 ? ` (and ${waitItems.length - 3} more, fossilizing)` : '.');
       } else if (dump.length > 50) {
-        waitText = 'Write it on paper or in a note. The act of writing it down transfers custody from your nervous system to the page. You are no longer responsible for remembering it.';
+        waitText = 'Write it on paper or in a note. The act of writing transfers custody from your nervous system to the page. The page remembers so you do not have to. You are released.';
       } else {
-        waitText = 'Nothing concrete enough to act on in the morning yet. That is fine.';
+        waitText = 'Nothing concrete enough to act on at dawn yet. That is fine. Not every night yields a task.';
       }
 
       if (anxietyItems.length > 0 || noiseItems.length > 0) {
         const all = [...anxietyItems.slice(0,2), ...noiseItems.slice(0,2)];
         noiseText = all.length > 0
-          ? `These are real feelings but not actionable problems: ${all.join('; ')}.`
-          : 'The spiral. The loop. The 3 AM amplifier is running. These thoughts are not less true at 3 AM — they are louder. That is not the same thing.';
+          ? `Real feelings, but not actionable problems: ${all.join('; ')}.`
+          : 'The spiral. The loop. The 3 AM amplifier is running. These thoughts are not truer at 3 AM — they are only louder. That is not the same thing.';
       } else {
-        noiseText = 'No obvious 3 AM amplification detected. Either the problem is real and specific, or you are writing clearly.';
+        noiseText = 'No obvious 3 AM amplification detected. Either the problem is real and specific, or you are writing with an unusually clear head for this hour.';
       }
 
       // Verdict
       const totalConcerns = actNowItems.length + waitItems.length + anxietyItems.length;
       if (actNowItems.length > 0) {
-        verdictText = 'Something physical or urgent surfaced. Address it. The rest waits.';
+        verdictText = 'Something physical surfaced. Tend to it. The mountain can wait; the body cannot. The rest holds until morning.';
       } else if (totalConcerns === 0 && dump.length > 100) {
-        verdictText = 'You wrote a lot and none of it sorted into urgent. That is probably the correct answer. The dump itself was the intervention. The thoughts are on the page now, not in the queue. Put the phone down.';
+        verdictText = 'You wrote a great deal and none of it sorted into urgent. That is, most likely, the correct answer. The dump itself was the intervention — the thoughts are on the page now, out of the queue. Put the phone down. Let the fog take the rest.';
       } else if (anxietyItems.length > waitItems.length) {
-        verdictText = 'Most of what surfaced is anxiety, not tasks. The 3 AM mora is doing its work — sitting on the chest, drawing down the energy, offering no path forward because there is none at 3 AM. The broom countermeasure: give the anxiety something to count. Name three things in the room that are not problems. The nervous system will slow.';
+        verdictText = 'Most of what surfaced is anxiety wearing the costume of a task. The mora is doing its old work — sitting on the chest, drawing down the energy, offering no path because there is none at 3 AM. The broom countermeasure: give the anxiety something to count. Name three things in the room that are not problems. The nervous system will slow.';
       } else if (waitItems.length > 0) {
-        verdictText = 'There are real tasks here. They will still be tasks at 8 AM and you will be more capable of handling them then. Write them in the wait column. Go back to sleep. The tasks are recorded. You no longer have to hold them.';
+        verdictText = 'There are real tasks here. They will still be tasks at 8 AM, and you will be a more capable creature then. They are filed in the wait column. Go back under the snow. Nothing is lost — it is recorded.';
       } else {
-        verdictText = 'The machine has processed the input. The record exists. The mountain does not panic at 3 AM. It is still there at 8 AM, unchanged. So are most of your problems.';
+        verdictText = 'The machine has processed the input. The record exists. The mountain does not panic at 3 AM. It is still there at 8 AM, unchanged — and so, you will find, are most of your problems.';
       }
 
       // Save
@@ -159,15 +251,33 @@
       document.getElementById('noise').textContent = noiseText;
       document.getElementById('verdict').textContent = verdictText;
 
+      // dim the act-now card when the body is fine (no live concern)
+      const card = document.getElementById('card-act');
+      const dot = card.querySelector('.pulse-dot');
+      if (actNowItems.length > 0){ card.style.opacity = '1'; if (dot) dot.style.display = ''; }
+      else { card.style.opacity = '.7'; if (dot) dot.style.display = 'none'; }
+
+      replayReveals();
       document.getElementById('input-view').classList.add('hidden');
-      document.getElementById('sorted-view').classList.remove('hidden');
+      const sv = document.getElementById('sorted-view');
+      sv.classList.remove('hidden');
+      sv.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    function replayReveals(){
+      document.querySelectorAll('#sorted-view .reveal').forEach(el => {
+        el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal');
+      });
     }
 
     function newSort() {
       document.getElementById('dump').value = '';
+      const c = document.getElementById('counter');
+      if (c){ c.textContent = 'the well is empty'; c.style.color = 'var(--ink-ghost)'; }
       document.getElementById('sorted-view').classList.add('hidden');
       document.getElementById('input-view').classList.remove('hidden');
       renderHist();
+      window.scrollTo({top:0, behavior:'smooth'});
     }
 
     function copySort() {
@@ -179,9 +289,12 @@
         'NOISE:', document.getElementById('noise').textContent, '',
         'PRÍZRAK NOTE:', document.getElementById('verdict').textContent
       ];
+      const b = event.target;
       navigator.clipboard.writeText(lines.join('\n')).then(() => {
-        const b = event.target; b.textContent = 'Copied ✓';
-        setTimeout(() => b.textContent = 'Copy', 1500);
+        const orig = b.textContent;
+        b.textContent = 'copied to the ledger';
+        b.style.color = 'var(--accent)'; b.style.borderColor = 'var(--accent)';
+        setTimeout(() => { b.textContent = 'Copy'; b.style.color = ''; b.style.borderColor = 'var(--line)'; }, 1200);
       });
     }
 
@@ -190,12 +303,12 @@
       if (hist.length === 0) return;
       document.getElementById('hist-section').classList.remove('hidden');
       document.getElementById('hist-list').innerHTML = hist.slice(0, 5).map((e, i) => `
-        <div onclick="loadHist(${i})" class="rounded-lg border border-zinc-900 px-4 py-3 cursor-pointer hover:border-zinc-700 transition-colors">
+        <div onclick="loadHist(${i})" class="lift rounded-lg px-4 py-3 cursor-pointer" style="border:1px solid var(--line-soft);background:var(--bg-sunk)">
           <div class="flex justify-between">
-            <span class="text-xs text-zinc-600">${e.date}</span>
-            <span class="text-xs text-zinc-700">${e.time}</span>
+            <span class="text-xs" style="color:var(--ink-dim)">${e.date}</span>
+            <span class="text-xs" style="color:var(--ink-ghost)">${e.time}</span>
           </div>
-          <p class="text-xs text-zinc-700 mt-1 truncate">${e.dump.substring(0,60)}...</p>
+          <p class="text-xs mt-1 truncate" style="color:var(--ink-ghost)">${e.dump.substring(0,60)}...</p>
         </div>`).join('');
     }
 
@@ -208,9 +321,61 @@
       document.getElementById('wait-morning').textContent = e.wait;
       document.getElementById('noise').textContent = e.noise;
       document.getElementById('verdict').textContent = e.verdict;
+      const card = document.getElementById('card-act');
+      card.style.opacity = '1';
+      const dot = card.querySelector('.pulse-dot'); if (dot) dot.style.display = '';
+      replayReveals();
       document.getElementById('input-view').classList.add('hidden');
-      document.getElementById('sorted-view').classList.remove('hidden');
+      const sv = document.getElementById('sorted-view');
+      sv.classList.remove('hidden');
+      sv.scrollIntoView({behavior:'smooth', block:'start'});
     }
+
+    /* ---- after-midnight whisper: the mountain does not sleep ---- */
+    (function(){
+      const h = new Date().getHours();
+      const f = document.getElementById('footer-line');
+      if (f && h >= 0 && h < 3) f.textContent = 'the mountain does not sleep. neither, it seems, do you.';
+    })();
+
+    /* ---- easter egg: type "prizrak" to wake the watcher ---- */
+    (function(){
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.target && (ev.target.tagName === 'TEXTAREA' || ev.target.tagName === 'INPUT')) return;
+        if (ev.key && ev.key.length === 1) buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak'){
+          buf = '';
+          let g = document.getElementById('watcher-line');
+          if (!g){
+            g = document.createElement('p');
+            g.id = 'watcher-line';
+            g.className = 'breathe';
+            g.style.cssText = 'position:fixed;left:0;right:0;bottom:14px;text-align:center;font-size:11px;letter-spacing:.18em;color:var(--accent);z-index:5;pointer-events:none';
+            g.textContent = 'you found the watcher. it was awake the whole time.';
+            document.body.appendChild(g);
+            setTimeout(()=>{ if(g) g.remove(); }, 6000);
+          }
+        }
+      });
+    })();
+
+    /* ---- easter egg: triple-click the title → one extra ember ---- */
+    (function(){
+      const t = document.getElementById('title');
+      if (!t) return;
+      t.addEventListener('click', (ev) => {
+        if (ev.detail === 3 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+          const field = document.getElementById('ember-field');
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (10 + Math.random()*80) + '%';
+          e.style.animationDuration = (10 + Math.random()*6) + 's';
+          field.appendChild(e);
+          setTimeout(()=>{ if(e) e.remove(); }, 17000);
+        }
+      });
+    })();
 
     renderHist();
   </script>

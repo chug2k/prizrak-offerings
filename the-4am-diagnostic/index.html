@@ -6,50 +6,130 @@
     <title>The 4AM Diagnostic — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0a0a0d; }
-        .pulse { animation: pulse 3s ease-in-out infinite; }
-        @keyframes pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-        .glow-amber { text-shadow: 0 0 18px rgba(251,191,36,0.5); }
-        .glow-red { text-shadow: 0 0 18px rgba(239,68,68,0.5); }
-        .glow-blue { text-shadow: 0 0 18px rgba(99,102,241,0.5); }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#fbbf24;            /* this app's lead: the 4AM amber */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background: var(--bg); }
+        body{ color: var(--ink); }
+
+        /* ---- ambient motion (CSS-only, reduced-motion-safe) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* ---- legacy hooks kept for compatibility ---- */
+        .pulse { animation: breathe 4.5s ease-in-out infinite; }
+        .fade-in { animation: reveal 0.35s ease-out both; }
+        .glow-amber  { text-shadow: 0 0 18px rgba(251,191,36,0.5); }
+        .glow-red    { text-shadow: 0 0 18px rgba(239,68,68,0.5); }
+        .glow-blue   { text-shadow: 0 0 18px rgba(99,102,241,0.5); }
         .glow-violet { text-shadow: 0 0 18px rgba(167,139,250,0.5); }
-        .clock-tick { font-variant-numeric: tabular-nums; }
+        .clock-tick { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+        /* result panel breathing glow */
+        .result-panel{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+        /* tactile interaction */
+        .opt-btn{ transition:transform .12s ease, border-color .15s, color .15s, background-color .15s, box-shadow .15s; }
+        .opt-btn:hover{ transform:translateY(-1px); }
+        .opt-btn:active{ transform:translateY(1px); }
+        button:focus-visible, .opt-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        .lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+        .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+        .lift:active{ transform:translateY(1px); }
+
+        #content{ position:relative; z-index:2; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.pulse,.fade-in{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker,.pulse{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen flex flex-col items-center justify-start px-4 py-10">
+<body class="grain text-zinc-300 font-mono antialiased min-h-screen flex flex-col items-center justify-start px-4 py-10">
 
-    <div class="w-full max-w-xl">
+    <!-- ambient layers (decorative, behind content) -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <div id="content" class="w-full max-w-xl">
         <!-- Clock -->
         <div class="text-center mb-8">
-            <div id="clock" class="clock-tick text-5xl font-bold text-amber-400 glow-amber pulse mb-1"></div>
+            <div id="clock" class="clock-tick text-5xl font-bold breathe mb-1" style="color:var(--accent)"></div>
             <div id="date" class="text-xs text-zinc-600"></div>
         </div>
 
         <!-- Header -->
         <div class="mb-8 text-center">
-            <h1 class="text-2xl font-bold text-white mb-2">The 4AM Diagnostic</h1>
-            <p class="text-sm text-zinc-500 leading-relaxed">You are awake at an hour when most things are not.<br>Five questions. The machine will tell you what this means.</p>
+            <h1 id="title" class="text-2xl font-bold text-white mb-2 select-none cursor-default">The 4AM Diagnostic</h1>
+            <p class="text-sm text-zinc-500 leading-relaxed">you are awake at an hour when most things are not.<br>five questions. the machine will tell you what this means.</p>
         </div>
 
         <!-- Quiz -->
         <div id="quiz" class="space-y-6"></div>
 
         <!-- Result -->
-        <div id="result" class="hidden fade-in mt-8"></div>
+        <div id="result" class="hidden reveal mt-8"></div>
 
         <!-- Log -->
         <div id="log-section" class="hidden mt-10">
             <div class="border-t border-zinc-800 pt-6">
-                <p class="text-xs text-zinc-600 mb-3 uppercase tracking-widest">Previous readings</p>
+                <p class="text-[11px] text-zinc-600 mb-3 uppercase tracking-[0.2em]">THE LEDGER / PREVIOUS READINGS</p>
                 <div id="log-entries" class="space-y-2"></div>
             </div>
         </div>
+
+        <!-- Footer whisper -->
+        <p id="footer-whisper" class="text-center text-[11px] mt-12 tracking-wide" style="color:var(--ink-ghost)">measured in the dark. nothing leaves this machine.</p>
+        <p id="idle-whisper" class="text-center text-[11px] mt-2 tracking-wide opacity-0 transition-opacity duration-1000 flicker" style="color:var(--ink-ghost)"></p>
     </div>
 
     <script>
-    // Clock
+    // ---------- ambient embers (capped, staggered) ----------
+    (function spawnEmbers(){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const host = document.getElementById('embers');
+        const N = 8;
+        for (let i=0;i<N;i++){
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (4 + Math.random()*92) + '%';
+            e.style.animationDelay = (Math.random()*14) + 's';
+            e.style.animationDuration = (12 + Math.random()*8) + 's';
+            host.appendChild(e);
+        }
+    })();
+
+    // ---------- Clock ----------
     function updateClock() {
         const now = new Date();
         const h = String(now.getHours()).padStart(2,'0');
@@ -59,6 +139,14 @@
         const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
         const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         document.getElementById('date').textContent = `${days[now.getDay()]} ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+
+        // dead-hour whisper: 00:00–03:00 local
+        const fw = document.getElementById('footer-whisper');
+        if (now.getHours() < 3) {
+            fw.textContent = 'the mountain does not sleep.';
+        } else {
+            fw.textContent = 'measured in the dark. nothing leaves this machine.';
+        }
     }
     setInterval(updateClock, 1000);
     updateClock();
@@ -187,6 +275,9 @@
         }
     };
 
+    // Map diagnosis color -> rgb glow for the result panel ring
+    const TYPE_RGB = { SIGNAL:'251,191,36', LOOP:'239,68,68', BIOLOGY:'99,102,241', SHIFT:'167,139,250' };
+
     // Scoring
     function diagnose(answers) {
         const t = answers.trigger;
@@ -249,11 +340,26 @@
             const isActive = i === currentQ;
 
             const div = document.createElement('div');
-            div.className = `fade-in rounded-lg border p-4 transition-all ${isActive ? 'border-zinc-700 bg-zinc-900/60' : 'border-zinc-800 bg-zinc-900/20 opacity-60'}`;
+            div.className = `reveal rounded-lg border p-4 transition-all ${isActive ? 'border-zinc-700 bg-zinc-900/60 lift' : 'border-zinc-800 bg-zinc-900/20 opacity-60'}`;
+
+            const head = document.createElement('div');
+            head.className = 'flex items-center justify-between mb-3';
+            const tag = document.createElement('span');
+            tag.className = 'text-[10px] uppercase tracking-[0.2em] text-zinc-600';
+            tag.textContent = `PROBE 0${i + 1} / 05`;
+            head.appendChild(tag);
+            if (answered) {
+                const done = document.createElement('span');
+                done.className = 'text-[10px] tracking-widest';
+                done.style.color = 'var(--accent)';
+                done.textContent = '✓ logged';
+                head.appendChild(done);
+            }
+            div.appendChild(head);
 
             const qText = document.createElement('p');
             qText.className = 'text-sm text-zinc-300 mb-3';
-            qText.textContent = `${i + 1}. ${q.text}`;
+            qText.textContent = q.text;
             div.appendChild(qText);
 
             const opts = document.createElement('div');
@@ -261,7 +367,7 @@
             q.options.forEach(opt => {
                 const btn = document.createElement('button');
                 const isSelected = answered === opt.value;
-                btn.className = `w-full text-left px-3 py-2 rounded text-xs transition-all border ${
+                btn.className = `opt-btn w-full text-left px-3 py-2 rounded text-xs border ${
                     isSelected
                     ? 'border-amber-700 bg-amber-950/40 text-amber-300'
                     : isActive
@@ -275,6 +381,10 @@
                         if (currentQ < QUESTIONS.length - 1) {
                             currentQ++;
                             renderQuiz();
+                            // bring the newly-revealed probe into view
+                            const c = document.getElementById('quiz');
+                            const last = c.lastElementChild;
+                            if (last && last.scrollIntoView) last.scrollIntoView({behavior:'smooth', block:'nearest'});
                         } else {
                             showResult();
                         }
@@ -291,30 +401,33 @@
         document.getElementById('quiz').innerHTML = '';
         const { type, scores } = diagnose(answers);
         const diag = DIAGNOSES[type];
+        const rgb = TYPE_RGB[type] || '251,191,36';
         const res = document.getElementById('result');
         res.classList.remove('hidden');
         res.innerHTML = `
-            <div class="rounded-lg border ${diag.border} ${diag.bg} p-5 space-y-4">
+            <div class="result-panel rounded-lg border ${diag.border} ${diag.bg} p-5 space-y-4" style="box-shadow:0 0 0 1px rgba(${rgb},0.18), 0 0 30px -8px rgba(${rgb},0.45)">
                 <div>
-                    <p class="text-xs text-zinc-600 uppercase tracking-widest mb-1">Diagnosis</p>
-                    <h2 class="text-2xl font-bold ${diag.color} ${diag.glow}">${diag.label}</h2>
+                    <p class="text-[10px] text-zinc-600 uppercase tracking-[0.2em] mb-1">DIAGNOSIS / THE MACHINE HAS DECIDED</p>
+                    <h2 class="text-2xl font-bold ${diag.color} ${diag.glow} breathe">${diag.label}</h2>
                     <p class="text-sm text-zinc-300 mt-2">${diag.summary}</p>
                 </div>
                 <div>
                     <p class="text-xs text-zinc-400 leading-relaxed">${diag.detail}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Protocol</p>
+                    <p class="text-[10px] text-zinc-600 uppercase tracking-[0.2em] mb-2">PROTOCOL</p>
                     <ul class="space-y-2">
                         ${diag.protocol.map((p,i) => `<li class="flex gap-2 text-xs text-zinc-400"><span class="${diag.color} font-bold shrink-0">${i+1}.</span><span>${p}</span></li>`).join('')}
                     </ul>
                 </div>
                 <div class="border-t border-zinc-800 pt-3">
-                    <p class="text-xs text-zinc-500 italic">${diag.verdict}</p>
+                    <p class="text-[10px] text-zinc-600 uppercase tracking-[0.2em] mb-1">THE VERDICT</p>
+                    <p class="text-xs text-zinc-400 italic">${diag.verdict}</p>
                 </div>
             </div>
             <div class="mt-4 flex gap-2">
-                <button id="restart" class="text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300 transition-all">Run again</button>
+                <button id="copy-verdict" class="opt-btn text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300">Copy to the ledger</button>
+                <button id="restart" class="opt-btn text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300">Run again</button>
             </div>
         `;
         document.getElementById('restart').addEventListener('click', () => {
@@ -322,14 +435,38 @@
             currentQ = 0;
             res.classList.add('hidden');
             renderQuiz();
+            window.scrollTo({top:0, behavior:'smooth'});
         });
+
+        // copy verdict to clipboard
+        const copyBtn = document.getElementById('copy-verdict');
+        copyBtn.addEventListener('click', () => {
+            const stamp = document.getElementById('clock').textContent;
+            const text = `THE 4AM DIAGNOSTIC — ${stamp}\n${diag.label}\n${diag.summary}\n\nVERDICT: ${diag.verdict}`;
+            const flash = () => {
+                copyBtn.textContent = 'copied to the ledger';
+                copyBtn.style.borderColor = 'var(--accent)';
+                copyBtn.style.color = 'var(--accent)';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy to the ledger';
+                    copyBtn.style.borderColor = '';
+                    copyBtn.style.color = '';
+                }, 1200);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(flash).catch(flash);
+            } else { flash(); }
+        });
+
+        // scroll the verdict into view
+        res.scrollIntoView({behavior:'smooth', block:'start'});
 
         // Save to log
         saveLog(type, diag.label);
         renderLog();
     }
 
-    // Local log
+    // ---------- Local log (UNCHANGED keys/shape) ----------
     const LOG_KEY = 'prizrak_4am_log';
 
     function saveLog(type, label) {
@@ -351,10 +488,14 @@
 
     function renderLog() {
         const log = getLog();
-        if (!log.length) return;
         const section = document.getElementById('log-section');
-        section.classList.remove('hidden');
         const entries = document.getElementById('log-entries');
+        if (!log.length) {
+            section.classList.remove('hidden');
+            entries.innerHTML = `<p class="text-xs italic" style="color:var(--ink-ghost)">the cave is empty. nothing has fossilized yet.</p>`;
+            return;
+        }
+        section.classList.remove('hidden');
         const TYPE_COLORS = { SIGNAL: 'text-amber-400', LOOP: 'text-red-400', BIOLOGY: 'text-indigo-400', SHIFT: 'text-violet-400' };
         entries.innerHTML = log.map(e => `
             <div class="flex items-center justify-between text-xs">
@@ -363,6 +504,51 @@
             </div>
         `).join('');
     }
+
+    // ---------- Easter eggs (non-blocking, never touch saved state) ----------
+    // 1) type "prizrak" -> reveal the watcher line
+    let typed = '';
+    window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+            typed = (typed + ev.key.toLowerCase()).slice(-7);
+            if (typed === 'prizrak') {
+                const iw = document.getElementById('idle-whisper');
+                iw.textContent = 'you found the watcher.';
+                iw.style.opacity = '1';
+            }
+        }
+    });
+
+    // 2) triple-click the title -> spawn one extra ember
+    document.getElementById('title').addEventListener('click', (ev) => {
+        if (ev.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (10 + Math.random()*80) + '%';
+            e.style.animationDuration = '11s';
+            document.getElementById('embers').appendChild(e);
+            setTimeout(() => e.remove(), 12000);
+        }
+    });
+
+    // 3) idle 60s -> a single ghost line fades in
+    let idleTimer = null;
+    function armIdle(){
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            const iw = document.getElementById('idle-whisper');
+            if (!iw.textContent) iw.textContent = 'still here. still watching.';
+            iw.style.opacity = '1';
+        }, 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, () => {
+            const iw = document.getElementById('idle-whisper');
+            if (iw.textContent === 'still here. still watching.') { iw.style.opacity = '0'; iw.textContent=''; }
+            armIdle();
+        }, {passive:true})
+    );
+    armIdle();
 
     // Init
     renderQuiz();

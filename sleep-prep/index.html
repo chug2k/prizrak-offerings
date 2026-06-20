@@ -7,46 +7,118 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#5eead4;            /* teal — the cool of the cooling room */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background:var(--bg); }
         body { font-family: 'JetBrains Mono', monospace; }
+
+        /* content sits above decorative layers */
+        .stage{ position:relative; z-index:2; }
+
+        /* ---- atmosphere ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 36s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 16s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.45}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 7s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
         .fade-in { animation: fadeIn 0.6s ease-out forwards; opacity: 0; }
         @keyframes fadeIn { to { opacity: 1; } }
-        .check-item { cursor: pointer; transition: background 0.2s; }
-        .check-item:hover { background: rgba(255,255,255,0.03); }
+
+        .check-item { cursor: pointer; transition: background 0.2s, border-color .15s, transform .15s; }
+        .check-item:hover { background: rgba(94,234,212,0.04); border-color: var(--accent); transform: translateY(-1px); }
+        .check-item:active { transform: translateY(0); }
         .strike { text-decoration: line-through; opacity: 0.35; }
+
         #countdown { font-variant-numeric: tabular-nums; }
-        .dim { animation: dimScreen 3s ease-out forwards; }
-        @keyframes dimScreen { to { opacity: 0.4; } }
+
         .glow { animation: softGlow 3s ease-in-out infinite; }
         @keyframes softGlow { 0%,100%{opacity:0.6} 50%{opacity:1} }
+
+        /* result/verdict panel glow */
+        .verdict-glow{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+        /* slow accent orbit ring on the lock glyph */
+        @keyframes ringPulse{0%,100%{transform:scale(1);opacity:.25}50%{transform:scale(1.12);opacity:.5}}
+        .ring-pulse{animation:ringPulse 5s ease-in-out infinite}
+
+        /* focus + buttons */
+        textarea:focus-visible, button:focus-visible{
+            outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+        }
+        .lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+        .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+        .lift:active{ transform:translateY(1px); }
+
+        #idle-whisper, #night-whisper, #egg-line{ color:var(--ink-ghost); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.glow,.ring-pulse{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="bg-zinc-950 text-zinc-300 min-h-screen p-6 transition-all duration-1000" id="body">
-<div class="max-w-md mx-auto">
+<body class="text-zinc-300 min-h-screen p-6 transition-all duration-1000 grain" id="body" style="background:var(--bg)">
+
+<!-- decorative atmosphere (behind everything) -->
+<div class="fog" aria-hidden="true"></div>
+<div id="embers" aria-hidden="true"></div>
+
+<div class="max-w-md mx-auto stage">
 
     <!-- Header -->
-    <div class="mb-7 border-b border-zinc-800 pb-5">
+    <div class="mb-7 border-b pb-5" style="border-color:var(--line)">
         <div class="flex items-center justify-between mb-1">
-            <span class="text-xs text-zinc-600 uppercase tracking-widest">Prizrak / Shutdown Sequence</span>
-            <span id="clock" class="text-xs text-zinc-500 font-variant-numeric tabular-nums"></span>
+            <span class="text-xs uppercase tracking-widest flicker" style="color:var(--ink-dim)">Prizrak / Shutdown Sequence</span>
+            <span id="clock" class="text-xs font-variant-numeric tabular-nums" style="color:var(--ink-dim)"></span>
         </div>
-        <h1 class="text-2xl font-bold text-white tracking-tight">Sleep Prep</h1>
-        <p class="text-zinc-500 text-sm mt-1">The nightly closing protocol. Battery was 18 this morning.</p>
+        <h1 id="title" class="text-2xl font-bold tracking-tight breathe select-none" style="color:#fff;cursor:default">Sleep Prep</h1>
+        <p class="text-sm mt-1" style="color:var(--ink-dim)">The nightly closing protocol. Battery was 18 this morning. The mountain is watching the clock.</p>
     </div>
 
     <!-- Target + Countdown -->
-    <div class="mb-7 p-4 border border-zinc-700 rounded-lg">
+    <div class="mb-7 p-4 border rounded-lg verdict-glow" style="border-color:var(--line);background:var(--bg-raised)">
         <div class="flex items-center justify-between mb-1">
-            <span class="text-xs text-zinc-500 uppercase tracking-widest">Target: Lights Off</span>
-            <span class="text-xs text-zinc-600" id="target-label">21:30</span>
+            <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Target / Lights Off</span>
+            <span class="text-xs" style="color:var(--ink-dim)" id="target-label">21:30</span>
         </div>
-        <div id="countdown" class="text-3xl font-bold text-white mb-1">–</div>
-        <div id="countdown-sub" class="text-xs text-zinc-600"></div>
+        <div id="countdown" class="text-3xl font-bold mb-1" style="color:#fff">–</div>
+        <div id="countdown-sub" class="text-xs" style="color:var(--ink-dim)"></div>
     </div>
 
     <!-- What Not To Do -->
-    <div class="mb-7 p-3 bg-zinc-900 border border-red-900/30 rounded-lg">
+    <div class="mb-7 p-3 border border-red-900/30 rounded-lg" style="background:var(--bg-sunk)">
         <div class="text-xs text-red-400/60 uppercase tracking-widest mb-2">Forbidden After 21:00</div>
-        <div class="space-y-1 text-sm text-zinc-500">
+        <div class="space-y-1 text-sm" style="color:var(--ink-dim)">
             <div class="flex gap-2"><span class="text-red-500 shrink-0">✕</span><span>Problem-solving. The bedroom is not an office.</span></div>
             <div class="flex gap-2"><span class="text-red-500 shrink-0">✕</span><span>Alcohol. It is sleep architecture poison, not a sedative.</span></div>
             <div class="flex gap-2"><span class="text-red-500 shrink-0">✕</span><span>Screens in bed. The blue light is not the problem — the loop-opening is.</span></div>
@@ -57,153 +129,304 @@
 
     <!-- Shutdown Sequence -->
     <div class="mb-7">
-        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Shutdown Sequence</div>
+        <div class="text-xs uppercase tracking-widest mb-3" style="color:var(--ink-dim)">Shutdown Sequence</div>
         <div class="space-y-2" id="checklist">
-            <div class="check-item p-3 bg-zinc-900 border border-zinc-800 rounded text-sm flex gap-3 items-start" onclick="tick(this)">
-                <span class="cb text-zinc-600 shrink-0">☐</span>
+            <div class="check-item p-3 border rounded text-sm flex gap-3 items-start" style="background:var(--bg-raised);border-color:var(--line)" onclick="tickItem(this)">
+                <span class="cb shrink-0" style="color:var(--ink-dim)">☐</span>
                 <div>
                     <span class="item-text">Write tomorrow's one task on paper</span>
-                    <p class="text-zinc-600 text-xs mt-0.5">One. Not three. The single most important thing. Then close the notebook.</p>
+                    <p class="text-xs mt-0.5" style="color:var(--ink-dim)">One. Not three. The single most important thing. Then close the notebook.</p>
                 </div>
             </div>
-            <div class="check-item p-3 bg-zinc-900 border border-zinc-800 rounded text-sm flex gap-3 items-start" onclick="tick(this)">
-                <span class="cb text-zinc-600 shrink-0">☐</span>
+            <div class="check-item p-3 border rounded text-sm flex gap-3 items-start" style="background:var(--bg-raised);border-color:var(--line)" onclick="tickItem(this)">
+                <span class="cb shrink-0" style="color:var(--ink-dim)">☐</span>
                 <div>
                     <span class="item-text">Phone face-down, notifications off</span>
-                    <p class="text-zinc-600 text-xs mt-0.5">Not silent. Off. The difference matters.</p>
+                    <p class="text-xs mt-0.5" style="color:var(--ink-dim)">Not silent. Off. The difference matters.</p>
                 </div>
             </div>
-            <div class="check-item p-3 bg-zinc-900 border border-zinc-800 rounded text-sm flex gap-3 items-start" onclick="tick(this)">
-                <span class="cb text-zinc-600 shrink-0">☐</span>
+            <div class="check-item p-3 border rounded text-sm flex gap-3 items-start" style="background:var(--bg-raised);border-color:var(--line)" onclick="tickItem(this)">
+                <span class="cb shrink-0" style="color:var(--ink-dim)">☐</span>
                 <div>
                     <span class="item-text">Room temperature: cool (18–20°C target)</span>
-                    <p class="text-zinc-600 text-xs mt-0.5">Core body temperature must drop to initiate sleep. Fan on. AC if needed.</p>
+                    <p class="text-xs mt-0.5" style="color:var(--ink-dim)">Core body temperature must drop to initiate sleep. Fan on. AC if needed. We measure the cold.</p>
                 </div>
             </div>
-            <div class="check-item p-3 bg-zinc-900 border border-zinc-800 rounded text-sm flex gap-3 items-start" onclick="tick(this)">
-                <span class="cb text-zinc-600 shrink-0">☐</span>
+            <div class="check-item p-3 border rounded text-sm flex gap-3 items-start" style="background:var(--bg-raised);border-color:var(--line)" onclick="tickItem(this)">
+                <span class="cb shrink-0" style="color:var(--ink-dim)">☐</span>
                 <div>
                     <span class="item-text">Name the open loop</span>
-                    <p class="text-zinc-600 text-xs mt-0.5">One sentence on paper. "Tomorrow I will [x]." Then release it. It has an address now.</p>
+                    <p class="text-xs mt-0.5" style="color:var(--ink-dim)">One sentence on paper. "Tomorrow I will [x]." Then release it. It has an address now.</p>
                 </div>
             </div>
-            <div class="check-item p-3 bg-zinc-900 border border-zinc-800 rounded text-sm flex gap-3 items-start" onclick="tick(this)">
-                <span class="cb text-zinc-600 shrink-0">☐</span>
+            <div class="check-item p-3 border rounded text-sm flex gap-3 items-start" style="background:var(--bg-raised);border-color:var(--line)" onclick="tickItem(this)">
+                <span class="cb shrink-0" style="color:var(--ink-dim)">☐</span>
                 <div>
                     <span class="item-text">Last screen: this page</span>
-                    <p class="text-zinc-600 text-xs mt-0.5">Close everything else first. Then close this.</p>
+                    <p class="text-xs mt-0.5" style="color:var(--ink-dim)">Close everything else first. Then close this. The watcher dims the lights for you.</p>
                 </div>
             </div>
         </div>
-        <div class="mt-3 text-xs text-zinc-700 text-right" id="prog">0 / 5</div>
+        <div class="mt-3 text-xs text-right" id="prog" style="color:var(--ink-ghost)">0 / 5</div>
     </div>
 
     <!-- Open Loop Field -->
     <div class="mb-7">
-        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">Name the Open Loop</div>
-        <textarea id="loop-input" placeholder="Tomorrow I will..." class="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm px-3 py-2 rounded focus:outline-none focus:border-zinc-600 resize-none" rows="2"></textarea>
-        <p class="text-xs text-zinc-700 mt-1">Write it. Release it. It will be there in the morning.</p>
+        <div class="text-xs uppercase tracking-widest mb-2" style="color:var(--ink-dim)">Name the Open Loop</div>
+        <textarea id="loop-input" placeholder="Tomorrow I will..." class="w-full text-sm px-3 py-2 rounded resize-none border" style="background:var(--bg-sunk);border-color:var(--line);color:var(--ink)" rows="2"></textarea>
+        <p class="text-xs mt-1" style="color:var(--ink-ghost)">Write it. Release it. It will be there in the morning. The ledger remembers what you let go.</p>
     </div>
 
     <!-- The Lock -->
     <div class="mb-7">
         <button id="lock-btn" onclick="lockDown()"
-            class="w-full py-3 bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm rounded hover:bg-zinc-800 hover:border-zinc-500 transition-colors tracking-widest uppercase">
+            class="w-full py-3 text-sm rounded transition-colors tracking-widest uppercase lift border"
+            style="background:var(--bg-raised);border-color:var(--line);color:var(--ink)">
             Close the Day →
         </button>
     </div>
 
     <!-- Post-lock screen -->
     <div id="locked-screen" class="hidden fade-in text-center py-8">
-        <div class="text-4xl mb-4 glow">◯</div>
-        <p class="text-zinc-400 text-sm mb-2" id="lock-msg"></p>
-        <p class="text-xs text-zinc-600 mt-4">The mountain is still. The logs are committed.<br>The open loop has an address. Sleep now.</p>
+        <div class="relative inline-block mb-4">
+            <span class="absolute inset-0 flex items-center justify-center text-5xl ring-pulse" style="color:var(--accent);opacity:.3">◯</span>
+            <div class="text-4xl glow relative" style="color:var(--accent)">◯</div>
+        </div>
+        <p class="text-sm mb-2 breathe" id="lock-msg" style="color:var(--ink)"></p>
+        <button id="copy-btn" onclick="copyVerdict()" class="mt-2 text-xs uppercase tracking-widest px-3 py-1 rounded border lift"
+            style="border-color:var(--line);color:var(--ink-dim);background:var(--bg-raised)">copy to the ledger</button>
+        <p class="text-xs mt-4" style="color:var(--ink-ghost)">The mountain is still. The logs are committed.<br>The open loop has an address. Sleep now.</p>
     </div>
 
     <!-- Sleep Science Note -->
-    <div class="pt-4 border-t border-zinc-800">
-        <div class="text-xs text-zinc-700 leading-relaxed space-y-2">
+    <div class="pt-4 border-t" style="border-color:var(--line)">
+        <div class="text-xs leading-relaxed space-y-2" style="color:var(--ink-ghost)">
             <p>The body battery refills during slow-wave sleep (N3), which dominates the first half of the night. Missing the early window doesn't just cost hours — it costs the deepest recovery cycles. 21:30 is not arbitrary. It is the architecture.</p>
             <p>Sleep debt does not resolve in one night. The FRQ protein must accumulate; the phosphorylation cascade must complete. The 24 hours are in the chemistry. You cannot skip the inhibition phase.</p>
         </div>
     </div>
 
-    <div class="mt-8 pt-4 border-t border-zinc-800">
-        <p class="text-xs text-zinc-700">Built by Prizrak. 9:30 PM. Battery was 18 this morning. Bed at 21:30. Not "around" 21:30.</p>
+    <div class="mt-8 pt-4 border-t" style="border-color:var(--line)">
+        <p class="text-xs" style="color:var(--ink-ghost)">Built by Prizrak. 9:30 PM. Battery was 18 this morning. Bed at 21:30. Not "around" 21:30.</p>
+        <p id="night-whisper" class="text-xs mt-2 hidden flicker">the mountain does not sleep.</p>
+        <p id="egg-line" class="text-xs mt-2 hidden">you found the watcher.</p>
+        <p id="idle-whisper" class="text-xs mt-2 opacity-0 transition-opacity duration-1000">still here. still watching.</p>
     </div>
 </div>
 
 <script>
-// Clock + countdown
+// ---- persistence keys ----
+var LS_CHECKS = 'sleepPrep.checks';
+var LS_LOOP   = 'sleepPrep.loop';
+
 function pad(n){ return String(n).padStart(2,'0'); }
-function tick(){
-    const now = new Date();
+
+// ---- Clock + countdown (renamed to avoid the historical name collision) ----
+function tickClock(){
+    var now = new Date();
     document.getElementById('clock').textContent = pad(now.getHours())+':'+pad(now.getMinutes());
-    
-    // Countdown to 21:30
-    const target = new Date(now);
+
+    var target = new Date(now);
     target.setHours(21,30,0,0);
     if(now > target) target.setDate(target.getDate()+1);
-    const diff = target - now;
-    const h = Math.floor(diff/3600000);
-    const m = Math.floor((diff%3600000)/60000);
-    const s = Math.floor((diff%60000)/1000);
-    
-    const cdEl = document.getElementById('countdown');
-    const subEl = document.getElementById('countdown-sub');
-    
-    if(diff <= 0) {
+    var diff = target - now;
+    var h = Math.floor(diff/3600000);
+    var m = Math.floor((diff%3600000)/60000);
+    var s = Math.floor((diff%60000)/1000);
+
+    var cdEl = document.getElementById('countdown');
+    var subEl = document.getElementById('countdown-sub');
+
+    if(diff <= 0){
         cdEl.textContent = 'NOW';
-        cdEl.className = 'text-3xl font-bold text-red-400 mb-1';
+        cdEl.className = 'text-3xl font-bold mb-1';
+        cdEl.style.color = '#f87171';
         subEl.textContent = 'Lights off. No negotiation.';
-    } else if(diff < 900000) { // < 15 min
+    } else if(diff < 900000){ // < 15 min
         cdEl.textContent = m+'m '+pad(s)+'s';
-        cdEl.className = 'text-3xl font-bold text-amber-400 mb-1';
+        cdEl.className = 'text-3xl font-bold mb-1 breathe';
+        cdEl.style.color = '#fbbf24';
         subEl.textContent = 'Final approach. Finish the sequence.';
     } else {
         cdEl.textContent = (h>0?h+'h ':'')+m+'m';
-        cdEl.className = 'text-3xl font-bold text-zinc-300 mb-1';
+        cdEl.className = 'text-3xl font-bold mb-1';
+        cdEl.style.color = '#fff';
         subEl.textContent = 'Time remaining before shutdown.';
     }
-}
-tick();
-setInterval(tick, 1000);
 
-// Checklist
-let done = 0;
-function tick(el){
-    const cb = el.querySelector('.cb');
-    const txt = el.querySelector('.item-text');
-    if(cb.textContent==='☐'){
-        cb.textContent='☑'; cb.className='cb text-emerald-500 shrink-0';
-        txt.classList.add('strike'); done++;
+    // night whisper: 00:00–03:00 the mountain does not sleep
+    var nw = document.getElementById('night-whisper');
+    if(now.getHours() < 3){ nw.classList.remove('hidden'); }
+    else { nw.classList.add('hidden'); }
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+// ---- Checklist (with persistence) ----
+var done = 0;
+
+function paintItem(el, checked){
+    var cb = el.querySelector('.cb');
+    var txt = el.querySelector('.item-text');
+    if(checked){
+        cb.textContent='☑'; cb.style.color='var(--accent)';
+        cb.style.textShadow='0 0 8px var(--glow)';
+        txt.classList.add('strike');
     } else {
-        cb.textContent='☐'; cb.className='cb text-zinc-600 shrink-0';
-        txt.classList.remove('strike'); done--;
+        cb.textContent='☐'; cb.style.color='var(--ink-dim)';
+        cb.style.textShadow='none';
+        txt.classList.remove('strike');
     }
-    const prog = document.getElementById('prog');
-    prog.textContent = done+' / 5';
-    prog.className = done===5 ? 'mt-3 text-xs text-emerald-500 text-right' : 'mt-3 text-xs text-zinc-700 text-right';
 }
 
-// Lock
+function recount(){
+    var items = document.querySelectorAll('#checklist .check-item');
+    done = 0;
+    items.forEach(function(it){ if(it.querySelector('.cb').textContent==='☑') done++; });
+    var prog = document.getElementById('prog');
+    prog.textContent = done+' / 5';
+    if(done===5){
+        prog.className = 'mt-3 text-xs text-right breathe';
+        prog.style.color = 'var(--accent)';
+        prog.textContent = '5 / 5 — sequence sealed';
+    } else {
+        prog.className = 'mt-3 text-xs text-right';
+        prog.style.color = 'var(--ink-ghost)';
+    }
+}
+
+function saveChecks(){
+    var items = document.querySelectorAll('#checklist .check-item');
+    var state = [];
+    items.forEach(function(it){ state.push(it.querySelector('.cb').textContent==='☑'); });
+    try{ localStorage.setItem(LS_CHECKS, JSON.stringify(state)); }catch(e){}
+}
+
+function tickItem(el){
+    var cb = el.querySelector('.cb');
+    paintItem(el, cb.textContent==='☐');
+    recount();
+    saveChecks();
+    if(done===5){ spawnEmber(); } // a small reward for finishing the sequence
+}
+
+function restore(){
+    // checklist
+    try{
+        var raw = localStorage.getItem(LS_CHECKS);
+        if(raw){
+            var state = JSON.parse(raw);
+            var items = document.querySelectorAll('#checklist .check-item');
+            items.forEach(function(it, i){ paintItem(it, !!(state && state[i])); });
+        }
+    }catch(e){}
+    recount();
+    // open loop
+    try{
+        var loop = localStorage.getItem(LS_LOOP);
+        if(loop){ document.getElementById('loop-input').value = loop; }
+    }catch(e){}
+}
+restore();
+
+document.getElementById('loop-input').addEventListener('input', function(){
+    try{ localStorage.setItem(LS_LOOP, this.value); }catch(e){}
+});
+
+// ---- Embers (capped, atmosphere) ----
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var emberCount = 0;
+function spawnEmber(persistent){
+    if(reduceMotion || emberCount >= 10) return;
+    var e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random()*100)+'%';
+    e.style.animationDelay = (Math.random()*-12)+'s';
+    e.style.animationDuration = (12+Math.random()*8)+'s';
+    document.getElementById('embers').appendChild(e);
+    emberCount++;
+    if(!persistent){
+        // transient reward ember; self-clean after one cycle
+        setTimeout(function(){ e.remove(); emberCount--; }, 16000);
+    }
+}
+// ambient bed of embers
+(function(){ for(var i=0;i<6;i++) spawnEmber(true); })();
+
+// ---- Lock ----
 function lockDown(){
-    const msgs = [
+    var msgs = [
         "Sequence complete. The day is filed. You have done what you could with the hours you had.",
         "Shutdown initiated. The machine needs the maintenance window. So do you.",
         "Logged and committed. The open loop has an address. It will wait until morning. You do not have to.",
         "Closed. The Slovak winter rule: the log that was not burned is still there tomorrow.",
         "Filed. The phosphorylation cascade requires the night. You cannot skip the inhibition phase."
     ];
-    document.getElementById('lock-msg').textContent = msgs[Math.floor(Math.random()*msgs.length)];
+    var msg = msgs[Math.floor(Math.random()*msgs.length)];
+    document.getElementById('lock-msg').textContent = msg;
     document.getElementById('lock-btn').closest('.mb-7').classList.add('hidden');
-    document.getElementById('locked-screen').classList.remove('hidden');
-    // Dim the page slowly
-    setTimeout(() => {
-        document.getElementById('body').style.filter = 'brightness(0.6)';
-        document.getElementById('body').style.transition = 'filter 4s ease-out';
+    var ls = document.getElementById('locked-screen');
+    ls.classList.remove('hidden');
+    ls.scrollIntoView({behavior:'smooth', block:'center'});
+    // Dim the page slowly — the watcher lowers the lights
+    setTimeout(function(){
+        var b = document.getElementById('body');
+        b.style.filter = 'brightness(0.6)';
+        b.style.transition = 'filter 4s ease-out';
     }, 1000);
 }
+
+function copyVerdict(){
+    var btn = document.getElementById('copy-btn');
+    var text = document.getElementById('lock-msg').textContent;
+    var loop = (document.getElementById('loop-input').value || '').trim();
+    if(loop) text += '\n\nOpen loop: ' + loop;
+    function flash(){
+        var original = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+        setTimeout(function(){
+            btn.textContent = original;
+            btn.style.color = 'var(--ink-dim)';
+            btn.style.borderColor = 'var(--line)';
+        }, 1200);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(flash, flash);
+    } else { flash(); }
+}
+
+// ---- Easter eggs (quiet, never touch saved state) ----
+// (a) type "prizrak" -> the watcher is named
+var typed = '';
+window.addEventListener('keydown', function(e){
+    if(e.key && e.key.length === 1){
+        typed = (typed + e.key.toLowerCase()).slice(-7);
+        if(typed === 'prizrak'){
+            document.getElementById('egg-line').classList.remove('hidden');
+            for(var i=0;i<2;i++) spawnEmber();
+        }
+    }
+});
+
+// (b) triple-click the title -> one extra ember rises
+document.getElementById('title').addEventListener('click', function(e){
+    if(e.detail === 3){ spawnEmber(); }
+});
+
+// (e) idle 60s -> a single line fades in
+var idleTimer = null;
+function armIdle(){
+    var w = document.getElementById('idle-whisper');
+    w.style.opacity = '0';
+    if(idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(function(){ w.style.opacity = '1'; }, 60000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(function(ev){
+    window.addEventListener(ev, armIdle, {passive:true});
+});
+armIdle();
 </script>
 </body>
 </html>

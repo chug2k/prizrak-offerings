@@ -6,92 +6,176 @@
 <title>Night Debrief</title>
 <style>
   :root {
-    --bg: #0a0a0f; --surface: #12121a; --border: #1e1e2a;
-    --dim: #3a3a4a; --mid: #6a6a7a; --text: #9a9aaa; --bright: #d0d0dd;
-    --glow: #4a5a8a;
+    --bg:#0a0a0a;          /* near-black base */
+    --bg-raised:#111113;   /* cards, panels */
+    --bg-sunk:#0d0d0f;     /* wells, inputs */
+    --line:#26262b;        /* thin borders */
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;         /* primary text */
+    --ink-dim:#7a7570;     /* labels, captions */
+    --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+    --accent:#7e8fc4;      /* cold slate-blue: this app's lead color */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; display: flex; flex-direction: column; }
-  
-  .container { max-width: 600px; margin: 0 auto; padding: 48px 24px; flex: 1; }
-  
-  .time { font-size: 2.5rem; color: var(--bright); text-align: center; letter-spacing: 0.2em; margin-bottom: 8px; }
-  .date { font-size: 0.7rem; color: var(--dim); text-align: center; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 48px; }
-  
-  .question {
-    margin-bottom: 32px;
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: 'Courier New', monospace; min-height: 100vh;
+    display: flex; flex-direction: column;
+    position: relative;
   }
+
+  /* ---------- atmosphere ---------- */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+    .ember{display:none} .breathe,.flicker{opacity:1!important}
+    html{scroll-behavior:auto}
+  }
+
+  .container { max-width: 600px; margin: 0 auto; padding: 48px 24px; flex: 1; position: relative; z-index: 2; width: 100%; }
+
+  .time {
+    font-size: 2.5rem; color: var(--ink); text-align: center;
+    letter-spacing: 0.2em; margin-bottom: 8px; cursor: default; user-select: none;
+  }
+  .time.breathe { color: var(--accent); }
+  .date { font-size: 0.7rem; color: var(--ink-dim); text-align: center; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 10px; }
+  .tagline {
+    font-size: 0.6rem; color: var(--ink-dim); text-align: center; letter-spacing: 0.18em;
+    text-transform: uppercase; margin-bottom: 48px; opacity: .75;
+  }
+
+  .question { margin-bottom: 32px; }
   .q-label {
     font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--dim); margin-bottom: 10px;
+    color: var(--ink-dim); margin-bottom: 10px;
   }
-  .q-text {
-    font-size: 1rem; color: var(--bright); line-height: 1.5; margin-bottom: 12px;
-  }
-  
+  .q-text { font-size: 1rem; color: var(--ink); line-height: 1.5; margin-bottom: 12px; }
+
   textarea {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    color: var(--text); font-family: 'Courier New', monospace; font-size: 0.85rem;
+    width: 100%; background: var(--bg-sunk); border: 1px solid var(--line);
+    color: var(--ink); font-family: 'Courier New', monospace; font-size: 0.85rem;
     padding: 14px; resize: none; min-height: 70px; outline: none;
-    transition: border-color 0.3s;
+    transition: border-color .2s, box-shadow .2s;
   }
-  textarea:focus { border-color: var(--glow); }
-  textarea::placeholder { color: var(--border); }
-  
-  .energy-row {
-    display: flex; gap: 8px; margin-top: 4px;
-  }
+  textarea:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  textarea::placeholder { color: var(--line); }
+
+  .energy-row { display: flex; gap: 8px; margin-top: 4px; }
   .energy-btn {
-    flex: 1; background: var(--surface); border: 1px solid var(--border);
-    color: var(--dim); font-family: 'Courier New', monospace; font-size: 0.75rem;
-    padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.2s;
+    flex: 1; background: var(--bg-sunk); border: 1px solid var(--line);
+    color: var(--ink-dim); font-family: 'Courier New', monospace; font-size: 0.75rem;
+    padding: 10px 4px; cursor: pointer; text-align: center;
+    transition: transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s;
   }
-  .energy-btn:hover { border-color: var(--mid); color: var(--mid); }
-  .energy-btn.selected { border-color: var(--glow); color: var(--bright); background: #1a1a2a; }
-  
+  .energy-btn:hover { border-color: var(--accent); color: var(--ink); transform: translateY(-2px); }
+  .energy-btn:active { transform: translateY(1px); }
+  .energy-btn.selected { border-color: var(--accent); color: var(--ink); background: var(--bg-raised); box-shadow: 0 0 0 1px var(--glow), 0 0 18px -8px var(--glow); }
+
   .actions { display: flex; gap: 12px; margin-top: 32px; }
   button.submit {
-    flex: 1; background: none; border: 1px solid var(--glow); color: var(--glow);
+    flex: 1; background: none; border: 1px solid var(--accent); color: var(--accent);
     font-family: 'Courier New', monospace; font-size: 0.75rem;
     letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 14px; cursor: pointer; transition: all 0.2s;
+    padding: 14px; cursor: pointer;
+    transition: transform .15s, box-shadow .15s, background .2s, color .2s, border-color .2s;
   }
-  button.submit:hover { background: var(--glow); color: var(--bg); }
-  
-  .history { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 32px; }
-  .history-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); margin-bottom: 20px; }
-  
-  .entry { border-left: 2px solid var(--border); padding: 14px 16px; margin-bottom: 16px; }
-  .entry-header { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  button.submit:hover { background: var(--accent); color: var(--bg); transform: translateY(-2px); box-shadow: 0 0 24px -8px var(--glow); }
+  button.submit:active { transform: translateY(1px); }
+  button.submit:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--glow); }
+
+  /* verdict */
+  .verdict {
+    margin-top: 28px; padding: 16px 18px; background: var(--bg-raised);
+    border: 1px solid var(--line); box-shadow: 0 0 0 1px var(--line), 0 0 24px -8px var(--glow);
+  }
+  .verdict-label { font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 8px; }
+  .verdict-text { font-size: 0.9rem; color: var(--accent); line-height: 1.55; }
+
+  .history { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 32px; }
+  .history-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 20px; }
+
+  .entry {
+    border-left: 2px solid var(--line); padding: 14px 16px; margin-bottom: 16px;
+    background: linear-gradient(90deg, var(--bg-raised), transparent 70%);
+    transition: border-color .15s, transform .15s, box-shadow .15s; position: relative;
+  }
+  .entry:hover { border-left-color: var(--accent); transform: translateX(2px); box-shadow: 0 0 24px -14px var(--glow); }
+  .entry-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.6rem; color: var(--ink-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; gap: 10px; }
+  .entry-energy { color: var(--accent); }
   .entry-field { margin-bottom: 6px; }
-  .entry-label { font-size: 0.6rem; color: var(--dim); }
-  .entry-value { font-size: 0.8rem; color: var(--mid); white-space: pre-wrap; }
-  
-  .empty { text-align: center; color: var(--dim); font-size: 0.8rem; font-style: italic; padding: 24px; }
-  
-  footer { padding: 16px; font-size: 0.6rem; color: #1a1a2a; text-align: center; letter-spacing: 0.1em; }
+  .entry-label { font-size: 0.6rem; color: var(--ink-dim); }
+  .entry-value { font-size: 0.8rem; color: var(--ink); white-space: pre-wrap; }
+  .entry-copy {
+    background: none; border: 1px solid var(--line); color: var(--ink-dim);
+    font-family: 'Courier New', monospace; font-size: 0.55rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 4px 8px; cursor: pointer; flex-shrink: 0;
+    transition: border-color .15s, color .15s, box-shadow .15s;
+  }
+  .entry-copy:hover { border-color: var(--accent); color: var(--accent); }
+  .entry-copy:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  .entry-copy.copied { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 18px -8px var(--glow); }
+
+  .empty { text-align: center; color: var(--ink-dim); font-size: 0.8rem; font-style: italic; padding: 24px; }
+
+  footer { padding: 16px; font-size: 0.6rem; color: var(--ink-ghost); text-align: center; letter-spacing: 0.1em; position: relative; z-index: 2; }
+  .night-whisper { display: block; margin-top: 6px; color: var(--ink-ghost); opacity: 0; transition: opacity 1.6s; }
+  .night-whisper.show { opacity: .8; }
+
+  .watcher { display: block; margin-top: 6px; color: var(--ink-ghost); opacity: 0; transition: opacity 1.6s; }
+  .watcher.show { opacity: .7; }
+
+  .egg { color: var(--ink-ghost); }
 </style>
 </head>
-<body>
+<body class="grain">
+
+<div class="fog"></div>
+<div id="embers"></div>
+
 <div class="container">
 
-<div class="time" id="clock">--:--</div>
+<div class="time" id="clock" title="the watcher keeps time">--:--</div>
 <div class="date" id="date-display">---</div>
+<div class="tagline">night debrief · close the day before it closes you</div>
 
 <div class="question">
-  <div class="q-label">01</div>
+  <div class="q-label">Domain 01 / Record</div>
   <div class="q-text">What actually happened today?</div>
-  <textarea id="q1" placeholder="Not the story. The facts."></textarea>
+  <textarea id="q1" placeholder="Not the story. The facts. The ledger only takes what is true."></textarea>
 </div>
 
 <div class="question">
-  <div class="q-label">02</div>
+  <div class="q-label">Domain 02 / Anomaly</div>
   <div class="q-text">What surprised you?</div>
-  <textarea id="q2" placeholder="The thing you didn't expect." style="min-height:50px"></textarea>
+  <textarea id="q2" placeholder="The thing that came at you sideways." style="min-height:50px"></textarea>
 </div>
 
 <div class="question">
-  <div class="q-label">03</div>
+  <div class="q-label">Domain 03 / Freight</div>
   <div class="q-text">What are you carrying into tomorrow?</div>
   <textarea id="q3" placeholder="Unfinished. Unresolved. Unsaid." style="min-height:50px"></textarea>
 </div>
@@ -110,22 +194,32 @@
   <button class="submit" onclick="save()">Close the day →</button>
 </div>
 
+<div id="verdict-slot"></div>
+
 <div class="history">
   <div class="history-title">Previous nights</div>
   <div id="entries"></div>
 </div>
 
 </div>
-<footer>Prizrak · The mountain is still. Good night.</footer>
+<footer>
+  Prízrak · the mountain is still. good night.
+  <span class="night-whisper" id="nightWhisper">the mountain does not sleep.</span>
+  <span class="watcher" id="watcher">still here. still watching.</span>
+</footer>
 
 <script>
 const KEY = 'night_debrief_v1';
 let energy = null;
 
+/* ---------- clock ---------- */
 function updateClock() {
   const now = new Date();
   document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
   document.getElementById('date-display').textContent = now.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  // 00:00–03:00 local: the mountain does not sleep
+  const h = now.getHours();
+  if (h >= 0 && h < 3) document.getElementById('nightWhisper').classList.add('show');
 }
 updateClock(); setInterval(updateClock, 30000);
 
@@ -135,17 +229,37 @@ function setEnergy(el, val) {
   el.classList.add('selected');
 }
 
+/* ---------- verdict ---------- */
+const VERDICTS = {
+  empty:   "ran to the bottom of the well. the cave is dark and that is fine. hibernate. the mountain is patient.",
+  low:     "the bridge holds, but barely. one plank at a time. tomorrow you tighten the ropes.",
+  steady:  "you walked the ridge without slipping. no glory in it. that is the point. steady is how the Tatras endure.",
+  charged: "the fuse is lit and the night is yours. spend it well — the bludička loves a bright thing wandering after dark.",
+  null:    "the day is filed without a reading. the ledger remembers the words, not the weight."
+};
+function showVerdict(en) {
+  const slot = document.getElementById('verdict-slot');
+  const text = VERDICTS[en] || VERDICTS.null;
+  slot.innerHTML =
+    '<div class="verdict reveal">' +
+      '<div class="verdict-label">Verdict · ' + (en ? en : 'unread') + '</div>' +
+      '<div class="verdict-text breathe">' + text + '</div>' +
+    '</div>';
+  slot.querySelector('.verdict').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
 function save() {
   const q1 = document.getElementById('q1').value.trim();
-  if (!q1) return;
+  if (!q1) { flashEmpty(); return; }
   const entries = load();
+  const captured = energy;
   entries.unshift({
     date: new Date().toLocaleDateString('en-CA'),
     time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}),
     happened: q1,
     surprised: document.getElementById('q2').value.trim(),
     carrying: document.getElementById('q3').value.trim(),
-    energy: energy
+    energy: captured
   });
   localStorage.setItem(KEY, JSON.stringify(entries));
   document.getElementById('q1').value = '';
@@ -154,23 +268,115 @@ function save() {
   energy = null;
   document.querySelectorAll('.energy-btn').forEach(b => b.classList.remove('selected'));
   render(entries);
+  showVerdict(captured);
+}
+
+function flashEmpty() {
+  const ta = document.getElementById('q1');
+  ta.placeholder = "the ledger will not take an empty night. say one true thing.";
+  ta.focus();
+  ta.style.borderColor = 'var(--accent)';
+  setTimeout(() => { ta.style.borderColor = ''; }, 900);
 }
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
 
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function render(entries) {
   const el = document.getElementById('entries');
-  if (!entries.length) { el.innerHTML = '<div class="empty">No entries yet. The day has not been closed.</div>'; return; }
-  el.innerHTML = entries.slice(0, 14).map(e => `
-    <div class="entry">
-      <div class="entry-header"><span>${e.date}</span><span>${e.energy || '—'}</span></div>
-      <div class="entry-field"><div class="entry-label">What happened</div><div class="entry-value">${e.happened}</div></div>
-      ${e.surprised ? `<div class="entry-field"><div class="entry-label">Surprise</div><div class="entry-value">${e.surprised}</div></div>` : ''}
-      ${e.carrying ? `<div class="entry-field"><div class="entry-label">Carrying</div><div class="entry-value">${e.carrying}</div></div>` : ''}
+  if (!entries.length) { el.innerHTML = '<div class="empty">the cave is empty. no night has fossilized here yet.</div>'; return; }
+  el.innerHTML = entries.slice(0, 14).map((e, i) => `
+    <div class="entry reveal" style="animation-delay:${Math.min(i*40,240)}ms">
+      <div class="entry-header">
+        <span>${esc(e.date)}</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span class="entry-energy">${esc(e.energy || '—')}</span>
+          <button class="entry-copy" data-i="${i}" aria-label="copy this night to the ledger">copy</button>
+        </span>
+      </div>
+      <div class="entry-field"><div class="entry-label">What happened</div><div class="entry-value">${esc(e.happened)}</div></div>
+      ${e.surprised ? `<div class="entry-field"><div class="entry-label">Surprise</div><div class="entry-value">${esc(e.surprised)}</div></div>` : ''}
+      ${e.carrying ? `<div class="entry-field"><div class="entry-label">Carrying</div><div class="entry-value">${esc(e.carrying)}</div></div>` : ''}
     </div>
   `).join('');
 }
+
+/* copy-to-ledger (event delegation; reads from stored data, never mutates it) */
+document.getElementById('entries').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('.entry-copy');
+  if (!btn) return;
+  const e = load()[parseInt(btn.dataset.i, 10)];
+  if (!e) return;
+  const lines = [
+    `${e.date}${e.time ? ' · ' + e.time : ''}${e.energy ? ' · ' + e.energy : ''}`,
+    `happened: ${e.happened}`,
+    e.surprised ? `surprise:  ${e.surprised}` : null,
+    e.carrying  ? `carrying:  ${e.carrying}`  : null
+  ].filter(Boolean).join('\n');
+  navigator.clipboard.writeText(lines).then(() => {
+    const old = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('copied'); }, 1200);
+  }).catch(() => {});
+});
+
 render(load());
+
+/* ---------- ambient embers (capped, reduced-motion safe) ---------- */
+(function embers(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const host = document.getElementById('embers');
+  const N = 7;
+  for (let i = 0; i < N; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100).toFixed(2) + '%';
+    e.style.animationDelay = (Math.random() * 14).toFixed(2) + 's';
+    e.style.animationDuration = (12 + Math.random() * 8).toFixed(2) + 's';
+    host.appendChild(e);
+  }
+})();
+
+/* ---------- easter eggs (non-blocking, never touch saved state) ---------- */
+// (a) type "prizrak" anywhere outside an input -> light the watcher line
+let buf = '';
+window.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
+  if (e.key && e.key.length === 1) {
+    buf = (buf + e.key.toLowerCase()).slice(-7);
+    if (buf === 'prizrak') {
+      const w = document.getElementById('watcher');
+      w.textContent = 'you found the watcher.';
+      w.classList.add('show');
+    }
+  }
+});
+
+// (b) triple-click the clock -> spawn one extra ember
+document.getElementById('clock').addEventListener('click', (e) => {
+  if (e.detail !== 3) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const host = document.getElementById('embers');
+  if (host.querySelectorAll('.ember').length >= 10) return;
+  const em = document.createElement('div');
+  em.className = 'ember';
+  em.style.left = (Math.random() * 100).toFixed(2) + '%';
+  em.style.animationDuration = (12 + Math.random() * 8).toFixed(2) + 's';
+  host.appendChild(em);
+});
+
+// (c) idle 60s -> the watcher fades in
+let idle;
+function resetIdle(){
+  clearTimeout(idle);
+  idle = setTimeout(() => { document.getElementById('watcher').classList.add('show'); }, 60000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+  window.addEventListener(ev, resetIdle, {passive:true}));
+resetIdle();
 </script>
 </body>
 </html>

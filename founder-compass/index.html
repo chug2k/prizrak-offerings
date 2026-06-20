@@ -104,7 +104,11 @@
       background: var(--bg-raised);
       transition: border-color 0.4s ease, box-shadow 0.4s ease;
     }
-    .verdict-box.has-data { box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow); }
+    .verdict-box.has-data { box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow); animation: verdictBreathe 5s ease-in-out infinite; }
+    @keyframes verdictBreathe {
+      0%,100% { box-shadow:0 0 0 1px var(--line), 0 0 22px -12px var(--glow); }
+      50%     { box-shadow:0 0 0 1px var(--line), 0 0 34px -8px var(--glow); }
+    }
 
     .copy-btn { transition: color .15s, border-color .15s; }
     .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
@@ -113,11 +117,31 @@
 
     .ghost-line { color: var(--ink-ghost); }
 
+    /* ---- the compass rose: the needle that never lies ---- */
+    .compass { --hue: #52525b; }
+    .compass-ring { stroke: var(--line); }
+    .compass-tick { stroke: var(--line); }
+    /* the four cardinal letters, dimmed until the needle favours them */
+    .compass-card { fill: var(--ink-ghost); transition: fill .5s ease, opacity .5s ease; font-size: 9px; }
+    .compass-card.lit { fill: var(--hue); }
+    .needle-grp {
+      transform-box: fill-box; transform-origin: center;
+      transition: transform 1.1s cubic-bezier(.34,1.4,.5,1);
+    }
+    .needle-n { fill: var(--hue); filter: drop-shadow(0 0 4px var(--hue)); transition: fill .5s ease; }
+    .needle-s { fill: #3a3a40; }
+    .compass-hub { fill: var(--hue); transition: fill .5s ease; }
+    @keyframes needleWaver { 0%,100%{transform:rotate(-1.2deg)} 50%{transform:rotate(1.2deg)} }
+    .needle-grp.settled { animation: needleWaver 6s ease-in-out infinite; }
+
     @media (prefers-reduced-motion:reduce){
       .fog,.ember,.breathe,.reveal,.flicker,.log-entry{animation:none!important}
       .ember{display:none}
       .breathe,.flicker{opacity:1!important}
       .quadrant:hover{transform:none}
+      .needle-grp{transition:none!important}
+      .needle-grp.settled{animation:none!important}
+      .verdict-box.has-data{animation:none!important}
     }
   </style>
 </head>
@@ -135,9 +159,32 @@
           <h1 id="title" class="text-2xl font-semibold text-white mono tracking-tight breathe select-none" title="the needle never lies">The Founder's Compass</h1>
           <p class="text-zinc-500 text-sm mt-1">Where did the hours actually go? The mountain keeps score, and it does not flatter you.</p>
         </div>
-        <div class="text-right">
-          <div id="current-date" class="mono text-zinc-400 text-sm"></div>
-          <div id="week-range" class="mono text-zinc-600 text-xs mt-0.5"></div>
+        <div class="flex items-center gap-4">
+          <!-- the compass rose: needle swings to the direction the week leans -->
+          <svg class="compass flex-shrink-0" id="compass" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+            <circle class="compass-ring" cx="32" cy="32" r="29" fill="none" stroke-width="1"/>
+            <circle class="compass-ring" cx="32" cy="32" r="22" fill="none" stroke-width="1" opacity="0.4"/>
+            <!-- cardinal ticks -->
+            <line class="compass-tick" x1="32" y1="3"  x2="32" y2="9"  stroke-width="1"/>
+            <line class="compass-tick" x1="61" y1="32" x2="55" y2="32" stroke-width="1"/>
+            <line class="compass-tick" x1="32" y1="61" x2="32" y2="55" stroke-width="1"/>
+            <line class="compass-tick" x1="3"  y1="32" x2="9"  y2="32" stroke-width="1"/>
+            <!-- cardinal letters: B(uild) top, S(ell) right, C(onnect) bottom, T(hink) left -->
+            <text class="compass-card mono" id="card-build"   x="32" y="17" text-anchor="middle">B</text>
+            <text class="compass-card mono" id="card-sell"    x="49" y="35" text-anchor="middle">S</text>
+            <text class="compass-card mono" id="card-connect" x="32" y="52" text-anchor="middle">C</text>
+            <text class="compass-card mono" id="card-think"   x="15" y="35" text-anchor="middle">T</text>
+            <!-- needle: north arm is the live one -->
+            <g class="needle-grp" id="needle">
+              <polygon class="needle-n" points="32,9 35,32 29,32"/>
+              <polygon class="needle-s" points="32,55 35,32 29,32"/>
+            </g>
+            <circle class="compass-hub" cx="32" cy="32" r="2.5"/>
+          </svg>
+          <div class="text-right">
+            <div id="current-date" class="mono text-zinc-400 text-sm"></div>
+            <div id="week-range" class="mono text-zinc-600 text-xs mt-0.5"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -247,7 +294,10 @@
     <div class="verdict-box rounded-r-xl p-5 mb-8" id="verdict-container">
       <div class="flex items-center justify-between mb-2">
         <div class="text-xs text-zinc-600 mono uppercase tracking-widest">Prízrak's Verdict</div>
-        <button id="copy-verdict" onclick="copyVerdict()" class="copy-btn text-xs text-zinc-600 mono border border-zinc-800 rounded px-2 py-0.5">copy</button>
+        <div class="flex items-center gap-2">
+          <button id="reroll-verdict" onclick="rerollVerdict()" class="copy-btn text-xs text-zinc-600 mono border border-zinc-800 rounded px-2 py-0.5" title="ask the mountain again">ask again</button>
+          <button id="copy-verdict" onclick="copyVerdict()" class="copy-btn text-xs text-zinc-600 mono border border-zinc-800 rounded px-2 py-0.5">copy</button>
+        </div>
       </div>
       <p class="text-zinc-400 text-sm leading-relaxed" id="verdict-text">No bearing yet. The mountain cannot read what is not carved.</p>
     </div>
@@ -320,6 +370,44 @@
     }
 
     function random(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    // direction the needle points for each quadrant, in degrees clockwise from north
+    const DIR_ANGLE = { build:0, sell:90, connect:180, think:270 };
+    const HUES = { build:'#22d3ee', sell:'#f59e0b', connect:'#a78bfa', think:'#34d399' };
+    let _needleAngle = 0; // remembered so the needle takes the short way round
+
+    // Swing the needle toward the weighted pull of the week.
+    function updateCompass(totals, total, dominant) {
+      const compass = document.getElementById('compass');
+      const needle = document.getElementById('needle');
+      if (!compass || !needle) return;
+
+      // sum the four pulls as a 2D vector; angle = where the week actually leans
+      let x = 0, y = 0;
+      ['build','sell','connect','think'].forEach(q => {
+        const r = total > 0 ? totals[q] / total : 0;
+        const a = DIR_ANGLE[q] * Math.PI / 180;
+        x += r * Math.sin(a);
+        y += r * -Math.cos(a); // north is up (negative y in screen space inverted here)
+      });
+
+      let target = total > 0 ? (Math.atan2(x, y) * 180 / Math.PI) : 0;
+      // take the short way round from the last position (no spinning 350deg)
+      let delta = ((target - _needleAngle + 540) % 360) - 180;
+      _needleAngle += delta;
+      needle.style.transform = `rotate(${_needleAngle}deg)`;
+
+      // tint the live arm + hub to the dominant direction's hue
+      const hue = dominant ? HUES[dominant] : '#52525b';
+      compass.style.setProperty('--hue', hue);
+      needle.classList.toggle('settled', total > 0);
+
+      // light the cardinal letter(s) the needle favours
+      ['build','sell','connect','think'].forEach(q => {
+        const el = document.getElementById('card-'+q);
+        el.classList.toggle('lit', total > 0 && totals[q] === Math.max(totals.build,totals.sell,totals.connect,totals.think) && totals[q] > 0);
+      });
+    }
 
     function selectQuadrant(q) {
       selectedQuadrant = q;
@@ -420,6 +508,9 @@
       vtext.textContent = verdict;
       vtext.classList.remove('reveal'); void vtext.offsetWidth; vtext.classList.add('reveal');
 
+      // The needle never lies — swing it toward where the week leans.
+      updateCompass(totals, total, dominant);
+
       // Log list
       const list = document.getElementById('log-list');
       if (entries.length === 0) {
@@ -441,6 +532,17 @@
 
     function escapeHtml(s){
       return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function rerollVerdict() {
+      const totals = getTotals();
+      const total = totals.build + totals.sell + totals.connect + totals.think;
+      const vtext = document.getElementById('verdict-text');
+      vtext.textContent = getVerdict(totals, total);
+      vtext.classList.remove('reveal'); void vtext.offsetWidth; vtext.classList.add('reveal');
+      const btn = document.getElementById('reroll-verdict');
+      btn.style.color = 'var(--accent)';
+      setTimeout(() => { btn.style.color = ''; }, 500);
     }
 
     function copyVerdict() {
@@ -532,6 +634,30 @@
         if (n >= 3) { n = 0; spawnEmber(0); }
       };
     })());
+
+    // Easter egg: idle 60s and a whisper fades in at ghost-ink. Never touches state.
+    (function(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      let idle = null, line = null;
+      function wake(){
+        if (line) { line.style.display = 'none'; }
+        clearTimeout(idle);
+        idle = setTimeout(() => {
+          if (!line) {
+            line = document.createElement('div');
+            line.className = 'text-center text-xs ghost-line mono pb-4 reveal';
+            line.textContent = 'still here. still counting. the needle has not moved.';
+            document.querySelector('main').appendChild(line);
+          } else {
+            line.style.display = 'block';
+            line.classList.remove('reveal'); void line.offsetWidth; line.classList.add('reveal');
+          }
+        }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, wake, { passive: true }));
+      wake();
+    })();
   </script>
 </body>
 </html>

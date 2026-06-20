@@ -123,11 +123,44 @@
         #title-line { cursor: default; }
         .copy-btn { transition: color .15s ease, border-color .15s ease; }
 
+        /* ── defrag block map: the week, in fragments ─────────── */
+        #defrag-map {
+            display: grid;
+            grid-template-columns: repeat(20, 1fr);
+            gap: 2px;
+            margin: 0 auto;
+            max-width: 360px;
+        }
+        .frag {
+            aspect-ratio: 1;
+            background: rgba(167,139,250,0.05);
+            border: 0.5px solid rgba(167,139,250,0.06);
+            transition: background .4s ease, box-shadow .4s ease, transform .2s ease;
+        }
+        .frag.filled { background: rgba(167,139,250,0.32); }
+        .frag.consolidated { background: #a78bfa; box-shadow: 0 0 5px var(--glow); }
+        .frag.sweeping { background: #c4b5fd; box-shadow: 0 0 8px var(--glow); transform: scale(1.15); }
+
+        /* the read-head sweeping across the disk during defrag */
+        @keyframes diskSweep { 0%{left:-6%} 100%{left:106%} }
+        .disk-head {
+            position: absolute; top: 0; bottom: 0; width: 2px;
+            background: linear-gradient(transparent, var(--accent), transparent);
+            box-shadow: 0 0 12px var(--glow);
+            animation: diskSweep 1.1s ease-in-out infinite;
+        }
+
+        .defrag-line { opacity: 0; }
+        .defrag-line.show { animation: reveal .3s ease-out both; }
+
         @media (prefers-reduced-motion:reduce){
-            .fog,.ember,.breathe,.reveal,.flicker,.night-glow,.fade-in{animation:none!important}
+            .fog,.ember,.breathe,.reveal,.flicker,.night-glow,.fade-in,.defrag-line.show{animation:none!important}
             .ember{display:none}
             .breathe,.flicker{opacity:1!important}
             .step-card:hover,.btn-ghost:hover{transform:none}
+            .disk-head{display:none}
+            .frag{transition:background .2s ease}
+            .defrag-line{opacity:1!important}
         }
     </style>
 </head>
@@ -147,7 +180,7 @@
     </div>
 
     <!-- Progress dots -->
-    <div class="flex justify-center gap-2 mb-8" id="progress-dots">
+    <div class="flex justify-center gap-2 mb-6" id="progress-dots">
         <div class="progress-dot active" id="dot-0"></div>
         <div class="progress-dot" id="dot-1"></div>
         <div class="progress-dot" id="dot-2"></div>
@@ -155,15 +188,30 @@
         <div class="progress-dot" id="dot-4"></div>
     </div>
 
+    <!-- Defrag block map: the week, scattered across the disk -->
+    <div class="mb-8">
+        <p class="mono text-xs text-violet-900 tracking-widest text-center mb-2" id="defrag-status">DISK: 5 FRAGMENTS SCATTERED · UNCONSOLIDATED</p>
+        <div id="defrag-map" aria-hidden="true"></div>
+    </div>
+
     <!-- Steps container -->
     <div id="steps-container" class="space-y-4"></div>
 
     <!-- Submit -->
     <div id="submit-section" class="mt-8 text-center" style="display:none;">
-        <button onclick="renderVerdict()"
+        <button id="submit-btn" onclick="runDefrag()"
             class="btn-ghost mono text-sm px-8 py-3 border border-violet-800 text-violet-400 hover:border-violet-600 hover:text-violet-300 tracking-wider uppercase">
-            🌙 Receive the Verdict
+            🌙 Run the Defrag
         </button>
+    </div>
+
+    <!-- Defrag sequence overlay -->
+    <div id="defrag-overlay" class="mt-8" style="display:none;">
+        <div class="verdict-frame p-6 text-center relative overflow-hidden">
+            <div class="disk-head" id="disk-head"></div>
+            <div class="mono text-xs tracking-widest text-violet-400 breathe mb-4">CONSOLIDATING THE WEEK</div>
+            <div id="defrag-log" class="mono text-xs text-left text-violet-700 space-y-1 max-w-xs mx-auto" style="min-height:96px;"></div>
+        </div>
     </div>
 
     <!-- Verdict -->
@@ -264,6 +312,45 @@ const VERDICTS = {
 let answers = {};
 let currentStep = 0;
 
+/* ── the disk: 60 fragments, 12 per step, scattered by hash ── */
+const FRAG_COUNT = 60;
+let fragOrder = [];
+function buildDefragMap() {
+    const map = document.getElementById('defrag-map');
+    if (!map) return;
+    map.innerHTML = '';
+    fragOrder = [];
+    for (let i = 0; i < FRAG_COUNT; i++) {
+        const f = document.createElement('div');
+        f.className = 'frag';
+        // assign each block to a step (0..4), scattered, not contiguous — that's the point
+        f.dataset.step = (i * 7 + 3) % STEPS.length;
+        map.appendChild(f);
+        fragOrder.push(f);
+    }
+}
+
+function paintFragments() {
+    fragOrder.forEach(f => {
+        const stepIdx = parseInt(f.dataset.step);
+        const s = STEPS[stepIdx];
+        const v = answers[s.id];
+        const answered = v !== undefined && v !== '' && !(typeof v === 'string' && v.length < 2);
+        f.classList.toggle('filled', answered);
+    });
+    const done = STEPS.filter(s => {
+        const v = answers[s.id];
+        return v !== undefined && v !== '' && !(typeof v === 'string' && v.length < 2);
+    }).length;
+    const remaining = STEPS.length - done;
+    const status = document.getElementById('defrag-status');
+    if (status) {
+        status.textContent = remaining > 0
+            ? `DISK: ${remaining} FRAGMENT${remaining === 1 ? '' : 'S'} SCATTERED · UNCONSOLIDATED`
+            : `DISK: ALL FRAGMENTS READ · READY TO CONSOLIDATE`;
+    }
+}
+
 function updateClock() {
     const now = new Date();
     const str = now.toLocaleString('en-US', {
@@ -363,6 +450,7 @@ function updateDots() {
         const isAnswered = answers[s.id] !== undefined && answers[s.id] !== '' && !(typeof answers[s.id] === 'string' && answers[s.id].length < 2);
         dot.className = 'progress-dot' + (isAnswered ? ' done' : (i === currentStep ? ' active' : ''));
     });
+    paintFragments();
     if (answered.length === STEPS.length) {
         document.getElementById('submit-section').style.display = 'block';
     }
@@ -370,7 +458,71 @@ function updateDots() {
 
 let lastVerdictText = '';
 
+const DEFRAG_LOG = [
+    'reading sector I … shipped',
+    'reading sector II … carried',
+    'measuring battery … {energy}/10',
+    'logging tonight … noted',
+    'sealing the parked item until Monday',
+    'consolidating fragments …',
+    'the week is contiguous. set down.'
+];
+
+function prefersReduced() {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function runDefrag() {
+    const btn = document.getElementById('submit-btn');
+    if (btn) btn.disabled = true;
+    const overlay = document.getElementById('defrag-overlay');
+    const log = document.getElementById('defrag-log');
+    const energy = answers['s3'] || 5;
+
+    // reduced-motion or no-overlay: skip straight to verdict
+    if (prefersReduced() || !overlay || !log) { renderVerdict(); return; }
+
+    document.getElementById('submit-section').style.display = 'none';
+    overlay.style.display = 'block';
+    log.innerHTML = '';
+    overlay.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // consolidate the scattered blocks left-to-right, like a real defrag
+    const filled = fragOrder.filter(f => f.classList.contains('filled'));
+    filled.forEach((f, i) => {
+        setTimeout(() => {
+            f.classList.add('sweeping');
+            setTimeout(() => {
+                f.classList.remove('sweeping');
+                f.classList.add('consolidated');
+            }, 220);
+        }, 40 + i * 28);
+    });
+
+    // stream the log lines
+    let line = 0;
+    const total = DEFRAG_LOG.length;
+    const tick = () => {
+        if (line >= total) {
+            setTimeout(renderVerdict, 520);
+            return;
+        }
+        const p = document.createElement('div');
+        p.className = 'defrag-line show';
+        const txt = DEFRAG_LOG[line].replace('{energy}', energy);
+        p.innerHTML = (line === total - 1)
+            ? `<span class="text-violet-400">›</span> ${esc(txt)}`
+            : `<span class="text-violet-900">›</span> ${esc(txt)}`;
+        log.appendChild(p);
+        line++;
+        setTimeout(tick, line === total ? 0 : 320);
+    };
+    setTimeout(tick, 260);
+}
+
 function renderVerdict() {
+    const overlay = document.getElementById('defrag-overlay');
+    if (overlay) overlay.style.display = 'none';
     const energy = answers['s3'] || 5;
     const shipped = answers['s1'] || 'nothing logged';
     const carrying = answers['s2'] || 'nothing named';
@@ -468,7 +620,12 @@ function resetAll() {
     document.getElementById('verdict-container').style.display = 'none';
     document.getElementById('reset-section').style.display = 'none';
     document.getElementById('submit-section').style.display = 'none';
+    const overlay = document.getElementById('defrag-overlay');
+    if (overlay) overlay.style.display = 'none';
+    const btn = document.getElementById('submit-btn');
+    if (btn) btn.disabled = false;
     renderSteps();
+    buildDefragMap();
     answers['s3'] = 5;
     updateDots();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -561,6 +718,7 @@ armIdle();
 // init slider default
 answers['s3'] = 5;
 renderSteps();
+buildDefragMap();
 updateClock();
 setInterval(updateClock, 1000);
 spawnEmbers(7);

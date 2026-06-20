@@ -7,7 +7,7 @@
     <meta name="description" content="A quote generator channeling the boundless arrogance of the Demon King of Tyranny. An offering of Prízrak.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Inter:ital,wght@0,400;0,600;0,800;1,500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Inter:ital,wght@0,400;0,600;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -16,6 +16,7 @@
                     fontFamily: {
                         display: ['Cinzel', 'serif'],
                         sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
                     },
                     keyframes: {
                         emberRise: {
@@ -33,6 +34,19 @@
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
     <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#dc2626;           /* the Demon King's red — the lead, kept */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
         /* Drifting embers behind the card — pure CSS, no assets. */
         .ember {
             position: absolute;
@@ -45,24 +59,56 @@
             pointer-events: none;
         }
         [x-cloak] { display: none !important; }
+
+        /* --- Prízrak house motion vocabulary (reduced-motion-safe) --- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes breathe{0%,100%{text-shadow:0 0 10px var(--glow)}50%{text-shadow:0 0 22px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* the watcher's mark — hidden until summoned */
+        .watcher{color:var(--ink-ghost);transition:opacity .8s ease}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="bg-zinc-900 text-zinc-200 font-sans antialiased min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-fixed selection:bg-red-700/40"
-      style="background-image: linear-gradient(rgba(24, 24, 27, 0.88), rgba(9, 9, 11, 0.92)), url('assets/bg.png');"
+<body class="grain bg-zinc-900 text-zinc-200 font-sans antialiased min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-fixed selection:bg-red-700/40"
+      style="background-image: linear-gradient(rgba(10, 10, 10, 0.9), rgba(9, 9, 11, 0.94)), url('assets/bg.png'); background-color: var(--bg);"
       x-data="quoteGenerator()" x-init="init()" @keydown.window="onKey($event)">
 
+    <!-- Drifting fog (decorative, behind everything) -->
+    <div class="fog" aria-hidden="true"></div>
+
     <!-- Ambient embers -->
-    <div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+    <div class="pointer-events-none fixed inset-0 overflow-hidden" style="z-index:1" aria-hidden="true">
         <template x-for="e in embers" :key="e.id">
             <div class="ember animate-ember"
                  :style="`left:${e.left}%; animation-duration:${e.dur}s; animation-delay:${e.delay}s;`"></div>
         </template>
     </div>
 
-    <main class="max-w-2xl w-full text-center relative z-10">
+    <main class="max-w-2xl w-full text-center relative" style="z-index:2">
 
         <header class="mb-10 md:mb-12">
-            <h1 class="font-display text-4xl md:text-6xl font-black text-red-600 mb-3 tracking-tight uppercase drop-shadow-[0_2px_12px_rgba(220,38,38,0.35)]">
+            <p class="font-mono text-[0.65rem] text-zinc-600 tracking-[0.4em] uppercase mb-3 flicker">Decree 01 / Tyranny</p>
+            <h1 @click="onTitleClick()"
+                class="font-display text-4xl md:text-6xl font-black text-red-600 mb-3 tracking-tight uppercase drop-shadow-[0_2px_12px_rgba(220,38,38,0.35)] breathe cursor-default select-none">
                 Absolute Fault Tolerance
             </h1>
             <p class="text-zinc-500 text-xs md:text-sm tracking-[0.3em] uppercase">The Wisdom of Anos Voldigoad</p>
@@ -70,11 +116,14 @@
 
         <!-- Quote card -->
         <figure
-            class="relative bg-black/60 backdrop-blur-md p-8 md:p-12 rounded-xl border border-red-900/50 shadow-2xl min-h-[260px] flex flex-col justify-center transition-all duration-300 ease-out"
+            class="relative bg-black/60 backdrop-blur-md p-8 md:p-12 rounded-xl border border-red-900/50 min-h-[260px] flex flex-col justify-center transition-all duration-300 ease-out"
+            style="box-shadow:0 0 0 1px var(--line), 0 0 40px -8px var(--glow);"
             :class="isAnimating ? 'scale-[0.97] opacity-0 blur-sm' : 'scale-100 opacity-100 blur-0'"
             aria-live="polite">
             <span class="absolute top-3 left-5 font-display text-6xl md:text-7xl text-red-900/40 leading-none select-none" aria-hidden="true">&ldquo;</span>
             <blockquote class="text-2xl md:text-[2.5rem] font-extrabold text-white italic leading-tight px-2"
+                        :class="isAnimating ? '' : 'reveal'"
+                        :key="currentQuote"
                         x-text="currentQuote">
                 Did you really think killing me would be enough to make me die?
             </blockquote>
@@ -84,26 +133,36 @@
         <!-- Controls -->
         <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button @click="generateQuote()"
-                    class="group bg-red-700 hover:bg-red-600 active:scale-95 text-white font-bold py-4 px-9 rounded-full text-base tracking-[0.2em] uppercase transition-all duration-200 shadow-[0_0_20px_rgba(185,28,28,0.5)] hover:shadow-[0_0_34px_rgba(220,38,38,0.85)] hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900">
+                    class="group bg-red-700 hover:bg-red-600 active:scale-95 active:translate-y-px text-white font-bold py-4 px-9 rounded-full text-base tracking-[0.2em] uppercase transition-all duration-200 shadow-[0_0_20px_rgba(185,28,28,0.5)] hover:shadow-[0_0_34px_rgba(220,38,38,0.85)] hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900">
                 <span x-text="hasInteracted ? 'Override Reality' : 'Speak, Demon King'"></span>
             </button>
 
             <button @click="copyQuote()"
-                    class="text-zinc-400 hover:text-white border border-zinc-700 hover:border-red-700/70 py-4 px-7 rounded-full text-xs tracking-[0.2em] uppercase transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
-                    :aria-label="copied ? 'Copied to clipboard' : 'Copy quote to clipboard'">
-                <span x-text="copied ? 'Inscribed ✓' : 'Inscribe'"></span>
+                    class="text-zinc-400 hover:text-white border border-zinc-700 hover:border-red-700/70 hover:-translate-y-px py-4 px-7 rounded-full text-xs tracking-[0.2em] uppercase transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                    :class="copied ? 'text-red-400 border-red-700/70' : ''"
+                    :aria-label="copied ? 'Filed to the ledger' : 'Inscribe quote to clipboard'">
+                <span x-text="copied ? 'Filed to the ledger ✓' : 'Inscribe'"></span>
             </button>
         </div>
 
         <!-- Meta -->
-        <p class="mt-6 text-[0.7rem] text-zinc-600 tracking-widest uppercase">
-            Decree <span class="text-zinc-400" x-text="seenCount"></span> of <span x-text="quotes.length"></span>
+        <p class="mt-6 font-mono text-[0.7rem] text-zinc-600 tracking-widest uppercase">
+            Decree <span class="text-zinc-400" x-text="seenCount"></span> of <span x-text="quotes.length"></span> witnessed
             <span class="mx-2 text-zinc-700">·</span>
             <kbd class="px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700 text-zinc-400">Space</kbd> to invoke
         </p>
 
-        <footer class="mt-14 text-xs text-zinc-600">
+        <!-- Easter-egg whisper: lit by typing "prizrak" or the Konami code -->
+        <p class="watcher mt-5 font-mono text-[0.7rem] tracking-[0.3em] uppercase"
+           :style="`opacity:${watcherLit ? 1 : 0}`"
+           x-text="watcherLit ? 'you found the watcher.' : ''"></p>
+
+        <footer class="mt-12 text-xs text-zinc-600">
             <a href="/" class="hover:text-zinc-400 transition-colors">&larr; Return to the Offerings</a>
+            <!-- Idle / late-night whispers -->
+            <p class="watcher mt-4 font-mono text-[0.65rem] tracking-[0.25em] lowercase"
+               :style="`opacity:${nightWhisper ? 1 : 0}`"
+               x-text="nightWhisper"></p>
         </footer>
     </main>
 
@@ -133,12 +192,20 @@
                 copied: false,
                 seen: new Set([0]),
                 embers: [],
+                watcherLit: false,
+                nightWhisper: '',
+                _buf: '',
+                _konami: 0,
+                _idleTimer: null,
+                _konamiSeq: ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'],
 
                 get seenCount() { return this.seen.size; },
 
                 init() {
-                    // Seed ambient embers.
-                    for (let i = 0; i < 16; i++) {
+                    // Seed ambient embers (capped at 10 per house standard).
+                    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    const count = reduced ? 0 : 10;
+                    for (let i = 0; i < count; i++) {
                         this.embers.push({
                             id: i,
                             left: Math.random() * 100,
@@ -146,6 +213,24 @@
                             delay: Math.random() * 8,
                         });
                     }
+                    // Late-night whisper: the mountain does not sleep (00:00–03:00 local).
+                    const h = new Date().getHours();
+                    if (h >= 0 && h < 3) {
+                        setTimeout(() => { this.nightWhisper = 'the mountain does not sleep.'; }, 1400);
+                    }
+                    // Idle watcher.
+                    this.resetIdle();
+                    ['mousemove','keydown','click','touchstart','scroll'].forEach(ev =>
+                        window.addEventListener(ev, () => this.resetIdle(), { passive: true }));
+                },
+
+                resetIdle() {
+                    clearTimeout(this._idleTimer);
+                    // don't stomp the late-night line
+                    if (this.nightWhisper === 'still here. still watching.') this.nightWhisper = '';
+                    this._idleTimer = setTimeout(() => {
+                        if (!this.nightWhisper) this.nightWhisper = 'still here. still watching.';
+                    }, 60000);
                 },
 
                 generateQuote() {
@@ -184,8 +269,46 @@
                     setTimeout(() => { this.copied = false; }, 1800);
                 },
 
+                onTitleClick() {
+                    // Triple-click the title → one extra ember claws its way up.
+                    this._clicks = (this._clicks || 0) + 1;
+                    clearTimeout(this._clickTimer);
+                    this._clickTimer = setTimeout(() => { this._clicks = 0; }, 600);
+                    if (this._clicks >= 3) {
+                        this._clicks = 0;
+                        const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                        if (reduced || this.embers.length >= 14) return; // hard cap on spawns
+                        this.embers.push({
+                            id: 'x' + Date.now(),
+                            left: Math.random() * 100,
+                            dur: 5 + Math.random() * 4,
+                            delay: 0,
+                        });
+                    }
+                },
+
+                lightWatcher() {
+                    this.watcherLit = true;
+                    setTimeout(() => { this.watcherLit = false; }, 6000);
+                },
+
                 onKey(e) {
-                    // Space or Enter invokes a new quote, unless focus is on the copy button.
+                    // --- Easter egg 1: type "prizrak" anywhere ---
+                    const k = (e.key || '').toLowerCase();
+                    if (k.length === 1 && k >= 'a' && k <= 'z') {
+                        this._buf = (this._buf + k).slice(-7);
+                        if (this._buf === 'prizrak') { this.lightWatcher(); this._buf = ''; }
+                    }
+                    // --- Easter egg 2: Konami code ---
+                    const want = this._konamiSeq[this._konami];
+                    if (e.key === want || k === (want || '').toLowerCase()) {
+                        this._konami++;
+                        if (this._konami === this._konamiSeq.length) { this.lightWatcher(); this._konami = 0; }
+                    } else {
+                        this._konami = (e.key === this._konamiSeq[0]) ? 1 : 0;
+                    }
+
+                    // Space or Enter invokes a new decree, unless focus is on a button.
                     if ((e.code === 'Space' || e.key === 'Enter') && e.target.tagName !== 'BUTTON') {
                         e.preventDefault();
                         this.generateQuote();

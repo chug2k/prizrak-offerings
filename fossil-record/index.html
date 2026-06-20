@@ -70,6 +70,33 @@
   @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
   .flicker{animation:flicker 7s steps(1) infinite}
 
+  /* ---- strata: thin geological bands deposited along the bottom edge ---- */
+  @keyframes strataShift{0%,100%{background-position:0 0}50%{background-position:0 2px}}
+  .strata{position:fixed;left:0;right:0;bottom:0;height:34vh;pointer-events:none;z-index:0;
+    opacity:.5;
+    background:
+      linear-gradient(to top, rgba(200,136,42,.05), transparent 60%),
+      repeating-linear-gradient(to top,
+        transparent 0 22px,
+        rgba(40,38,43,.55) 22px 23px,
+        transparent 23px 46px,
+        rgba(122,79,18,.10) 46px 47px);
+    -webkit-mask-image:linear-gradient(to top, #000, transparent);
+            mask-image:linear-gradient(to top, #000, transparent);
+    animation:strataShift 18s ease-in-out infinite}
+
+  /* settling motion for a freshly buried specimen — it sinks into place */
+  @keyframes settle{
+    0%{opacity:0;transform:translateY(-14px);filter:blur(2px)}
+    60%{opacity:1;filter:blur(0)}
+    78%{transform:translateY(2px)}
+    100%{opacity:1;transform:translateY(0)}}
+  .settle{animation:settle .6s cubic-bezier(.22,.9,.3,1) both}
+
+  /* tiny pulse on the bury button as the sediment accepts the specimen */
+  @keyframes buried{0%{box-shadow:0 0 0 0 var(--glow)}100%{box-shadow:0 0 28px -4px transparent}}
+  button.burying{animation:buried .5s ease-out}
+
   .container {
     max-width: 720px;
     margin: 0 auto;
@@ -370,6 +397,14 @@
     color: var(--ink-dim);
   }
 
+  .specimen-depth {
+    font-size: 0.55rem;
+    color: var(--ink-ghost);
+    letter-spacing: 0.06em;
+    margin-left: 0.5rem;
+  }
+  .specimen.fossilized .specimen-depth { color: var(--amber-dim); }
+
   .specimen-verdict {
     font-size: 0.6rem;
     text-transform: uppercase;
@@ -513,9 +548,11 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .fog, .ember, .breathe, .reveal, .flicker { animation: none !important; }
+    .fog, .ember, .breathe, .reveal, .flicker,
+    .strata, .settle, button.burying { animation: none !important; }
     .ember { display: none; }
     .breathe, .flicker { opacity: 1 !important; }
+    .settle { opacity: 1 !important; transform: none !important; filter: none !important; }
     .whisper { transition: opacity .2s; }
     * { scroll-behavior: auto !important; }
   }
@@ -523,6 +560,7 @@
 </head>
 <body class="grain">
 <div class="fog" aria-hidden="true"></div>
+<div class="strata" aria-hidden="true"></div>
 <div id="embers" aria-hidden="true"></div>
 
 <div class="container">
@@ -582,7 +620,7 @@
     </div>
 
     <div class="btn-row">
-      <button onclick="addSpecimen()">Bury Specimen</button>
+      <button onclick="addSpecimen(this)">Bury Specimen</button>
       <button class="secondary" onclick="clearForm()">Clear</button>
     </div>
   </div>
@@ -638,7 +676,7 @@ function setFilter(f, btn) {
   render();
 }
 
-function addSpecimen() {
+function addSpecimen(btn) {
   const content = document.getElementById('inp-content').value.trim();
   if (!content) { document.getElementById('inp-content').focus(); return; }
 
@@ -648,17 +686,29 @@ function addSpecimen() {
 
   const data = load();
   const id = Date.now();
+  const v = verdict(clarity, significance, decay);
   data.unshift({
     id,
     content,
     clarity,
     significance,
     decay,
-    verdict: verdict(clarity, significance, decay),
+    verdict: v,
     ts: new Date().toISOString()
   });
   save(data);
   clearForm();
+
+  // the sediment accepts the specimen
+  if (btn) {
+    btn.classList.remove('burying');
+    void btn.offsetWidth; // restart the pulse
+    btn.classList.add('burying');
+    setTimeout(() => btn.classList.remove('burying'), 550);
+  }
+  // a fresh burial throws up a small ember from the disturbed strata
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) addEmber();
+
   render(id);
 }
 
@@ -681,6 +731,17 @@ function fmtTime(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', {day:'2-digit',month:'short'}) + ' ' +
          d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+}
+
+// burial depth — older specimens have settled further down the column.
+// purely derived from the timestamp; never stored. deeper = more time has buried it.
+function burialDepth(iso) {
+  const days = (Date.now() - new Date(iso).getTime()) / 86400000;
+  if (days < 1)   return 'surface sediment';
+  if (days < 7)   return Math.round(days * 4) + ' cm down';
+  if (days < 30)  return (days * 0.4).toFixed(1) + ' m down';
+  if (days < 365) return (days * 0.12).toFixed(1) + ' m down';
+  return (days / 30).toFixed(0) + ' m · deep strata';
 }
 
 // verdict flavor — terse, with teeth
@@ -732,8 +793,12 @@ function render(highlightId) {
   const filtered = currentFilter === 'all' ? all : all.filter(s => s.verdict === currentFilter);
 
   // stats
+  const fossilCount = all.filter(s=>s.verdict==='fossilized').length;
   document.getElementById('stat-total').textContent = all.length;
-  document.getElementById('stat-fossilized').textContent = all.filter(s=>s.verdict==='fossilized').length;
+  const fEl = document.getElementById('stat-fossilized');
+  fEl.textContent = fossilCount;
+  // the survivors glow faintly — the record breathes when something is preserved
+  fEl.classList.toggle('breathe', fossilCount > 0);
   document.getElementById('stat-decaying').textContent = all.filter(s=>s.verdict==='decaying').length;
   document.getElementById('count-label').textContent = filtered.length + ' specimen' + (filtered.length !== 1 ? 's' : '');
 
@@ -752,13 +817,13 @@ function render(highlightId) {
   const verdictLabel = { fossilized: '◆ Fossilized', uncertain: '◇ Uncertain', decaying: '✕ Decaying' };
 
   list.innerHTML = filtered.map(s => `
-    <div class="specimen ${s.verdict}${highlightId === s.id ? ' reveal' : ''}" data-id="${s.id}">
+    <div class="specimen ${s.verdict}${highlightId === s.id ? ' settle' : ''}" data-id="${s.id}">
       <div class="specimen-actions">
         <button class="icon-btn copy" onclick="copySpecimen(${s.id}, this)" title="copy to the ledger">copy</button>
         <button class="icon-btn del" onclick="deleteSpecimen(${s.id})" title="let the fog take it">✕</button>
       </div>
       <div class="specimen-meta">
-        <span class="specimen-time">${fmtTime(s.ts)}</span>
+        <span class="specimen-time">${fmtTime(s.ts)}<span class="specimen-depth">· ${burialDepth(s.ts)}</span></span>
         <span class="specimen-verdict verdict-${s.verdict}">${verdictLabel[s.verdict]}</span>
       </div>
       <div class="specimen-content">${escHtml(s.content)}</div>
@@ -840,6 +905,7 @@ window.addEventListener('keydown', (ev) => {
   if (ev.key && ev.key.length === 1) {
     typed = (typed + ev.key.toLowerCase()).slice(-7);
     if (typed === 'prizrak') whisper('you found the watcher. it was always reading over your shoulder.', 9000);
+    if (typed.endsWith('fossil')) whisper('to fossilize is rare. most of you will be mudstone, unread.', 8000);
   }
   // konami
   konami = (konami + ev.key).slice(-KONAMI.length);

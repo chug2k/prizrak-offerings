@@ -7,26 +7,107 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
-        body { font-family: 'JetBrains Mono', monospace; }
-        .fade-in { animation: fadeIn 0.4s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#fbbf24;            /* the app's existing amber lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        body { font-family: 'JetBrains Mono', monospace; background:var(--bg); }
+
+        /* keep content above decorative layers */
+        .layer-content{ position:relative; z-index:2; }
+
+        /* --- motion vocabulary (reduced-motion-safe) --- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+        .fade-in { animation: reveal 0.4s ease-out both; }
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
         textarea { resize: none; }
-        .energy-dot { transition: all 0.15s; }
+
+        /* inputs: sunk wells, accent focus */
+        .field{ background:var(--bg-sunk); border-color:var(--line);
+            transition:border-color .15s, box-shadow .15s; }
+        .field:focus{ outline:none; border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow); }
+
+        /* energy dots */
+        .energy-dot { transition: transform .15s, background-color .15s, box-shadow .15s; }
         .energy-dot.selected { transform: scale(1.3); }
+        .energy-dot.selected.lit { filter:drop-shadow(0 0 4px var(--glow)); }
+
+        /* the verdict panel breathes */
+        .verdict-panel{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+        /* submit button — tactile press */
+        .reckon-btn{ transition:transform .15s, border-color .15s, box-shadow .15s, background-color .15s; }
+        .reckon-btn:hover{ transform:translateY(-2px); border-color:var(--accent);
+            box-shadow:0 0 24px -8px var(--glow); }
+        .reckon-btn:active{ transform:translateY(1px); box-shadow:none; }
+
+        /* generic lift for action buttons / archive cards */
+        .lift{ transition:transform .15s, border-color .15s, box-shadow .15s; }
+        .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+        .lift:active{ transform:translateY(1px); }
+
+        button:focus-visible, .field:focus-visible{ outline:none; border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow); }
+
+        .accent-text{ color:var(--accent); }
+        .ghost-text{ color:var(--ink-ghost); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.fade-in{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="bg-zinc-950 text-zinc-300 min-h-screen">
+<body class="bg-zinc-950 text-zinc-300 min-h-screen grain">
+
+    <!-- decorative atmosphere (behind content) -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="ember-field" aria-hidden="true"></div>
+
+    <div class="layer-content">
 
     <!-- HEADER -->
     <div class="border-b border-zinc-800 px-6 py-5">
         <div class="max-w-2xl mx-auto flex items-center justify-between">
             <div>
-                <h1 class="text-lg font-bold text-white">The Friday Reckoning</h1>
+                <h1 id="title" class="text-lg font-bold text-white breathe select-none cursor-default" title="the ghost keeps the books">The Friday Reckoning</h1>
                 <p class="text-xs text-zinc-500 mt-0.5">A structured account of the week. The mountain demands honesty.</p>
             </div>
             <div class="text-right">
                 <div class="text-xs text-zinc-500" id="week-label"></div>
-                <div class="text-xs text-zinc-600 mt-0.5">Prizrak, 2026</div>
+                <div class="text-xs text-zinc-600 mt-0.5">Prízrak, 2026</div>
             </div>
         </div>
     </div>
@@ -39,7 +120,7 @@
             <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-2">01 — What shipped this week?</label>
             <p class="text-xs text-zinc-600 mb-3">Be specific. Vague answers are lies in disguise.</p>
             <textarea id="q-shipped" rows="4"
-                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                class="field w-full border rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600"
                 placeholder="e.g. Closed deal with Franklyn. Finished the pitch deck. Sent 12 cold emails. Deployed the new landing page."></textarea>
         </div>
 
@@ -48,7 +129,7 @@
             <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-2">02 — What didn't ship? (The Graveyard)</label>
             <p class="text-xs text-zinc-600 mb-3">Everything that was planned and did not happen. No excuses needed. Just the list.</p>
             <textarea id="q-graveyard" rows="4"
-                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                class="field w-full border rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600"
                 placeholder="e.g. Did not finish the investor memo. Never called Spencer. Skipped the gym Monday and Tuesday and Thursday."></textarea>
         </div>
 
@@ -57,7 +138,7 @@
             <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-2">03 — One person you should have called</label>
             <p class="text-xs text-zinc-600 mb-3">Name them. One person. The relationship you let go cold this week.</p>
             <input id="q-missed" type="text"
-                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                class="field w-full border rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600"
                 placeholder="e.g. Kartick. Spencer. Mom.">
         </div>
 
@@ -94,7 +175,7 @@
             <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-2">05 — One decision you avoided</label>
             <p class="text-xs text-zinc-600 mb-3">The thing you knew needed a decision but you let it sit. Name it.</p>
             <textarea id="q-avoided" rows="3"
-                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                class="field w-full border rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600"
                 placeholder="e.g. Whether to pivot the platform. Whether to let someone go. Whether to move the office."></textarea>
         </div>
 
@@ -103,37 +184,38 @@
             <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-2">06 — Next week's single mission</label>
             <p class="text-xs text-zinc-600 mb-3">One sentence. If you had to pick one thing that must happen next week, what is it?</p>
             <textarea id="q-mission" rows="2"
-                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                class="field w-full border rounded-lg p-4 text-sm text-zinc-200 placeholder-zinc-600"
                 placeholder="e.g. Close the first paying customer. Hire the engineer. Launch the beta."></textarea>
         </div>
 
         <!-- SUBMIT -->
         <div class="pt-4">
             <button onclick="generateReckoning()"
-                class="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-400 text-white font-bold py-4 rounded-xl transition-all text-sm tracking-wide">
-                Generate the Reckoning →
+                class="reckon-btn w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white font-bold py-4 rounded-xl text-sm tracking-wide">
+                Summon the Reckoning →
             </button>
+            <p class="text-center text-xs ghost-text mt-3 flicker">the ledger is open. it is listening.</p>
         </div>
 
     </div>
 
     <!-- OUTPUT -->
     <div id="output-section" class="hidden max-w-2xl mx-auto px-6 py-8">
-        <div class="border border-zinc-700 rounded-xl overflow-hidden fade-in">
+        <div class="verdict-panel border border-zinc-700 rounded-xl overflow-hidden fade-in">
             <!-- Header bar -->
             <div class="bg-zinc-900 border-b border-zinc-700 px-6 py-4 flex items-center justify-between">
-                <span class="text-xs text-zinc-500 font-mono">PRIZRAK // WEEKLY RECKONING</span>
+                <span class="text-xs accent-text font-mono breathe">PRÍZRAK // WEEKLY RECKONING</span>
                 <span class="text-xs text-zinc-600" id="output-date"></span>
             </div>
             <div class="p-6 space-y-6 bg-zinc-950" id="output-body"></div>
             <!-- Actions -->
             <div class="bg-zinc-900 border-t border-zinc-700 px-6 py-4 flex gap-4">
                 <button onclick="copyReckoning()" id="copy-btn"
-                    class="flex-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs py-2 rounded-lg transition-colors">
-                    Copy to clipboard
+                    class="lift flex-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs py-2 rounded-lg">
+                    Copy to the ledger
                 </button>
                 <button onclick="resetForm()"
-                    class="flex-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs py-2 rounded-lg transition-colors">
+                    class="lift flex-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs py-2 rounded-lg">
                     New reckoning
                 </button>
             </div>
@@ -142,6 +224,13 @@
         <!-- Archive -->
         <div class="mt-8" id="archive-section"></div>
     </div>
+
+    <!-- FOOTER (quiet Prízrak line) -->
+    <footer class="max-w-2xl mx-auto px-6 py-8 text-center">
+        <p class="text-xs ghost-text" id="footer-line">we measure the cold and keep the ledger of it.</p>
+    </footer>
+
+    </div><!-- /layer-content -->
 
     <script>
     // --- Week label ---
@@ -167,18 +256,18 @@
         const container = document.getElementById(`energy-${day}`);
         ENERGY_LEVELS.slice().reverse().forEach(level => {
             const btn = document.createElement('button');
-            btn.className = 'energy-dot text-lg w-8 h-8 flex items-center justify-center rounded-lg hover:bg-zinc-800 transition-all';
+            btn.className = 'energy-dot text-lg w-8 h-8 flex items-center justify-center rounded-lg hover:bg-zinc-800';
             btn.textContent = level.label;
             btn.title = level.tip;
             btn.onclick = () => {
                 energyState[day] = level.value;
                 // Update UI
-                container.querySelectorAll('.energy-dot').forEach(b => b.classList.remove('selected', 'bg-zinc-800'));
+                container.querySelectorAll('.energy-dot').forEach(b => b.classList.remove('selected', 'lit', 'bg-zinc-800'));
                 // highlight selected and below
                 container.querySelectorAll('.energy-dot').forEach((b, i, arr) => {
                     const lvl = ENERGY_LEVELS[ENERGY_LEVELS.length - 1 - (arr.length - 1 - i)];
                     if (lvl && lvl.value <= level.value) {
-                        b.classList.add('selected');
+                        b.classList.add('selected', 'lit');
                     }
                 });
             };
@@ -191,11 +280,15 @@
         "The machine does not tire. The human does. The week ends to remind you which one you are.",
         "A graveyard is only shameful if you do not visit it. Walk through it now.",
         "The decision you avoided this week is already making itself. You are just not in the room.",
-        "Next week is a clean field. You will track mud into it anyway. That is fine. That is building.",
+        "Next week is a clean field of snow. You will track mud into it anyway. That is fine. That is building.",
         "The person you did not call already noticed. Call them Monday.",
         "Productivity is not what you completed. It is the ratio of what you started to what you finished.",
         "The mission is one sentence because the mind can only carry one thing clearly. Everything else is cargo.",
         "Five depleted days is a signal, not a failure. The body battery recovers. The ignored pattern does not.",
+        "The poludnica visits at noon and asks what you have done. Have an answer ready by Friday.",
+        "Every Friday is a small threshold. You cross it whether or not you packed.",
+        "The cold does not negotiate. Neither does the calendar. Both are honest in ways you are not.",
+        "What you bury in the graveyard does not stay buried. It hibernates. It comes back hungry in spring.",
     ];
 
     const ENERGY_WORDS = { 0: 'unknown', 1: 'depleted', 2: 'low', 3: 'moderate', 4: 'good', 5: 'peak' };
@@ -215,12 +308,19 @@
 
     function energySummary() {
         const avg = avgEnergy();
-        if (avg === 0) return "not recorded";
-        if (avg < 2) return "a punishing week on the body";
-        if (avg < 3) return "running below baseline";
-        if (avg < 4) return "workable — not exceptional";
-        if (avg < 5) return "a strong week physically";
-        return "operating at peak capacity";
+        if (avg === 0) return "not recorded — the body kept no ledger";
+        if (avg < 2) return "a punishing week on the body. the cold got in.";
+        if (avg < 3) return "running below baseline. embers, not fire.";
+        if (avg < 4) return "workable — not exceptional. the bridge held.";
+        if (avg < 5) return "a strong week physically. the fire kept.";
+        return "operating at peak capacity. the mountain noticed.";
+    }
+
+    // basic HTML escaping so user text can't break the markup
+    function esc(s) {
+        return String(s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function generateReckoning() {
@@ -237,19 +337,19 @@
 
         const output = document.getElementById('output-body');
         output.innerHTML = `
-            <div>
+            <div class="reveal">
                 <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">I. What was built</div>
-                <div class="text-sm text-zinc-200 whitespace-pre-wrap leading-relaxed">${shipped || '— Nothing recorded. The field is bare.'}</div>
+                <div class="text-sm text-zinc-200 whitespace-pre-wrap leading-relaxed">${shipped ? esc(shipped) : '— Nothing recorded. The field is bare. The snow is unbroken.'}</div>
             </div>
-            <div class="border-t border-zinc-800 pt-6">
+            <div class="border-t border-zinc-800 pt-6 reveal">
                 <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">II. The Graveyard</div>
-                <div class="text-sm text-zinc-400 whitespace-pre-wrap leading-relaxed italic">${graveyard || '— No graveyard entries. Either everything shipped or nothing was planned.'}</div>
+                <div class="text-sm text-zinc-400 whitespace-pre-wrap leading-relaxed italic">${graveyard ? esc(graveyard) : '— No graveyard entries. Either everything shipped or nothing was buried honestly.'}</div>
             </div>
-            <div class="border-t border-zinc-800 pt-6">
+            <div class="border-t border-zinc-800 pt-6 reveal">
                 <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">III. The Missed Call</div>
-                <div class="text-sm text-amber-400/80">${missed ? `<span class="text-zinc-300">${missed}</span> — call them Monday. Not Tuesday. Monday.` : '— Nobody named. Either you were attentive or you forgot to be honest.'}</div>
+                <div class="text-sm text-amber-400/80">${missed ? `<span class="text-zinc-300">${esc(missed)}</span> — call them Monday. Not Tuesday. Monday. The line goes cold fast in winter.` : '— Nobody named. Either you were attentive or you forgot to be honest.'}</div>
             </div>
-            <div class="border-t border-zinc-800 pt-6">
+            <div class="border-t border-zinc-800 pt-6 reveal">
                 <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">IV. Energy Profile</div>
                 <div class="grid grid-cols-5 gap-2 text-center text-xs">
                     ${['mon','tue','wed','thu','fri'].map(d => `
@@ -262,22 +362,22 @@
                 </div>
                 <div class="mt-3 text-xs text-zinc-500">Overall: ${energySummary()}</div>
             </div>
-            <div class="border-t border-zinc-800 pt-6">
+            <div class="border-t border-zinc-800 pt-6 reveal">
                 <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">V. The Avoided Decision</div>
-                <div class="text-sm text-red-400/80 whitespace-pre-wrap leading-relaxed">${avoided || '— None recorded. Suspicious.'}</div>
-                ${avoided ? `<div class="text-xs text-zinc-600 mt-2">It is still waiting. It will wait until Monday.</div>` : ''}
+                <div class="text-sm text-red-400/80 whitespace-pre-wrap leading-relaxed">${avoided ? esc(avoided) : '— None recorded. Suspicious. The fog hides what you will not face.'}</div>
+                ${avoided ? `<div class="text-xs text-zinc-600 mt-2">It is still waiting at the threshold. It will wait until Monday. It will not wait longer.</div>` : ''}
             </div>
-            <div class="border-t border-zinc-800 pt-6">
+            <div class="border-t border-zinc-800 pt-6 reveal">
                 <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">VI. The Mission</div>
-                <div class="text-base font-bold text-white leading-relaxed">${mission || '— No mission stated. You are starting Monday without a compass.'}</div>
+                <div class="text-base font-bold text-white leading-relaxed">${mission ? esc(mission) : '— No mission stated. You are starting Monday without a compass, into the dark.'}</div>
             </div>
-            <div class="border-t border-zinc-800 pt-6 bg-zinc-900/50 -mx-6 px-6 -mb-6 pb-6 rounded-b-xl">
-                <div class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prizrak // Observation</div>
-                <div class="text-xs text-zinc-400 italic leading-relaxed">"${aphorism}"</div>
+            <div class="border-t border-zinc-800 pt-6 bg-zinc-900/50 -mx-6 px-6 -mb-6 pb-6 rounded-b-xl reveal">
+                <div class="text-xs accent-text uppercase tracking-widest mb-2">Prízrak // Observation</div>
+                <div class="text-xs text-zinc-400 italic leading-relaxed">"${esc(aphorism)}"</div>
             </div>
         `;
 
-        // Save to archive
+        // Save to archive (same key + shape as before)
         saveToArchive({ shipped, graveyard, missed, avoided, mission, energy: { ...energyState }, date: dateStr });
 
         document.getElementById('form-section').classList.add('hidden');
@@ -286,7 +386,7 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // --- Archive (localStorage) ---
+    // --- Archive (localStorage) — SAME KEY + SHAPE ---
     const ARCHIVE_KEY = 'prizrak_reckoning_v1';
 
     function saveToArchive(entry) {
@@ -300,17 +400,17 @@
         if (archive.length <= 1) return;
         const sec = document.getElementById('archive-section');
         sec.innerHTML = `
-            <div class="text-xs text-zinc-600 uppercase tracking-widest mb-4">Previous Reckonings</div>
+            <div class="text-xs text-zinc-600 uppercase tracking-widest mb-4">Previous Reckonings — the cave remembers</div>
             <div class="space-y-3">
                 ${archive.slice(1).map(e => `
-                    <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+                    <div class="lift bg-zinc-900 border border-zinc-800 rounded-lg p-4">
                         <div class="flex justify-between items-start mb-2">
-                            <div class="text-xs text-zinc-500">${e.date}</div>
+                            <div class="text-xs text-zinc-500">${esc(e.date || '')}</div>
                             <div class="flex gap-1">
                                 ${['mon','tue','wed','thu','fri'].map(d => energyBar(e.energy?.[d] || 0)).join('')}
                             </div>
                         </div>
-                        <div class="text-xs text-zinc-400 line-clamp-2">${e.mission || 'No mission stated'}</div>
+                        <div class="text-xs text-zinc-400 line-clamp-2">${e.mission ? esc(e.mission) : 'No mission stated — a week that walked itself.'}</div>
                     </div>
                 `).join('')}
             </div>
@@ -321,8 +421,14 @@
         const body = document.getElementById('output-body').innerText;
         navigator.clipboard.writeText(body).then(() => {
             const btn = document.getElementById('copy-btn');
-            btn.textContent = 'Copied ✓';
-            setTimeout(() => { btn.textContent = 'Copy to clipboard'; }, 2000);
+            btn.textContent = 'copied to the ledger';
+            btn.style.borderColor = 'var(--accent)';
+            btn.style.color = 'var(--accent)';
+            setTimeout(() => {
+                btn.textContent = 'Copy to the ledger';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }, 1200);
         });
     }
 
@@ -337,10 +443,106 @@
         Object.keys(energyState).forEach(d => { energyState[d] = 0; });
         ['mon','tue','wed','thu','fri'].forEach(d => {
             document.getElementById(`energy-${d}`).querySelectorAll('.energy-dot')
-                .forEach(b => b.classList.remove('selected', 'bg-zinc-800'));
+                .forEach(b => b.classList.remove('selected', 'lit', 'bg-zinc-800'));
         });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    // --- Render any existing archive on first load (so the cave isn't hidden until a new entry) ---
+    (function showExistingArchive(){
+        const archive = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '[]');
+        if (archive.length === 0) return;
+        const sec = document.getElementById('archive-section');
+        // mirror renderArchive but show ALL stored (index 0 included) since we're not mid-reckoning
+        sec.innerHTML = `
+            <div class="text-xs text-zinc-600 uppercase tracking-widest mb-4">Previous Reckonings — the cave remembers</div>
+            <div class="space-y-3">
+                ${archive.map(e => `
+                    <div class="lift bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-xs text-zinc-500">${esc(e.date || '')}</div>
+                            <div class="flex gap-1">
+                                ${['mon','tue','wed','thu','fri'].map(d => energyBar(e.energy?.[d] || 0)).join('')}
+                            </div>
+                        </div>
+                        <div class="text-xs text-zinc-400 line-clamp-2">${e.mission ? esc(e.mission) : 'No mission stated — a week that walked itself.'}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        // surface the section beneath the form without disrupting the form flow
+        const formSec = document.getElementById('form-section');
+        const wrap = document.createElement('div');
+        wrap.className = 'max-w-2xl mx-auto px-6 pb-8 fade-in';
+        wrap.appendChild(sec.cloneNode(true));
+        formSec.parentNode.insertBefore(wrap, formSec.nextSibling);
+        // clear original so it isn't doubled when a reckoning is later generated
+        sec.innerHTML = '';
+    })();
+
+    // --- Atmosphere: floating embers (cap 8, reduced-motion respected) ---
+    (function spawnEmbers(){
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const field = document.getElementById('ember-field');
+        const COUNT = 8;
+        for (let i = 0; i < COUNT; i++) {
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (Math.random() * 100) + 'vw';
+            e.style.animationDelay = (Math.random() * 14) + 's';
+            e.style.animationDuration = (11 + Math.random() * 8) + 's';
+            field.appendChild(e);
+        }
+    })();
+
+    // --- Easter egg 1: type "prízrak" / "prizrak" → wake the watcher ---
+    (function watcherEgg(){
+        let buf = '';
+        const target = 'prizrak';
+        window.addEventListener('keydown', (ev) => {
+            if (ev.target && /^(input|textarea)$/i.test(ev.target.tagName)) return; // don't intrude on typing
+            const k = (ev.key || '').toLowerCase().replace('í','i');
+            if (k.length !== 1) return;
+            buf = (buf + k).slice(-target.length);
+            if (buf === target) {
+                const f = document.getElementById('footer-line');
+                f.textContent = 'you found the watcher. it was always here.';
+                f.classList.add('breathe');
+                f.style.color = 'var(--accent)';
+                setTimeout(() => {
+                    f.textContent = 'we measure the cold and keep the ledger of it.';
+                    f.classList.remove('breathe');
+                    f.style.color = '';
+                }, 5000);
+            }
+        });
+    })();
+
+    // --- Easter egg 2: triple-click the title → spawn one extra ember ---
+    (function tripleClickEgg(){
+        const title = document.getElementById('title');
+        if (!title) return;
+        title.addEventListener('click', (ev) => {
+            if (ev.detail === 3) {
+                if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                const field = document.getElementById('ember-field');
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (Math.random() * 100) + 'vw';
+                e.style.animationDuration = (10 + Math.random() * 6) + 's';
+                field.appendChild(e);
+                setTimeout(() => e.remove(), 18000);
+            }
+        });
+    })();
+
+    // --- Quiet whisper: between 00:00 and 03:00 local, the mountain stirs ---
+    (function nightWhisper(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) {
+            document.getElementById('footer-line').textContent = 'the mountain does not sleep. neither, apparently, do you.';
+        }
+    })();
     </script>
 </body>
 </html>

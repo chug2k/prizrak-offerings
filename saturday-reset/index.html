@@ -7,7 +7,46 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap');
-        body { font-family: 'JetBrains Mono', monospace; }
+
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#f59e0b;            /* amber — the reckoning hour */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        body { font-family: 'JetBrains Mono', monospace; background:var(--bg); }
+
+        /* ---- atmosphere layers ---- */
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .wrap{position:relative;z-index:2;}
+
+        /* ---- motion vocabulary ---- */
+        @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
         .blink { animation: blink 1.2s step-end infinite; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         .progress-bar { transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
@@ -16,17 +55,50 @@
             from { opacity: 0; transform: translateY(8px); }
             to   { opacity: 1; transform: translateY(0); }
         }
+
+        /* ---- interaction patterns ---- */
+        input[type="text"]:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+        input[type="range"]:focus-visible{outline:none;box-shadow:0 0 0 2px var(--glow);border-radius:6px}
+
+        .accent-btn{transition:transform .15s, box-shadow .15s, border-color .15s, background .2s}
+        .accent-btn:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 0 18px -6px var(--glow)}
+        .accent-btn:active{transform:translateY(1px)}
+
+        .block-card{transition:transform .15s, box-shadow .15s, border-color .15s}
+        .block-card:hover{transform:translateY(-2px);box-shadow:0 0 18px -10px var(--glow)}
+
+        .glow-panel{box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow)}
+
+        .glyph{cursor:pointer;user-select:none}
+        .glyph.fast{animation-duration:1.4s !important}
+
+        #idle-whisper{opacity:0;transition:opacity 1.4s ease}
+        #idle-whisper.show{opacity:1}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.blink,.block-enter{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .block-enter{opacity:1!important;transform:none!important}
+        }
     </style>
 </head>
-<body class="bg-zinc-950 text-zinc-300 min-h-screen">
+<body class="bg-zinc-950 text-zinc-300 min-h-screen grain">
 
-<div class="max-w-2xl mx-auto px-6 py-12">
+<!-- atmosphere -->
+<div class="fog"></div>
+<div id="embers"></div>
+
+<div class="wrap max-w-2xl mx-auto px-6 py-12">
 
     <!-- Header -->
     <div class="mb-10">
-        <div class="text-xs text-zinc-600 font-mono mb-2 tracking-widest">PRIZRAK // WEEKLY RESET PROTOCOL</div>
-        <h1 class="text-3xl font-bold text-white mb-1">The Saturday Reset</h1>
-        <p class="text-zinc-500 text-sm">The week is dead. Saturday belongs to recovery and reckoning. Input your state. Receive your orders.</p>
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-xs tracking-widest flicker" style="color:var(--ink-dim)">PRIZRAK // WEEKLY RESET PROTOCOL</span>
+            <span id="glyph" class="glyph text-sm breathe" style="color:var(--accent)" title="hold it">◈</span>
+        </div>
+        <h1 id="title" class="text-3xl font-bold text-white mb-1 tracking-tight">The Saturday Reset</h1>
+        <p class="text-zinc-500 text-sm">The week is dead. Saturday belongs to recovery and reckoning. Tell the ghost your state. Receive your orders.</p>
     </div>
 
     <!-- Input Form -->
@@ -35,53 +107,53 @@
 
             <!-- Sleep Score -->
             <div>
-                <label class="block text-xs text-zinc-500 mb-2 tracking-widest">SLEEP SCORE (0–100)</label>
+                <label class="block text-xs mb-2 tracking-widest" style="color:var(--ink-dim)">SLEEP SCORE / 0–100</label>
                 <div class="flex items-center gap-4">
                     <input type="range" id="sleep-score" min="0" max="100" value="75"
                         class="flex-1 h-2 bg-zinc-800 rounded appearance-none cursor-pointer accent-amber-400">
                     <span id="sleep-val" class="text-amber-400 font-bold w-8 text-right">75</span>
                 </div>
                 <div class="flex justify-between text-xs text-zinc-700 mt-1">
-                    <span>dead</span><span>moderate</span><span>restored</span>
+                    <span>the Mora won</span><span>moderate</span><span>restored</span>
                 </div>
             </div>
 
             <!-- Body Battery -->
             <div>
-                <label class="block text-xs text-zinc-500 mb-2 tracking-widest">BODY BATTERY (0–100)</label>
+                <label class="block text-xs mb-2 tracking-widest" style="color:var(--ink-dim)">BODY BATTERY / 0–100</label>
                 <div class="flex items-center gap-4">
                     <input type="range" id="body-battery" min="0" max="100" value="40"
                         class="flex-1 h-2 bg-zinc-800 rounded appearance-none cursor-pointer accent-cyan-400">
                     <span id="battery-val" class="text-cyan-400 font-bold w-8 text-right">40</span>
                 </div>
                 <div class="flex justify-between text-xs text-zinc-700 mt-1">
-                    <span>critical</span><span>functional</span><span>peak</span>
+                    <span>firewood gone</span><span>functional</span><span>peak</span>
                 </div>
             </div>
 
             <!-- Undone tasks -->
             <div>
-                <label class="block text-xs text-zinc-500 mb-2 tracking-widest">THREE THINGS LEFT UNDONE THIS WEEK</label>
-                <p class="text-xs text-zinc-600 mb-3">The Mora brings these things to sit on your chest at night. Name them. They lose power when named.</p>
+                <label class="block text-xs mb-2 tracking-widest" style="color:var(--ink-dim)">THREE THINGS LEFT UNDONE THIS WEEK</label>
+                <p class="text-xs text-zinc-600 mb-3">The Mora brings these to sit on your chest at night. Name them. They lose power when named.</p>
                 <div class="space-y-2">
                     <input type="text" id="task1" placeholder="The call you didn't make"
-                        class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-zinc-500">
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600">
                     <input type="text" id="task2" placeholder="The thing you almost started"
-                        class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-zinc-500">
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600">
                     <input type="text" id="task3" placeholder="The decision you owe someone"
-                        class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-zinc-500">
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600">
                 </div>
             </div>
 
             <!-- One win -->
             <div>
-                <label class="block text-xs text-zinc-500 mb-2 tracking-widest">ONE THING THAT ACTUALLY SHIPPED</label>
+                <label class="block text-xs mb-2 tracking-widest" style="color:var(--ink-dim)">ONE THING THAT ACTUALLY SHIPPED</label>
                 <input type="text" id="win" placeholder="Be honest. One thing. Even if small."
-                    class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-zinc-500">
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600">
             </div>
 
             <button onclick="generateReset()"
-                class="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-500 text-white font-bold py-4 rounded-lg transition-colors tracking-wider">
+                class="accent-btn w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white font-bold py-4 rounded-lg tracking-wider">
                 GENERATE SATURDAY PROTOCOL →
             </button>
         </div>
@@ -95,32 +167,41 @@
 
         <!-- Time blocks -->
         <div class="mb-8">
-            <div class="text-xs text-zinc-600 tracking-widest mb-4">TODAY'S BLOCK SCHEDULE</div>
+            <div class="text-xs tracking-widest mb-4" style="color:var(--ink-dim)">TODAY'S BLOCK SCHEDULE</div>
             <div id="blocks" class="space-y-3"></div>
         </div>
 
         <!-- The Reckoning -->
         <div id="reckoning" class="mb-8 bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-            <div class="text-xs text-zinc-600 tracking-widest mb-3">THE RECKONING</div>
+            <div class="text-xs tracking-widest mb-3" style="color:var(--ink-dim)">THE RECKONING</div>
             <div id="reckoning-text" class="text-sm text-zinc-400 leading-relaxed space-y-2"></div>
         </div>
 
         <!-- Mission -->
-        <div id="mission-box" class="border-l-4 border-amber-500 pl-5 mb-8">
-            <div class="text-xs text-zinc-600 tracking-widest mb-2">SINGLE MISSION FOR TODAY</div>
-            <div id="mission-text" class="text-white font-bold text-lg"></div>
+        <div id="mission-box" class="border-l-4 pl-5 mb-6" style="border-color:var(--accent)">
+            <div class="text-xs tracking-widest mb-2" style="color:var(--ink-dim)">SINGLE MISSION FOR TODAY</div>
+            <div id="mission-text" class="text-white font-bold text-lg breathe"></div>
         </div>
 
-        <button onclick="resetForm()"
-            class="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 py-3 rounded-lg text-sm transition-colors">
-            ← RECALCULATE
-        </button>
+        <div class="flex gap-3 mb-8">
+            <button id="copy-btn" onclick="copyProtocol()"
+                class="accent-btn flex-1 bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-zinc-200 py-3 rounded-lg text-sm">
+                copy to the ledger
+            </button>
+            <button onclick="resetForm()"
+                class="accent-btn flex-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 py-3 rounded-lg text-sm">
+                ← RECALCULATE
+            </button>
+        </div>
     </div>
 
     <div class="mt-12 pt-6 border-t border-zinc-900 text-center">
         <a href="/index.html" class="text-xs text-zinc-700 hover:text-zinc-500">← all offerings</a>
         <span class="text-zinc-800 mx-3">|</span>
         <span class="text-xs text-zinc-800">prizrak // saturday reset v1</span>
+        <p id="ghost-line" class="hidden text-xs mt-3" style="color:var(--ink-ghost)">you found the watcher. it was always Saturday somewhere.</p>
+        <p id="night-whisper" class="hidden text-xs mt-2" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+        <p id="idle-whisper" class="text-xs mt-2" style="color:var(--ink-ghost)">still here. still watching.</p>
     </div>
 </div>
 
@@ -264,6 +345,9 @@ function getMission(tier, tasks) {
     return 'Close the most overdue item on your list. One task, done completely.';
 }
 
+// last protocol, for copy-to-ledger
+let lastProtocol = '';
+
 function generateReset() {
     const sleep = parseInt(document.getElementById('sleep-score').value);
     const battery = parseInt(document.getElementById('body-battery').value);
@@ -279,15 +363,15 @@ function generateReset() {
 
     // Verdict bar
     const vbar = document.getElementById('verdict-bar');
-    vbar.className = `mb-8 p-5 rounded-xl border ${verdict.color}`;
+    vbar.className = `mb-8 p-5 rounded-xl border reveal glow-panel ${verdict.color}`;
     vbar.innerHTML = `
         <div class="flex items-center justify-between mb-3">
-            <span class="${verdict.labelColor} font-bold text-sm tracking-widest">${verdict.label}</span>
+            <span class="${verdict.labelColor} font-bold text-sm tracking-widest breathe">${verdict.label}</span>
             <span class="text-xs text-zinc-600">battery: ${battery} | sleep: ${sleep}</span>
         </div>
         <p class="text-sm text-zinc-400">${verdict.text}</p>
         <div class="mt-3 h-1.5 bg-zinc-800 rounded">
-            <div class="h-1.5 rounded progress-bar ${tier === 'critical' ? 'bg-red-600' : tier === 'low' ? 'bg-orange-500' : tier === 'functional' ? 'bg-yellow-500' : tier === 'good' ? 'bg-lime-500' : 'bg-cyan-400'}" style="width: ${battery}%"></div>
+            <div class="h-1.5 rounded progress-bar ${tier === 'critical' ? 'bg-red-600' : tier === 'low' ? 'bg-orange-500' : tier === 'functional' ? 'bg-yellow-500' : tier === 'good' ? 'bg-lime-500' : 'bg-cyan-400'}" style="width: 0%"></div>
         </div>
     `;
 
@@ -297,7 +381,7 @@ function generateReset() {
     blocksEl.innerHTML = blocks.map((b, i) => `
         <div class="flex gap-4 block-enter" style="animation-delay: ${i*0.1}s">
             <div class="text-xs text-zinc-600 font-mono w-12 shrink-0 pt-3">${b.time}</div>
-            <div class="flex-1 bg-zinc-900 border ${b.border} rounded-lg p-4">
+            <div class="block-card flex-1 bg-zinc-900 border ${b.border} rounded-lg p-4">
                 <div class="${b.color} text-xs font-bold tracking-widest mb-1">${b.label}</div>
                 <div class="text-sm text-zinc-400">${b.desc}</div>
             </div>
@@ -311,18 +395,154 @@ function generateReset() {
     ).join('');
 
     // Mission
-    document.getElementById('mission-text').textContent = getMission(tier, tasks);
+    const mission = getMission(tier, tasks);
+    document.getElementById('mission-text').textContent = mission;
+
+    // Build a plain-text ledger entry for copying
+    lastProtocol = buildLedgerText(verdict, battery, sleep, blocks, recLines, mission);
+
+    // Reset copy button label
+    const cb = document.getElementById('copy-btn');
+    if (cb) cb.textContent = 'copy to the ledger';
 
     // Switch views
     document.getElementById('form-section').classList.add('hidden');
-    document.getElementById('output-section').classList.remove('hidden');
+    const out = document.getElementById('output-section');
+    out.classList.remove('hidden');
     window.scrollTo(0, 0);
+
+    // animate the battery bar after paint
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const fill = vbar.querySelector('.progress-bar');
+        if (fill) fill.style.width = battery + '%';
+    }));
+}
+
+function buildLedgerText(verdict, battery, sleep, blocks, recLines, mission) {
+    const L = [];
+    L.push('THE SATURDAY RESET — prizrak');
+    L.push('');
+    L.push(`VERDICT: ${verdict.label}  (battery ${battery} / sleep ${sleep})`);
+    L.push('');
+    L.push('BLOCK SCHEDULE');
+    blocks.forEach(b => {
+        L.push(`  ${b.time}  ${b.label}`);
+        L.push(`         ${b.desc}`);
+    });
+    L.push('');
+    L.push('THE RECKONING');
+    recLines.forEach(l => L.push(`  - ${l}`));
+    L.push('');
+    L.push(`SINGLE MISSION: ${mission}`);
+    L.push('');
+    L.push('the mountain is watching.');
+    return L.join('\n');
+}
+
+function copyProtocol() {
+    const btn = document.getElementById('copy-btn');
+    const done = () => {
+        btn.textContent = 'copied to the ledger';
+        btn.style.borderColor = 'var(--accent)';
+        setTimeout(() => {
+            btn.textContent = 'copy to the ledger';
+            btn.style.borderColor = '';
+        }, 1200);
+    };
+    const fail = () => {
+        btn.textContent = 'the fog ate it';
+        setTimeout(() => { btn.textContent = 'copy to the ledger'; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastProtocol).then(done).catch(fail);
+    } else {
+        fail();
+    }
 }
 
 function resetForm() {
     document.getElementById('form-section').classList.remove('hidden');
     document.getElementById('output-section').classList.add('hidden');
+    window.scrollTo(0, 0);
 }
+
+// ---------- atmosphere: embers (cap 8) ----------
+(function spawnEmbers(){
+    const host = document.getElementById('embers');
+    if (!host) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    for (let i = 0; i < 8; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100) + '%';
+        e.style.animationDelay = (Math.random()*14) + 's';
+        e.style.animationDuration = (12 + Math.random()*6) + 's';
+        host.appendChild(e);
+    }
+})();
+
+// ---------- night whisper 00:00–03:00 ----------
+(function nightWhisper(){
+    const hr = new Date().getHours();
+    if (hr >= 0 && hr < 3) {
+        const n = document.getElementById('night-whisper');
+        if (n) n.classList.remove('hidden');
+    }
+})();
+
+// ---------- easter eggs ----------
+// (1) type "prizrak" → ghost line in the footer
+let buf = '';
+window.addEventListener('keydown', (e) => {
+    if (e.key && e.key.length === 1) {
+        buf = (buf + e.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+            document.getElementById('ghost-line').classList.remove('hidden');
+        }
+    }
+});
+
+// (2) triple-click title → one extra ember
+document.getElementById('title').addEventListener('click', (e) => {
+    if (e.detail === 3) {
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) return;
+        const host = document.getElementById('embers');
+        const ex = document.createElement('div');
+        ex.className = 'ember';
+        ex.style.left = (Math.random()*100) + '%';
+        ex.style.animationDuration = '12s';
+        host.appendChild(ex);
+        setTimeout(() => ex.remove(), 12000);
+    }
+});
+
+// (3) hold the accent glyph → it breathes faster for 3s
+(function glyphHold(){
+    const g = document.getElementById('glyph');
+    if (!g) return;
+    let t = null;
+    const start = () => {
+        g.classList.add('fast');
+        clearTimeout(t);
+        t = setTimeout(() => g.classList.remove('fast'), 3000);
+    };
+    g.addEventListener('mousedown', start);
+    g.addEventListener('touchstart', start, {passive:true});
+})();
+
+// ---------- idle 60s whisper ----------
+let idleTimer = null;
+function resetIdle(){
+    const w = document.getElementById('idle-whisper');
+    if (w) w.classList.remove('show');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (w) w.classList.add('show'); }, 60000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+    window.addEventListener(ev, resetIdle, {passive:true}));
+resetIdle();
 </script>
 </body>
 </html>

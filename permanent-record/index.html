@@ -7,10 +7,20 @@
 <style>
   :root {
     --bg: #0a0a0a;
-    --surface: #111;
-    --border: #222;
-    --text: #e0e0e0;
-    --muted: #555;
+    --bg-raised: #111113;
+    --bg-sunk: #0d0d0f;
+    --line: #26262b;
+    --line-soft: #1a1a1d;
+    --ink: #d4cfc8;
+    --ink-dim: #7a7570;
+    --ink-ghost: #3a3530;
+
+    /* legacy aliases mapped to house palette */
+    --surface: var(--bg-raised);
+    --border: var(--line);
+    --text: var(--ink);
+    --muted: var(--ink-dim);
+
     --perm: #4ade80;
     --perm-dim: #14532d;
     --eph: #f87171;
@@ -19,7 +29,8 @@
     --week-dim: #451a03;
     --day: #60a5fa;
     --day-dim: #1e3a5f;
-    --accent: #a3a3a3;
+    --accent: #4ade80;             /* permanence green is this app's lead */
+    --glow: color-mix(in srgb, var(--accent) 55%, transparent);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -29,15 +40,63 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow-x: hidden;
   }
+
+  /* ---- atmosphere layers (decorative, behind content) ---- */
+  .fog {
+    position: fixed; inset: -10% -10% auto; height: 60vh;
+    pointer-events: none; z-index: 0;
+    background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+    animation: fogDrift 32s ease-in-out infinite alternate;
+  }
+  @keyframes fogDrift {
+    0% { transform: translateX(-5%); opacity: .04 }
+    50% { opacity: .07 }
+    100% { transform: translateX(5%); opacity: .04 }
+  }
+  .ember {
+    position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--glow);
+    pointer-events: none; z-index: 0;
+    animation: ember 14s linear infinite;
+  }
+  @keyframes ember {
+    0% { transform: translateY(0); opacity: 0 }
+    10% { opacity: .5 }
+    100% { transform: translateY(-90vh); opacity: 0 }
+  }
+  .grain::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .035;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  @keyframes breathe { 0%,100%{ opacity:.85; text-shadow:0 0 8px var(--glow) } 50%{ opacity:1; text-shadow:0 0 16px var(--glow) } }
+  .breathe { animation: breathe 4.5s ease-in-out infinite }
+  @keyframes reveal { from{ opacity:0; transform:translateY(8px) } to{ opacity:1; transform:translateY(0) } }
+  .reveal { animation: reveal .35s ease-out both }
+  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 94%{opacity:1} 97%{opacity:.7} 98%{opacity:1} }
+  .flicker { animation: flicker 6s steps(1) infinite }
+
+  /* keep all real content above the atmosphere */
+  header, .stats-bar, .ratio-bar-wrap, .input-zone, .verdict-zone, .log-zone, footer {
+    position: relative; z-index: 2;
+  }
+
   header {
     border-bottom: 1px solid var(--border);
     padding: 20px 32px;
     display: flex;
     align-items: baseline;
     gap: 16px;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
   }
-  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+  header h1 {
+    font-size: 18px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: #fff; cursor: default; user-select: none;
+  }
+  header h1 .glyph { color: var(--accent); text-shadow: 0 0 10px var(--glow); }
   header .sub { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
 
   .stats-bar {
@@ -51,9 +110,11 @@
     padding: 16px 24px;
     border-right: 1px solid var(--border);
     text-align: center;
+    transition: background .2s;
   }
+  .stat:hover { background: var(--bg-sunk); }
   .stat:last-child { border-right: none; }
-  .stat .num { font-size: 28px; font-weight: 700; }
+  .stat .num { font-size: 28px; font-weight: 700; transition: color .3s; }
   .stat .label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
   .stat.perm .num { color: var(--perm); }
   .stat.eph .num { color: var(--eph); }
@@ -62,7 +123,7 @@
   .ratio-bar-wrap {
     padding: 12px 32px;
     border-bottom: 1px solid var(--border);
-    background: #0d0d0d;
+    background: var(--bg-sunk);
   }
   .ratio-bar {
     height: 6px;
@@ -73,8 +134,9 @@
   .ratio-fill {
     height: 100%;
     background: var(--perm);
-    transition: width 0.5s ease;
+    transition: width 0.6s cubic-bezier(.2,.8,.2,1);
     border-radius: 3px;
+    box-shadow: 0 0 12px -2px var(--glow);
   }
   .ratio-label {
     display: flex;
@@ -83,14 +145,15 @@
     color: var(--muted);
     margin-top: 6px;
     letter-spacing: 1px;
+    text-transform: uppercase;
   }
 
   .input-zone {
     padding: 24px 32px;
     border-bottom: 1px solid var(--border);
-    background: #0d0d0d;
+    background: var(--bg-sunk);
   }
-  .input-zone label {
+  .input-zone > label {
     font-size: 11px;
     color: var(--muted);
     letter-spacing: 1px;
@@ -116,9 +179,9 @@
     height: 48px;
     line-height: 1.4;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
-  textarea:focus { border-color: #444; }
+  textarea:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
   textarea::placeholder { color: var(--muted); }
 
   .half-life-select {
@@ -126,7 +189,7 @@
     flex-direction: column;
     gap: 6px;
   }
-  .half-life-select label { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .half-life-select label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
   .hl-buttons { display: flex; gap: 6px; }
   .hl-btn {
     padding: 10px 14px;
@@ -139,13 +202,15 @@
     cursor: pointer;
     border-radius: 4px;
     white-space: nowrap;
-    transition: all 0.15s;
+    transition: transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s;
   }
-  .hl-btn:hover { border-color: #444; color: var(--text); }
-  .hl-btn.selected-perm { border-color: var(--perm); color: var(--perm); background: var(--perm-dim); }
-  .hl-btn.selected-week { border-color: var(--week); color: var(--week); background: var(--week-dim); }
-  .hl-btn.selected-day { border-color: var(--day); color: var(--day); background: var(--day-dim); }
-  .hl-btn.selected-eph { border-color: var(--eph); color: var(--eph); background: var(--eph-dim); }
+  .hl-btn:hover { transform: translateY(-2px); border-color: var(--accent); color: var(--text); }
+  .hl-btn:active { transform: translateY(1px); }
+  .hl-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  .hl-btn.selected-perm { border-color: var(--perm); color: var(--perm); background: var(--perm-dim); box-shadow: 0 0 16px -6px var(--perm); }
+  .hl-btn.selected-week { border-color: var(--week); color: var(--week); background: var(--week-dim); box-shadow: 0 0 16px -6px var(--week); }
+  .hl-btn.selected-day { border-color: var(--day); color: var(--day); background: var(--day-dim); box-shadow: 0 0 16px -6px var(--day); }
+  .hl-btn.selected-eph { border-color: var(--eph); color: var(--eph); background: var(--eph-dim); box-shadow: 0 0 16px -6px var(--eph); }
 
   .add-btn {
     background: #1a1a1a;
@@ -159,18 +224,22 @@
     letter-spacing: 1px;
     white-space: nowrap;
     align-self: flex-end;
-    transition: all 0.15s;
+    transition: transform .15s, box-shadow .15s, border-color .15s, background .15s, opacity .15s;
   }
-  .add-btn:hover { background: #222; border-color: #555; }
+  .add-btn:hover:not(:disabled) { background: #222; border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 0 18px -8px var(--glow); }
+  .add-btn:active:not(:disabled) { transform: translateY(1px); }
+  .add-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
   .add-btn:disabled { opacity: 0.3; cursor: default; }
 
   .verdict-zone {
-    padding: 12px 32px;
-    background: #0a0f0a;
+    padding: 14px 32px;
+    background: var(--bg-sunk);
     border-bottom: 1px solid var(--border);
     min-height: 44px;
     display: flex;
     align-items: center;
+    gap: 16px;
+    justify-content: space-between;
   }
   .verdict-text {
     font-size: 12px;
@@ -178,9 +247,31 @@
     letter-spacing: 0.5px;
     line-height: 1.5;
     font-style: italic;
+    flex: 1;
   }
   .verdict-text.warn { color: var(--eph); }
   .verdict-text.neutral { color: var(--accent); }
+
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--line-soft);
+    color: var(--ink-dim);
+    font-family: 'Courier New', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s, box-shadow .15s, transform .15s, opacity .2s;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); transform: translateY(-1px); }
+  .copy-btn:active { transform: translateY(1px); }
+  .copy-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  .copy-btn.flash { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px -6px var(--glow); }
+  .copy-btn[hidden] { display: none; }
 
   .log-zone {
     flex: 1;
@@ -197,16 +288,23 @@
     margin-bottom: 10px;
     padding-bottom: 6px;
     border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
   }
+  .day-header .day-ratio { color: var(--ink-ghost); letter-spacing: 1px; }
 
   .entry {
     display: flex;
     align-items: flex-start;
     gap: 12px;
     padding: 10px 0;
-    border-bottom: 1px solid #161616;
+    border-bottom: 1px solid var(--line-soft);
     animation: fadeIn 0.3s ease;
+    transition: background .15s;
   }
+  .entry:hover { background: color-mix(in srgb, var(--bg-raised) 60%, transparent); }
   @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
 
   .entry-hl {
@@ -216,10 +314,12 @@
     flex-shrink: 0;
     margin-top: 3px;
   }
-  .hl-perm { background: var(--perm); }
+  .hl-perm { background: var(--perm); box-shadow: 0 0 8px -2px var(--perm); }
   .hl-week { background: var(--week); }
   .hl-day { background: var(--day); }
-  .hl-eph { background: var(--eph); }
+  /* ephemeral marks visibly decay — they are, after all, going to fade */
+  .hl-eph { background: var(--eph); animation: decay 5s ease-in-out infinite; }
+  @keyframes decay { 0%,100%{ opacity: .9 } 50%{ opacity: .35 } }
 
   .entry-body { flex: 1; }
   .entry-text { font-size: 13px; line-height: 1.5; color: var(--text); }
@@ -244,10 +344,11 @@
     cursor: pointer;
     font-size: 14px;
     padding: 4px;
-    transition: color 0.15s;
+    transition: color 0.15s, transform 0.15s;
     flex-shrink: 0;
   }
-  .delete-btn:hover { color: var(--eph); }
+  .delete-btn:hover { color: var(--eph); transform: scale(1.15); }
+  .delete-btn:focus-visible { outline: none; color: var(--eph); }
 
   .empty-state {
     text-align: center;
@@ -257,6 +358,7 @@
     line-height: 2;
     letter-spacing: 0.5px;
   }
+  .empty-state .ghost-line { color: var(--ink-ghost); font-style: italic; }
 
   footer {
     border-top: 1px solid var(--border);
@@ -266,14 +368,40 @@
     letter-spacing: 1px;
     display: flex;
     justify-content: space-between;
+    gap: 12px;
+  }
+  footer .whisper { color: var(--ink-ghost); font-style: italic; opacity: 0; transition: opacity 1.2s; }
+  footer .whisper.show { opacity: 1; }
+  #idleWhisper {
+    position: fixed; left: 50%; bottom: 54px; transform: translateX(-50%);
+    color: var(--ink-ghost); font-size: 11px; font-style: italic; letter-spacing: 1px;
+    pointer-events: none; opacity: 0; transition: opacity 1.4s; z-index: 3;
+  }
+  #idleWhisper.show { opacity: 1; }
+
+  #egg {
+    position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%);
+    color: var(--ink-ghost); font-size: 11px; font-style: italic; letter-spacing: 2px;
+    pointer-events: none; opacity: 0; transition: opacity .6s; z-index: 4;
+    text-shadow: 0 0 10px var(--glow);
+  }
+  #egg.show { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fog, .ember, .breathe, .reveal, .flicker, .ratio-fill, .hl-eph, .entry { animation: none !important; }
+    .ratio-fill { transition: none !important; }
+    .ember { display: none; }
+    .breathe, .flicker { opacity: 1 !important; }
   }
 </style>
 </head>
-<body>
+<body class="grain">
+
+<div class="fog" aria-hidden="true"></div>
 
 <header>
-  <h1>The Permanent Record</h1>
-  <span class="sub">Will this still exist in one year?</span>
+  <h1 id="appTitle"><span class="glyph breathe">∞</span> The Permanent Record</h1>
+  <span class="sub">will this still exist in one year?</span>
 </header>
 
 <div class="stats-bar">
@@ -302,15 +430,15 @@
 <div class="ratio-bar-wrap">
   <div class="ratio-bar"><div class="ratio-fill" id="ratioFill" style="width:0%"></div></div>
   <div class="ratio-label">
-    <span>ephemeral</span>
-    <span>permanent</span>
+    <span>smoke</span>
+    <span>stone</span>
   </div>
 </div>
 
 <div class="input-zone">
   <label>Log a work block</label>
   <div class="input-row">
-    <textarea id="entryInput" placeholder="What did you just do? Be specific." rows="2"></textarea>
+    <textarea id="entryInput" placeholder="what did you just do? be specific. the ledger does not forgive vagueness." rows="2"></textarea>
     <div class="half-life-select">
       <label>Half-life</label>
       <div class="hl-buttons">
@@ -325,32 +453,37 @@
 </div>
 
 <div class="verdict-zone">
-  <div class="verdict-text neutral" id="verdictText">Log your first block to see where your time is going.</div>
+  <div class="verdict-text neutral" id="verdictText">the cave is empty. nothing has fossilized yet.</div>
+  <button class="copy-btn" id="copyBtn" onclick="copyVerdict()" hidden>copy verdict</button>
 </div>
 
 <div class="log-zone" id="logZone">
   <div class="empty-state" id="emptyState">
-    No entries yet.<br>
-    The URL https://omnom-demo.vercel.app will exist tomorrow.<br>
-    The VC meeting notes will not.<br>
-    Start logging.
+    the cave is empty. nothing has fossilized yet.<br>
+    the URL https://omnom-demo.vercel.app will exist tomorrow.<br>
+    the VC meeting notes will not.<br>
+    <span class="ghost-line">start logging. the mountain is watching.</span>
   </div>
 </div>
 
 <footer>
   <span>PERMANENT RECORD v1 · PRÍZRAK</span>
+  <span class="whisper" id="nightWhisper">the mountain does not sleep.</span>
   <span id="footerCount">0 entries</span>
 </footer>
+
+<div id="idleWhisper">still here. still watching.</div>
+<div id="egg">you found the watcher.</div>
 
 <script>
 let selectedHL = null;
 let entries = JSON.parse(localStorage.getItem('pr_entries') || '[]');
 
 const HL_META = {
-  perm: { label: '∞ PERMANENT', cls: 'hl-perm', tagCls: 'tag-perm', desc: 'Exists in one year' },
-  week: { label: '~ WEEKS', cls: 'hl-week', tagCls: 'tag-week', desc: 'Fades in weeks' },
-  day:  { label: '~ DAYS', cls: 'hl-day', tagCls: 'tag-day', desc: 'Gone in days' },
-  eph:  { label: '~ HOURS', cls: 'hl-eph', tagCls: 'tag-eph', desc: 'Gone tonight' }
+  perm: { label: '∞ PERMANENT', cls: 'hl-perm', tagCls: 'tag-perm', desc: 'exists in one year' },
+  week: { label: '~ WEEKS', cls: 'hl-week', tagCls: 'tag-week', desc: 'fades in weeks' },
+  day:  { label: '~ DAYS', cls: 'hl-day', tagCls: 'tag-day', desc: 'gone in days' },
+  eph:  { label: '~ HOURS', cls: 'hl-eph', tagCls: 'tag-eph', desc: 'gone tonight' }
 };
 
 function selectHL(hl) {
@@ -385,6 +518,13 @@ function addEntry() {
   document.querySelectorAll('.hl-btn').forEach(b => b.className = 'hl-btn');
   document.getElementById('addBtn').disabled = true;
   render();
+  // newest entry gets a reveal flourish, then we scroll the ledger to it
+  const zone = document.getElementById('logZone');
+  const first = zone.querySelector('.entry');
+  if (first) {
+    first.classList.add('reveal');
+    first.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 function deleteEntry(id) {
@@ -407,14 +547,19 @@ function getStats() {
 
 function getVerdict(counts, ratio) {
   if (counts.perm + counts.week + counts.day + counts.eph === 0) {
-    return { text: 'Log your first block to see where your time is going.', warn: false };
+    return { text: 'the cave is empty. nothing has fossilized yet.', warn: false };
   }
-  if (ratio === null) return { text: 'Loading...', warn: false };
-  if (ratio >= 60) return { text: `${ratio}% permanent. The potato endures. You are building the silo.`, warn: false };
-  if (ratio >= 40) return { text: `${ratio}% permanent. Acceptable. The barn is half full. Keep going.`, warn: false };
-  if (ratio >= 20) return { text: `${ratio}% permanent. More performance than product. The meeting notes decay by Thursday.`, warn: true };
-  if (ratio > 0) return { text: `${ratio}% permanent. You are mostly smoke. The mountain is suspicious.`, warn: true };
-  return { text: `0% permanent. Everything you did today will be gone by the weekend. Is this what you came here to build?`, warn: true };
+  if (ratio === null) return { text: 'reading the ledger...', warn: false };
+  if (ratio >= 60) return { text: `${ratio}% stone. the silo rises. what you built today will outlast the winter.`, warn: false };
+  if (ratio >= 40) return { text: `${ratio}% stone. the bridge holds. for now. keep laying the karst.`, warn: false };
+  if (ratio >= 20) return { text: `${ratio}% stone. more performance than product. the meeting notes decay by Thursday.`, warn: true };
+  if (ratio > 0) return { text: `${ratio}% stone. you are mostly smoke. the mountain is suspicious.`, warn: true };
+  return { text: `0% stone. everything you touched today is gone by the weekend. is this what you came here to build?`, warn: true };
+}
+
+function dayRatio(dayEntries) {
+  const perm = dayEntries.filter(e => e.hl === 'perm').length;
+  return Math.round((perm / dayEntries.length) * 100);
 }
 
 function groupByDay(entries) {
@@ -443,14 +588,17 @@ function render() {
   const vEl = document.getElementById('verdictText');
   vEl.textContent = verdict.text;
   vEl.className = 'verdict-text ' + (verdict.warn ? 'warn' : total === 0 ? 'neutral' : '');
+  // the verdict breathes once there's something to judge
+  vEl.classList.toggle('breathe', total > 0);
+  document.getElementById('copyBtn').hidden = total === 0;
 
   const zone = document.getElementById('logZone');
   if (entries.length === 0) {
     zone.innerHTML = `<div class="empty-state" id="emptyState">
-      No entries yet.<br>
-      The URL https://omnom-demo.vercel.app will exist tomorrow.<br>
-      The VC meeting notes will not.<br>
-      Start logging.
+      the cave is empty. nothing has fossilized yet.<br>
+      the URL https://omnom-demo.vercel.app will exist tomorrow.<br>
+      the VC meeting notes will not.<br>
+      <span class="ghost-line">start logging. the mountain is watching.</span>
     </div>`;
     return;
   }
@@ -460,7 +608,8 @@ function render() {
   Object.entries(groups).forEach(([day, dayEntries]) => {
     const group = document.createElement('div');
     group.className = 'day-group';
-    group.innerHTML = `<div class="day-header">${day}</div>`;
+    const dr = dayRatio(dayEntries);
+    group.innerHTML = `<div class="day-header"><span>${day}</span><span class="day-ratio">${dr}% stone</span></div>`;
     dayEntries.forEach(e => {
       const meta = HL_META[e.hl];
       const time = new Date(e.ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -476,7 +625,7 @@ function render() {
             <span>${meta.desc}</span>
           </div>
         </div>
-        <button class="delete-btn" onclick="deleteEntry(${e.id})" title="Remove">×</button>
+        <button class="delete-btn" onclick="deleteEntry(${e.id})" title="let the fog take it">×</button>
       `;
       group.appendChild(el);
     });
@@ -487,6 +636,79 @@ function render() {
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+function copyVerdict() {
+  const text = document.getElementById('verdictText').textContent;
+  const btn = document.getElementById('copyBtn');
+  navigator.clipboard.writeText(text).then(() => {
+    const prev = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('flash');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('flash'); }, 1200);
+  }).catch(() => {});
+}
+
+/* ---- ambient embers (capped, staggered) ---- */
+(function spawnEmbers() {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const COUNT = 7;
+  for (let i = 0; i < COUNT; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + 'vw';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (12 + Math.random() * 8) + 's';
+    document.body.appendChild(e);
+  }
+})();
+
+/* ---- easter egg 1: type "prizrak" → the watcher reveals itself ---- */
+(function watcherEgg() {
+  const target = 'prizrak';
+  let buf = '';
+  const egg = document.getElementById('egg');
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-target.length);
+      if (buf === target) {
+        egg.classList.add('show');
+        setTimeout(() => egg.classList.remove('show'), 3000);
+      }
+    }
+  });
+})();
+
+/* ---- easter egg 2: triple-click the title → one extra ember ---- */
+document.getElementById('appTitle').addEventListener('click', function (ev) {
+  if (ev.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + 'vw';
+    e.style.animationDuration = '12s';
+    document.body.appendChild(e);
+    setTimeout(() => e.remove(), 12000);
+  }
+});
+
+/* ---- night whisper: 00:00–03:00 local ---- */
+(function nightWatch() {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) document.getElementById('nightWhisper').classList.add('show');
+})();
+
+/* ---- idle 60s → a single line fades in (never touches saved state) ---- */
+(function idleWatch() {
+  const w = document.getElementById('idleWhisper');
+  let t;
+  const reset = () => {
+    w.classList.remove('show');
+    clearTimeout(t);
+    t = setTimeout(() => w.classList.add('show'), 60000);
+  };
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+    window.addEventListener(ev, reset, { passive: true }));
+  reset();
+})();
 
 render();
 </script>

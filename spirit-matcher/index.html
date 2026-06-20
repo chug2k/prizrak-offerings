@@ -7,47 +7,134 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap');
-    body { background: #0d0d0d; color: #c8b89a; font-family: 'IM Fell English', serif; }
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111008;   /* cards, panels (kept warm) */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#3a3028;        /* thin borders (kept warm) */
+      --line-soft:#1a1a1d;
+      --ink:#c8b89a;         /* primary text (kept) */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#a07b44;      /* warm Tatra bronze — this app's lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { background: var(--bg); color: var(--ink); font-family: 'IM Fell English', serif; }
     .mono { font-family: 'JetBrains Mono', monospace; }
-    .spirit-card { border: 1px solid #3a3028; background: #111008; }
-    .slider { accent-color: #8b6a3e; }
-    select { background: #1a160e; border: 1px solid #3a3028; color: #c8b89a; }
-    .result-glow { text-shadow: 0 0 20px rgba(200, 184, 154, 0.3); }
-    .fog { opacity: 0.6; }
+    .spirit-card {
+      border: 1px solid var(--line);
+      background: var(--bg-raised);
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .slider { accent-color: var(--accent); }
+    select {
+      background: var(--bg-sunk); border: 1px solid var(--line); color: var(--ink);
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    select:hover { border-color: var(--accent); }
+    select:focus-visible, .slider:focus-visible {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--glow);
+    }
+    .result-glow { text-shadow: 0 0 20px var(--glow); }
+    .fog-text { color: var(--ink-dim); }
+    .ghost-text { color: var(--ink-ghost); }
+
+    /* result panel breathes when revealed */
+    .result-active {
+      box-shadow: 0 0 0 1px var(--line), 0 0 28px -8px var(--glow);
+      border-color: var(--line);
+    }
+
+    /* ---- ambient motion (delight spec) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* tactile button */
+    .btn-classify{
+      border:1px solid var(--line);
+      transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .btn-classify:hover{transform:translateY(-2px);border-color:var(--accent);color:#e6d6b6}
+    .btn-classify:active{transform:translateY(1px)}
+    .btn-classify:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    .copy-btn{
+      border:1px solid var(--line); color:var(--ink-dim);
+      transition:border-color .15s ease, color .15s ease, transform .12s ease;
+    }
+    .copy-btn:hover{border-color:var(--accent);color:var(--ink)}
+    .copy-btn:active{transform:translateY(1px)}
+    .copy-btn:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    #title{cursor:default;user-select:none}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen p-6 md:p-12">
-  <div class="max-w-2xl mx-auto">
+<body class="min-h-screen p-6 md:p-12 grain">
+
+  <!-- ambient layers (decorative, behind content) -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <div class="max-w-2xl mx-auto" style="position:relative;z-index:2">
 
     <!-- Header -->
     <div class="text-center mb-10">
-      <p class="mono text-xs fog mb-2 tracking-widest">PRÍZRAK DIAGNOSTIC SYSTEM v1.0</p>
-      <h1 class="text-3xl md:text-4xl mb-3 result-glow">Tatra Spirit Classifier</h1>
-      <p class="text-sm fog italic">Which Slovak folk spirit are you embodying today?</p>
-      <p class="text-xs mono mt-2 fog">The mountain does not guess. It classifies.</p>
+      <p class="mono text-xs fog-text mb-2 tracking-widest flicker">PRÍZRAK DIAGNOSTIC SYSTEM v1.0</p>
+      <h1 id="title" class="text-3xl md:text-4xl mb-3 result-glow breathe">Tatra Spirit Classifier</h1>
+      <p class="text-sm fog-text italic">Which Slovak folk spirit are you embodying tonight?</p>
+      <p class="text-xs mono mt-2 fog-text">The mountain does not guess. It classifies.</p>
     </div>
 
     <!-- Form -->
     <div class="spirit-card rounded p-6 mb-8">
-      <h2 class="text-lg mb-6 border-b border-gray-800 pb-3">Current State Assessment</h2>
+      <h2 class="text-lg mb-1">Current State Assessment</h2>
+      <p class="mono text-[10px] fog-text tracking-widest mb-6 pb-3 border-b" style="border-color:var(--line)">INTAKE 01 / FIVE READINGS, THEN A VERDICT</p>
 
       <!-- Body Battery -->
       <div class="mb-6">
-        <label class="text-sm fog block mb-2">Body Battery / Energy Level (0 = empty, 100 = full)</label>
+        <label class="mono text-[10px] tracking-widest fog-text block mb-2" for="battery">BODY BATTERY / ENERGY · 0 EMPTY → 100 FULL</label>
         <input type="range" id="battery" min="0" max="100" value="50" class="slider w-full mb-1">
-        <div class="flex justify-between mono text-xs fog"><span>0 — depleted</span><span id="batteryVal">50</span><span>100 — charged</span></div>
+        <div class="flex justify-between mono text-xs fog-text"><span>0 — depleted</span><span id="batteryVal" class="text-base" style="color:var(--accent)">50</span><span>100 — charged</span></div>
       </div>
 
       <!-- Stress -->
       <div class="mb-6">
-        <label class="text-sm fog block mb-2">Stress Level (0 = serene, 100 = crisis)</label>
+        <label class="mono text-[10px] tracking-widest fog-text block mb-2" for="stress">STRESS LOAD · 0 SERENE → 100 CRISIS</label>
         <input type="range" id="stress" min="0" max="100" value="30" class="slider w-full mb-1">
-        <div class="flex justify-between mono text-xs fog"><span>0 — calm</span><span id="stressVal">30</span><span>100 — burning</span></div>
+        <div class="flex justify-between mono text-xs fog-text"><span>0 — calm</span><span id="stressVal" class="text-base" style="color:var(--accent)">30</span><span>100 — burning</span></div>
       </div>
 
       <!-- Time of Day -->
       <div class="mb-6">
-        <label class="text-sm fog block mb-2">Current Hour</label>
+        <label class="mono text-[10px] tracking-widest fog-text block mb-2" for="hour">CURRENT HOUR</label>
         <select id="hour" class="w-full rounded px-3 py-2 text-sm">
           <option value="night">Night (0–5 AM) — the dark interval</option>
           <option value="dawn">Dawn (5–9 AM) — the uncertain threshold</option>
@@ -61,7 +148,7 @@
 
       <!-- Current Challenge -->
       <div class="mb-6">
-        <label class="text-sm fog block mb-2">Primary Challenge Mode</label>
+        <label class="mono text-[10px] tracking-widest fog-text block mb-2" for="challenge">PRIMARY CHALLENGE MODE</label>
         <select id="challenge" class="w-full rounded px-3 py-2 text-sm">
           <option value="building">Building something new</option>
           <option value="waiting">Waiting for someone / something to move</option>
@@ -75,7 +162,7 @@
 
       <!-- Recent Activity -->
       <div class="mb-6">
-        <label class="text-sm fog block mb-2">Last significant physical activity?</label>
+        <label class="mono text-[10px] tracking-widest fog-text block mb-2" for="activity">LAST SIGNIFICANT PHYSICAL ACTIVITY</label>
         <select id="activity" class="w-full rounded px-3 py-2 text-sm">
           <option value="intense">Intense (sports, hard labor, >2 hours)</option>
           <option value="moderate">Moderate (walk, light exercise)</option>
@@ -84,25 +171,31 @@
         </select>
       </div>
 
-      <button onclick="classify()" class="w-full py-3 border border-gray-600 hover:border-gray-400 transition-colors rounded mono text-sm tracking-wider">
+      <button onclick="classify()" class="btn-classify w-full py-3 rounded mono text-sm tracking-wider">
         CLASSIFY MY SPIRIT →
       </button>
     </div>
 
     <!-- Result -->
     <div id="result" class="spirit-card rounded p-6 hidden">
-      <p class="mono text-xs fog mb-4 tracking-widest">CLASSIFICATION RESULT</p>
-      <div id="spiritName" class="text-3xl mb-2 result-glow"></div>
-      <div id="spiritTranslation" class="text-sm fog italic mb-6"></div>
+      <div class="flex items-center justify-between mb-4">
+        <p class="mono text-xs fog-text tracking-widest">CLASSIFICATION RESULT</p>
+        <button id="copyBtn" onclick="copyVerdict()" class="copy-btn mono text-[10px] tracking-widest rounded px-2 py-1">COPY TO LEDGER</button>
+      </div>
+      <div id="spiritName" class="text-3xl mb-2 result-glow breathe"></div>
+      <div id="spiritTranslation" class="text-sm fog-text italic mb-6"></div>
       <div id="spiritDescription" class="text-sm leading-relaxed mb-6"></div>
-      <div id="spiritAdvice" class="border-t border-gray-800 pt-4 text-sm italic fog"></div>
-      <div id="batteryNote" class="mt-4 mono text-xs fog"></div>
+      <div id="spiritAdvice" class="border-t pt-4 text-sm italic fog-text" style="border-color:var(--line)"></div>
+      <div id="batteryNote" class="mt-4 mono text-xs fog-text"></div>
     </div>
 
     <!-- Footer -->
     <div class="text-center mt-12">
-      <p class="mono text-xs fog">Prízrak Diagnostic System — built at 4 AM while Charles slept</p>
-      <p class="mono text-xs fog mt-1">The mountain classifies. You decide what to do with the data.</p>
+      <p class="mono text-xs fog-text">Prízrak Diagnostic System — built at 4 AM while Charles slept</p>
+      <p class="mono text-xs fog-text mt-1">The mountain classifies. You decide what to do with the data.</p>
+      <p id="nightWhisper" class="mono text-[11px] ghost-text mt-3" style="display:none">the mountain does not sleep.</p>
+      <p id="idleWhisper" class="mono text-[11px] ghost-text mt-3" style="opacity:0;transition:opacity 1.2s ease">still here. still watching.</p>
+      <p id="eggLine" class="mono text-[11px] ghost-text mt-3" style="display:none">you found the watcher.</p>
     </div>
   </div>
 
@@ -162,6 +255,8 @@
       }
     };
 
+    let lastVerdictText = '';
+
     function classify() {
       const battery = parseInt(document.getElementById('battery').value);
       const stress = parseInt(document.getElementById('stress').value);
@@ -208,7 +303,7 @@
       document.getElementById('spiritName').textContent = s.name;
       document.getElementById('spiritTranslation').textContent = s.translation;
       document.getElementById('spiritDescription').textContent = s.description;
-      document.getElementById('spiritAdvice').textContent = '🥔 Prizrak notes: ' + s.advice;
+      document.getElementById('spiritAdvice').textContent = '🥔 Prízrak notes: ' + s.advice;
 
       // Battery annotation
       let batteryNote = '';
@@ -217,9 +312,124 @@
       else if (battery > 80) batteryNote = `Body battery ${battery}/100 — strong reserves. The harvest window is open.`;
       document.getElementById('batteryNote').textContent = batteryNote;
 
-      document.getElementById('result').classList.remove('hidden');
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+      // assemble the ledger line (for copy-to-clipboard)
+      lastVerdictText = `${s.name} — ${s.translation}\n\n${s.description}\n\n🥔 Prízrak notes: ${s.advice}${batteryNote ? '\n\n' + batteryNote : ''}\n\n— Tatra Spirit Classifier`;
+
+      const result = document.getElementById('result');
+      result.classList.remove('hidden');
+      result.classList.remove('reveal'); void result.offsetWidth; result.classList.add('reveal');
+      result.classList.add('result-active');
+      resetCopyBtn();
+      result.scrollIntoView({ behavior: 'smooth' });
+
+      // remember the last classification (additive; namespaced; never blocks UI)
+      try {
+        localStorage.setItem('spirit-matcher:last', JSON.stringify({
+          spirit, battery, stress, hour, challenge, activity, at: Date.now()
+        }));
+      } catch (e) { /* the fog takes it */ }
     }
+
+    // ---- copy to the ledger ----
+    function resetCopyBtn(){
+      const b = document.getElementById('copyBtn');
+      b.textContent = 'COPY TO LEDGER';
+      b.style.color = '';
+      b.style.borderColor = '';
+    }
+    function copyVerdict(){
+      if (!lastVerdictText) return;
+      const b = document.getElementById('copyBtn');
+      const done = () => {
+        b.textContent = 'COPIED TO THE LEDGER';
+        b.style.color = 'var(--accent)';
+        b.style.borderColor = 'var(--accent)';
+        setTimeout(resetCopyBtn, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastVerdictText).then(done).catch(done);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = lastVerdictText; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch(e){}
+        document.body.removeChild(ta); done();
+      }
+    }
+
+    // ---- ambient embers (cap 10, staggered) ----
+    (function spawnEmbers(){
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const field = document.getElementById('emberField');
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random() * 90) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg: triple-click the title spawns one extra ember ----
+    document.getElementById('title').addEventListener('click', function(){
+      this._clicks = (this._clicks || 0) + 1;
+      clearTimeout(this._t);
+      this._t = setTimeout(() => { this._clicks = 0; }, 600);
+      if (this._clicks >= 3) {
+        this._clicks = 0;
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) return;
+        const field = document.getElementById('emberField');
+        if (field.querySelectorAll('.ember').length >= 10) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random() * 90) + '%';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        field.appendChild(e);
+        setTimeout(() => e.remove(), 19000);
+      }
+    });
+
+    // ---- easter egg: type "prizrak" to wake the watcher ----
+    (function(){
+      const word = 'prizrak'; let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+          buf = (buf + ev.key.toLowerCase()).slice(-word.length);
+          if (buf === word) {
+            const el = document.getElementById('eggLine');
+            el.style.display = 'block';
+            el.classList.add('flicker');
+          }
+        }
+      });
+    })();
+
+    // ---- footer whisper between 00:00–03:00 local ----
+    (function(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        document.getElementById('nightWhisper').style.display = 'block';
+      }
+    })();
+
+    // ---- idle 60s: a single line fades in ----
+    (function(){
+      let t;
+      const reset = () => {
+        document.getElementById('idleWhisper').style.opacity = '0';
+        clearTimeout(t);
+        t = setTimeout(() => {
+          document.getElementById('idleWhisper').style.opacity = '0.9';
+        }, 60000);
+      };
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, reset, { passive: true }));
+      reset();
+    })();
   </script>
+  <script src="/shared/star-widget.js"></script>
 </body>
 </html>

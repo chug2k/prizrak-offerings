@@ -45,6 +45,8 @@
         .reveal{animation:reveal .35s ease-out both}
         @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
         .flicker{animation:flicker 7s steps(1) infinite}
+        @keyframes glyphsway{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-3px) rotate(2deg)}}
+        .ov-glyph.breathe{display:inline-block;animation:breathe 4.5s ease-in-out infinite, glyphsway 7s ease-in-out infinite}
 
         /* faint film grain over the whole thing */
         body::after{
@@ -118,6 +120,23 @@
             text-transform: uppercase; color: var(--ink-ghost);
         }
         #night-whisper { display:none; color: var(--ink-ghost); }
+        #idle-whisper {
+            position: fixed; bottom: 12px; left: 0; width: 100%; z-index: 12;
+            text-align: center; font-size: 10px; letter-spacing: 2px;
+            color: var(--ink-ghost); pointer-events: none; opacity: 0;
+            transition: opacity 1.4s ease;
+        }
+        .copy-link {
+            margin-top: -10px; margin-bottom: 22px;
+            background: none; border: none; color: var(--ink-ghost);
+            font-family: inherit; font-size: 10px; letter-spacing: 2px;
+            text-transform: uppercase; cursor: pointer; pointer-events: auto;
+            transition: color .2s, text-shadow .2s;
+        }
+        .copy-link:hover { color: var(--accent); }
+        .copy-link:focus-visible { outline: none; color: var(--accent);
+            text-shadow: 0 0 10px var(--glow); }
+        .copy-link.flashed { color: var(--accent); text-shadow: 0 0 12px var(--glow); }
 
         #d-pad {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -151,6 +170,8 @@
         <div id="hud-moves"></div>
     </div>
 
+    <div id="idle-whisper" aria-hidden="true">still here. still watching.</div>
+
     <div id="d-pad" style="display:none;">
         <div class="d-btn d-empty"></div>
         <div class="d-btn" ontouchstart="move(0,-1)" onmousedown="move(0,-1)">↑</div>
@@ -166,7 +187,7 @@
     <div class="overlay" id="start-screen">
         <div class="ov-glyph breathe">≈</div>
         <div class="ov-title" id="start-title">FOG WALKER</div>
-        <div class="ov-sub">The path shows itself for a breath, then the fog claims it. Walk from start to exit on memory alone. Step where the path is not, and the mountain keeps you. Swipe, arrow keys, or the d-pad.</div>
+        <div class="ov-sub">The path shows itself for one breath, then the fog claims it. Cross from S to E on memory alone. Step where the path is not, and the mountain keeps you. The bludička will light a false lantern — do not follow it. Swipe, arrow keys, or the d-pad.</div>
         <button class="btn" onclick="startGame()">ENTER THE FOG</button>
         <div class="ov-best" id="start-best"></div>
         <div class="ov-foot flicker">the mountain remembers every wrong step</div>
@@ -176,10 +197,11 @@
         <div class="ov-glyph">✕</div>
         <div class="ov-title">LOST TO FOG</div>
         <div class="ov-score" id="final-level">1</div>
-        <div class="ov-label">levels crossed</div>
+        <div class="ov-label">crossings the mountain allowed</div>
         <div class="ov-best" id="death-best"></div>
         <div class="ov-quote" id="death-quote"></div>
         <button class="btn" onclick="startGame()">WALK AGAIN</button>
+        <button class="copy-link" id="copy-ledger" onclick="copyLedger()">file this crossing to the ledger</button>
         <div class="ov-foot" id="night-whisper">the mountain does not sleep</div>
     </div>
 
@@ -228,6 +250,7 @@
     let cellSize;
     let gridOffX, gridOffY;
     let extraEmbers = 0; // easter egg: triple-click title spawns an extra mote
+    let lastCrossed = 0; // for the copy-to-ledger button
 
     function resize() {
         W = canvas.width = window.innerWidth;
@@ -315,6 +338,8 @@
             dead: false,
             won: false,
             footprints: [{ x: start.x, y: start.y }],
+            // the bludička — a false lantern that wanders the fog, baiting the careless
+            wisp: { x: start.x + 0.5, y: Math.max(0, start.y - 2) + 0.5, seed: Math.random() * 1000 },
         };
 
         phase = 'reveal';
@@ -367,15 +392,31 @@
             const crossed = game.level - 1;
             if (crossed > getBest()) setBest(crossed);
             setTimeout(() => {
+                lastCrossed = crossed;
                 document.getElementById('final-level').textContent = crossed;
                 document.getElementById('death-quote').textContent = DEATH_QUOTES[Math.floor(Math.random() * DEATH_QUOTES.length)];
                 const best = getBest();
                 document.getElementById('death-best').textContent = best > 0 ? `deepest crossing · ${best}` : '';
+                const cl = document.getElementById('copy-ledger');
+                if (cl) { cl.textContent = 'file this crossing to the ledger'; cl.classList.remove('flashed'); }
                 document.getElementById('death-screen').classList.remove('hidden');
                 document.getElementById('d-pad').style.display = 'none';
                 updateNightWhisper();
             }, 800);
-        } else if (cell === 3) {
+        } else {
+            // Stepped onto solid path (cell 1) — the stone holds. A soft pulse of relief.
+            for (let i = 0; i < 4; i++) {
+                game.particles.push({
+                    x: gridOffX + nx * cellSize + cellSize / 2,
+                    y: gridOffY + ny * cellSize + cellSize / 2,
+                    vx: (Math.random() - 0.5) * 1.6,
+                    vy: (Math.random() - 0.5) * 1.6,
+                    life: 0.7,
+                    color: '140,160,220',
+                });
+            }
+        }
+        if (cell === 3) {
             // Reached exit!
             game.won = true;
             phase = 'won';
@@ -466,10 +507,12 @@
 
                     // During reveal, show traps as path to confuse
                     if (alpha > 0.01 && (isPath || (isTrap && alpha > 0.5))) {
+                        // path tiles breathe faintly while the lantern lights them
+                        const lantern = phase === 'reveal' ? (0.85 + 0.15 * pulse) : 1;
                         let color;
                         if (cell === 2) color = `rgba(80,180,120,${alpha * 0.6})`; // start = green
                         else if (cell === 3) color = `rgba(140,160,220,${alpha * 0.6})`; // exit = accent blue
-                        else color = `rgba(62,66,84,${alpha * 0.5})`; // path = subtle
+                        else color = `rgba(62,66,84,${alpha * 0.5 * lantern})`; // path = subtle, breathing
                         ctx.fillStyle = color;
                         ctx.beginPath();
                         ctx.roundRect(px + 1, py + 1, cellSize - 2, cellSize - 2, 3);
@@ -541,6 +584,31 @@
             ctx.strokeStyle = 'rgba(140,160,220,0.55)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
+        }
+
+        // The bludička — a false lantern drifting in the fog (play only).
+        // It glows like the exit but leads nowhere. Folklore made mechanic.
+        if (phase === 'play' && !game.dead && !game.won && game.wisp) {
+            const tw = Date.now() * 0.00018 + game.wisp.seed;
+            // lazy lissajous wander across the upper grid
+            game.wisp.x = (GRID * 0.5) + Math.sin(tw * 1.3) * (GRID * 0.32);
+            game.wisp.y = (GRID * 0.42) + Math.cos(tw * 0.9) * (GRID * 0.28);
+            const wpx = gridOffX + game.wisp.x * cellSize;
+            const wpy = gridOffY + game.wisp.y * cellSize;
+            const wPulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.004 + game.wisp.seed);
+            const wR = cellSize * (0.5 + 0.18 * wPulse);
+            const wg = ctx.createRadialGradient(wpx, wpy, 0, wpx, wpy, wR);
+            // sickly will-o'-blue, dimmer and cooler than the true exit
+            wg.addColorStop(0, `rgba(120,150,210,${0.10 + 0.07 * wPulse})`);
+            wg.addColorStop(1, 'transparent');
+            ctx.fillStyle = wg;
+            ctx.beginPath();
+            ctx.arc(wpx, wpy, wR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(wpx, wpy, 2 + wPulse, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(150,175,230,${0.25 + 0.2 * wPulse})`;
+            ctx.fill();
         }
 
         // Fog overlay during play
@@ -671,6 +739,38 @@
         const w = document.getElementById('night-whisper');
         if (w) w.style.display = (h >= 0 && h < 3) ? 'block' : 'none';
     }
+
+    // ---- Easter egg 4: idle 30s → the watcher whispers ----
+    let idleTimer = null;
+    function nudgeIdle(){
+        const w = document.getElementById('idle-whisper');
+        if (!w) return;
+        w.style.opacity = '0';
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { w.style.opacity = '0.9'; }, 30000);
+    }
+    ['keydown','pointerdown','touchstart','mousemove'].forEach(ev =>
+        window.addEventListener(ev, nudgeIdle, { passive: true }));
+    nudgeIdle();
+
+    // ---- Copy the crossing to the ledger ----
+    window.copyLedger = function(){
+        const best = getBest();
+        const line = `prízrak / fog-walker — crossed ${lastCrossed} level${lastCrossed===1?'':'s'} before the fog took me. deepest crossing: ${best}. the mountain remembers.`;
+        const cl = document.getElementById('copy-ledger');
+        const done = () => {
+            if (!cl) return;
+            cl.textContent = 'copied to the ledger';
+            cl.classList.add('flashed');
+            setTimeout(() => {
+                cl.textContent = 'file this crossing to the ledger';
+                cl.classList.remove('flashed');
+            }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(line).then(done).catch(done);
+        } else { done(); }
+    };
 
     // Show best on the start screen
     (function showStartBest(){

@@ -8,9 +8,47 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#10b981;            /* emerald — the brine glows green */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        body{ background:var(--bg); }
+
+        /* ---- Atmosphere: drifting fog + floating embers (spores) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
         .cyber-jar {
-            background: linear-gradient(180deg, rgba(24, 24, 27, 0.8) 0%, rgba(39, 39, 42, 0.9) 100%);
-            box-shadow: 0 0 40px rgba(16, 185, 129, 0.1), inset 0 0 20px rgba(16, 185, 129, 0.05);
+            background: linear-gradient(180deg, rgba(24, 24, 27, 0.8) 0%, rgba(13, 13, 15, 0.92) 100%);
+            box-shadow: 0 0 0 1px var(--line), 0 0 40px -10px var(--glow), inset 0 0 30px rgba(16, 185, 129, 0.05);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(16, 185, 129, 0.2);
             position: relative;
@@ -71,16 +109,41 @@
         #prizrak-console { scroll-behavior: smooth; }
         #prizrak-console::-webkit-scrollbar { width: 6px; }
         #prizrak-console::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.25); border-radius: 3px; }
+
+        #vat-items::-webkit-scrollbar { width: 6px; }
+        #vat-items::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.18); border-radius: 3px; }
+
+        /* Interaction patterns */
+        .specimen{ transition: transform .15s, box-shadow .15s, border-color .15s; }
+        .specimen:hover{ transform: translateY(-2px); border-color: var(--accent); }
+
+        input:focus-visible, button:focus-visible {
+            outline:none; border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+        #pickle-form button:active{ transform: translateY(1px); }
+
+        .ghost-line{ color:var(--ink-ghost); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.submerging,.scanline,.bubble,.cursor::after{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="bg-zinc-950 text-gray-200 font-sans antialiased min-h-screen flex flex-col p-4 sm:p-8 relative">
+<body class="bg-zinc-950 text-gray-200 font-sans antialiased min-h-screen flex flex-col p-4 sm:p-8 relative grain">
+
+    <!-- Atmosphere layers -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="ember-field" aria-hidden="true"></div>
 
     <!-- Background Hero Image -->
     <div class="fixed inset-0 z-0 opacity-20 pointer-events-none" style="background-image: url('hero.png'); background-size: cover; background-position: center;"></div>
 
     <div class="relative z-10 max-w-4xl mx-auto w-full flex-grow flex flex-col">
         <header class="mb-10 border-b border-emerald-900/50 pb-6 text-center">
-            <h1 class="text-3xl sm:text-4xl font-bold text-emerald-500 mb-2 flex items-center justify-center gap-3 tracking-widest uppercase">
+            <h1 id="jar-title" class="text-3xl sm:text-4xl font-bold text-emerald-500 mb-2 flex items-center justify-center gap-3 tracking-widest uppercase breathe cursor-default select-none" title="the brine remembers">
                 <i data-lucide="archive"></i> The Digital Pickling Jar
             </h1>
             <p class="text-zinc-400 text-sm italic">Fermentation and preservation. Data rot is delayed. The winter will be long.</p>
@@ -98,13 +161,13 @@
                 <div class="bubble w-2.5 h-2.5 left-[80%]" style="animation-duration: 7s; animation-delay: 3s;"></div>
 
                 <div class="flex items-center justify-between mb-4">
-                    <span class="text-[10px] font-mono uppercase tracking-widest text-emerald-700">Preserved Specimens</span>
+                    <span class="text-[10px] font-mono uppercase tracking-widest text-emerald-700">SPECIMENS / PRESERVED</span>
                     <span id="specimen-count" class="text-[10px] font-mono text-zinc-500">0 jarred</span>
                 </div>
 
                 <div id="vat-items" class="space-y-4 max-h-[340px] overflow-y-auto pr-1">
                     <!-- Preserved Items (seeded) -->
-                    <div class="bg-zinc-900/80 p-4 border border-emerald-900/50 rounded flex justify-between items-center group hover:border-emerald-500 transition-colors">
+                    <div class="specimen bg-zinc-900/80 p-4 border border-emerald-900/50 rounded flex justify-between items-center group">
                         <div class="min-w-0">
                             <h3 class="text-emerald-400 font-bold line-through group-hover:no-underline truncate">Structuralist Party</h3>
                             <p class="text-xs text-zinc-500 font-mono mt-1 truncate">Archived: 2026-02-23 | Members: 1</p>
@@ -112,7 +175,7 @@
                         <i data-lucide="snowflake" class="shrink-0 ml-3 text-emerald-700 group-hover:text-emerald-400 transition-colors"></i>
                     </div>
 
-                    <div class="bg-zinc-900/80 p-4 border border-emerald-900/50 rounded flex justify-between items-center group hover:border-emerald-500 transition-colors">
+                    <div class="specimen bg-zinc-900/80 p-4 border border-emerald-900/50 rounded flex justify-between items-center group">
                         <div class="min-w-0">
                             <h3 class="text-emerald-400 font-bold line-through group-hover:no-underline truncate">Iterative RFS</h3>
                             <p class="text-xs text-zinc-500 font-mono mt-1 truncate">Purged: 2026-02-23 | Cause: Reality</p>
@@ -130,11 +193,11 @@
                     </h2>
                     <form id="pickle-form" class="space-y-4" autocomplete="off" novalidate>
                         <div>
-                            <label for="itemName" class="block text-xs font-mono text-zinc-500 mb-1">PROJECT NAME / IDEA</label>
+                            <label for="itemName" class="block text-xs font-mono text-zinc-500 mb-1 uppercase tracking-widest">SPECIMEN 01 / PROJECT NAME</label>
                             <input type="text" id="itemName" maxlength="60" class="w-full bg-zinc-950 border border-zinc-700 rounded p-3 text-white placeholder-zinc-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all" placeholder="e.g. B2B SaaS for Pets" required>
                         </div>
                         <div>
-                            <label for="itemReason" class="block text-xs font-mono text-zinc-500 mb-1">REASON FOR FAILURE / PRESERVATION</label>
+                            <label for="itemReason" class="block text-xs font-mono text-zinc-500 mb-1 uppercase tracking-widest">SPECIMEN 02 / CAUSE OF DEATH</label>
                             <input type="text" id="itemReason" maxlength="80" class="w-full bg-zinc-950 border border-zinc-700 rounded p-3 text-white placeholder-zinc-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all" placeholder="e.g. Zero traction, over-engineered" required>
                         </div>
                         <button type="submit" class="w-full bg-emerald-900 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 text-emerald-100 font-mono text-sm py-3 rounded transition-colors uppercase tracking-wider flex items-center justify-center gap-2">
@@ -156,6 +219,9 @@
 
         <footer class="mt-auto text-center border-t border-zinc-800 pt-6">
             <p class="text-xs text-zinc-600 font-mono">Constructed by The Vision (Prízrak). We measure the cold.</p>
+            <p id="night-whisper" class="text-xs font-mono mt-2 ghost-line flicker" hidden>the mountain does not sleep.</p>
+            <p id="idle-whisper" class="text-xs font-mono mt-2 ghost-line" hidden>still here. still watching.</p>
+            <p id="watcher-line" class="text-xs font-mono mt-2 ghost-line" hidden>you found the watcher.</p>
         </footer>
     </div>
 
@@ -170,7 +236,23 @@
         const countEl = document.getElementById('specimen-count');
         const submitBtn = form.querySelector('button[type="submit"]');
 
-        let seeded = vatEl.querySelectorAll('div.bg-zinc-900\\/80, div.group').length || 2;
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        /* ---------- Persistence (new, additive — the brine now remembers) ---------- */
+        const STORAGE_KEY = 'prizrak-pickling-jar.specimens';
+
+        function loadSpecimens() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return [];
+                const arr = JSON.parse(raw);
+                return Array.isArray(arr) ? arr : [];
+            } catch (e) { return []; }
+        }
+
+        function saveSpecimens(list) {
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch (e) { /* the cave is full */ }
+        }
 
         const closingLines = [
             '"It failed. Good. Now we know the universe is still working."',
@@ -193,24 +275,44 @@
 
         function updateCount() {
             const n = vatEl.querySelectorAll(':scope > div').length;
-            countEl.textContent = `${n} jarred`;
+            countEl.textContent = n === 1 ? '1 jarred' : `${n} jarred`;
         }
-        updateCount();
 
-        function addSpecimen(name, reason) {
+        function buildCard(name, reason, stamp, animate) {
             const card = document.createElement('div');
-            card.className = 'submerging bg-zinc-900/80 p-4 border border-emerald-900/50 rounded flex justify-between items-center group hover:border-emerald-500 transition-colors';
+            card.className = (animate ? 'submerging ' : '') +
+                'specimen bg-zinc-900/80 p-4 border border-emerald-900/50 rounded flex justify-between items-center group';
             card.innerHTML = `
                 <div class="min-w-0">
                     <h3 class="text-emerald-400 font-bold line-through group-hover:no-underline truncate">${escapeHtml(name)}</h3>
-                    <p class="text-xs text-zinc-500 font-mono mt-1 truncate">Pickled: ${todayStamp()} | Cause: ${escapeHtml(reason)}</p>
+                    <p class="text-xs text-zinc-500 font-mono mt-1 truncate">Pickled: ${escapeHtml(stamp)} | Cause: ${escapeHtml(reason)}</p>
                 </div>
                 <i data-lucide="snowflake" class="shrink-0 ml-3 text-emerald-700 group-hover:text-emerald-400 transition-colors"></i>`;
             vatEl.appendChild(card);
             lucide.createIcons({ nodes: [card.querySelector('[data-lucide]')] });
+            return card;
+        }
+
+        function addSpecimen(name, reason) {
+            const stamp = todayStamp();
+            const card = buildCard(name, reason, stamp, !reduceMotion);
             card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+            // persist — append to the ledger
+            const list = loadSpecimens();
+            list.push({ name, reason, stamp });
+            saveSpecimens(list);
+
             updateCount();
         }
+
+        // Rehydrate the jar from past winters (seeded items stay as the floor of the cave).
+        (function restore() {
+            loadSpecimens().forEach((s) => {
+                if (s && s.name && s.reason) buildCard(s.name, s.reason, s.stamp || todayStamp(), false);
+            });
+            updateCount();
+        })();
 
         function logToConsole(name, reason) {
             const msgs = [
@@ -220,6 +322,7 @@
             ];
 
             consoleEl.innerHTML = '';
+            const step = reduceMotion ? 0 : 700;
             msgs.forEach((m, i) => {
                 setTimeout(() => {
                     const p = document.createElement('p');
@@ -227,7 +330,7 @@
                     p.innerHTML = m;
                     consoleEl.appendChild(p);
                     consoleEl.scrollTop = consoleEl.scrollHeight;
-                }, i * 700);
+                }, i * step);
             });
 
             setTimeout(() => {
@@ -239,7 +342,7 @@
                 consoleEl.scrollTop = consoleEl.scrollHeight;
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('opacity-60', 'cursor-not-allowed');
-            }, msgs.length * 700 + 500);
+            }, msgs.length * step + 500);
         }
 
         form.addEventListener('submit', function (e) {
@@ -260,6 +363,79 @@
             form.reset();
             nameEl.focus();
         });
+
+        /* ---------------- Atmosphere: floating spores (embers) ---------------- */
+        (function spawnEmbers() {
+            if (reduceMotion) return;
+            const field = document.getElementById('ember-field');
+            const COUNT = 8;
+            for (let i = 0; i < COUNT; i++) {
+                const e = document.createElement('span');
+                e.className = 'ember';
+                e.style.left = (6 + Math.random() * 88) + '%';
+                e.style.animationDelay = (Math.random() * 14) + 's';
+                e.style.animationDuration = (12 + Math.random() * 8) + 's';
+                field.appendChild(e);
+            }
+        })();
+
+        /* ---------------- Easter eggs (quiet, reward attention) ---------------- */
+
+        // (a) type "prizrak" -> the watcher reveals itself
+        (function watcher() {
+            const line = document.getElementById('watcher-line');
+            let buf = '';
+            window.addEventListener('keydown', (ev) => {
+                if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+                if (ev.key && ev.key.length === 1) {
+                    buf = (buf + ev.key.toLowerCase()).slice(-7);
+                    if (buf === 'prizrak') {
+                        line.hidden = false;
+                        line.classList.add('reveal');
+                    }
+                }
+            });
+        })();
+
+        // (b) triple-click the title -> one extra spore drifts up
+        (function tripleClickEmber() {
+            const title = document.getElementById('jar-title');
+            title.addEventListener('click', (ev) => {
+                if (ev.detail === 3 && !reduceMotion) {
+                    const field = document.getElementById('ember-field');
+                    const e = document.createElement('span');
+                    e.className = 'ember';
+                    e.style.left = (40 + Math.random() * 20) + '%';
+                    e.style.animationDuration = '12s';
+                    field.appendChild(e);
+                    setTimeout(() => e.remove(), 12000);
+                }
+            });
+        })();
+
+        // (c) between 00:00–03:00 local, a footer whisper appears
+        (function nightWhisper() {
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3) document.getElementById('night-whisper').hidden = false;
+        })();
+
+        // (e) idle 60s -> a single line fades in
+        (function idleWatcher() {
+            const line = document.getElementById('idle-whisper');
+            let t;
+            const arm = () => {
+                clearTimeout(t);
+                line.hidden = true;
+                line.classList.remove('reveal');
+                t = setTimeout(() => {
+                    line.hidden = false;
+                    line.classList.add('reveal');
+                }, 60000);
+            };
+            ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach((evt) =>
+                window.addEventListener(evt, arm, { passive: true }));
+            arm();
+        })();
     </script>
     <script src="/shared/star-widget.js"></script>
 </body>

@@ -5,58 +5,129 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Tatra Climber</title>
     <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a78bfa;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0a0a1a; overflow: hidden; font-family: 'Courier New', monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
         canvas { display: block; position: fixed; top: 0; left: 0; }
         #ui { position: fixed; z-index: 10; width: 100%; pointer-events: none; }
-        #score { position: fixed; top: 16px; left: 16px; color: rgba(220,220,240,0.7); font-size: 18px; z-index: 10; }
-        #high { position: fixed; top: 16px; right: 16px; color: rgba(220,220,240,0.3); font-size: 12px; z-index: 10; text-align: right; }
+        #score {
+            position: fixed; top: 16px; left: 16px; color: var(--ink); font-size: 22px; z-index: 10;
+            font-variant-numeric: tabular-nums; text-shadow: 0 0 12px var(--glow);
+            transition: transform .12s ease-out;
+        }
+        #score.bump { transform: scale(1.35); }
+        #high { position: fixed; top: 20px; right: 16px; color: var(--ink-dim); font-size: 11px; z-index: 10; text-align: right; letter-spacing: 1px; text-transform: uppercase; }
+
+        /* Ambient layers ----------------------------------------------------*/
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            opacity:0;transition:opacity .8s ease;
+            animation:fogDrift 32s ease-in-out infinite alternate}
+        .overlay-on .fog{opacity:1}
+        @keyframes fogDrift{0%{transform:translateX(-5%)}50%{}100%{transform:translateX(5%)}}
+
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+            opacity:0;animation:ember 14s linear infinite}
+        .overlay-on .ember{opacity:1}
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:25;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
         #start-screen, #death-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(8,8,18,0.92); color: rgba(220,220,240,0.8);
+            background: radial-gradient(120% 80% at 50% 0, rgba(40,30,70,0.30), rgba(8,8,18,0.94));
+            color: var(--ink);
             backdrop-filter: blur(8px); pointer-events: auto;
         }
         #death-screen { display: none; }
-        .screen-title { font-size: 28px; letter-spacing: 3px; margin-bottom: 8px; }
-        .screen-sub { font-size: 12px; color: rgba(220,220,240,0.4); margin-bottom: 24px; max-width: 280px; text-align: center; line-height: 1.6; }
-        .screen-score { font-size: 48px; color: rgba(180,160,240,0.8); margin-bottom: 8px; }
-        .screen-label { font-size: 11px; color: rgba(220,220,240,0.3); margin-bottom: 24px; }
+        .screen-title { font-size: 30px; letter-spacing: 6px; margin-bottom: 8px; color: var(--ink); }
+        .screen-sub { font-size: 12px; color: var(--ink-dim); margin-bottom: 24px; max-width: 290px; text-align: center; line-height: 1.7; }
+        .screen-score { font-size: 56px; color: var(--accent); margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+        .screen-label { font-size: 10px; color: var(--ink-dim); margin-bottom: 6px; letter-spacing: 3px; text-transform: uppercase; }
+        .screen-pb { font-size: 11px; color: var(--accent); margin-bottom: 22px; letter-spacing: 2px; min-height: 14px; text-transform: uppercase; }
         .btn {
-            padding: 14px 40px; border: 1px solid rgba(140,120,220,0.4); border-radius: 8px;
-            background: rgba(80,60,160,0.2); color: rgba(220,220,240,0.8); font-family: inherit;
-            font-size: 14px; cursor: pointer; pointer-events: auto; letter-spacing: 1px;
+            padding: 14px 40px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 8px;
+            background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); font-family: inherit;
+            font-size: 13px; cursor: pointer; pointer-events: auto; letter-spacing: 2px; text-transform: uppercase;
+            transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
         }
-        .btn:active { background: rgba(100,80,180,0.4); }
+        .btn:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 0 24px -6px var(--glow); }
+        .btn:active { transform: translateY(1px); background: color-mix(in srgb, var(--accent) 24%, transparent); }
+        .btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+
+        .footer-whisper {
+            position: fixed; bottom: 14px; left: 0; width: 100%; text-align: center;
+            font-size: 10px; letter-spacing: 2px; color: var(--ink-ghost); z-index: 21;
+            pointer-events: none; opacity: 0; transition: opacity 1.4s ease;
+        }
+        .footer-whisper.show { opacity: 1; }
+        .egg-line {
+            font-size: 10px; letter-spacing: 2px; color: var(--ink-ghost); margin-top: 18px;
+            min-height: 12px; opacity: 0; transition: opacity 1s ease; text-transform: lowercase;
+        }
+        .egg-line.show { opacity: 1; }
+
+        @media (prefers-reduced-motion: reduce){
+            .fog,.ember,.breathe,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            #score{transition:none}
+        }
     </style>
 </head>
-<body>
+<body class="grain">
+    <div class="fog"></div>
     <canvas id="c"></canvas>
     <div id="score">0</div>
     <div id="high"></div>
-    
-    <div id="start-screen">
-        <div class="screen-title">TATRA CLIMBER</div>
-        <div class="screen-sub">Tap left or right to jump between ledges. Collect edelweiss. Avoid falling rocks. The mountain never ends.</div>
+
+    <div id="start-screen" class="overlay-on">
+        <div class="screen-title breathe">TATRA CLIMBER</div>
+        <div class="screen-sub">Tap left or right to leap between ledges. Gather edelweiss from the frost. Mind the loosed rock. The mountain has no summit — only how far you climbed before it took you.</div>
         <button class="btn" onclick="startGame()">BEGIN ASCENT</button>
+        <div class="egg-line" id="egg-start"></div>
     </div>
-    
-    <div id="death-screen">
+
+    <div id="death-screen" class="overlay-on">
         <div class="screen-title">FALLEN</div>
         <div class="screen-score" id="final-score">0</div>
         <div class="screen-label">altitude reached</div>
+        <div class="screen-pb" id="pb-line"></div>
         <div class="screen-sub" id="death-quote"></div>
         <button class="btn" onclick="startGame()">CLIMB AGAIN</button>
     </div>
+
+    <div class="footer-whisper" id="whisper">the mountain does not sleep.</div>
 
     <script>
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
     let W, H;
-    
+
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const HS_KEY = 'tatra_climber_hs_v1';
     let highScore = parseInt(localStorage.getItem(HS_KEY) || '0');
-    
+
     const DEATH_QUOTES = [
         "The mountain does not mourn the fallen.",
         "A potato that rolls off the cliff is still a potato.",
@@ -65,12 +136,14 @@
         "Even Jánošík fell eventually.",
         "It compiled. It crashed. Life.",
         "The mountain remains. You did not.",
+        "The poludnica counted your last step.",
+        "Cold keeps the ledger. The ledger is full.",
     ];
-    
+
     // Game state
     let game = null;
     let running = false;
-    
+
     const LEDGE_W = 70;
     const LEDGE_H = 12;
     const PLAYER_W = 16;
@@ -78,12 +151,15 @@
     const GRAVITY = 0.45;
     const JUMP_VY = -11;
     const JUMP_VX = 6;
-    
+
+    // Easter egg: hold-the-glow makes embers surge for a moment
+    let emberSurge = 0;
+
     function resize() {
         W = canvas.width = window.innerWidth;
         H = canvas.height = window.innerHeight;
     }
-    
+
     function initGame() {
         const ledges = [];
         // Starting platform
@@ -92,7 +168,7 @@
         for (let i = 1; i < 20; i++) {
             ledges.push(generateLedge(H - 80 - i * 90, ledges[i-1]));
         }
-        
+
         game = {
             player: {
                 x: W / 2 - PLAYER_W / 2,
@@ -111,8 +187,10 @@
             difficulty: 1,
             rockTimer: 0,
             bgStars: [],
+            flowersCollected: 0,
+            shake: 0,
         };
-        
+
         // Background stars
         for (let i = 0; i < 100; i++) {
             game.bgStars.push({
@@ -120,9 +198,10 @@
                 y: Math.random() * H * 3,
                 r: Math.random() * 1.2 + 0.3,
                 a: Math.random() * 0.5 + 0.1,
+                tw: Math.random() * Math.PI * 2,
             });
         }
-        
+
         // Place some initial flowers
         ledges.forEach((l, i) => {
             if (i > 0 && Math.random() < 0.3) {
@@ -134,16 +213,16 @@
             }
         });
     }
-    
+
     function generateLedge(targetY, prev) {
         const maxDx = 120 + game.difficulty * 10;
         let x = prev.x + (Math.random() - 0.5) * maxDx * 2;
         x = Math.max(20, Math.min(W - LEDGE_W - 20, x));
-        
+
         const w = LEDGE_W + Math.random() * 30 - game.difficulty * 3;
         const types = ['normal', 'normal', 'normal', 'crumble'];
         if (game.difficulty > 3) types.push('ice');
-        
+
         return {
             x, y: targetY,
             w: Math.max(35, w),
@@ -152,17 +231,17 @@
             gone: false,
         };
     }
-    
+
     function jump(direction) {
         if (!running || !game) return;
         const p = game.player;
         if (!p.onGround) return;
-        
+
         p.vy = JUMP_VY - game.difficulty * 0.3;
         p.vx = direction * (JUMP_VX + game.difficulty * 0.2);
         p.onGround = false;
         p.facing = direction;
-        
+
         // Jump particles
         for (let i = 0; i < 6; i++) {
             game.particles.push({
@@ -175,23 +254,23 @@
             });
         }
     }
-    
+
     function update() {
         if (!game || !running) return;
         const p = game.player;
-        
+
         // Physics
         p.vy += GRAVITY;
         p.x += p.vx;
         p.y += p.vy;
-        
+
         // Air friction
         p.vx *= 0.97;
-        
+
         // Wall bounce
         if (p.x < 0) { p.x = 0; p.vx *= -0.5; }
         if (p.x + PLAYER_W > W) { p.x = W - PLAYER_W; p.vx *= -0.5; }
-        
+
         // Landing on ledges
         if (p.vy > 0) {
             game.ledges.forEach(l => {
@@ -202,7 +281,7 @@
                     p.vy = 0;
                     p.vx *= 0.7;
                     p.onGround = true;
-                    
+
                     if (l.type === 'crumble') {
                         l.crumbleTimer += 0.05;
                         if (l.crumbleTimer > 1) {
@@ -227,11 +306,11 @@
         } else {
             p.onGround = false;
         }
-        
+
         // Camera follows player up
         const targetCam = Math.min(game.camera, p.y - H * 0.4);
         game.camera += (targetCam - game.camera) * 0.08;
-        
+
         // Score = height
         const height = Math.floor(Math.max(0, (H - 80 - p.y) / 10));
         if (height > game.maxHeight) {
@@ -239,7 +318,7 @@
             game.score = height;
             game.difficulty = 1 + height / 50;
         }
-        
+
         // Generate more ledges above
         const topLedge = game.ledges.reduce((min, l) => l.y < min.y ? l : min, game.ledges[0]);
         while (topLedge.y > game.camera - H) {
@@ -248,7 +327,7 @@
             game.ledges.push(nl);
             topLedge.y = newY;
             topLedge.x = nl.x;
-            
+
             // Flower on some new ledges
             if (Math.random() < 0.25) {
                 game.flowers.push({
@@ -258,10 +337,10 @@
                 });
             }
         }
-        
+
         // Remove ledges far below
         game.ledges = game.ledges.filter(l => l.y < game.camera + H + 200);
-        
+
         // Falling rocks
         game.rockTimer += 0.016;
         if (game.rockTimer > Math.max(0.8, 3 - game.difficulty * 0.3)) {
@@ -276,13 +355,13 @@
                 rotSpeed: (Math.random() - 0.5) * 0.1,
             });
         }
-        
+
         // Update rocks
         game.rocks.forEach(r => {
             r.y += r.vy;
             r.x += r.vx;
             r.rot += r.rotSpeed;
-            
+
             // Hit player?
             const dx = (p.x + PLAYER_W/2) - r.x;
             const dy = (p.y + PLAYER_H/2) - r.y;
@@ -291,7 +370,7 @@
             }
         });
         game.rocks = game.rocks.filter(r => r.y < game.camera + H + 50);
-        
+
         // Collect flowers
         game.flowers.forEach(f => {
             if (f.collected) return;
@@ -300,6 +379,8 @@
             if (dx*dx + dy*dy < 400) {
                 f.collected = true;
                 game.score += 25;
+                game.flowersCollected++;
+                bumpScore();
                 for (let i = 0; i < 10; i++) {
                     game.particles.push({
                         x: f.x, y: f.y,
@@ -312,7 +393,7 @@
             }
         });
         game.flowers = game.flowers.filter(f => !f.collected || f.y < game.camera + H + 50);
-        
+
         // Update particles
         game.particles.forEach(pt => {
             pt.x += pt.vx;
@@ -321,46 +402,83 @@
             pt.life -= 0.03;
         });
         game.particles = game.particles.filter(pt => pt.life > 0);
-        
+
+        // Screen shake decay
+        if (game.shake > 0) game.shake *= 0.86;
+
         // Fell off bottom
         if (p.y > game.camera + H + 50) die();
     }
-    
+
+    function bumpScore() {
+        if (reduceMotion) return;
+        const el = document.getElementById('score');
+        el.classList.remove('bump');
+        // reflow to restart the transition
+        void el.offsetWidth;
+        el.classList.add('bump');
+        setTimeout(() => el.classList.remove('bump'), 130);
+    }
+
     function die() {
         running = false;
-        if (game.score > highScore) {
+        if (game) game.shake = 16;
+        const beatBest = game.score > highScore;
+        if (beatBest) {
             highScore = game.score;
             localStorage.setItem(HS_KEY, String(highScore));
         }
         document.getElementById('final-score').textContent = game.score;
+        const pb = document.getElementById('pb-line');
+        if (beatBest && game.score > 0) {
+            pb.textContent = 'a new high mark — the ledger remembers';
+        } else if (game.flowersCollected >= 5) {
+            pb.textContent = game.flowersCollected + ' edelweiss, frozen in the cave';
+        } else {
+            pb.textContent = '';
+        }
         document.getElementById('death-quote').textContent = DEATH_QUOTES[Math.floor(Math.random() * DEATH_QUOTES.length)];
         document.getElementById('death-screen').style.display = 'flex';
     }
-    
+
     function render() {
         ctx.clearRect(0, 0, W, H);
-        
+
         if (!game) { requestAnimationFrame(render); return; }
-        
+
         // Dark gradient background
         const grad = ctx.createLinearGradient(0, 0, 0, H);
         grad.addColorStop(0, '#06060f');
         grad.addColorStop(1, '#12122a');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
-        
-        // Stars (parallax)
+
+        // A faint breathing aurora — the watcher's glow over the peaks
+        const breath = reduceMotion ? 0.07 : 0.07 + Math.sin(Date.now() * 0.0008) * 0.04;
+        const aur = ctx.createRadialGradient(W * 0.5, H * 0.15, 0, W * 0.5, H * 0.15, W * 0.7);
+        aur.addColorStop(0, `rgba(167,139,250,${breath})`);
+        aur.addColorStop(1, 'rgba(167,139,250,0)');
+        ctx.fillStyle = aur;
+        ctx.fillRect(0, 0, W, H);
+
+        // Stars (parallax), with a slow twinkle
+        const tw = Date.now() * 0.001;
         game.bgStars.forEach(s => {
             const sy = ((s.y - game.camera * 0.1) % (H * 3) + H * 3) % (H * 3) - H;
+            const a = reduceMotion ? s.a : s.a * (0.6 + 0.4 * Math.sin(tw + s.tw));
             ctx.beginPath();
             ctx.arc(s.x, sy, s.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(200,200,240,${s.a})`;
+            ctx.fillStyle = `rgba(200,200,240,${a})`;
             ctx.fill();
         });
-        
+
         ctx.save();
+        // screen shake on death-impact
+        if (game.shake > 0.5) {
+            ctx.translate((Math.random() - 0.5) * game.shake, (Math.random() - 0.5) * game.shake);
+        }
         ctx.translate(0, -game.camera);
-        
+
         // Ledges
         game.ledges.forEach(l => {
             if (l.gone) return;
@@ -370,33 +488,39 @@
                 ice: ['rgba(120,160,200,0.7)', 'rgba(90,130,180,0.6)'],
             };
             const [top, body] = colors[l.type] || colors.normal;
-            
+
             // Ledge body
             ctx.fillStyle = body;
             ctx.beginPath();
             ctx.roundRect(l.x, l.y, l.w, LEDGE_H, 3);
             ctx.fill();
-            
+
             // Ledge top edge
             ctx.fillStyle = top;
             ctx.fillRect(l.x + 2, l.y, l.w - 4, 3);
-            
+
             // Snow on top
             if (l.type !== 'ice') {
                 ctx.fillStyle = 'rgba(220,225,235,0.2)';
                 ctx.fillRect(l.x + 4, l.y - 1, l.w - 8, 2);
             }
-            
+
             // Ice shimmer
             if (l.type === 'ice') {
                 ctx.fillStyle = `rgba(200,230,255,${0.1 + Math.sin(Date.now() * 0.003 + l.x) * 0.05})`;
                 ctx.fillRect(l.x, l.y, l.w, LEDGE_H);
             }
         });
-        
+
         // Flowers
         game.flowers.forEach(f => {
             if (f.collected) return;
+            // Soft glow halo
+            const halo = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, 12);
+            halo.addColorStop(0, 'rgba(255,235,150,0.18)');
+            halo.addColorStop(1, 'rgba(255,235,150,0)');
+            ctx.fillStyle = halo;
+            ctx.fillRect(f.x - 12, f.y - 12, 24, 24);
             // Stem
             ctx.strokeStyle = 'rgba(80,140,60,0.7)';
             ctx.lineWidth = 1.5;
@@ -419,7 +543,7 @@
             ctx.fillStyle = 'rgba(255,220,80,0.9)';
             ctx.fill();
         });
-        
+
         // Rocks
         game.rocks.forEach(r => {
             ctx.save();
@@ -441,7 +565,7 @@
             ctx.stroke();
             ctx.restore();
         });
-        
+
         // Player
         const p = game.player;
         // Body
@@ -461,7 +585,7 @@
         // Eyes
         ctx.fillStyle = 'rgba(40,40,40,0.8)';
         ctx.fillRect(p.x + PLAYER_W/2 + p.facing * 2 - 1, p.y + 4, 2, 2);
-        
+
         // Particles
         game.particles.forEach(pt => {
             ctx.beginPath();
@@ -469,50 +593,129 @@
             ctx.fillStyle = `rgba(${pt.color},${pt.life})`;
             ctx.fill();
         });
-        
+
         ctx.restore();
-        
+
         // HUD
         document.getElementById('score').textContent = game.score;
-        document.getElementById('high').textContent = `best: ${highScore}`;
+        document.getElementById('high').textContent = `best · ${highScore}`;
     }
-    
+
     function gameLoop() {
         update();
         render();
         requestAnimationFrame(gameLoop);
     }
-    
+
     window.startGame = function() {
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('death-screen').style.display = 'none';
+        // dismiss idle whisper on the menu
+        document.getElementById('whisper').classList.remove('show');
+        resetIdle();
         initGame();
         running = true;
     };
-    
+
     // Touch/click controls
     function handleInput(x) {
         if (!running) return;
         if (x < W / 2) jump(-1);
         else jump(1);
     }
-    
+
     canvas.addEventListener('touchstart', e => {
         e.preventDefault();
         handleInput(e.touches[0].clientX);
+        resetIdle();
     }, { passive: false });
-    
-    canvas.addEventListener('mousedown', e => handleInput(e.clientX));
-    
+
+    canvas.addEventListener('mousedown', e => { handleInput(e.clientX); resetIdle(); });
+
     // Keyboard
     window.addEventListener('keydown', e => {
         if (e.key === 'ArrowLeft' || e.key === 'a') jump(-1);
         if (e.key === 'ArrowRight' || e.key === 'd') jump(1);
+        resetIdle();
     });
-    
+
     window.addEventListener('resize', resize);
     resize();
     gameLoop();
+
+    /* ---------------- Ambient embers (DOM, cheap, motion-safe) ----------- */
+    (function spawnEmbers(){
+        if (reduceMotion) return;
+        const count = 8;
+        for (let i = 0; i < count; i++){
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (Math.random() * 100) + 'vw';
+            e.style.animationDelay = (Math.random() * 14) + 's';
+            e.style.animationDuration = (11 + Math.random() * 7) + 's';
+            document.body.appendChild(e);
+        }
+    })();
+
+    /* ---------------- Easter eggs ---------------------------------------- */
+    // (a) type "prizrak" anywhere → the watcher answers on the start screen
+    let typed = '';
+    window.addEventListener('keydown', e => {
+        if (e.key.length !== 1) return;
+        typed = (typed + e.key.toLowerCase()).slice(-7);
+        if (typed === 'prizrak') {
+            const el = document.getElementById('egg-start');
+            el.textContent = 'you found the watcher. it was always here.';
+            el.classList.add('show');
+        }
+    });
+
+    // (b) triple-click the FALLEN / TATRA title → one extra ember surges up
+    document.querySelectorAll('.screen-title').forEach(t => {
+        t.addEventListener('click', e => {
+            if (e.detail === 3 && !reduceMotion) {
+                const em = document.createElement('div');
+                em.className = 'ember';
+                em.style.left = (e.clientX / window.innerWidth * 100) + 'vw';
+                em.style.bottom = (window.innerHeight - e.clientY) + 'px';
+                em.style.animationDuration = '4s';
+                em.style.opacity = '1';
+                document.body.appendChild(em);
+                setTimeout(() => em.remove(), 4200);
+            }
+        });
+    });
+
+    // (c) between 00:00–03:00 local, a faint footer whisper haunts the menus
+    (function nightWhisper(){
+        const hr = new Date().getHours();
+        if (hr >= 0 && hr < 3) {
+            // only while an overlay is visible
+            const overlayUp = () =>
+                document.getElementById('start-screen').style.display !== 'none' ||
+                document.getElementById('death-screen').style.display === 'flex';
+            if (overlayUp()) {
+                setTimeout(() => document.getElementById('whisper').classList.add('show'), 2500);
+            }
+        }
+    })();
+
+    // (d) idle 60s on a menu → a single line fades in
+    let idleTimer = null;
+    function resetIdle(){
+        if (reduceMotion) return;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            const overlayUp =
+                document.getElementById('start-screen').style.display !== 'none' ||
+                document.getElementById('death-screen').style.display === 'flex';
+            if (!overlayUp) return;
+            const w = document.getElementById('whisper');
+            w.textContent = 'still here. still watching.';
+            w.classList.add('show');
+        }, 60000);
+    }
+    resetIdle();
     </script>
 </body>
 </html>

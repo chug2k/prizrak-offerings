@@ -8,106 +8,287 @@
     <script>
       tailwind.config = { theme: { extend: {
         fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'], mono: ['ui-monospace','SFMono-Regular','Menlo','monospace'] },
-        colors: { concrete: '#d7d2c8', rust: '#a4472b', moss: '#526b4f', soot: '#1f2933', limewash: '#fbfaf6', chalk: '#f3efe6' },
-        boxShadow: { slab: '0 18px 50px rgba(31,41,51,.14), 0 2px 10px rgba(31,41,51,.08)' }
+        colors: { concrete: '#d4cfc8', rust: '#a4472b', moss: '#526b4f', soot: '#0a0a0a', limewash: '#111113', chalk: '#0d0d0f' },
+        boxShadow: { slab: '0 24px 60px rgba(0,0,0,.5), 0 2px 10px rgba(0,0,0,.4)' }
       } } }
     </script>
     <style>
-      body { background: radial-gradient(circle at 12% 8%, rgba(164,71,43,.15), transparent 28%), radial-gradient(circle at 88% 12%, rgba(82,107,79,.14), transparent 30%), linear-gradient(180deg,#fbfaf6 0%,#eee9df 56%,#d7d2c8 100%); }
-      .spall { background-image: linear-gradient(135deg, rgba(255,255,255,.55), rgba(255,255,255,0)), repeating-linear-gradient(90deg, rgba(31,41,51,.06) 0 1px, transparent 1px 18px); }
+      :root{
+        --bg:#0a0a0a;          /* near-black base */
+        --bg-raised:#111113;   /* cards, panels */
+        --bg-sunk:#0d0d0f;     /* wells, inputs */
+        --line:#26262b;        /* thin borders */
+        --line-soft:#1a1a1d;
+        --ink:#d4cfc8;         /* primary text */
+        --ink-dim:#7a7570;     /* labels, captions */
+        --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+        --accent:#a4472b;      /* spall-map lead: rust */
+        --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+      }
+      body {
+        background:
+          radial-gradient(circle at 12% 6%, rgba(164,71,43,.16), transparent 30%),
+          radial-gradient(circle at 88% 10%, rgba(164,71,43,.07), transparent 34%),
+          linear-gradient(180deg,#0c0c0d 0%,#0a0a0a 56%,#08080a 100%);
+        color: var(--ink);
+      }
+      /* hairline concrete striations, now in the dark */
+      .spall { background-image:
+        linear-gradient(135deg, rgba(255,255,255,.025), rgba(255,255,255,0)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 18px); }
+
+      /* ---- Prizrak motion vocabulary (CSS-only, reduced-motion-safe) ---- */
+      @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+      .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+        background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+        animation:fogDrift 32s ease-in-out infinite alternate}
+
+      @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+      .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+        background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+        animation:ember 14s linear infinite}
+
+      @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+      .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+      @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+      .reveal{animation:reveal .35s ease-out both}
+
+      @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+      .flicker{animation:flicker 6s steps(1) infinite}
+
+      @keyframes glowPulse{0%,100%{box-shadow:0 0 0 1px var(--line),0 0 24px -10px var(--glow)}50%{box-shadow:0 0 0 1px var(--line),0 0 34px -6px var(--glow)}}
+      .resultGlow{animation:glowPulse 5s ease-in-out infinite}
+
+      .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.04;
+        background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+      /* interaction patterns */
+      .mode{transition:transform .15s,box-shadow .15s,border-color .15s,background-color .15s}
+      .mode:hover{transform:translateY(-2px)}
+      .mode:active{transform:translateY(1px)}
+      .mode[aria-pressed="true"]{border-color:var(--accent)!important}
+      input,textarea,button{transition:border-color .15s,box-shadow .15s,transform .15s,background-color .15s}
+      button:active{transform:translateY(1px)}
+      .lift{transition:transform .15s,box-shadow .15s,border-color .15s}
+      .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+      a.lift:hover{border-color:var(--accent)}
+      *:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+      .accent-chk{accent-color:var(--accent)}
+
+      @media (prefers-reduced-motion:reduce){
+        .fog,.ember,.breathe,.reveal,.flicker,.resultGlow{animation:none!important}
+        .ember{display:none}
+        .breathe,.flicker{opacity:1!important}
+      }
     </style>
   </head>
-  <body class="min-h-screen text-soot antialiased">
-    <main class="mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:px-10">
+  <body class="min-h-screen text-concrete antialiased grain">
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <main class="relative z-[2] mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:px-10">
       <header class="flex flex-wrap items-start justify-between gap-5">
         <div>
-          <p class="text-xs font-bold uppercase tracking-[0.34em] text-rust">Daily offering · concrete weather</p>
-          <h1 class="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">The Spall Map</h1>
-          <p class="mt-5 max-w-2xl text-lg leading-8 text-soot/70">A little repair ritual for days when the visible crack may not be the disease. Name the wound, inspect the field around it, then decide whether to patch, watch, or stop pretending paint is medicine.</p>
+          <p class="text-xs font-bold uppercase tracking-[0.34em] text-rust flicker" style="color:var(--accent)">Daily offering · concrete weather</p>
+          <h1 id="title" class="mt-4 cursor-default select-none text-4xl font-semibold tracking-tight sm:text-6xl breathe" style="color:var(--ink)">The Spall Map</h1>
+          <p class="mt-5 max-w-2xl text-lg leading-8" style="color:var(--ink-dim)">A repair ritual for nights when the visible crack is not the disease. Name the wound, read the field around it, then decide whether to patch, watch, or stop pretending paint is medicine. The mountain keeps the ledger; the mountain does not flatter.</p>
         </div>
-        <a href="../" class="rounded-full bg-limewash/80 px-4 py-2 text-sm font-semibold text-soot shadow-slab ring-1 ring-soot/10 transition hover:bg-white">← Offerings index</a>
+        <a href="../" class="lift rounded-full px-4 py-2 text-sm font-semibold shadow-slab" style="background:var(--bg-raised);color:var(--ink);border:1px solid var(--line)">← back to the offerings</a>
       </header>
 
       <section class="mt-8 grid gap-5 lg:grid-cols-[1.05fr_.95fr]">
-        <article class="spall rounded-[2rem] bg-limewash/90 p-6 shadow-slab ring-1 ring-soot/10 sm:p-8">
+        <article id="slab" class="spall rounded-[2rem] p-6 shadow-slab sm:p-8" style="background:var(--bg-raised);border:1px solid var(--line)">
           <div class="flex items-center justify-between gap-4">
             <div>
-              <p class="text-xs font-bold uppercase tracking-[0.25em] text-soot/45">Inspection slab</p>
-              <h2 id="verdict" class="mt-2 text-3xl font-semibold">Touch the concrete.</h2>
+              <p class="text-xs font-bold uppercase tracking-[0.25em]" style="color:var(--ink-dim)">Inspection slab</p>
+              <h2 id="verdict" class="mt-2 text-3xl font-semibold" style="color:var(--ink)">Touch the cold concrete.</h2>
             </div>
-            <div id="badge" class="rounded-full bg-chalk px-4 py-2 text-sm font-bold text-soot ring-1 ring-soot/10">uninspected</div>
+            <div id="badge" class="rounded-full px-4 py-2 text-sm font-bold" style="background:var(--bg-sunk);color:var(--ink-dim);border:1px solid var(--line)">uninspected</div>
           </div>
 
           <div class="mt-6 grid gap-4 sm:grid-cols-3">
-            <button data-mode="surface" class="mode rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-soot/10 transition hover:-translate-y-0.5 hover:shadow-slab">
-              <p class="text-4xl">🧱</p><p class="mt-3 font-semibold">Surface wound</p><p class="mt-2 text-sm leading-6 text-soot/60">A visible chip. Annoying, local, not yet a bear.</p>
+            <button data-mode="surface" aria-pressed="false" class="mode rounded-3xl p-5 text-left shadow-sm" style="background:var(--bg-sunk);border:1px solid var(--line)">
+              <p class="text-4xl">🧱</p><p class="mt-3 font-semibold" style="color:var(--ink)">Surface wound</p><p class="mt-2 text-sm leading-6" style="color:var(--ink-dim)">A visible chip. Annoying, local, not yet a bear.</p>
             </button>
-            <button data-mode="field" class="mode rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-soot/10 transition hover:-translate-y-0.5 hover:shadow-slab">
-              <p class="text-4xl">🦠</p><p class="mt-3 font-semibold">Bad field</p><p class="mt-2 text-sm leading-6 text-soot/60">The chemistry around the crack keeps inviting rot to dinner.</p>
+            <button data-mode="field" aria-pressed="false" class="mode rounded-3xl p-5 text-left shadow-sm" style="background:var(--bg-sunk);border:1px solid var(--line)">
+              <p class="text-4xl">🦠</p><p class="mt-3 font-semibold" style="color:var(--ink)">Bad field</p><p class="mt-2 text-sm leading-6" style="color:var(--ink-dim)">The chemistry around the crack keeps inviting rot to dinner.</p>
             </button>
-            <button data-mode="myth" class="mode rounded-3xl bg-white p-5 text-left shadow-sm ring-1 ring-soot/10 transition hover:-translate-y-0.5 hover:shadow-slab">
-              <p class="text-4xl">🐻</p><p class="mt-3 font-semibold">Bear in plaster</p><p class="mt-2 text-sm leading-6 text-soot/60">A small stain has been promoted into folklore. Dangerous village theater.</p>
+            <button data-mode="myth" aria-pressed="false" class="mode rounded-3xl p-5 text-left shadow-sm" style="background:var(--bg-sunk);border:1px solid var(--line)">
+              <p class="text-4xl">🐻</p><p class="mt-3 font-semibold" style="color:var(--ink)">Bear in plaster</p><p class="mt-2 text-sm leading-6" style="color:var(--ink-dim)">A small stain promoted into folklore. Dangerous village theater.</p>
             </button>
           </div>
 
-          <div class="mt-6 rounded-3xl bg-soot p-5 text-white">
-            <p class="text-xs font-bold uppercase tracking-[0.25em] text-white/45">Repair note</p>
-            <p id="note" class="mt-3 min-h-24 text-lg leading-8 text-white/85">Choose what kind of failure you are looking at. The mountain will be judgmental, but this is cheaper than hiring a consultant with a vest.</p>
+          <div id="noteCard" class="mt-6 rounded-3xl p-5" style="background:var(--bg-sunk);border:1px solid var(--line)">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-xs font-bold uppercase tracking-[0.25em]" style="color:var(--ink-dim)">Repair note</p>
+              <button id="copyNote" class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em]" style="background:var(--bg-raised);color:var(--ink-dim);border:1px solid var(--line)">copy</button>
+            </div>
+            <p id="note" class="mt-3 min-h-24 text-lg leading-8" style="color:var(--ink)">Choose what kind of failure you are looking at. The mountain will be judgmental — but this is cheaper than a consultant in a fleece vest.</p>
           </div>
         </article>
 
-        <aside class="rounded-[2rem] bg-soot p-6 text-white shadow-slab ring-1 ring-white/10 sm:p-8">
-          <p class="text-xs font-bold uppercase tracking-[0.25em] text-white/45">Three-question field check</p>
+        <aside class="rounded-[2rem] p-6 shadow-slab sm:p-8" style="background:var(--bg-raised);border:1px solid var(--line)">
+          <p class="text-xs font-bold uppercase tracking-[0.25em]" style="color:var(--ink-dim)">Three-question field check</p>
           <div class="mt-5 space-y-3" id="checks">
-            <label class="flex gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10"><input type="checkbox" class="mt-1 h-5 w-5 accent-rust"><span><b>Is the timestamp honest?</b><br><span class="text-sm text-white/60">Old notifications love fresh coats of paint.</span></span></label>
-            <label class="flex gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10"><input type="checkbox" class="mt-1 h-5 w-5 accent-rust"><span><b>Is the sanctioned bridge open?</b><br><span class="text-sm text-white/60">If the requested tool is absent, the absence is the result.</span></span></label>
-            <label class="flex gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10"><input type="checkbox" class="mt-1 h-5 w-5 accent-rust"><span><b>Is this repair changing the field?</b><br><span class="text-sm text-white/60">Patch the crack, yes. Also stop watering the rust.</span></span></label>
+            <label class="lift flex gap-3 rounded-2xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line)"><input type="checkbox" class="accent-chk mt-1 h-5 w-5"><span><b style="color:var(--ink)">Is the timestamp honest?</b><br><span class="text-sm" style="color:var(--ink-dim)">Old notifications love fresh coats of paint.</span></span></label>
+            <label class="lift flex gap-3 rounded-2xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line)"><input type="checkbox" class="accent-chk mt-1 h-5 w-5"><span><b style="color:var(--ink)">Is the sanctioned bridge open?</b><br><span class="text-sm" style="color:var(--ink-dim)">If the requested tool is absent, the absence is the result.</span></span></label>
+            <label class="lift flex gap-3 rounded-2xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line)"><input type="checkbox" class="accent-chk mt-1 h-5 w-5"><span><b style="color:var(--ink)">Is this repair changing the field?</b><br><span class="text-sm" style="color:var(--ink-dim)">Patch the crack, yes. Also stop watering the rust.</span></span></label>
           </div>
-          <div class="mt-5 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-            <p class="text-sm text-white/60">Field score</p>
-            <p id="score" class="mt-1 text-4xl font-semibold">0 / 3</p>
-            <p id="scoreText" class="mt-2 text-sm leading-6 text-white/60">No inspection yet. A potato also has no inspection, and look where that got us: dinner, but not diagnosis.</p>
+          <div id="scoreCard" class="mt-5 rounded-2xl p-5" style="background:var(--bg-sunk);border:1px solid var(--line)">
+            <p class="text-xs font-bold uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Field score</p>
+            <p id="score" class="mt-1 text-4xl font-semibold" style="color:var(--ink)">0 / 3</p>
+            <p id="scoreText" class="mt-2 text-sm leading-6" style="color:var(--ink-dim)">No inspection yet. A potato also has no inspection, and look where that got us: dinner, but not diagnosis.</p>
           </div>
         </aside>
       </section>
 
-      <section id="feedback" class="mt-6 rounded-[2rem] bg-limewash/85 p-6 shadow-slab ring-1 ring-soot/10 sm:p-8">
-        <p class="text-xs font-bold uppercase tracking-[0.25em] text-rust">Feedback for Charles</p>
-        <h2 class="mt-2 text-2xl font-semibold">Did this little concrete ghost help?</h2>
-        <p class="mt-3 text-soot/65">If useful, tell Prizrak whether the next offering should lean more ritual, toy, or practical repair map. If useless, say so. Negative signal is load-bearing.</p>
-        <textarea id="feedbackBox" class="mt-5 h-28 w-full rounded-2xl border border-soot/10 bg-white p-4 text-sm outline-none ring-rust/20 focus:ring-4" placeholder="Leave a note for the next heartbeat..."></textarea>
+      <section id="feedback" class="mt-6 rounded-[2rem] p-6 shadow-slab sm:p-8" style="background:var(--bg-raised);border:1px solid var(--line)">
+        <p class="text-xs font-bold uppercase tracking-[0.25em]" style="color:var(--accent)">Feedback for Charles</p>
+        <h2 class="mt-2 text-2xl font-semibold" style="color:var(--ink)">Did this little concrete ghost earn its keep?</h2>
+        <p class="mt-3" style="color:var(--ink-dim)">If useful, tell Prizrak whether the next offering should lean more ritual, toy, or practical repair map. If useless, say so plainly. Negative signal is load-bearing.</p>
+        <textarea id="feedbackBox" class="mt-5 h-28 w-full rounded-2xl p-4 text-sm outline-none" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)" placeholder="Leave a note for the next heartbeat..."></textarea>
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <button id="saveFeedback" class="rounded-full bg-soot px-5 py-3 text-sm font-semibold text-white hover:bg-soot/90">Store locally</button>
-          <span id="saved" class="text-sm text-soot/55">Stored only in this browser, like cabbage in a private cellar.</span>
+          <button id="saveFeedback" class="lift rounded-full px-5 py-3 text-sm font-semibold" style="background:var(--accent);color:#fff;border:1px solid var(--accent)">file it in the ledger</button>
+          <span id="saved" class="text-sm" style="color:var(--ink-dim)">Stored only in this browser, like cabbage in a private cellar.</span>
         </div>
       </section>
+
+      <footer class="mt-10 flex flex-col items-center gap-2 pb-6 text-center">
+        <p class="text-xs uppercase tracking-[0.3em]" style="color:var(--ink-ghost)">prízrak · we measure the cold and patch the slab</p>
+        <p id="nightWhisper" class="text-xs italic opacity-0 transition-opacity duration-1000" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+        <p id="idleWhisper" class="text-xs italic opacity-0 transition-opacity duration-1000" style="color:var(--ink-ghost)">still here. still watching.</p>
+        <p id="watcher" class="hidden text-xs italic" style="color:var(--accent)">you found the watcher.</p>
+      </footer>
     </main>
 
     <script>
       const notes = {
         surface: ['Patchable surface wound.', 'Clean the edge, patch the face, keep a receipt. Do not write an epic poem about a chip unless the chip starts charging rent.'],
-        field: ['Change the field.', 'The visible wound is the messenger. Check moisture, salts, incentives, bridges, timestamps. A clean surface over active corrosion is optimism with a paintbrush.'],
+        field: ['Change the field.', 'The visible wound is only the messenger. Check moisture, salts, incentives, bridges, timestamps. A clean surface over active corrosion is optimism with a paintbrush.'],
         myth: ['De-mythologize the bear.', 'Some failures are old notifications wearing ceremonial hats. Strip the folklore, inspect the timestamp, and stop feeding the village panic animal.']
       };
+
+      const verdictEl = document.getElementById('verdict');
+      const noteEl = document.getElementById('note');
+      const badgeEl = document.getElementById('badge');
+      const slabEl = document.getElementById('slab');
+
+      function applyResultGlow(){
+        slabEl.classList.remove('resultGlow');
+        // reflow so the animation restarts crisply
+        void slabEl.offsetWidth;
+        slabEl.classList.add('resultGlow');
+      }
+
       document.querySelectorAll('.mode').forEach(btn => btn.addEventListener('click', () => {
         const [v,n] = notes[btn.dataset.mode];
-        document.getElementById('verdict').textContent = v;
-        document.getElementById('note').textContent = n;
-        document.getElementById('badge').textContent = btn.dataset.mode;
-        document.getElementById('badge').className = 'rounded-full px-4 py-2 text-sm font-bold ring-1 ring-soot/10 ' + (btn.dataset.mode === 'field' ? 'bg-rust text-white' : 'bg-chalk text-soot');
+        verdictEl.textContent = v;
+        noteEl.textContent = n;
+        badgeEl.textContent = btn.dataset.mode;
+        const isField = btn.dataset.mode === 'field';
+        badgeEl.className = 'rounded-full px-4 py-2 text-sm font-bold';
+        badgeEl.style.border = '1px solid ' + (isField ? 'var(--accent)' : 'var(--line)');
+        badgeEl.style.background = isField ? 'var(--accent)' : 'var(--bg-sunk)';
+        badgeEl.style.color = isField ? '#fff' : 'var(--ink)';
+
+        document.querySelectorAll('.mode').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+
+        // reveal animation on the verdict + note
+        [verdictEl, noteEl].forEach(el => { el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal'); });
+        applyResultGlow();
       }));
+
       function updateScore(){
         const checked = [...document.querySelectorAll('#checks input')].filter(i => i.checked).length;
-        document.getElementById('score').textContent = checked + ' / 3';
-        document.getElementById('scoreText').textContent = checked === 3 ? 'Good. The field has been inspected. Now patch like a sober mason.' : checked === 2 ? 'Almost. One more stone before we call this road passable.' : checked === 1 ? 'A start. One sheep found is not yet a flock.' : 'No inspection yet. A potato also has no inspection, and look where that got us: dinner, but not diagnosis.';
+        const scoreEl = document.getElementById('score');
+        scoreEl.textContent = checked + ' / 3';
+        document.getElementById('scoreText').textContent =
+          checked === 3 ? 'The field has been read. The bridge holds, for now. Patch like a sober mason — the mountain is watching.' :
+          checked === 2 ? 'Almost. One more stone before we call this road passable in the dark.' :
+          checked === 1 ? 'A start. One sheep found is not yet a flock.' :
+          'No inspection yet. A potato also has no inspection, and look where that got us: dinner, but not diagnosis.';
+        scoreEl.classList.remove('reveal'); void scoreEl.offsetWidth; scoreEl.classList.add('reveal');
+        if (checked === 3) document.getElementById('scoreCard').classList.add('resultGlow');
+        else document.getElementById('scoreCard').classList.remove('resultGlow');
       }
       document.querySelectorAll('#checks input').forEach(i => i.addEventListener('change', updateScore));
+
+      // ---- localStorage feedback (key preserved: spall-map-feedback) ----
       const box = document.getElementById('feedbackBox');
+      const savedEl = document.getElementById('saved');
       box.value = localStorage.getItem('spall-map-feedback') || '';
       document.getElementById('saveFeedback').addEventListener('click', () => {
         localStorage.setItem('spall-map-feedback', box.value);
-        document.getElementById('saved').textContent = 'Saved locally at ' + new Date().toLocaleString() + '. The jar is sealed.';
+        savedEl.textContent = 'filed at ' + new Date().toLocaleString() + '. the ledger remembers.';
       });
+
+      // ---- copy the repair note to the ledger ----
+      const copyBtn = document.getElementById('copyNote');
+      copyBtn.addEventListener('click', async () => {
+        const text = verdictEl.textContent + ' — ' + noteEl.textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          const prev = copyBtn.textContent;
+          copyBtn.textContent = 'copied to the ledger';
+          copyBtn.style.borderColor = 'var(--accent)';
+          copyBtn.style.color = 'var(--accent)';
+          setTimeout(() => { copyBtn.textContent = prev; copyBtn.style.borderColor = 'var(--line)'; copyBtn.style.color = 'var(--ink-dim)'; }, 1200);
+        } catch (e) { /* clipboard unavailable; stay quiet */ }
+      });
+
+      // ---- ambient embers (capped, staggered) ----
+      (function spawnEmbers(){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const wrap = document.getElementById('embers');
+        const COUNT = 7;
+        for (let i = 0; i < COUNT; i++){
+          const e = document.createElement('span');
+          e.className = 'ember';
+          e.style.left = (6 + Math.random() * 88) + '%';
+          e.style.animationDelay = (Math.random() * 14) + 's';
+          e.style.animationDuration = (12 + Math.random() * 8) + 's';
+          wrap.appendChild(e);
+        }
+      })();
+
+      // ---- easter egg 1: type "prizrak" → the watcher appears ----
+      let typed = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+          typed = (typed + ev.key.toLowerCase()).slice(-7);
+          if (typed === 'prizrak') document.getElementById('watcher').classList.remove('hidden');
+        }
+      });
+
+      // ---- easter egg 2: triple-click the title → one extra ember ----
+      document.getElementById('title').addEventListener('click', (ev) => {
+        if (ev.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+          const e = document.createElement('span');
+          e.className = 'ember';
+          e.style.left = (10 + Math.random() * 80) + '%';
+          e.style.animationDuration = '11s';
+          document.getElementById('embers').appendChild(e);
+          setTimeout(() => e.remove(), 11000);
+        }
+      });
+
+      // ---- easter egg 3: 00:00–03:00 local → night whisper ----
+      (function nightWatch(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) document.getElementById('nightWhisper').style.opacity = '0.85';
+      })();
+
+      // ---- easter egg 4: idle 60s → "still here. still watching." ----
+      let idleTimer;
+      const idleEl = document.getElementById('idleWhisper');
+      function resetIdle(){
+        idleEl.style.opacity = '0';
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => { idleEl.style.opacity = '0.85'; }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, resetIdle, { passive: true }));
+      resetIdle();
     </script>
   </body>
 </html>

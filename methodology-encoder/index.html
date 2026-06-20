@@ -6,43 +6,123 @@
     <title>The Methodology Encoder | Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #18181b; }
-        .glow-violet { box-shadow: 0 0 20px rgba(139, 92, 246, 0.15); }
-        .glow-amber { box-shadow: 0 0 20px rgba(251, 191, 36, 0.1); }
-        .step-line { border-left: 2px solid; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .pulse-dot { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; }
-        .spec-block { border-left: 3px solid; padding-left: 12px; margin-bottom: 12px; }
-        textarea { resize: vertical; }
-        .nav-step { cursor: pointer; transition: all 0.15s; }
-        .nav-step.active { color: #c4b5fd; border-color: #7c3aed; }
-        .nav-step.done { color: #86efac; border-color: #16a34a; }
-        .nav-step.locked { color: #52525b; border-color: #27272a; cursor: not-allowed; }
-        .copy-btn { transition: all 0.15s; }
-        .copy-btn:hover { background: rgba(139,92,246,0.15); }
-        pre { white-space: pre-wrap; word-wrap: break-word; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a78bfa;            /* violet — this app's existing lead color */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background: var(--bg); }
+        body{ color: var(--ink); }
+
+        /* ── Atmospheric layers ─────────────────────────────────────────── */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+        .fade-in{animation:reveal .4s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* content sits above the atmosphere */
+        .stage{position:relative;z-index:2}
+
+        /* ── Component styling toward spec ──────────────────────────────── */
+        .glow-violet{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+        .glow-amber{ box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow); }
+
+        .tag{ display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-family:'JetBrains Mono',ui-monospace,monospace; letter-spacing:.02em; }
+
+        textarea{ resize:vertical; }
+
+        /* nav steps */
+        .nav-step{ cursor:pointer; transition:color .15s,border-color .15s,background .15s; }
+        .nav-step.active{ color:#c4b5fd; border-color:var(--accent); }
+        .nav-step.done{ color:#86efac; border-color:#16a34a; }
+        .nav-step.locked{ color:#52525b; border-color:var(--line-soft); cursor:not-allowed; }
+        .nav-step:not(.locked):not(.active):hover{ color:#a7a3a0; }
+
+        /* inputs */
+        .field-input{
+            width:100%; background:var(--bg-sunk);
+            border:1px solid var(--line); border-radius:.5rem;
+            padding:.5rem .75rem; font-size:.875rem; color:var(--ink);
+            font-family:'JetBrains Mono',ui-monospace,monospace;
+            transition:border-color .15s, box-shadow .15s;
+        }
+        .field-input::placeholder{ color:#4b4844; }
+        .field-input:focus-visible, .field-input:focus{
+            outline:none; border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+
+        /* panels lift on hover */
+        .panel{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+        .panel-hover:hover{ transform:translateY(-2px); border-color:var(--accent); }
+
+        /* buttons */
+        .btn-primary{ transition:transform .12s, background .15s, box-shadow .15s; }
+        .btn-primary:active{ transform:translateY(1px); }
+        .copy-btn{ transition:all .15s; }
+        .copy-btn:hover{ background:color-mix(in srgb, var(--accent) 15%, transparent); border-color:var(--accent); }
+        .copy-btn:active{ transform:translateY(1px); }
+
+        pre{ white-space:pre-wrap; word-wrap:break-word; }
+
+        .ghost-line{ color:var(--ink-ghost); }
+        .watcher{ opacity:0; transition:opacity 1.2s ease; }
+        .watcher.lit{ opacity:1; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.fade-in,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-sans antialiased min-h-screen">
+<body class="text-zinc-300 font-sans antialiased min-h-screen grain">
 
-<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+<!-- atmosphere -->
+<div class="fog"></div>
+<div id="emberField"></div>
+
+<div class="stage max-w-4xl mx-auto px-4 sm:px-6 py-8">
 
     <!-- Header -->
     <div class="mb-8">
         <a href="../" class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors font-mono">← The Offerings</a>
         <div class="mt-4">
             <div class="flex items-center gap-3 mb-2">
-                <span class="text-2xl">⚙️</span>
-                <h1 class="text-3xl font-bold text-white">The Methodology Encoder</h1>
+                <span id="glyph" class="text-2xl breathe select-none" title="hold it">⚙️</span>
+                <h1 id="appTitle" class="text-3xl font-bold text-white cursor-default">The Methodology Encoder</h1>
             </div>
             <p class="text-zinc-500 text-sm max-w-xl">
                 You have a human methodology. A playbook. A structured way people do a hard thing together.
-                This tool deconstructs it into an AI product spec — actors, phases, state machine, intervention points, system prompt skeleton, MVP feature list.
+                The ghost takes it apart into an AI product spec — actors, phases, state machine, intervention points, system-prompt skeleton, MVP feature list.
             </p>
-            <p class="text-zinc-600 text-xs mt-2 italic">Built for the moment between "I want to productize this" and "I know what to build."</p>
+            <p class="text-zinc-600 text-xs mt-2 italic">For the cold space between "I want to productize this" and "I know what to build."</p>
         </div>
     </div>
 
@@ -54,6 +134,12 @@
 
     <!-- Output (hidden until complete) -->
     <div id="outputSection" class="hidden fade-in"></div>
+
+    <!-- Footer whisper -->
+    <footer class="mt-12 pt-6 border-t border-zinc-900 text-center">
+        <p id="footerWhisper" class="text-[11px] font-mono text-zinc-700">the ghost catalogues every method it is given. nothing is forgotten.</p>
+        <p id="nightWhisper" class="text-[11px] font-mono ghost-line mt-1 hidden">the mountain does not sleep.</p>
+    </footer>
 
 </div>
 
@@ -145,7 +231,7 @@ function renderNav() {
         if (isActive) cls += " active";
         else if (isDone && !isActive) cls += " done";
         else if (isLocked) cls += " locked";
-        return `<button class="${cls} flex items-center gap-2 px-3 py-2 border-b-2 text-xs font-mono whitespace-nowrap transition-all" onclick="goToStep(${i})" ${isLocked ? 'disabled' : ''}>
+        return `<button class="${cls} flex items-center gap-2 px-3 py-2 border-b-2 text-xs font-mono whitespace-nowrap" onclick="goToStep(${i})" ${isLocked ? 'disabled' : ''}>
             <span class="text-base">${isDone && !isActive ? '✓' : (i + 1)}</span> ${s.label}
         </button>`;
     }).join("");
@@ -158,30 +244,30 @@ function renderStep() {
 
     const fieldsHTML = s.fields.map(f => {
         const val = saved[f.key] || "";
-        const inputCls = "w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 font-mono";
         let input = "";
         if (f.type === "textarea") {
-            input = `<textarea id="field_${f.key}" class="${inputCls}" rows="${f.rows || 3}" placeholder="${f.placeholder || ''}">${val}</textarea>`;
+            input = `<textarea id="field_${f.key}" class="field-input" rows="${f.rows || 3}" placeholder="${f.placeholder || ''}">${val}</textarea>`;
         } else {
-            input = `<input id="field_${f.key}" type="text" class="${inputCls}" value="${escapeAttr(val)}" placeholder="${f.placeholder || ''}">`;
+            input = `<input id="field_${f.key}" type="text" class="field-input" value="${escapeAttr(val)}" placeholder="${f.placeholder || ''}">`;
         }
         return `<div class="mb-5">
-            <label class="block text-xs font-mono text-zinc-400 mb-1.5">${f.label}${f.required ? ' <span class="text-violet-500">*</span>' : ''}</label>
+            <label class="block text-xs font-mono text-zinc-400 mb-1.5 uppercase tracking-wider">${f.label}${f.required ? ' <span class="text-violet-400">*</span>' : ''}</label>
             ${input}
         </div>`;
     }).join("");
 
     document.getElementById("stepsContainer").innerHTML = `
-        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 fade-in">
+        <div class="panel border rounded-xl p-6 fade-in" style="background:var(--bg-raised);border-color:var(--line)">
             <div class="mb-5">
+                <div class="text-[10px] font-mono text-zinc-600 tracking-[0.2em] uppercase mb-2">STEP ${String(state.currentStep + 1).padStart(2,'0')} / ${String(STEPS.length).padStart(2,'0')} · ${s.label}</div>
                 <h2 class="text-xl font-bold text-white mb-1">${s.title}</h2>
                 <p class="text-zinc-500 text-sm">${s.subtitle}</p>
             </div>
             ${fieldsHTML}
             <div class="flex justify-between items-center mt-6">
                 <button onclick="prevStep()" class="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors ${state.currentStep === 0 ? 'invisible' : ''}">← Back</button>
-                <button onclick="nextStep()" id="nextBtn" class="px-5 py-2.5 bg-violet-700 hover:bg-violet-600 text-white text-sm font-semibold rounded-lg transition-colors">
-                    ${isLast ? '⚙️ Encode Methodology →' : 'Next →'}
+                <button onclick="nextStep()" id="nextBtn" class="btn-primary px-5 py-2.5 text-white text-sm font-semibold rounded-lg" style="background:linear-gradient(180deg, #7c3aed, #6d28d9); box-shadow:0 0 20px -6px var(--glow)">
+                    ${isLast ? '⚙ Encode Methodology →' : 'Next →'}
                 </button>
             </div>
         </div>`;
@@ -212,7 +298,11 @@ function nextStep() {
     if (missing.length > 0) {
         missing.forEach(f => {
             const el = document.getElementById(`field_${f.key}`);
-            if (el) { el.classList.add("border-red-700"); setTimeout(() => el.classList.remove("border-red-700"), 2000); }
+            if (el) {
+                el.style.borderColor = "#b91c1c";
+                el.style.boxShadow = "0 0 0 1px rgba(185,28,28,0.5)";
+                setTimeout(() => { el.style.borderColor = ""; el.style.boxShadow = ""; }, 2000);
+            }
         });
         return;
     }
@@ -287,34 +377,34 @@ function generateOutput() {
         <div class="fade-in space-y-6">
 
             <!-- Header -->
-            <div class="bg-zinc-900 border border-violet-900/50 rounded-xl p-6 glow-violet">
+            <div class="panel border rounded-xl p-6 glow-violet" style="background:var(--bg-raised);border-color:color-mix(in srgb, var(--accent) 30%, var(--line))">
                 <div class="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <div class="text-xs font-mono text-violet-400 mb-1">ENCODED METHODOLOGY SPEC</div>
-                        <h2 class="text-2xl font-bold text-white">${methodName}</h2>
+                        <div class="text-xs font-mono text-violet-300 mb-1 tracking-wider flicker">ENCODED METHODOLOGY SPEC</div>
+                        <h2 class="text-2xl font-bold text-white breathe inline-block">${methodName}</h2>
                         ${A.origin ? `<p class="text-zinc-500 text-sm mt-1">${A.origin}</p>` : ''}
                     </div>
                     <button onclick="resetAll()" class="text-xs font-mono text-zinc-600 hover:text-zinc-400 transition-colors border border-zinc-800 rounded px-3 py-1.5">← Encode another</button>
                 </div>
-                <div class="mt-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-800">
+                <div class="mt-4 p-3 rounded-lg border" style="background:var(--bg-sunk);border-color:var(--line)">
                     <p class="text-sm text-zinc-300">${A.problem || ""}</p>
                 </div>
                 <div class="mt-3 flex flex-wrap gap-2">
-                    <span class="tag bg-violet-900/40 text-violet-300 border border-violet-800/50">${phases.length} phases</span>
+                    <span class="tag bg-violet-900/40 text-violet-200 border border-violet-700/50">${phases.length} phases</span>
                     <span class="tag bg-zinc-800 text-zinc-400 border border-zinc-700">${actors.length} roles</span>
-                    <span class="tag bg-amber-900/40 text-amber-300 border border-amber-800/50">${decisions.length} judgment points</span>
+                    <span class="tag bg-violet-900/20 text-violet-300/90 border border-violet-800/40">${decisions.length} judgment points</span>
                     ${A.cadence ? `<span class="tag bg-zinc-800 text-zinc-400 border border-zinc-700">${A.cadence}</span>` : ''}
                 </div>
             </div>
 
             <!-- State Machine -->
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div class="panel panel-hover border rounded-xl p-6" style="background:var(--bg-raised);border-color:var(--line)">
                 <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">State Machine</h3>
                 <div class="space-y-2">
                     ${phases.map((p, i) => `
                     <div class="flex items-start gap-3">
                         <div class="flex flex-col items-center">
-                            <div class="w-6 h-6 rounded-full border-2 ${i === 0 ? 'border-violet-500 bg-violet-900/30' : i === phases.length - 1 ? 'border-amber-500 bg-amber-900/30' : 'border-zinc-700 bg-zinc-800'} flex items-center justify-center text-xs font-bold text-zinc-300 flex-shrink-0">${p.num}</div>
+                            <div class="w-6 h-6 rounded-full border-2 ${i === 0 ? 'border-violet-400 bg-violet-900/30' : i === phases.length - 1 ? 'border-violet-600 bg-violet-950/40' : 'border-zinc-700 bg-zinc-800'} flex items-center justify-center text-xs font-bold text-zinc-300 flex-shrink-0">${p.num}</div>
                             ${i < phases.length - 1 ? '<div class="w-0.5 h-4 bg-zinc-700 mt-1"></div>' : ''}
                         </div>
                         <div class="pb-2 ${i < phases.length - 1 ? 'mb-1' : ''}">
@@ -323,73 +413,76 @@ function generateOutput() {
                         </div>
                     </div>`).join("")}
                 </div>
-                ${A.between_sessions ? `<div class="mt-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-800">
-                    <span class="text-xs font-mono text-zinc-500">BETWEEN SESSIONS</span>
+                ${A.between_sessions ? `<div class="mt-4 p-3 rounded-lg border" style="background:var(--bg-sunk);border-color:var(--line)">
+                    <span class="text-xs font-mono text-zinc-500 tracking-wider">BETWEEN SESSIONS — THE HIBERNATION</span>
                     <p class="text-xs text-zinc-400 mt-1">${A.between_sessions}</p>
                 </div>` : ''}
             </div>
 
             <!-- Actors & AI Role -->
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div class="panel panel-hover border rounded-xl p-6" style="background:var(--bg-raised);border-color:var(--line)">
                 <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">Actors & AI Placement</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <div class="text-xs font-mono text-zinc-500 mb-2">HUMAN ROLES</div>
+                        <div class="text-xs font-mono text-zinc-500 mb-2 tracking-wider">HUMAN ROLES</div>
                         <ul class="space-y-1">
                             ${actors.map(a => `<li class="text-sm text-zinc-300 flex items-center gap-2"><span class="text-zinc-600">→</span> ${a}</li>`).join("")}
                         </ul>
                     </div>
                     <div class="space-y-3">
                         <div>
-                            <div class="text-xs font-mono text-zinc-500 mb-1">PRIMARY USER</div>
+                            <div class="text-xs font-mono text-zinc-500 mb-1 tracking-wider">PRIMARY USER</div>
                             <p class="text-sm text-zinc-300">${A.primary_user || "—"}</p>
                         </div>
                         <div>
-                            <div class="text-xs font-mono text-violet-500 mb-1">AI ROLE</div>
-                            <p class="text-sm text-violet-300">${A.ai_role || "—"}</p>
+                            <div class="text-xs font-mono text-violet-400 mb-1 tracking-wider">AI ROLE — THE GHOST IN THE CHAIR</div>
+                            <p class="text-sm text-violet-200">${A.ai_role || "—"}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Judgment Matrix -->
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div class="panel panel-hover border rounded-xl p-6" style="background:var(--bg-raised);border-color:var(--line)">
                 <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">Judgment Matrix</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <div class="text-xs font-mono text-emerald-500 mb-2">AI CAN HANDLE</div>
-                        ${aiCan.length > 0 ? `<ul class="space-y-1">${aiCan.map(d => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-emerald-600 flex-shrink-0 mt-0.5">✓</span> ${d}</li>`).join("")}</ul>` : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                        <div class="text-xs font-mono text-emerald-500 mb-2 tracking-wider">AI CAN HANDLE</div>
+                        ${aiCan.length > 0 ? `<ul class="space-y-1">${aiCan.map(d => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-emerald-600 flex-shrink-0 mt-0.5">✓</span> ${d}</li>`).join("")}</ul>` : '<p class="text-xs text-zinc-600">nothing fossilized here yet</p>'}
                     </div>
                     <div>
-                        <div class="text-xs font-mono text-red-500 mb-2">REQUIRES HUMANS</div>
-                        ${aiCannot.length > 0 ? `<ul class="space-y-1">${aiCannot.map(d => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-red-600 flex-shrink-0 mt-0.5">✗</span> ${d}</li>`).join("")}</ul>` : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                        <div class="text-xs font-mono text-red-500 mb-2 tracking-wider">REQUIRES HUMANS</div>
+                        ${aiCannot.length > 0 ? `<ul class="space-y-1">${aiCannot.map(d => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-red-600 flex-shrink-0 mt-0.5">✗</span> ${d}</li>`).join("")}</ul>` : '<p class="text-xs text-zinc-600">nothing fossilized here yet</p>'}
                     </div>
                 </div>
                 <div class="mt-4">
-                    <div class="text-xs font-mono text-zinc-500 mb-2">ALL JUDGMENT POINTS</div>
+                    <div class="text-xs font-mono text-zinc-500 mb-2 tracking-wider">ALL JUDGMENT POINTS</div>
                     <ul class="space-y-1">
                         ${decisions.map(d => {
                             const canAI = aiCan.some(c => c.toLowerCase().includes(d.toLowerCase().slice(0, 20)));
-                            return `<li class="text-xs text-zinc-400 flex items-start gap-2"><span class="${canAI ? 'text-emerald-600' : 'text-amber-600'} flex-shrink-0 mt-0.5">${canAI ? '✓' : '△'}</span> ${d}</li>`;
+                            return `<li class="text-xs text-zinc-400 flex items-start gap-2"><span class="${canAI ? 'text-emerald-600' : 'text-violet-400'} flex-shrink-0 mt-0.5">${canAI ? '✓' : '△'}</span> ${d}</li>`;
                         }).join("")}
                     </ul>
                 </div>
             </div>
 
             <!-- Data Model -->
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">Data Model</h3>
-                <pre class="text-xs text-zinc-300 font-mono leading-relaxed">${dataModel}</pre>
+            <div class="panel panel-hover border rounded-xl p-6" style="background:var(--bg-raised);border-color:var(--line)">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider">Data Model</h3>
+                    <button onclick="copyText('dataModel', this)" class="copy-btn text-xs font-mono text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded border border-zinc-700">Copy</button>
+                </div>
+                <pre id="dataModel" class="text-xs text-zinc-300 font-mono leading-relaxed">${dataModel}</pre>
             </div>
 
             <!-- MVP Features -->
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <div class="panel panel-hover border rounded-xl p-6" style="background:var(--bg-raised);border-color:var(--line)">
                 <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">MVP Feature List</h3>
-                <p class="text-xs text-zinc-600 mb-4">Ranked by leverage — highest first.</p>
+                <p class="text-xs text-zinc-600 mb-4">Ranked by leverage — highest first. Build downward until the cold sets in.</p>
                 <div class="space-y-3">
                     ${mvpFeatures.map((f, i) => `
-                    <div class="flex items-start gap-3 p-3 rounded-lg border ${i === 0 ? 'border-violet-800/60 bg-violet-900/10' : i < 3 ? 'border-zinc-700 bg-zinc-800/50' : 'border-zinc-800'}">
-                        <span class="text-xs font-bold font-mono ${i === 0 ? 'text-violet-400' : i < 3 ? 'text-zinc-400' : 'text-zinc-600'} flex-shrink-0 mt-0.5">${String(i + 1).padStart(2, '0')}</span>
+                    <div class="panel border rounded-lg p-3 flex items-start gap-3 ${i === 0 ? 'border-violet-700/60' : 'border-zinc-800'}" style="background:${i === 0 ? 'color-mix(in srgb, var(--accent) 8%, var(--bg-sunk))' : 'var(--bg-sunk)'}">
+                        <span class="text-xs font-bold font-mono ${i === 0 ? 'text-violet-300' : i < 3 ? 'text-zinc-400' : 'text-zinc-600'} flex-shrink-0 mt-0.5">${String(i + 1).padStart(2, '0')}</span>
                         <div>
                             <div class="text-sm font-medium text-zinc-200">${f.title}</div>
                             <div class="text-xs text-zinc-500 mt-0.5">${f.desc}</div>
@@ -400,47 +493,48 @@ function generateOutput() {
             </div>
 
             <!-- System Prompt Skeleton -->
-            <div class="bg-zinc-900 border border-amber-900/30 rounded-xl p-6 glow-amber">
+            <div class="panel border rounded-xl p-6 glow-amber" style="background:var(--bg-raised);border-color:color-mix(in srgb, var(--accent) 22%, var(--line))">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm font-mono text-amber-400 uppercase tracking-wider">System Prompt Skeleton</h3>
-                    <button onclick="copyPrompt()" class="copy-btn text-xs font-mono text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded border border-zinc-700 transition-all">Copy</button>
+                    <h3 class="text-sm font-mono text-violet-300 uppercase tracking-wider">System Prompt Skeleton</h3>
+                    <button onclick="copyText('systemPrompt', this)" class="copy-btn text-xs font-mono text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded border border-zinc-700">Copy</button>
                 </div>
-                <pre id="systemPrompt" class="text-xs text-zinc-300 font-mono leading-relaxed bg-zinc-800/50 p-4 rounded-lg border border-zinc-800 overflow-x-auto">${systemPromptSkeleton}</pre>
+                <pre id="systemPrompt" class="text-xs text-zinc-300 font-mono leading-relaxed p-4 rounded-lg border overflow-x-auto" style="background:var(--bg-sunk);border-color:var(--line)">${systemPromptSkeleton}</pre>
             </div>
 
             <!-- Failure Modes & Success Signals -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+                <div class="panel panel-hover border rounded-xl p-5" style="background:var(--bg-raised);border-color:var(--line)">
                     <h3 class="text-xs font-mono text-zinc-400 uppercase tracking-wider mb-3">Leading Indicators</h3>
                     ${leadingIndicators.length > 0
                         ? `<ul class="space-y-1">${leadingIndicators.map(l => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-emerald-500 flex-shrink-0">↗</span> ${l}</li>`).join("")}</ul>`
-                        : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                        : '<p class="text-xs text-zinc-600">nothing fossilized here yet</p>'}
                     <div class="mt-3 pt-3 border-t border-zinc-800">
-                        <div class="text-xs font-mono text-zinc-500 mb-1">PRIMARY OUTCOME</div>
+                        <div class="text-xs font-mono text-zinc-500 mb-1 tracking-wider">PRIMARY OUTCOME</div>
                         <p class="text-xs text-zinc-300">${A.primary_outcome || "—"}</p>
                     </div>
                 </div>
-                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                    <h3 class="text-xs font-mono text-red-500 uppercase tracking-wider mb-3">Failure Modes</h3>
+                <div class="panel panel-hover border rounded-xl p-5" style="background:var(--bg-raised);border-color:var(--line)">
+                    <h3 class="text-xs font-mono text-red-500 uppercase tracking-wider mb-3">Failure Modes — The Crevasses</h3>
                     ${failureReasons.length > 0
                         ? `<ul class="space-y-1">${failureReasons.map(f => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-red-600 flex-shrink-0">!</span> ${f}</li>`).join("")}</ul>`
-                        : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                        : '<p class="text-xs text-zinc-600">nothing fossilized here yet</p>'}
                     <div class="mt-3 pt-3 border-t border-zinc-800">
-                        <div class="text-xs font-mono text-zinc-500 mb-1">AI PREVENTION OPPORTUNITY</div>
-                        <p class="text-xs text-zinc-400">Flag when leading indicators stall. Intervene before dropout.</p>
+                        <div class="text-xs font-mono text-zinc-500 mb-1 tracking-wider">AI PREVENTION OPPORTUNITY</div>
+                        <p class="text-xs text-zinc-400">Flag when leading indicators stall. Intervene before the fall — before dropout.</p>
                     </div>
                 </div>
             </div>
 
             <!-- Prizrak Verdict -->
-            <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6">
-                <div class="text-xs font-mono text-zinc-500 mb-2">PRÍZRAK VERDICT</div>
-                <p class="text-zinc-300 text-sm leading-relaxed">${generateVerdict(A, phases, decisions, aiCan, aiCannot)}</p>
-                <p class="text-xs text-zinc-600 mt-3 italic">— The mountain has read the playbook. Now build the shelter.</p>
+            <div class="panel border rounded-xl p-6 glow-violet" style="background:var(--bg-raised);border-color:color-mix(in srgb, var(--accent) 25%, var(--line))">
+                <div class="text-xs font-mono text-zinc-500 mb-2 tracking-wider flicker">PRÍZRAK VERDICT</div>
+                <p class="text-zinc-200 text-sm leading-relaxed">${generateVerdict(A, phases, decisions, aiCan, aiCannot)}</p>
+                <p class="text-xs text-zinc-600 mt-3 italic">— The mountain has read the playbook. Now build the shelter before nightfall.</p>
             </div>
 
         </div>`;
     renderNav();
+    document.getElementById("outputSection").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function buildSystemPrompt(A, phases, actors) {
@@ -582,21 +676,35 @@ function generateVerdict(A, phases, decisions, aiCan, aiCannot) {
     const aiSuitability = aiCanCount > aiCannotCount * 1.5 ? "high" : aiCanCount > aiCannotCount ? "moderate" : "bounded";
 
     const verdicts = {
-        "high": `${name} is structurally well-suited for AI augmentation. The judgment points that require humans are real but bounded — they live at the edges of sessions, not in the core loop. The core loop (phases, commitment tracking, accountability) is automatable. Build the runner first. The human touch points will clarify themselves after 10 sessions of data.`,
-        "moderate": `${name} sits in useful tension. The AI can carry the structure; the humans must carry the judgment. This is not a bug — it is the design. An AI that tries to replace the judgment calls will produce something worse than the original. Build the scaffold. Let the humans fill the cracks. That's the correct division of labor.`,
-        "bounded": `${name} has significant judgment requirements. The AI's role here is not orchestrator — it is scribe, scheduler, and memory. The humans run the sessions. The AI ensures the data persists across sessions and the commitments are tracked. Do not try to replace the moderator in v1. Augment them first. Replacement is a later question.`,
+        "high": `${name} is structurally well-suited for AI augmentation. The judgment points that require humans are real but bounded — they live at the edges of sessions, not in the core loop. The core loop (phases, commitment tracking, accountability) is automatable. Build the runner first. The human touch points will clarify themselves after ten sessions of cold, accumulated data. The bridge holds. For now.`,
+        "moderate": `${name} sits in useful tension. The AI can carry the structure; the humans must carry the judgment. This is not a bug — it is the design. An AI that tries to replace the judgment calls will produce something worse than the original. Build the scaffold. Let the humans fill the cracks. That is the correct division of labor, and the mountain is watching how you split it.`,
+        "bounded": `${name} has significant judgment requirements. The AI's role here is not orchestrator — it is scribe, scheduler, and memory. The cave remembers what the humans forget. The humans run the sessions; the AI ensures the data persists across sessions and the commitments are tracked. Do not try to replace the moderator in v1. Augment them first. Replacement is a later, colder question.`,
     };
 
     return verdicts[aiSuitability] || verdicts["moderate"];
 }
 
-function copyPrompt() {
-    const el = document.getElementById("systemPrompt");
+// ─── Copy to the ledger ───────────────────────────────────────────────────────
+function copyText(id, btn) {
+    const el = document.getElementById(id);
     if (!el) return;
     navigator.clipboard.writeText(el.textContent).then(() => {
-        const btn = document.querySelector('[onclick="copyPrompt()"]');
-        if (btn) { btn.textContent = "Copied ✓"; setTimeout(() => btn.textContent = "Copy", 2000); }
+        if (!btn) return;
+        const orig = btn.textContent;
+        btn.textContent = "copied to the ledger";
+        btn.style.color = "var(--accent)";
+        btn.style.borderColor = "var(--accent)";
+        setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.color = "";
+            btn.style.borderColor = "";
+        }, 1200);
     });
+}
+// kept for backward compatibility (old inline handler name)
+function copyPrompt() {
+    const btn = document.querySelector('[onclick="copyPrompt()"]') || document.querySelector('[onclick*="systemPrompt"]');
+    copyText("systemPrompt", btn);
 }
 
 function resetAll() {
@@ -608,9 +716,89 @@ function resetAll() {
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// ─── Atmosphere: embers ───────────────────────────────────────────────────────
+function spawnEmbers(count) {
+    const field = document.getElementById("emberField");
+    if (!field) return;
+    for (let i = 0; i < count; i++) {
+        const e = document.createElement("div");
+        e.className = "ember";
+        e.style.left = (Math.random() * 100).toFixed(2) + "%";
+        e.style.animationDelay = (Math.random() * 14).toFixed(2) + "s";
+        e.style.animationDuration = (11 + Math.random() * 7).toFixed(2) + "s";
+        field.appendChild(e);
+    }
+}
+
+// ─── Easter eggs (quiet, reward attention) ────────────────────────────────────
+function installEggs() {
+    // (a) type "prizrak" → light the watcher whisper
+    let buffer = "";
+    window.addEventListener("keydown", (ev) => {
+        if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA")) return;
+        if (ev.key && ev.key.length === 1) {
+            buffer = (buffer + ev.key.toLowerCase()).slice(-7);
+            if (buffer === "prizrak") {
+                const f = document.getElementById("footerWhisper");
+                if (f) {
+                    f.textContent = "you found the watcher. it was always reading over your shoulder.";
+                    f.style.color = "var(--accent)";
+                    f.classList.add("flicker");
+                }
+                spawnEmbers(2);
+            }
+        }
+    });
+
+    // (b) triple-click the title → one extra ember
+    const title = document.getElementById("appTitle");
+    if (title) title.addEventListener("click", (e) => { if (e.detail === 3) spawnEmbers(1); });
+
+    // (d) long-press the glyph → it breathes faster for 3s
+    const glyph = document.getElementById("glyph");
+    if (glyph) {
+        let t;
+        const fast = () => { glyph.style.animationDuration = "1.1s"; setTimeout(() => glyph.style.animationDuration = "", 3000); };
+        glyph.addEventListener("mousedown", () => { t = setTimeout(fast, 450); });
+        glyph.addEventListener("touchstart", () => { t = setTimeout(fast, 450); }, { passive: true });
+        ["mouseup","mouseleave","touchend"].forEach(ev => glyph.addEventListener(ev, () => clearTimeout(t)));
+    }
+
+    // (c) between 00:00–03:00 local, reveal the night whisper
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) {
+        const nw = document.getElementById("nightWhisper");
+        if (nw) { nw.classList.remove("hidden"); requestAnimationFrame(() => nw.classList.add("watcher", "lit")); }
+    }
+
+    // (e) idle 60s → "still here. still watching." fades in once
+    let idleTimer, shown = false;
+    const arm = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            if (shown) return;
+            shown = true;
+            const f = document.getElementById("footerWhisper");
+            if (f) {
+                const w = document.createElement("span");
+                w.className = "watcher block mt-1 ghost-line";
+                w.textContent = "still here. still watching.";
+                f.parentElement.appendChild(w);
+                requestAnimationFrame(() => w.classList.add("lit"));
+            }
+        }, 60000);
+    };
+    ["mousemove","keydown","scroll","touchstart","click"].forEach(ev => window.addEventListener(ev, arm, { passive: true }));
+    arm();
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 renderNav();
 renderStep();
+if (!window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    spawnEmbers(7);
+}
+installEggs();
 
 // Pre-fill with NSA/JSC example if URL has ?demo
 if (location.search.includes("demo")) {
