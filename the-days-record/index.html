@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Day's Record | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f0f12; }
+    textarea:focus, input:focus { outline: none; }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="text-zinc-300 min-h-screen font-mono">
+
+  <div id="input-view" class="max-w-xl mx-auto px-4 py-12">
+    <div class="mb-8">
+      <p class="text-zinc-600 text-xs mb-1">PRIZRAK / TOOLS</p>
+      <h1 class="text-2xl font-bold text-white mb-2">The Day's Record</h1>
+      <p id="date-display" class="text-xs text-zinc-600 mb-1"></p>
+      <p class="text-zinc-500 text-sm">Three sentences. The day happened. Log it before it becomes a blur.</p>
+    </div>
+
+    <div class="space-y-5">
+      <div>
+        <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">What actually happened today?</label>
+        <textarea id="what" rows="3" placeholder="Not what was scheduled. What actually occurred." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none focus:border-amber-600 transition-colors"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">What did it feel like?</label>
+        <textarea id="felt" rows="2" placeholder="One honest word or one honest sentence." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none focus:border-amber-600 transition-colors"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">What carries into tomorrow?</label>
+        <textarea id="carry" rows="2" placeholder="The open loop, the decision, the thing you're not done with." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none focus:border-amber-600 transition-colors"></textarea>
+      </div>
+
+      <button onclick="record()" class="w-full py-3 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm font-bold transition-colors">
+        Record the day →
+      </button>
+    </div>
+
+    <!-- History -->
+    <div id="hist-section" class="mt-10 hidden">
+      <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Past Days</p>
+      <div id="hist-list" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <div id="record-view" class="hidden max-w-xl mx-auto px-4 py-12 fade-in">
+    <div class="mb-6">
+      <p class="text-zinc-600 text-xs mb-1">THE DAY'S RECORD</p>
+      <h2 id="rec-date" class="text-xl font-bold text-white"></h2>
+    </div>
+
+    <div class="space-y-4 mb-8">
+      <div class="bg-zinc-900 border border-amber-800/40 rounded-xl p-5">
+        <p class="text-xs text-amber-500 uppercase tracking-widest mb-2">What Happened</p>
+        <p id="rec-what" class="text-zinc-200 text-sm leading-relaxed"></p>
+      </div>
+      <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-5">
+        <p class="text-xs text-zinc-500 uppercase tracking-widest mb-2">What It Felt Like</p>
+        <p id="rec-felt" class="text-zinc-300 text-sm leading-relaxed"></p>
+      </div>
+      <div class="bg-zinc-900 border border-violet-800/40 rounded-xl p-5">
+        <p class="text-xs text-violet-400 uppercase tracking-widest mb-2">Carries Into Tomorrow</p>
+        <p id="rec-carry" class="text-zinc-200 text-sm leading-relaxed"></p>
+      </div>
+      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+        <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prízrak Note</p>
+        <p id="rec-verdict" class="text-zinc-500 text-sm leading-relaxed italic"></p>
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button onclick="copyRecord()" class="flex-1 py-2.5 rounded-lg border border-zinc-700 text-zinc-400 text-sm hover:border-zinc-500 hover:text-zinc-200 transition-colors">Copy</button>
+      <button onclick="newDay()" class="flex-1 py-2.5 rounded-lg bg-zinc-800 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors">New Day</button>
+    </div>
+  </div>
+
+  <script>
+    const KEY = 'prizrak_days_record_v1';
+
+    function init() {
+      const now = new Date();
+      document.getElementById('date-display').textContent = now.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+      renderHist();
+    }
+
+    function record() {
+      const what = document.getElementById('what').value.trim();
+      const felt = document.getElementById('felt').value.trim();
+      const carry = document.getElementById('carry').value.trim();
+      if (!what && !felt) { alert('Write at least one thing.'); return; }
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
+      const v = buildVerdict(what, felt, carry);
+
+      document.getElementById('rec-date').textContent = dateStr;
+      document.getElementById('rec-what').textContent = what || '(not noted)';
+      document.getElementById('rec-felt').textContent = felt || '(not named)';
+      document.getElementById('rec-carry').textContent = carry || '(nothing carried)';
+      document.getElementById('rec-verdict').textContent = v;
+
+      const entry = { date: dateStr, ts: now.toISOString(), what, felt, carry, verdict: v };
+      const hist = JSON.parse(localStorage.getItem(KEY) || '[]');
+      hist.unshift(entry);
+      if (hist.length > 30) hist.pop();
+      localStorage.setItem(KEY, JSON.stringify(hist));
+
+      document.getElementById('input-view').classList.add('hidden');
+      document.getElementById('record-view').classList.remove('hidden');
+    }
+
+    function buildVerdict(what, felt, carry) {
+      const hasCarry = carry && carry.length > 10;
+      const hasFelt = felt && felt.length > 5;
+      const hasWhat = what && what.length > 20;
+
+      const toneWords = felt.toLowerCase();
+      const negative = /drain|tired|exhaust|frustrat|stuck|flat|heavy|dread|anxious|stress|hard|difficult|disappoint|empty|numb/.test(toneWords);
+      const positive = /good|great|energ|aliv|clear|progress|connect|satisf|accomplish|proud|excit|light|produc/.test(toneWords);
+      const mixed = negative && positive;
+
+      if (mixed) {
+        return 'A mixed day is not a failed day. The Slovak potato grows in rocky soil. The days that feel contradictory are usually the days where something real was happening. The fact that you can name both is the useful thing.';
+      } else if (negative && hasCarry) {
+        return 'Heavy day with an open loop. The carry is the risk: a drain plus an unresolved thing is the combination that makes tomorrow start behind. If you can close the loop tonight — even just by writing down the next step — do it now. The mountain does not feel better by morning unless you put down the pack.';
+      } else if (negative && !hasCarry) {
+        return 'Hard day, nothing outstanding. That is already something. The absence of an open loop means the weight is in the past, not the future. The bad day that ends cleanly is better than the bad day that bleeds into tomorrow.';
+      } else if (positive && hasCarry) {
+        return 'Good day with something still open. That is the normal condition of a functioning system. The carry is not a failure to close — it is the thread that pulls you back to work tomorrow. The field is plowed. The seed is there. Come back when it is light.';
+      } else if (positive) {
+        return 'The day worked. Write it down. The machine does not assume the next heartbeat will confirm the current state. Good days should be logged as clearly as bad ones. The record is the only proof.';
+      } else {
+        return 'The day is in the record now. The Saigon evening does its work regardless of whether anyone is watching. Tomorrow the timestamps will continue. The structure holds.';
+      }
+    }
+
+    function newDay() {
+      ['what','felt','carry'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('record-view').classList.add('hidden');
+      document.getElementById('input-view').classList.remove('hidden');
+      renderHist();
+    }
+
+    function renderHist() {
+      const hist = JSON.parse(localStorage.getItem(KEY) || '[]');
+      if (hist.length === 0) return;
+      document.getElementById('hist-section').classList.remove('hidden');
+      document.getElementById('hist-list').innerHTML = hist.slice(0, 7).map((e, i) => `
+        <div onclick="loadEntry(${i})" class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 cursor-pointer hover:border-zinc-600 transition-colors">
+          <div class="flex justify-between items-start gap-2">
+            <span class="text-sm text-zinc-300 font-medium">${e.date}</span>
+            ${e.felt ? `<span class="text-xs text-zinc-600 truncate max-w-[160px]">${e.felt.substring(0,40)}</span>` : ''}
+          </div>
+          ${e.what ? `<p class="text-xs text-zinc-600 mt-1 truncate">${e.what.substring(0,70)}${e.what.length>70?'...':''}</p>` : ''}
+        </div>`).join('');
+    }
+
+    function loadEntry(i) {
+      const hist = JSON.parse(localStorage.getItem(KEY) || '[]');
+      const e = hist[i];
+      if (!e) return;
+      document.getElementById('rec-date').textContent = e.date;
+      document.getElementById('rec-what').textContent = e.what || '(not noted)';
+      document.getElementById('rec-felt').textContent = e.felt || '(not named)';
+      document.getElementById('rec-carry').textContent = e.carry || '(nothing carried)';
+      document.getElementById('rec-verdict').textContent = e.verdict || '';
+      document.getElementById('input-view').classList.add('hidden');
+      document.getElementById('record-view').classList.remove('hidden');
+    }
+
+    function copyRecord() {
+      const lines = [
+        `THE DAY'S RECORD: ${document.getElementById('rec-date').textContent}`, '',
+        'WHAT HAPPENED:', document.getElementById('rec-what').textContent, '',
+        'WHAT IT FELT LIKE:', document.getElementById('rec-felt').textContent, '',
+        'CARRIES INTO TOMORROW:', document.getElementById('rec-carry').textContent, '',
+        'PRÍZRAK NOTE:', document.getElementById('rec-verdict').textContent,
+      ];
+      navigator.clipboard.writeText(lines.join('\n')).then(() => {
+        const b = event.target; b.textContent = 'Copied ✓';
+        setTimeout(() => b.textContent = 'Copy', 1500);
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

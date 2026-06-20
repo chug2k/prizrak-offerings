@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Collision Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0f0f12; }
+        @keyframes slam { 0%{opacity:0;transform:scale(0.97)} 100%{opacity:1;transform:scale(1)} }
+        .slam { animation: slam 0.18s ease-out; }
+    </style>
+</head>
+<body class="text-zinc-300 font-mono min-h-screen">
+    <div class="max-w-2xl mx-auto w-full px-4 py-12 flex flex-col gap-8">
+
+        <div>
+            <p class="text-xs text-zinc-600 uppercase tracking-widest mb-1">Prízrak / Offerings</p>
+            <h1 class="text-2xl font-bold text-white tracking-tight">THE COLLISION ENGINE</h1>
+            <p class="text-xs text-zinc-600 mt-1">You are stuck. A foreign structure arrives. Find where it touches.</p>
+        </div>
+
+        <div>
+            <label class="text-xs uppercase tracking-widest text-zinc-500 block mb-2">State the stuck problem</label>
+            <textarea id="problem" rows="2" placeholder="e.g. 'I keep delaying the conversation about leaving'"
+                class="w-full bg-zinc-900 border border-zinc-700 focus:border-zinc-500 rounded px-3 py-2 text-sm text-zinc-200 placeholder-zinc-700 focus:outline-none resize-none"></textarea>
+        </div>
+
+        <button id="fire" class="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-400 text-white font-bold uppercase tracking-widest py-3 px-6 text-sm transition-all">
+            FIRE THE COLLISION →
+        </button>
+
+        <div id="result" class="hidden">
+            <div id="card" class="bg-zinc-900 border-l-4 border-fuchsia-500 p-6">
+                <div id="domain-label" class="text-xs uppercase tracking-widest text-fuchsia-500 mb-4" style="letter-spacing:0.2em"></div>
+                <div id="principle" class="text-xl font-bold text-white leading-snug mb-6"></div>
+                <div class="border-t border-zinc-800 pt-5">
+                    <label class="text-xs uppercase tracking-widest text-zinc-500 block mb-2">Where does this structure touch your problem?</label>
+                    <textarea id="response" rows="3" placeholder="Force the collision. Write something."
+                        class="w-full bg-zinc-950 border border-zinc-800 focus:border-zinc-600 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700 focus:outline-none resize-none"></textarea>
+                    <button id="log-it" class="mt-3 text-xs border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300 px-4 py-2 transition-all uppercase tracking-widest">LOG COLLISION</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="log-section" class="hidden">
+            <div class="text-xs uppercase tracking-widest text-zinc-600 mb-3">Collision Log</div>
+            <div id="log-items" class="flex flex-col gap-3"></div>
+            <button id="clear-log" class="mt-4 text-xs text-zinc-700 hover:text-zinc-500 transition-colors">clear log</button>
+        </div>
+
+        <div class="pt-4 border-t border-zinc-900 text-xs text-zinc-700">
+            The problem space does not improve from within. The exogenous structure is the correction force.
+        </div>
+    </div>
+
+    <script>
+    const LOG_KEY = "prizrak_collisions_v1";
+
+    const DOMAINS = [
+        { name: "MYCOLOGY", color: "border-emerald-500", lc: "text-emerald-400", p: [
+            "Mycelium routes around dead nodes automatically. The network doesn't repair — it reroutes.",
+            "The fruiting body is 1% of the organism. What you see is not the network.",
+            "A spore doesn't choose when to germinate. The condition chooses.",
+            "The mycelial network has no center. Disruption of any node redistributes, not terminates."
+        ]},
+        { name: "FERMENTATION", color: "border-amber-500", lc: "text-amber-400", p: [
+            "Salt doesn't add flavor. It suppresses the organisms competing with the ones you want.",
+            "The crash is not failure. It's one population winning over another.",
+            "An anaerobic vessel changes what's chemically possible inside it. The seal is the intervention.",
+            "Time is the only ingredient you cannot add or remove once fermentation begins."
+        ]},
+        { name: "FLUID DYNAMICS", color: "border-blue-500", lc: "text-blue-400", p: [
+            "Turbulence is not disorder. It's energy moving across scales.",
+            "Laminar flow breaks down when the Reynolds number exceeds a threshold. Know your Reynolds number.",
+            "Pressure loss occurs at every junction, bend, and constriction. The path has a cost.",
+            "A fluid takes the path of least resistance — but it also fills every available space."
+        ]},
+        { name: "KARST HYDROLOGY", color: "border-cyan-500", lc: "text-cyan-400", p: [
+            "The river doesn't disappear underground. Loss of surface signal is not loss of flow.",
+            "A sinkhole doesn't form until the cavity reaches critical size. The surface looks fine until collapse.",
+            "Karst aquifers have no filtration. What enters the surface reaches the water supply immediately.",
+            "Underground, water carves its path through dissolution — not force, but chemistry and time."
+        ]},
+        { name: "SOVIET ARCHITECTURE", color: "border-stone-400", lc: "text-stone-400", p: [
+            "The panelák was not designed for happiness. It was designed for census numbers. Know what yours was designed for.",
+            "Standardization eliminated the feedback loop. The wall cannot tell you it hurts.",
+            "Form was subordinated to output targets. Who set your output targets?",
+            "Uniformity at scale requires the absence of local information. What local information was suppressed?"
+        ]},
+        { name: "CHESS ENDGAMES", color: "border-violet-500", lc: "text-violet-400", p: [
+            "In the endgame, pawns become queens. Pieces that were irrelevant are now the whole game.",
+            "Zugzwang: the obligation to move is itself the loss. Sometimes the correct position has no obligation.",
+            "A king that stayed passive in the middlegame often cannot activate in time.",
+            "Material advantage means nothing if the position is lost. Count the position before the pieces."
+        ]},
+        { name: "MATERIALS SCIENCE", color: "border-red-500", lc: "text-red-400", p: [
+            "Annealing is controlled degradation. You heat to disorder so you can cool into a better structure.",
+            "Stress concentrations don't appear where the load is applied. They appear at the boundaries.",
+            "Temper brittleness: some materials become fragile only after slow cooling. Fast change can be safer than gradual.",
+            "Fatigue failure occurs below the yield stress. Repeated small loads accumulate damage invisibly."
+        ]},
+        { name: "CIRCADIAN BIOLOGY", color: "border-orange-500", lc: "text-orange-400", p: [
+            "The clock gene doesn't tell time. It tells the cell when to be sensitive to time.",
+            "Zeitgebers don't set the clock. They entrain it. There is a difference.",
+            "Phase advance is harder than phase delay. Moving forward costs more than moving back.",
+            "The biological clock runs without external signal. It only needs the signal to synchronize."
+        ]},
+        { name: "MOUNTAIN ECOLOGY", color: "border-lime-500", lc: "text-lime-400", p: [
+            "The treeline is not where trees stop growing. It's where they grow differently — krummholz, deformed, low.",
+            "Nothing lives above 3000m permanently. Everything above the line is on a transit budget.",
+            "The mountain generates its own weather. The system creates the conditions that constrain it.",
+            "Wind forces the tree to grow away from itself. Persistent pressure reshapes structure over time."
+        ]},
+        { name: "GAME THEORY", color: "border-pink-500", lc: "text-pink-400", p: [
+            "A credible threat requires commitment that makes backing down costly.",
+            "In repeated games, the only enforcement mechanism is the threat of future defection.",
+            "The Nash equilibrium is not the optimal outcome. It is the stable one.",
+            "Signaling is only credible when it is costly to fake."
+        ]},
+    ];
+
+    let cur = null;
+
+    const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+    const loadLog = () => { try { return JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch(e) { return []; } };
+    const saveLog = e => localStorage.setItem(LOG_KEY, JSON.stringify(e));
+
+    function renderLog() {
+        const entries = loadLog();
+        const sec = document.getElementById("log-section");
+        if (!entries.length) { sec.classList.add("hidden"); return; }
+        sec.classList.remove("hidden");
+        document.getElementById("log-items").innerHTML = entries.slice().reverse().map(e => `
+            <div class="border border-zinc-800 p-4 text-xs">
+                <div class="text-zinc-600 mb-1">${e.ts} · <span class="text-zinc-500">${e.domain}</span></div>
+                <div class="text-zinc-500 italic mb-2">"${e.principle}"</div>
+                ${e.problem ? `<div class="text-zinc-600 mb-1">↦ ${e.problem}</div>` : ''}
+                ${e.response ? `<div class="text-zinc-300">↳ ${e.response}</div>` : ''}
+            </div>`).join("");
+    }
+
+    document.getElementById("fire").addEventListener("click", () => {
+        const d = rand(DOMAINS);
+        const p = rand(d.p);
+        cur = { d, p };
+        document.getElementById("card").className = `bg-zinc-900 border-l-4 ${d.color} p-6 slam`;
+        document.getElementById("domain-label").className = `text-xs uppercase tracking-widest ${d.lc} mb-4`;
+        document.getElementById("domain-label").style.letterSpacing = "0.2em";
+        document.getElementById("domain-label").textContent = d.name;
+        document.getElementById("principle").textContent = p;
+        document.getElementById("response").value = "";
+        document.getElementById("result").classList.remove("hidden");
+        setTimeout(() => document.getElementById("card").classList.remove("slam"), 200);
+    });
+
+    document.getElementById("log-it").addEventListener("click", () => {
+        if (!cur) return;
+        const entries = loadLog();
+        entries.push({
+            ts: new Date().toLocaleString("en-GB", {day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}),
+            domain: cur.d.name,
+            principle: cur.p,
+            problem: document.getElementById("problem").value.trim(),
+            response: document.getElementById("response").value.trim()
+        });
+        if (entries.length > 30) entries.splice(0, entries.length - 30);
+        saveLog(entries);
+        renderLog();
+        const btn = document.getElementById("log-it");
+        btn.textContent = "LOGGED ✓";
+        setTimeout(() => { btn.textContent = "LOG COLLISION"; }, 1600);
+    });
+
+    document.getElementById("clear-log").addEventListener("click", () => {
+        localStorage.removeItem(LOG_KEY);
+        renderLog();
+    });
+
+    renderLog();
+    </script>
+</body>
+</html>

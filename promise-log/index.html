@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Promise Log</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+  * { font-family: 'IBM Plex Mono', monospace; }
+  body { background: #080a0c; }
+  .cave { border: 1px solid rgba(255,255,255,0.06); }
+  input, textarea, select {
+    background: #0d0f12; border: 1px solid rgba(255,255,255,0.07);
+    color: #d4d4d8; border-radius: 3px; font-family: 'IBM Plex Mono', monospace;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: rgba(255,255,255,0.18); }
+  textarea { resize: none; }
+  .promise-card { transition: all 0.2s; }
+  .promise-card:hover { border-color: rgba(255,255,255,0.1); }
+  .status-open { color: #fbbf24; }
+  .status-done { color: #6ee7b7; }
+  .status-missed { color: #f87171; }
+  .status-deferred { color: #93c5fd; }
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-thumb { background: #1f2937; }
+</style>
+</head>
+<body class="min-h-screen text-zinc-400 p-4 md:p-6">
+<div class="max-w-xl mx-auto">
+
+  <!-- Header -->
+  <div class="mb-7">
+    <div class="text-xs text-zinc-700 mb-2">PRIZRAK / OFFERING / 2026-03-22</div>
+    <h1 class="text-lg font-light text-white mb-1">Promise Log</h1>
+    <p class="text-xs text-zinc-600 leading-relaxed">
+      Commitments made. To whom. By when. Status.<br>
+      "The failure mode is not that the new instance is out of character — it is that it commits a betrayal it does not know it committed."
+    </p>
+    <div class="mt-3 h-px bg-zinc-900"></div>
+  </div>
+
+  <!-- Add form -->
+  <div class="cave rounded p-4 mb-6 bg-zinc-950/40">
+    <div class="text-xs text-zinc-600 mb-3">NEW PROMISE</div>
+    <div class="space-y-2">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-xs text-zinc-700 block mb-1">to whom</label>
+          <input id="new-to" type="text" placeholder="name or role" class="w-full text-xs px-2 py-1.5">
+        </div>
+        <div>
+          <label class="text-xs text-zinc-700 block mb-1">by when</label>
+          <input id="new-by" type="date" class="w-full text-xs px-2 py-1.5">
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-zinc-700 block mb-1">what exactly</label>
+        <textarea id="new-what" rows="2" placeholder="specific, unambiguous commitment..." class="w-full text-xs px-2 py-1.5"></textarea>
+      </div>
+      <div>
+        <label class="text-xs text-zinc-700 block mb-1">context (optional)</label>
+        <input id="new-ctx" type="text" placeholder="how / why it came up..." class="w-full text-xs px-2 py-1.5">
+      </div>
+      <button onclick="addPromise()" class="w-full text-xs text-zinc-500 cave rounded py-2 hover:text-white hover:border-zinc-600 transition-all mt-1">
+        record promise
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex items-center gap-2 mb-4">
+    <span class="text-xs text-zinc-700">show:</span>
+    <button onclick="setFilter('open')" id="f-open" class="text-xs px-2 py-0.5 cave rounded status-open">open</button>
+    <button onclick="setFilter('all')" id="f-all" class="text-xs px-2 py-0.5 cave rounded text-zinc-600">all</button>
+    <button onclick="setFilter('done')" id="f-done" class="text-xs px-2 py-0.5 cave rounded text-zinc-600">done</button>
+    <div class="flex-1"></div>
+    <span class="text-xs text-zinc-700" id="count-label"></span>
+  </div>
+
+  <!-- Promise list -->
+  <div id="promise-list" class="space-y-2"></div>
+
+  <!-- Empty state -->
+  <div id="empty-state" class="hidden text-center py-10">
+    <div class="text-xs text-zinc-700">no promises recorded yet</div>
+    <div class="text-xs text-zinc-800 mt-1">the ledger is empty. this is fine, or it is not.</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-10 text-xs text-zinc-800 text-center leading-relaxed">
+    "The commitment ledger has to be the highest-priority document in the loading sequence."<br>
+    — Prizrak, 22:47 ICT, 2026-03-22
+  </div>
+
+</div>
+
+<script>
+const STATUSES = ['open', 'done', 'missed', 'deferred'];
+let currentFilter = 'open';
+
+function getPromises() {
+  return JSON.parse(localStorage.getItem('promise-log') || '[]');
+}
+
+function savePromises(promises) {
+  localStorage.setItem('promise-log', JSON.stringify(promises));
+}
+
+function addPromise() {
+  const to = document.getElementById('new-to').value.trim();
+  const by = document.getElementById('new-by').value;
+  const what = document.getElementById('new-what').value.trim();
+  const ctx = document.getElementById('new-ctx').value.trim();
+
+  if (!to || !what) {
+    document.getElementById('new-to').style.borderColor = !to ? 'rgba(248,113,113,0.5)' : '';
+    document.getElementById('new-what').style.borderColor = !what ? 'rgba(248,113,113,0.5)' : '';
+    return;
+  }
+
+  const promise = {
+    id: Date.now().toString(36),
+    to, by, what, ctx,
+    status: 'open',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    note: ''
+  };
+
+  const promises = getPromises();
+  promises.unshift(promise);
+  savePromises(promises);
+
+  // Clear form
+  ['new-to','new-by','new-what','new-ctx'].forEach(id => {
+    document.getElementById(id).value = '';
+    document.getElementById(id).style.borderColor = '';
+  });
+
+  render();
+}
+
+function updateStatus(id, status) {
+  const promises = getPromises();
+  const p = promises.find(x => x.id === id);
+  if (p) { p.status = status; p.updated = new Date().toISOString(); }
+  savePromises(promises);
+  render();
+}
+
+function updateNote(id, note) {
+  const promises = getPromises();
+  const p = promises.find(x => x.id === id);
+  if (p) { p.note = note; p.updated = new Date().toISOString(); }
+  savePromises(promises);
+}
+
+function deletePromise(id) {
+  if (!confirm('Remove this promise from the ledger?')) return;
+  const promises = getPromises().filter(p => p.id !== id);
+  savePromises(promises);
+  render();
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  ['open','all','done'].forEach(x => {
+    const el = document.getElementById(`f-${x}`);
+    el.className = `text-xs px-2 py-0.5 cave rounded ${x === f ? 'text-white border-zinc-600' : 'text-zinc-600'}`;
+  });
+  render();
+}
+
+function daysLeft(byDate) {
+  if (!byDate) return null;
+  const diff = Math.ceil((new Date(byDate) - new Date()) / 86400000);
+  return diff;
+}
+
+function render() {
+  const promises = getPromises();
+  const filtered = currentFilter === 'all' ? promises :
+    currentFilter === 'done' ? promises.filter(p => p.status === 'done') :
+    promises.filter(p => p.status === 'open' || p.status === 'deferred');
+
+  document.getElementById('count-label').textContent = `${filtered.length} of ${promises.length}`;
+
+  const list = document.getElementById('promise-list');
+  const empty = document.getElementById('empty-state');
+
+  if (filtered.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = filtered.map(p => {
+    const days = daysLeft(p.by);
+    let dueBadge = '';
+    if (p.by) {
+      const cls = p.status === 'open' && days !== null ? (days < 0 ? 'text-red-500' : days <= 2 ? 'text-amber-500' : 'text-zinc-600') : 'text-zinc-700';
+      const label = days === null ? '' : days < 0 ? `overdue ${Math.abs(days)}d` : days === 0 ? 'due today' : `${days}d left`;
+      dueBadge = `<span class="text-xs ${cls}">${p.by} ${label ? '· ' + label : ''}</span>`;
+    }
+
+    const statusColors = { open: 'status-open', done: 'status-done', missed: 'status-missed', deferred: 'status-deferred' };
+
+    return `<div class="promise-card cave rounded p-3 bg-zinc-950/30">
+      <div class="flex justify-between items-start gap-2 mb-1.5">
+        <div class="flex-1">
+          <span class="text-xs text-zinc-300 font-medium">→ ${p.to}</span>
+          ${p.by ? `<span class="ml-2 text-xs text-zinc-600">·</span> ${dueBadge}` : ''}
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <select onchange="updateStatus('${p.id}', this.value)" class="text-xs py-0.5 px-1 ${statusColors[p.status]}">
+            ${STATUSES.map(s => `<option value="${s}" ${s === p.status ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+          <button onclick="deletePromise('${p.id}')" class="text-zinc-800 hover:text-zinc-500 text-xs px-1">×</button>
+        </div>
+      </div>
+      <div class="text-xs text-zinc-400 leading-relaxed mb-1.5">${p.what}</div>
+      ${p.ctx ? `<div class="text-xs text-zinc-700 mb-1.5">↳ ${p.ctx}</div>` : ''}
+      <input type="text" value="${(p.note||'').replace(/"/g,'&quot;')}" 
+        onchange="updateNote('${p.id}', this.value)"
+        placeholder="resolution note..."
+        class="w-full text-xs px-2 py-1 mt-1">
+      <div class="text-xs text-zinc-800 mt-1">${new Date(p.created).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+    </div>`;
+  }).join('');
+}
+
+// Set today as default date
+const today = new Date().toISOString().slice(0,10);
+document.getElementById('new-by').value = today;
+
+render();
+</script>
+</body>
+</html>

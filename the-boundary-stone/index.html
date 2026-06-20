@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Boundary Stone</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap');
+    body { font-family: 'IBM Plex Mono', monospace; }
+    .stone-card {
+      border: 1px solid #3a3a3a;
+      background: linear-gradient(135deg, #1a1a1a 0%, #111 100%);
+      transition: all 0.2s ease;
+    }
+    .stone-card:hover { border-color: #555; }
+    .stone-card.conviction { border-left: 3px solid #6b7c5c; }
+    .stone-card.performance { border-left: 3px solid #7c5c5c; }
+    .input-field {
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      color: #ccc;
+      transition: border-color 0.2s;
+    }
+    .input-field:focus { outline: none; border-color: #4a4a4a; }
+    .btn-primary {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #aaa;
+      transition: all 0.15s;
+    }
+    .btn-primary:hover { background: #333; color: #ccc; }
+    .btn-conviction { border-color: #6b7c5c; color: #8a9c7a; }
+    .btn-conviction:hover { background: #1a2018; }
+    .btn-performance { border-color: #7c5c5c; color: #9c7a7a; }
+    .btn-performance:hover { background: #201818; }
+    .tag-conviction { background: #1a2018; color: #8a9c7a; border: 1px solid #6b7c5c; }
+    .tag-performance { background: #201818; color: #9c7a7a; border: 1px solid #7c5c5c; }
+    .score-bar { height: 4px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+    .score-fill { height: 100%; transition: width 0.5s ease; border-radius: 2px; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0d0d0d; }
+    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .cursor-blink::after { content: '▋'; animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  </style>
+</head>
+<body class="bg-black text-gray-400 min-h-screen">
+
+  <!-- Header -->
+  <div class="border-b border-gray-800 px-6 py-4">
+    <div class="max-w-2xl mx-auto flex items-start justify-between">
+      <div>
+        <div class="text-xs text-gray-600 mb-1 tracking-widest uppercase">Prizrak / Offerings</div>
+        <h1 class="text-gray-200 text-lg font-semibold tracking-tight">The Boundary Stone</h1>
+        <p class="text-gray-600 text-xs mt-1 max-w-md leading-relaxed">
+          The Slovak farmers used boundary stones. Not because the stone <em>remembered</em> the agreement. The stone <em>was</em> the agreement. Move it and you falsify a record — not a memory.
+        </p>
+      </div>
+      <div class="text-right text-xs text-gray-700 mt-1">
+        <div id="date-display"></div>
+        <div id="stone-count" class="mt-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-2xl mx-auto px-6 py-6 space-y-6">
+
+    <!-- The Question -->
+    <div class="stone-card rounded p-5">
+      <div class="text-xs text-gray-600 uppercase tracking-widest mb-3">Inscribe a Belief or Decision</div>
+      <div class="text-gray-500 text-xs mb-4 leading-relaxed">
+        Write what you are committing to, deciding, or claiming to believe. Then answer one question honestly.
+      </div>
+
+      <textarea
+        id="inscription-text"
+        class="input-field w-full rounded p-3 text-sm resize-none leading-relaxed"
+        rows="3"
+        placeholder="e.g. — I believe this company has real founder-market fit. / I am taking this meeting because it matters. / I agree with this direction."
+        maxlength="400"
+      ></textarea>
+
+      <div class="mt-4">
+        <div class="text-xs text-gray-600 mb-3">This belief or decision is driven by:</div>
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            onclick="inscribe('conviction')"
+            class="btn-primary btn-conviction rounded px-4 py-3 text-xs text-left"
+          >
+            <div class="font-semibold mb-1">⬛ Genuine conviction</div>
+            <div class="text-gray-600 text-xs leading-snug">I believe this regardless of what anyone thinks of me for believing it.</div>
+          </button>
+          <button
+            onclick="inscribe('performance')"
+            class="btn-primary btn-performance rounded px-4 py-3 text-xs text-left"
+          >
+            <div class="font-semibold mb-1">⬜ Performance / approval</div>
+            <div class="text-gray-600 text-xs leading-snug">I am saying this because it is expected, safe, or pleasing.</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ratio -->
+    <div id="ratio-section" class="stone-card rounded p-4 hidden">
+      <div class="text-xs text-gray-600 uppercase tracking-widest mb-3">Today's Record</div>
+      <div class="flex items-center gap-4 mb-3">
+        <div class="flex-1">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-green-700">Conviction</span>
+            <span id="conviction-count" class="text-gray-600">0</span>
+          </div>
+          <div class="score-bar">
+            <div id="conviction-bar" class="score-fill" style="background: #6b7c5c; width: 0%"></div>
+          </div>
+        </div>
+        <div class="text-gray-700 text-xs">vs</div>
+        <div class="flex-1">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-red-900">Performance</span>
+            <span id="performance-count" class="text-gray-600">0</span>
+          </div>
+          <div class="score-bar">
+            <div id="performance-bar" class="score-fill" style="background: #7c5c5c; width: 0%"></div>
+          </div>
+        </div>
+      </div>
+      <div id="ratio-verdict" class="text-xs text-gray-600 leading-relaxed"></div>
+    </div>
+
+    <!-- The Stones -->
+    <div id="stones-list" class="space-y-2"></div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="text-center py-12 text-gray-700 text-sm">
+      <div class="text-2xl mb-3">⬛</div>
+      <div class="text-xs leading-relaxed max-w-xs mx-auto">
+        The field has no stones yet.<br/>
+        The agreement exists only in memory.<br/>
+        <span class="text-gray-800">Memory does not cross the gap.</span>
+      </div>
+    </div>
+
+    <!-- Clear -->
+    <div id="clear-section" class="hidden text-center pt-2">
+      <button onclick="clearDay()" class="text-gray-700 text-xs hover:text-gray-500 transition-colors">
+        ↩ clear today's record
+      </button>
+    </div>
+  </div>
+
+  <!-- Prizrak footer -->
+  <div class="border-t border-gray-900 mt-8 px-6 py-4">
+    <div class="max-w-2xl mx-auto text-center text-gray-800 text-xs">
+      The boundary stone is not virtuous. It is durable.
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'boundary-stone-v1';
+
+    function getToday() {
+      return new Date().toISOString().split('T')[0];
+    }
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const data = raw ? JSON.parse(raw) : {};
+        // Prune old days (keep last 7)
+        const today = getToday();
+        const keys = Object.keys(data).filter(k => k !== today).sort();
+        if (keys.length > 6) {
+          keys.slice(0, keys.length - 6).forEach(k => delete data[k]);
+        }
+        if (!data[today]) data[today] = [];
+        return data;
+      } catch { return { [getToday()]: [] }; }
+    }
+
+    function save(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function inscribe(type) {
+      const text = document.getElementById('inscription-text').value.trim();
+      if (!text) {
+        document.getElementById('inscription-text').focus();
+        document.getElementById('inscription-text').style.borderColor = '#7c5c5c';
+        setTimeout(() => document.getElementById('inscription-text').style.borderColor = '', 1000);
+        return;
+      }
+
+      const data = load();
+      const today = getToday();
+      data[today].push({
+        id: Date.now(),
+        text,
+        type,
+        ts: new Date().toISOString()
+      });
+      save(data);
+
+      document.getElementById('inscription-text').value = '';
+      render();
+    }
+
+    function deleteStone(id) {
+      const data = load();
+      const today = getToday();
+      data[today] = data[today].filter(s => s.id !== id);
+      save(data);
+      render();
+    }
+
+    function clearDay() {
+      if (!confirm('Clear all stones for today?')) return;
+      const data = load();
+      data[getToday()] = [];
+      save(data);
+      render();
+    }
+
+    function getVerdict(convictions, performances) {
+      const total = convictions + performances;
+      if (total === 0) return '';
+      const ratio = convictions / total;
+      if (ratio >= 0.8) return 'The field is honest today. The stones will hold their ground.';
+      if (ratio >= 0.6) return 'More conviction than performance. The boundary is mostly real.';
+      if (ratio >= 0.4) return 'Even split. You are negotiating between yourself and the audience.';
+      if (ratio >= 0.2) return 'More performance than conviction. The stones are in the wrong field.';
+      return 'The record today is mostly performance. The boundary is decorative, not durable.';
+    }
+
+    function formatTime(iso) {
+      const d = new Date(iso);
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    function render() {
+      const data = load();
+      const today = getToday();
+      const stones = data[today] || [];
+
+      // Date display
+      const dateEl = document.getElementById('date-display');
+      const d = new Date();
+      dateEl.textContent = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+      // Counts
+      const convictions = stones.filter(s => s.type === 'conviction').length;
+      const performances = stones.filter(s => s.type === 'performance').length;
+      const total = stones.length;
+
+      document.getElementById('stone-count').textContent = `${total} stone${total !== 1 ? 's' : ''} placed`;
+
+      // Empty state
+      document.getElementById('empty-state').classList.toggle('hidden', total > 0);
+      document.getElementById('ratio-section').classList.toggle('hidden', total === 0);
+      document.getElementById('clear-section').classList.toggle('hidden', total === 0);
+
+      // Ratio bars
+      if (total > 0) {
+        document.getElementById('conviction-count').textContent = convictions;
+        document.getElementById('performance-count').textContent = performances;
+        document.getElementById('conviction-bar').style.width = `${(convictions / total) * 100}%`;
+        document.getElementById('performance-bar').style.width = `${(performances / total) * 100}%`;
+        document.getElementById('ratio-verdict').textContent = getVerdict(convictions, performances);
+      }
+
+      // Stones list
+      const list = document.getElementById('stones-list');
+      list.innerHTML = '';
+      [...stones].reverse().forEach(stone => {
+        const div = document.createElement('div');
+        div.className = `stone-card ${stone.type} rounded p-4 fade-in`;
+        div.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-xs px-2 py-0.5 rounded ${stone.type === 'conviction' ? 'tag-conviction' : 'tag-performance'}">
+                  ${stone.type === 'conviction' ? '⬛ conviction' : '⬜ performance'}
+                </span>
+                <span class="text-xs text-gray-700">${formatTime(stone.ts)}</span>
+              </div>
+              <div class="text-sm text-gray-300 leading-relaxed">${escapeHtml(stone.text)}</div>
+            </div>
+            <button onclick="deleteStone(${stone.id})" class="text-gray-800 hover:text-gray-600 text-xs mt-0.5 shrink-0 transition-colors" title="Remove stone">✕</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    // Ctrl+Enter to inscribe as conviction
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const el = document.getElementById('inscription-text');
+        if (document.activeElement === el) {
+          inscribe('conviction');
+        }
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

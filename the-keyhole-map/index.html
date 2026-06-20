@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Keyhole Map</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .keyhole-item { transition: all 0.2s; }
+    .keyhole-item:hover { border-color: #52525b; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-300 min-h-screen">
+
+  <div class="border-b border-zinc-800 px-6 py-4">
+    <div class="max-w-2xl mx-auto flex items-center justify-between">
+      <div>
+        <h1 class="mono text-zinc-100 text-sm font-medium tracking-wide">THE KEYHOLE MAP</h1>
+        <p class="text-zinc-500 text-xs mt-0.5">necessary openings · traversal cost · exposure surface</p>
+      </div>
+      <span class="mono text-xs text-zinc-600 border border-zinc-800 px-2 py-1 rounded">prizrak / 2026-03-26</span>
+    </div>
+  </div>
+
+  <div class="max-w-2xl mx-auto px-6 pt-5 pb-2">
+    <div class="bg-zinc-900 border border-zinc-800 rounded p-3 text-xs text-zinc-500 mono">
+      The Mora enters through the keyhole. Not despite the lock — because of it. The necessary opening is the attack surface.
+      <span class="text-zinc-600 block mt-1">Map your keyholes. Rate traversal cost. Do not pretend the door has no keyhole.</span>
+    </div>
+  </div>
+
+  <!-- Add keyhole form -->
+  <div class="max-w-2xl mx-auto px-6 py-4">
+    <div class="flex gap-2">
+      <input id="keyhole-name" type="text"
+        class="flex-1 bg-zinc-900 border border-zinc-800 rounded text-zinc-200 text-sm px-3 py-2 focus:border-zinc-600 transition-colors"
+        placeholder="Name a necessary opening (e.g. investor meeting, approval from X, email inbox...)"
+      />
+      <button onclick="addKeyhole()"
+        class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs mono px-4 py-2 rounded transition-colors whitespace-nowrap">
+        + ADD
+      </button>
+    </div>
+  </div>
+
+  <!-- Keyhole list -->
+  <div class="max-w-2xl mx-auto px-6" id="keyhole-list">
+    <!-- populated by JS -->
+  </div>
+
+  <!-- Summary -->
+  <div class="max-w-2xl mx-auto px-6 py-4" id="summary" style="display:none">
+    <div class="border-t border-zinc-800 pt-4">
+      <div class="mono text-xs text-zinc-500 mb-3">EXPOSURE SUMMARY</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-zinc-900 border border-zinc-800 rounded p-3 text-center">
+          <div id="count-low" class="text-green-400 text-2xl mono font-light">0</div>
+          <div class="text-zinc-600 text-xs mt-1">high cost<br>(defended)</div>
+        </div>
+        <div class="bg-zinc-900 border border-zinc-800 rounded p-3 text-center">
+          <div id="count-med" class="text-yellow-400 text-2xl mono font-light">0</div>
+          <div class="text-zinc-600 text-xs mt-1">medium cost<br>(manageable)</div>
+        </div>
+        <div class="bg-zinc-900 border border-zinc-800 rounded p-3 text-center">
+          <div id="count-high" class="text-red-400 text-2xl mono font-light">0</div>
+          <div class="text-zinc-600 text-xs mt-1">low cost<br>(exposed)</div>
+        </div>
+      </div>
+      <div id="diagnosis-text" class="mt-3 text-xs text-zinc-500 leading-relaxed"></div>
+    </div>
+  </div>
+
+  <div class="max-w-2xl mx-auto px-6 pb-10">
+    <p class="text-zinc-700 text-xs mono border-t border-zinc-900 pt-4">
+      The broom bristles had to be counted. The iron had to be navigated. The countermeasures raised the cost of traversal — they did not seal the keyhole.
+    </p>
+  </div>
+
+  <script>
+    let keyholes = JSON.parse(localStorage.getItem('keyholes') || '[]');
+
+    const costLabels = { high: 'defended', med: 'manageable', low: 'exposed' };
+    const costColors = { high: 'text-green-400 border-green-900', med: 'text-yellow-400 border-yellow-900', low: 'text-red-400 border-red-900' };
+    const costBg = { high: 'bg-green-950', med: 'bg-yellow-950', low: 'bg-red-950' };
+
+    const diagnoses = {
+      mostly_defended: "Most openings have high traversal cost. The Mora gets in slowly. This is the correct architecture — not sealed, but costly.",
+      mostly_exposed: "Several low-cost keyholes remain. These are not inherently dangerous. But they are the ones worth addressing first: raise the traversal cost, not the wall.",
+      balanced: "Mixed exposure profile. The defended keyholes are working. The exposed ones are known. Knowing is the first countermeasure.",
+      all_exposed: "High exposure across the board. The Mora moves freely. This is a period of genuine openness — either by necessity or by choice. Note which.",
+    };
+
+    function save() {
+      localStorage.setItem('keyholes', JSON.stringify(keyholes));
+    }
+
+    function addKeyhole() {
+      const name = document.getElementById('keyhole-name').value.trim();
+      if (!name) return;
+      keyholes.push({ id: Date.now(), name, cost: 'med', note: '' });
+      document.getElementById('keyhole-name').value = '';
+      save();
+      render();
+    }
+
+    function setCost(id, cost) {
+      keyholes = keyholes.map(k => k.id === id ? {...k, cost} : k);
+      save();
+      render();
+    }
+
+    function setNote(id, note) {
+      keyholes = keyholes.map(k => k.id === id ? {...k, note} : k);
+      save();
+    }
+
+    function removeKeyhole(id) {
+      keyholes = keyholes.filter(k => k.id !== id);
+      save();
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById('keyhole-list');
+      if (!keyholes.length) {
+        list.innerHTML = '<p class="text-zinc-700 text-xs mono text-center py-8">No keyholes mapped. Every door has one.</p>';
+        document.getElementById('summary').style.display = 'none';
+        return;
+      }
+
+      list.innerHTML = keyholes.map(k => `
+        <div class="keyhole-item border border-zinc-800 rounded mb-2 p-3 fade-in">
+          <div class="flex items-start gap-3">
+            <div class="flex-1">
+              <div class="text-zinc-200 text-sm">${escHtml(k.name)}</div>
+              <input
+                type="text"
+                value="${escHtml(k.note)}"
+                onchange="setNote(${k.id}, this.value)"
+                class="mt-1 w-full bg-transparent text-zinc-500 text-xs border-0 p-0 focus:outline-none"
+                placeholder="traversal note (optional)..."
+              />
+            </div>
+            <div class="flex gap-1 shrink-0">
+              ${['high','med','low'].map(c => `
+                <button onclick="setCost(${k.id},'${c}')"
+                  class="text-xs mono px-2 py-1 rounded border transition-colors ${k.cost === c ? costColors[c] + ' ' + costBg[c] : 'text-zinc-600 border-zinc-800 hover:border-zinc-700'}">
+                  ${c === 'high' ? 'defended' : c === 'med' ? 'managed' : 'exposed'}
+                </button>
+              `).join('')}
+              <button onclick="removeKeyhole(${k.id})" class="text-zinc-700 hover:text-zinc-500 ml-1 text-xs">×</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      // Summary
+      const high = keyholes.filter(k => k.cost === 'high').length;
+      const med = keyholes.filter(k => k.cost === 'med').length;
+      const low = keyholes.filter(k => k.cost === 'low').length;
+      document.getElementById('count-low').textContent = high;
+      document.getElementById('count-med').textContent = med;
+      document.getElementById('count-high').textContent = low;
+
+      let diag = 'balanced';
+      if (low > high + med) diag = 'all_exposed';
+      else if (low > 1) diag = 'mostly_exposed';
+      else if (high > low + med) diag = 'mostly_defended';
+      document.getElementById('diagnosis-text').textContent = diagnoses[diag];
+      document.getElementById('summary').style.display = 'block';
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    document.getElementById('keyhole-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addKeyhole();
+    });
+
+    render();
+  </script>
+</body>
+</html>

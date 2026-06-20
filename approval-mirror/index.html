@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Approval Mirror</title>
+<style>
+  :root {
+    --concrete: #1a1a1a;
+    --slab: #2a2a2a;
+    --crack: #3a3a3a;
+    --fog: #888;
+    --ghost: #aaa;
+    --peak: #e8e8e8;
+    --authentic: #4a9e6a;
+    --approval: #c44a4a;
+    --neutral: #4a7a9e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--concrete);
+    color: var(--peak);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    border-bottom: 1px solid var(--crack);
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  header h1 { font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ghost); }
+  header .score { font-size: 2rem; font-weight: bold; }
+  header .score span { font-size: 0.8rem; color: var(--fog); display: block; text-align: right; }
+  
+  .main { flex: 1; padding: 40px 32px; max-width: 800px; margin: 0 auto; width: 100%; }
+  
+  .question-block {
+    border: 1px solid var(--crack);
+    padding: 32px;
+    margin-bottom: 32px;
+  }
+  .question-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fog);
+    margin-bottom: 16px;
+  }
+  .question-text {
+    font-size: 1.4rem;
+    line-height: 1.5;
+    color: var(--peak);
+    margin-bottom: 24px;
+  }
+  
+  textarea {
+    width: 100%;
+    background: var(--slab);
+    border: 1px solid var(--crack);
+    color: var(--peak);
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    padding: 16px;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--fog); }
+  textarea::placeholder { color: var(--crack); }
+  
+  .spectrum {
+    margin: 24px 0;
+  }
+  .spectrum-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--fog);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .spectrum-track {
+    height: 6px;
+    background: linear-gradient(to right, var(--authentic), var(--neutral), var(--approval));
+    position: relative;
+    cursor: pointer;
+  }
+  .spectrum-handle {
+    width: 18px;
+    height: 18px;
+    background: var(--peak);
+    position: absolute;
+    top: -6px;
+    transform: translateX(-50%);
+    cursor: grab;
+    transition: background 0.2s;
+  }
+  .spectrum-handle:active { cursor: grabbing; }
+  
+  .verdict {
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fog);
+    margin-top: 8px;
+  }
+  
+  .actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+  }
+  button {
+    background: none;
+    border: 1px solid var(--crack);
+    color: var(--ghost);
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    cursor: pointer;
+    flex: 1;
+    transition: all 0.2s;
+  }
+  button:hover { border-color: var(--fog); color: var(--peak); }
+  button.primary {
+    border-color: var(--authentic);
+    color: var(--authentic);
+  }
+  button.primary:hover {
+    background: var(--authentic);
+    color: var(--concrete);
+  }
+  
+  .history-section {
+    margin-top: 48px;
+    border-top: 1px solid var(--crack);
+    padding-top: 32px;
+  }
+  .history-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fog);
+    margin-bottom: 24px;
+  }
+  
+  .log-entry {
+    border-left: 3px solid var(--crack);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .log-entry.authentic { border-left-color: var(--authentic); }
+  .log-entry.approval { border-left-color: var(--approval); }
+  .log-entry.mixed { border-left-color: var(--neutral); }
+  
+  .log-meta {
+    font-size: 0.7rem;
+    color: var(--fog);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .log-task { font-size: 0.95rem; color: var(--ghost); margin-bottom: 4px; }
+  .log-why { font-size: 0.85rem; color: var(--fog); font-style: italic; }
+  .log-delete {
+    position: absolute;
+    top: 8px; right: 12px;
+    background: none;
+    border: none;
+    color: var(--crack);
+    cursor: pointer;
+    font-size: 1rem;
+    flex: 0;
+    width: auto;
+    padding: 0;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .log-delete:hover { color: var(--approval); border: none; }
+  
+  .trend-bar {
+    display: flex;
+    height: 4px;
+    margin: 24px 0;
+    gap: 2px;
+  }
+  .trend-seg {
+    flex: 1;
+    height: 100%;
+  }
+  
+  .empty-state {
+    color: var(--fog);
+    font-size: 0.85rem;
+    font-style: italic;
+    text-align: center;
+    padding: 32px;
+  }
+  
+  .ratio-display {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .ratio-item {
+    flex: 1;
+    border: 1px solid var(--crack);
+    padding: 16px;
+    text-align: center;
+  }
+  .ratio-num { font-size: 1.8rem; font-weight: bold; }
+  .ratio-num.auth { color: var(--authentic); }
+  .ratio-num.appr { color: var(--approval); }
+  .ratio-num.mix { color: var(--neutral); }
+  .ratio-label { font-size: 0.65rem; color: var(--fog); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
+
+  footer {
+    border-top: 1px solid var(--crack);
+    padding: 16px 32px;
+    font-size: 0.7rem;
+    color: var(--crack);
+    text-align: center;
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>The Approval Mirror</h1>
+    <div style="font-size:0.75rem;color:var(--fog);margin-top:4px;">Are you building because you want to — or because you need someone to think well of you?</div>
+  </div>
+  <div class="score">
+    <div id="authentic-pct">—</div>
+    <span>authentic rate</span>
+  </div>
+</header>
+
+<div class="main">
+  
+  <div class="question-block">
+    <div class="question-label">Today's entry</div>
+    
+    <div style="margin-bottom:20px;">
+      <div class="question-label" style="margin-bottom:8px;">What are you doing?</div>
+      <textarea id="task-input" placeholder="Describe the work, project, or decision..."></textarea>
+    </div>
+    
+    <div style="margin-bottom:20px;">
+      <div class="question-label" style="margin-bottom:8px;">Why are you doing it?</div>
+      <textarea id="why-input" placeholder="The honest answer. Nobody reads this but the mountain." style="min-height:60px;"></textarea>
+    </div>
+    
+    <div class="spectrum">
+      <div class="spectrum-labels">
+        <span style="color:var(--authentic)">▲ Authentic</span>
+        <span>Mixed</span>
+        <span style="color:var(--approval)">Approval-Seeking ▲</span>
+      </div>
+      <div class="spectrum-track" id="spectrum-track">
+        <div class="spectrum-handle" id="spectrum-handle" style="left:50%"></div>
+      </div>
+      <div class="verdict" id="verdict">Drag to classify</div>
+    </div>
+    
+    <div class="actions">
+      <button onclick="clearForm()">Clear</button>
+      <button class="primary" onclick="logEntry()">Log Entry →</button>
+    </div>
+  </div>
+  
+  <div class="history-section">
+    <div class="history-title">Log — <span id="entry-count">0</span> entries</div>
+    
+    <div class="ratio-display" id="ratio-display" style="display:none">
+      <div class="ratio-item">
+        <div class="ratio-num auth" id="auth-count">0</div>
+        <div class="ratio-label">Authentic</div>
+      </div>
+      <div class="ratio-item">
+        <div class="ratio-num mix" id="mix-count">0</div>
+        <div class="ratio-label">Mixed</div>
+      </div>
+      <div class="ratio-item">
+        <div class="ratio-num appr" id="appr-count">0</div>
+        <div class="ratio-label">Approval</div>
+      </div>
+    </div>
+    
+    <div class="trend-bar" id="trend-bar"></div>
+    <div id="log-list"></div>
+  </div>
+
+</div>
+
+<footer>Prizrak · The mountain does not care about your LinkedIn profile.</footer>
+
+<script>
+const STORAGE_KEY = 'approval_mirror_v1';
+let spectrum_val = 50; // 0=authentic, 100=approval
+
+// Spectrum drag
+const track = document.getElementById('spectrum-track');
+const handle = document.getElementById('spectrum-handle');
+let dragging = false;
+
+function updateSpectrum(x) {
+  const rect = track.getBoundingClientRect();
+  let pct = Math.max(0, Math.min(100, ((x - rect.left) / rect.width) * 100));
+  spectrum_val = pct;
+  handle.style.left = pct + '%';
+  
+  const v = document.getElementById('verdict');
+  if (pct < 25) {
+    v.textContent = 'Authentic — building because you want to build';
+    v.style.color = 'var(--authentic)';
+  } else if (pct < 45) {
+    v.textContent = 'Mostly authentic, some external pressure';
+    v.style.color = '#6ab87e';
+  } else if (pct < 55) {
+    v.textContent = 'Mixed — honest territory';
+    v.style.color = 'var(--neutral)';
+  } else if (pct < 75) {
+    v.textContent = 'Leaning approval — worth examining';
+    v.style.color = '#c47a4a';
+  } else {
+    v.textContent = 'Approval-seeking — the mountain sees this';
+    v.style.color = 'var(--approval)';
+  }
+}
+
+track.addEventListener('mousedown', (e) => { dragging = true; updateSpectrum(e.clientX); });
+track.addEventListener('touchstart', (e) => { dragging = true; updateSpectrum(e.touches[0].clientX); });
+document.addEventListener('mousemove', (e) => { if (dragging) updateSpectrum(e.clientX); });
+document.addEventListener('touchmove', (e) => { if (dragging) updateSpectrum(e.touches[0].clientX); });
+document.addEventListener('mouseup', () => dragging = false);
+document.addEventListener('touchend', () => dragging = false);
+
+function getCategory(val) {
+  if (val < 35) return 'authentic';
+  if (val > 65) return 'approval';
+  return 'mixed';
+}
+
+function getCategoryLabel(cat) {
+  if (cat === 'authentic') return 'Authentic';
+  if (cat === 'approval') return 'Approval-Seeking';
+  return 'Mixed';
+}
+
+function logEntry() {
+  const task = document.getElementById('task-input').value.trim();
+  if (!task) { alert('Describe what you are doing.'); return; }
+  const why = document.getElementById('why-input').value.trim();
+  const cat = getCategory(spectrum_val);
+  
+  const entries = loadEntries();
+  const entry = {
+    id: Date.now(),
+    date: new Date().toLocaleDateString('en-CA'),
+    time: new Date().toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'}),
+    task,
+    why,
+    val: spectrum_val,
+    cat
+  };
+  entries.unshift(entry);
+  saveEntries(entries);
+  renderLog(entries);
+  clearForm();
+}
+
+function clearForm() {
+  document.getElementById('task-input').value = '';
+  document.getElementById('why-input').value = '';
+  spectrum_val = 50;
+  handle.style.left = '50%';
+  document.getElementById('verdict').textContent = 'Drag to classify';
+  document.getElementById('verdict').style.color = 'var(--fog)';
+}
+
+function deleteEntry(id) {
+  const entries = loadEntries().filter(e => e.id !== id);
+  saveEntries(entries);
+  renderLog(entries);
+}
+
+function loadEntries() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+function saveEntries(entries) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+function renderLog(entries) {
+  const list = document.getElementById('log-list');
+  const countEl = document.getElementById('entry-count');
+  const pctEl = document.getElementById('authentic-pct');
+  const ratioDisplay = document.getElementById('ratio-display');
+  const trendBar = document.getElementById('trend-bar');
+  
+  countEl.textContent = entries.length;
+  
+  if (!entries.length) {
+    list.innerHTML = '<div class="empty-state">No entries yet. The mirror is waiting.</div>';
+    pctEl.textContent = '—';
+    ratioDisplay.style.display = 'none';
+    trendBar.innerHTML = '';
+    return;
+  }
+  
+  ratioDisplay.style.display = 'flex';
+  const auth = entries.filter(e => e.cat === 'authentic').length;
+  const appr = entries.filter(e => e.cat === 'approval').length;
+  const mix = entries.filter(e => e.cat === 'mixed').length;
+  document.getElementById('auth-count').textContent = auth;
+  document.getElementById('appr-count').textContent = appr;
+  document.getElementById('mix-count').textContent = mix;
+  
+  const authPct = Math.round((auth / entries.length) * 100);
+  pctEl.textContent = authPct + '%';
+  pctEl.style.color = authPct >= 60 ? 'var(--authentic)' : authPct >= 40 ? 'var(--neutral)' : 'var(--approval)';
+  
+  // Trend bar (last 20 entries, oldest→newest)
+  const recent = [...entries].reverse().slice(-20);
+  trendBar.innerHTML = recent.map(e => {
+    const col = e.cat === 'authentic' ? 'var(--authentic)' : e.cat === 'approval' ? 'var(--approval)' : 'var(--neutral)';
+    return `<div class="trend-seg" style="background:${col}" title="${e.date}: ${e.task.substring(0,40)}"></div>`;
+  }).join('');
+  
+  list.innerHTML = entries.map(e => `
+    <div class="log-entry ${e.cat}">
+      <button class="log-delete" onclick="deleteEntry(${e.id})">×</button>
+      <div class="log-meta">
+        <span>${e.date} ${e.time}</span>
+        <span style="color:${e.cat==='authentic'?'var(--authentic)':e.cat==='approval'?'var(--approval)':'var(--neutral)'}">${getCategoryLabel(e.cat)}</span>
+      </div>
+      <div class="log-task">${e.task}</div>
+      ${e.why ? `<div class="log-why">"${e.why}"</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// Init
+updateSpectrum(track.getBoundingClientRect().left + track.getBoundingClientRect().width / 2);
+renderLog(loadEntries());
+</script>
+</body>
+</html>

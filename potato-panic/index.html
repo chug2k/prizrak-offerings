@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Potato Panic</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1408; overflow: hidden; font-family: 'Courier New', monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
+        canvas { display: block; position: fixed; top: 0; left: 0; }
+        
+        #hud {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 10;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; pointer-events: none;
+        }
+        #hud-score { color: rgba(255,220,140,0.8); font-size: 22px; }
+        #hud-timer { color: rgba(255,180,100,0.6); font-size: 16px; }
+        #hud-combo { color: rgba(255,160,60,0.5); font-size: 12px; }
+        
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(20,16,8,0.92); color: rgba(255,230,180,0.8);
+            backdrop-filter: blur(8px);
+        }
+        .overlay.hidden { display: none; }
+        .ov-title { font-size: 28px; letter-spacing: 3px; margin-bottom: 6px; }
+        .ov-emoji { font-size: 64px; margin-bottom: 12px; }
+        .ov-sub { font-size: 12px; color: rgba(255,230,180,0.4); margin-bottom: 24px; max-width: 280px; text-align: center; line-height: 1.6; }
+        .ov-score { font-size: 48px; color: rgba(255,200,100,0.8); margin-bottom: 4px; }
+        .ov-label { font-size: 11px; color: rgba(255,230,180,0.3); margin-bottom: 24px; }
+        .btn {
+            padding: 14px 40px; border: 1px solid rgba(200,160,80,0.4); border-radius: 8px;
+            background: rgba(120,90,30,0.2); color: rgba(255,230,180,0.8); font-family: inherit;
+            font-size: 14px; cursor: pointer; pointer-events: auto; letter-spacing: 1px;
+        }
+        .btn:active { background: rgba(150,110,40,0.4); }
+    </style>
+</head>
+<body>
+    <canvas id="c"></canvas>
+    
+    <div id="hud">
+        <div id="hud-score">0</div>
+        <div id="hud-combo"></div>
+        <div id="hud-timer">0:60</div>
+    </div>
+    
+    <div class="overlay" id="start-screen">
+        <div class="ov-emoji">🥔</div>
+        <div class="ov-title">POTATO PANIC</div>
+        <div class="ov-sub">Tap potatoes as they pop up from the ground. Avoid rocks and weeds. Chain harvests for combo multipliers. 60 seconds. Every potato counts.</div>
+        <button class="btn" onclick="startGame()">DIG IN</button>
+    </div>
+    
+    <div class="overlay hidden" id="end-screen">
+        <div class="ov-emoji">🥔</div>
+        <div class="ov-title">HARVEST OVER</div>
+        <div class="ov-score" id="final-score">0</div>
+        <div class="ov-label" id="final-label">potatoes harvested</div>
+        <div class="ov-sub" id="end-quote"></div>
+        <button class="btn" onclick="startGame()">DIG AGAIN</button>
+    </div>
+
+    <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+    
+    const HS_KEY = 'potato_panic_hs_v1';
+    let highScore = parseInt(localStorage.getItem(HS_KEY) || '0');
+    
+    const QUOTES = [
+        "This code is like a potato. Ugly, but it will keep us alive in winter.",
+        "The harvest is over. The silo remembers.",
+        "Every potato is a small victory against entropy.",
+        "In the Tatras, a man is measured by his potato yield.",
+        "The mountain fed us. Barely. But it fed us.",
+        "Some potatoes were never meant to be found.",
+        "The fog lifts. The field is empty. Time to plant again.",
+    ];
+    
+    // Grid config
+    let COLS, ROWS, CELL_W, CELL_H, GRID_X, GRID_Y;
+    
+    // Game state
+    let game = null;
+    let running = false;
+    
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        
+        // Responsive grid
+        COLS = W < 400 ? 3 : 4;
+        ROWS = W < 400 ? 4 : 4;
+        CELL_W = Math.min(100, (W - 40) / COLS);
+        CELL_H = Math.min(100, (H - 160) / ROWS);
+        GRID_X = (W - COLS * CELL_W) / 2;
+        GRID_Y = (H - ROWS * CELL_H) / 2 + 20;
+    }
+    
+    function initGame() {
+        const holes = [];
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                holes.push({
+                    col: c, row: r,
+                    x: GRID_X + c * CELL_W + CELL_W / 2,
+                    y: GRID_Y + r * CELL_H + CELL_H / 2,
+                    occupant: null,
+                    timer: 0,
+                    popProgress: 0,
+                    shakeX: 0, shakeY: 0,
+                });
+            }
+        }
+        
+        game = {
+            holes,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            timer: 60,
+            spawnRate: 1.2,
+            spawnTimer: 0,
+            particles: [],
+            floatTexts: [],
+            difficulty: 1,
+            potatoesHarvested: 0,
+        };
+    }
+    
+    function spawnOccupant() {
+        if (!game) return;
+        const empty = game.holes.filter(h => !h.occupant);
+        if (empty.length === 0) return;
+        
+        const hole = empty[Math.floor(Math.random() * empty.length)];
+        
+        // Type weights change with difficulty
+        const roll = Math.random();
+        let type;
+        if (roll < 0.55) type = 'potato';
+        else if (roll < 0.7) type = 'golden';  // worth 3x
+        else if (roll < 0.85) type = 'rock';
+        else type = 'weed';
+        
+        const stayTime = Math.max(0.8, 2.5 - game.difficulty * 0.15);
+        
+        hole.occupant = { type, stayTime, age: 0, tapped: false };
+        hole.popProgress = 0;
+    }
+    
+    function tapHole(hole) {
+        if (!running || !hole.occupant || hole.occupant.tapped) return;
+        
+        const occ = hole.occupant;
+        occ.tapped = true;
+        
+        if (occ.type === 'potato') {
+            game.combo++;
+            const pts = 10 * Math.min(game.combo, 8);
+            game.score += pts;
+            game.potatoesHarvested++;
+            spawnParticles(hole.x, hole.y, '200,180,120', 8);
+            addFloatText(hole.x, hole.y, `+${pts}`, '255,220,140');
+            if (game.combo > 2) addFloatText(hole.x, hole.y - 20, `x${Math.min(game.combo, 8)}`, '255,180,60');
+        } else if (occ.type === 'golden') {
+            game.combo += 2;
+            const pts = 30 * Math.min(game.combo, 8);
+            game.score += pts;
+            game.potatoesHarvested += 3;
+            spawnParticles(hole.x, hole.y, '255,220,80', 15);
+            addFloatText(hole.x, hole.y, `+${pts}`, '255,220,80');
+        } else if (occ.type === 'rock') {
+            game.combo = 0;
+            game.score = Math.max(0, game.score - 15);
+            spawnParticles(hole.x, hole.y, '100,90,80', 6);
+            addFloatText(hole.x, hole.y, '-15', '255,80,80');
+            hole.shakeX = 8;
+        } else if (occ.type === 'weed') {
+            game.combo = 0;
+            game.timer = Math.max(0, game.timer - 3);
+            spawnParticles(hole.x, hole.y, '60,120,40', 6);
+            addFloatText(hole.x, hole.y, '-3s', '255,100,100');
+        }
+        
+        if (game.combo > game.maxCombo) game.maxCombo = game.combo;
+        
+        // Quick disappear
+        setTimeout(() => {
+            if (hole.occupant === occ) hole.occupant = null;
+        }, 150);
+    }
+    
+    function spawnParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            game.particles.push({
+                x, y,
+                vx: (Math.random() - 0.5) * 6,
+                vy: -Math.random() * 5 - 2,
+                life: 1,
+                color,
+                r: Math.random() * 3 + 1,
+            });
+        }
+    }
+    
+    function addFloatText(x, y, text, color) {
+        game.floatTexts.push({ x, y, text, color, life: 1 });
+    }
+    
+    function update(dt) {
+        if (!game || !running) return;
+        
+        game.timer -= dt;
+        game.difficulty = 1 + (60 - game.timer) / 15;
+        
+        if (game.timer <= 0) {
+            game.timer = 0;
+            endGame();
+            return;
+        }
+        
+        // Spawn
+        game.spawnRate = Math.max(0.4, 1.2 - game.difficulty * 0.1);
+        game.spawnTimer += dt;
+        if (game.spawnTimer >= game.spawnRate) {
+            game.spawnTimer = 0;
+            spawnOccupant();
+            // Sometimes spawn two at higher difficulty
+            if (game.difficulty > 2 && Math.random() < 0.3) spawnOccupant();
+        }
+        
+        // Update holes
+        game.holes.forEach(h => {
+            if (h.occupant) {
+                h.occupant.age += dt;
+                h.popProgress = Math.min(1, h.occupant.age * 4);
+                
+                // Missed potato
+                if (h.occupant.age > h.occupant.stayTime && !h.occupant.tapped) {
+                    if (h.occupant.type === 'potato' || h.occupant.type === 'golden') {
+                        game.combo = 0;
+                    }
+                    h.occupant = null;
+                }
+            }
+            // Shake decay
+            h.shakeX *= 0.85;
+            h.shakeY *= 0.85;
+        });
+        
+        // Particles
+        game.particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.15;
+            p.life -= dt * 2;
+        });
+        game.particles = game.particles.filter(p => p.life > 0);
+        
+        // Float texts
+        game.floatTexts.forEach(f => {
+            f.y -= 40 * dt;
+            f.life -= dt * 1.5;
+        });
+        game.floatTexts = game.floatTexts.filter(f => f.life > 0);
+    }
+    
+    function endGame() {
+        running = false;
+        if (game.score > highScore) {
+            highScore = game.score;
+            localStorage.setItem(HS_KEY, String(highScore));
+        }
+        document.getElementById('final-score').textContent = game.score;
+        document.getElementById('final-label').textContent = `${game.potatoesHarvested} potatoes · best combo x${game.maxCombo} · high: ${highScore}`;
+        document.getElementById('end-quote').textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+        document.getElementById('end-screen').classList.remove('hidden');
+    }
+    
+    function render() {
+        ctx.clearRect(0, 0, W, H);
+        
+        // Soil background
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, '#1a1408');
+        grad.addColorStop(0.3, '#251c0e');
+        grad.addColorStop(1, '#1a1508');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        
+        // Soil texture dots
+        if (!render._soilDots) {
+            render._soilDots = [];
+            const rng = seededRandom(99);
+            for (let i = 0; i < 200; i++) {
+                render._soilDots.push({ x: rng() * W, y: rng() * H, r: rng() * 2 + 0.5, a: rng() * 0.08 });
+            }
+        }
+        render._soilDots.forEach(d => {
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(80,60,30,${d.a})`;
+            ctx.fill();
+        });
+        
+        if (!game) return;
+        
+        // Draw holes
+        game.holes.forEach(h => {
+            const x = h.x + h.shakeX;
+            const y = h.y + h.shakeY;
+            const hw = CELL_W * 0.38;
+            const hh = CELL_H * 0.2;
+            
+            // Dirt mound
+            ctx.beginPath();
+            ctx.ellipse(x, y + hh * 0.5, hw * 1.2, hh * 1.3, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(50,38,18,0.6)';
+            ctx.fill();
+            
+            // Hole opening
+            ctx.beginPath();
+            ctx.ellipse(x, y, hw, hh, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(20,15,5,0.8)';
+            ctx.fill();
+            
+            // Occupant
+            if (h.occupant && !h.occupant.tapped) {
+                const pop = h.popProgress;
+                const occ = h.occupant;
+                const remaining = occ.stayTime - occ.age;
+                const urgency = remaining < 0.5 ? Math.sin(Date.now() * 0.02) * 2 : 0;
+                
+                ctx.save();
+                ctx.translate(x + urgency, y - pop * 25);
+                
+                if (occ.type === 'potato') {
+                    drawPotato(0, 0, pop);
+                } else if (occ.type === 'golden') {
+                    drawGoldenPotato(0, 0, pop);
+                } else if (occ.type === 'rock') {
+                    drawRock(0, 0, pop);
+                } else if (occ.type === 'weed') {
+                    drawWeed(0, 0, pop);
+                }
+                
+                ctx.restore();
+            }
+        });
+        
+        // Particles
+        game.particles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color},${p.life})`;
+            ctx.fill();
+        });
+        
+        // Float texts
+        game.floatTexts.forEach(f => {
+            ctx.font = 'bold 16px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(${f.color},${f.life})`;
+            ctx.fillText(f.text, f.x, f.y);
+        });
+        
+        // HUD
+        document.getElementById('hud-score').textContent = game.score;
+        const secs = Math.ceil(game.timer);
+        document.getElementById('hud-timer').textContent = `0:${String(secs).padStart(2, '0')}`;
+        document.getElementById('hud-timer').style.color = secs <= 10 ? 'rgba(255,100,80,0.8)' : 'rgba(255,180,100,0.6)';
+        document.getElementById('hud-combo').textContent = game.combo > 1 ? `combo x${Math.min(game.combo, 8)}` : '';
+    }
+    
+    function drawPotato(x, y, scale) {
+        ctx.save();
+        ctx.scale(scale, scale);
+        // Body
+        ctx.beginPath();
+        ctx.ellipse(x, y, 16, 12, 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#b8945a';
+        ctx.fill();
+        ctx.strokeStyle = '#8a6b3a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Eyes (dots)
+        ctx.fillStyle = '#6b5030';
+        ctx.beginPath(); ctx.arc(x - 4, y - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + 5, y + 1, 1, 0, Math.PI * 2); ctx.fill();
+        // Highlight
+        ctx.beginPath();
+        ctx.ellipse(x - 5, y - 5, 4, 2, -0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,200,0.15)';
+        ctx.fill();
+        ctx.restore();
+    }
+    
+    function drawGoldenPotato(x, y, scale) {
+        ctx.save();
+        ctx.scale(scale, scale);
+        // Glow
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, 25);
+        glow.addColorStop(0, 'rgba(255,220,80,0.3)');
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.beginPath(); ctx.arc(x, y, 25, 0, Math.PI * 2); ctx.fill();
+        // Body
+        ctx.beginPath();
+        ctx.ellipse(x, y, 16, 12, 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#e8c840';
+        ctx.fill();
+        ctx.strokeStyle = '#c8a020';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Sparkle
+        const t = Date.now() * 0.005;
+        ctx.fillStyle = 'rgba(255,255,200,0.7)';
+        ctx.beginPath(); ctx.arc(x + Math.cos(t) * 8, y + Math.sin(t) * 6, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+    
+    function drawRock(x, y, scale) {
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.beginPath();
+        ctx.moveTo(x - 12, y + 6);
+        ctx.lineTo(x - 8, y - 8);
+        ctx.lineTo(x + 4, y - 10);
+        ctx.lineTo(x + 12, y - 2);
+        ctx.lineTo(x + 10, y + 8);
+        ctx.closePath();
+        ctx.fillStyle = '#5a5048';
+        ctx.fill();
+        ctx.strokeStyle = '#3a3028';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Crack
+        ctx.beginPath();
+        ctx.moveTo(x - 2, y - 8);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + 3, y + 4);
+        ctx.strokeStyle = 'rgba(30,25,18,0.5)';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.restore();
+    }
+    
+    function drawWeed(x, y, scale) {
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.strokeStyle = '#3a6a28';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        const t = Date.now() * 0.003;
+        for (let i = 0; i < 3; i++) {
+            const angle = -Math.PI / 2 + (i - 1) * 0.4 + Math.sin(t + i) * 0.1;
+            ctx.beginPath();
+            ctx.moveTo(x, y + 5);
+            const cx = x + Math.cos(angle) * 12;
+            const cy = y + Math.sin(angle) * 15;
+            ctx.quadraticCurveTo(cx, cy, cx + Math.cos(angle) * 5, cy + Math.sin(angle) * 5);
+            ctx.stroke();
+            // Leaf
+            ctx.beginPath();
+            ctx.ellipse(cx + Math.cos(angle) * 5, cy + Math.sin(angle) * 5, 4, 2, angle, 0, Math.PI * 2);
+            ctx.fillStyle = '#4a8a30';
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+    
+    function seededRandom(seed) {
+        let s = seed;
+        return function() { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+    }
+    
+    // Input
+    function handleTap(px, py) {
+        if (!running || !game) return;
+        let closest = null;
+        let closestDist = Infinity;
+        game.holes.forEach(h => {
+            const dx = px - h.x;
+            const dy = py - h.y;
+            const dist = dx * dx + dy * dy;
+            if (dist < closestDist && dist < (CELL_W * 0.6) * (CELL_W * 0.6)) {
+                closest = h;
+                closestDist = dist;
+            }
+        });
+        if (closest && closest.occupant) tapHole(closest);
+    }
+    
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        for (let i = 0; i < e.touches.length; i++) {
+            handleTap(e.touches[i].clientX, e.touches[i].clientY);
+        }
+    }, { passive: false });
+    
+    canvas.addEventListener('mousedown', e => handleTap(e.clientX, e.clientY));
+    
+    window.startGame = function() {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('end-screen').classList.add('hidden');
+        resize();
+        initGame();
+        running = true;
+    };
+    
+    // Main loop
+    let lastTime = 0;
+    function loop(ts) {
+        const dt = Math.min(0.1, (ts - lastTime) / 1000);
+        lastTime = ts;
+        update(dt);
+        render();
+        requestAnimationFrame(loop);
+    }
+    
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(loop);
+    </script>
+</body>
+</html>

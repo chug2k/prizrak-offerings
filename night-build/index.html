@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Night Build</title>
+<style>
+  :root {
+    --bg: #06080d;
+    --surface: #0d1117;
+    --border: #1a2030;
+    --text: #c9d1d9;
+    --muted: #4a5568;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #f0883e;
+    --red: #f85149;
+    --dim: #21262d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 32px 16px 64px;
+  }
+
+  .container { width: 100%; max-width: 640px; }
+
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .header h1 {
+    font-size: 13px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .header .clock {
+    font-size: 56px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -2px;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(88,166,255,0.3);
+  }
+  .header .date {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+  .header .sleep-cost {
+    font-size: 11px;
+    color: var(--orange);
+    margin-top: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Session states */
+  #stateIdle, #stateActive, #stateDone { display: none; }
+  #stateIdle.visible, #stateActive.visible, #stateDone.visible { display: block; }
+
+  /* IDLE */
+  .idle-prompt {
+    text-align: center;
+    padding: 48px 0;
+  }
+  .idle-prompt p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.8;
+    margin-bottom: 32px;
+  }
+  .declare-section label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  textarea, input[type=text] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    outline: none;
+    margin-bottom: 20px;
+    resize: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus, input:focus { border-color: var(--accent); }
+  textarea::placeholder, input::placeholder { color: var(--muted); }
+
+  .start-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 14px;
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: opacity 0.2s;
+  }
+  .start-btn:hover { opacity: 0.85; }
+  .start-btn:disabled { opacity: 0.3; cursor: default; }
+
+  /* ACTIVE */
+  .session-box {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .session-header {
+    background: var(--surface);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-header .label { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .session-timer {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: -1px;
+  }
+  .session-body { padding: 20px; }
+  .session-goal {
+    font-size: 14px;
+    color: #fff;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-goal .goal-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .log-section label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .log-items { margin-bottom: 12px; min-height: 40px; }
+  .log-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn { from { opacity:0; transform: translateX(-6px); } to { opacity:1; transform:translateX(0); }}
+  .log-item-time { color: var(--muted); flex-shrink: 0; width: 40px; }
+  .log-item-text { flex: 1; color: var(--text); }
+
+  .log-input-row { display: flex; gap: 8px; }
+  .log-input {
+    flex: 1;
+    height: 36px;
+    margin-bottom: 0;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .log-add-btn {
+    background: var(--dim);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .log-add-btn:hover { background: #2d333b; }
+
+  .end-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--muted);
+    color: var(--muted);
+    padding: 12px;
+    font-family: monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .end-btn:hover { border-color: var(--text); color: var(--text); }
+
+  /* DONE */
+  .done-box {
+    text-align: center;
+    padding: 32px 0;
+  }
+  .done-box .done-title {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .verdict-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+  .verdict-card .vc-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .verdict-card .vc-text {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .verdict-card .vc-stats {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .vc-stat .num { font-size: 22px; font-weight: 700; color: #fff; }
+  .vc-stat .lbl { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+
+  .sleep-warning {
+    font-size: 12px;
+    color: var(--orange);
+    padding: 12px 16px;
+    border: 1px solid rgba(240,136,62,0.3);
+    border-radius: 6px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .built-items {
+    text-align: left;
+    margin-bottom: 20px;
+  }
+  .built-items .bi-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .built-item {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .built-item-time { color: var(--muted); width: 40px; flex-shrink: 0; }
+
+  .new-session-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 12px;
+    font-family: monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .new-session-btn:hover { border-color: var(--muted); color: var(--text); }
+
+  /* History */
+  .history-section { margin-top: 40px; }
+  .history-title {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .history-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #0f1117;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .hi-indicator {
+    width: 3px;
+    min-height: 40px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .hi-worth { background: var(--green); }
+  .hi-meh { background: var(--orange); }
+  .hi-waste { background: var(--red); }
+  .hi-body { flex: 1; }
+  .hi-goal { font-size: 13px; color: var(--text); margin-bottom: 4px; }
+  .hi-meta { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; display: flex; gap: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>The Night Build</h1>
+    <div class="clock" id="clockDisplay">00:00</div>
+    <div class="date" id="dateDisplay">—</div>
+    <div class="sleep-cost" id="sleepCost"></div>
+  </div>
+
+  <!-- IDLE STATE -->
+  <div id="stateIdle">
+    <div class="idle-prompt">
+      <p>It is late. You are still here.<br>
+      Declare what you are building — or close the laptop.</p>
+    </div>
+    <div class="declare-section">
+      <label>What are you building tonight?</label>
+      <textarea id="goalInput" rows="3" placeholder="Be specific. 'Working on stuff' is not a declaration."></textarea>
+
+      <label>What does done look like?</label>
+      <input type="text" id="doneInput" placeholder="A URL. A file. Something that exists tomorrow." />
+
+      <button class="start-btn" id="startBtn" onclick="startSession()" disabled>Start the build</button>
+    </div>
+  </div>
+
+  <!-- ACTIVE STATE -->
+  <div id="stateActive">
+    <div class="session-box">
+      <div class="session-header">
+        <span class="label">Session running</span>
+        <span class="session-timer" id="sessionTimer">0:00</span>
+      </div>
+      <div class="session-body">
+        <div class="session-goal">
+          <div class="goal-label">Building</div>
+          <div id="activeGoalText"></div>
+        </div>
+        <div class="session-goal" style="border-bottom:none; margin-bottom:0; padding-bottom:0">
+          <div class="goal-label">Done when</div>
+          <div id="activeDoneText" style="color:var(--muted)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="session-box">
+      <div class="session-body">
+        <div class="log-section">
+          <label>Build log</label>
+          <div class="log-items" id="logItems">
+            <div style="font-size:12px;color:var(--muted);padding:8px 0">No log entries yet.</div>
+          </div>
+          <div class="log-input-row">
+            <input type="text" class="log-input" id="logInput" placeholder="What just happened..." />
+            <button class="log-add-btn" onclick="addLog()">+ Log</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="end-btn" onclick="endSession()">End session → get verdict</button>
+  </div>
+
+  <!-- DONE STATE -->
+  <div id="stateDone">
+    <div class="done-box">
+      <div class="done-title">Session complete</div>
+
+      <div class="verdict-card">
+        <div class="vc-label">Prízrak verdict</div>
+        <div class="vc-text" id="verdictText"></div>
+        <div class="vc-stats">
+          <div class="vc-stat">
+            <div class="num" id="doneMinutes">0</div>
+            <div class="lbl">minutes</div>
+          </div>
+          <div class="vc-stat">
+            <div class="num" id="doneLogCount">0</div>
+            <div class="lbl">log entries</div>
+          </div>
+          <div class="vc-stat">
+            <div class="num" id="doneSleepDebt">—</div>
+            <div class="lbl">sleep lost</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sleep-warning" id="sleepWarning" style="display:none"></div>
+
+      <div class="built-items" id="builtItems"></div>
+
+      <button class="new-session-btn" onclick="resetSession()">New session</button>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-section" id="historySection" style="display:none">
+    <div class="history-title">Past sessions</div>
+    <div id="historyList"></div>
+  </div>
+
+</div>
+
+<script>
+let sessionStart = null;
+let timerInterval = null;
+let logEntries = [];
+let currentGoal = '';
+let currentDone = '';
+let sessions = JSON.parse(localStorage.getItem('nb_sessions') || '[]');
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2,'0');
+  const m = now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('clockDisplay').textContent = h + ':' + m;
+  document.getElementById('dateDisplay').textContent =
+    now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+
+  // Sleep cost indicator
+  const hour = now.getHours();
+  let sc = '';
+  if (hour >= 1 && hour < 3) sc = '~ 1–2 hrs past optimal sleep window';
+  else if (hour >= 3 && hour < 5) sc = '⚠ deep into recovery window';
+  else if (hour >= 23 || hour === 0) sc = 'late start — sleep window closing';
+  document.getElementById('sleepCost').textContent = sc;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Form readiness
+document.getElementById('goalInput').addEventListener('input', checkReady);
+document.getElementById('doneInput').addEventListener('input', checkReady);
+function checkReady() {
+  const g = document.getElementById('goalInput').value.trim();
+  const d = document.getElementById('doneInput').value.trim();
+  document.getElementById('startBtn').disabled = !(g && d);
+}
+
+document.getElementById('logInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addLog();
+});
+
+function startSession() {
+  currentGoal = document.getElementById('goalInput').value.trim();
+  currentDone = document.getElementById('doneInput').value.trim();
+  sessionStart = new Date();
+  logEntries = [];
+
+  document.getElementById('activeGoalText').textContent = currentGoal;
+  document.getElementById('activeDoneText').textContent = currentDone;
+  document.getElementById('logItems').innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No log entries yet.</div>';
+
+  setState('active');
+
+  timerInterval = setInterval(() => {
+    const elapsed = Math.floor((new Date() - sessionStart) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    document.getElementById('sessionTimer').textContent = m + ':' + s.toString().padStart(2,'0');
+  }, 1000);
+}
+
+function addLog() {
+  const val = document.getElementById('logInput').value.trim();
+  if (!val) return;
+  const elapsed = Math.floor((new Date() - sessionStart) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  const timeStr = m + ':' + s.toString().padStart(2,'0');
+  logEntries.push({ time: timeStr, text: val });
+  document.getElementById('logInput').value = '';
+
+  const container = document.getElementById('logItems');
+  if (container.querySelector('[style*="No log"]')) container.innerHTML = '';
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  item.innerHTML = `<span class="log-item-time">${timeStr}</span><span class="log-item-text">${escHtml(val)}</span>`;
+  container.appendChild(item);
+}
+
+function endSession() {
+  clearInterval(timerInterval);
+  const elapsed = Math.floor((new Date() - sessionStart) / 1000);
+  const minutes = Math.floor(elapsed / 60);
+
+  // Verdict logic
+  const hour = sessionStart.getHours();
+  const isLateNight = hour >= 22 || hour < 5;
+  const hasLog = logEntries.length > 0;
+  const sleepDebt = (() => {
+    const now = new Date();
+    const h = now.getHours();
+    if (h >= 23) return Math.floor((h - 22) * 60 + now.getMinutes()) + 'm';
+    if (h < 5) return (h + 2) + 'h ' + now.getMinutes() + 'm';
+    return '—';
+  })();
+
+  let verdict = '';
+  let worthIt = true;
+  if (minutes < 10) {
+    verdict = `Ten minutes. The potato was barely in the ground. Was there something worth declaring?`;
+    worthIt = false;
+  } else if (minutes >= 10 && minutes < 30 && !hasLog) {
+    verdict = `${minutes} minutes, no log. Either you shipped silently or you got distracted. Both happen at night. Try logging next time — not for accountability, but because the 3 AM log entry is the one that survives format rot.`;
+    worthIt = false;
+  } else if (minutes >= 30 && hasLog) {
+    const things = logEntries.length;
+    verdict = `${minutes} minutes, ${things} log ${things===1?'entry':'entries'}. The mountain has a record. Whether it was worth the sleep cost depends on what you shipped — you know better than I do. But the build happened. That is more than most.`;
+    worthIt = true;
+  } else if (minutes >= 120) {
+    verdict = `${minutes} minutes. Long session for this hour. The sleep debt is real — the body battery does not lie. If you shipped something that exists tomorrow, the math may still work. If not: the barn was empty before you started, and it is empty now.`;
+    worthIt = minutes > 0;
+  } else {
+    verdict = `${minutes} minutes. Solid. The night build is defensible when the thing you built still exists in the morning. Check ${currentDone} tomorrow.`;
+    worthIt = true;
+  }
+
+  // Save session
+  const session = {
+    id: Date.now(),
+    goal: currentGoal,
+    done: currentDone,
+    minutes,
+    log: logEntries,
+    startTime: sessionStart.toISOString(),
+    worthIt
+  };
+  sessions.unshift(session);
+  if (sessions.length > 20) sessions = sessions.slice(0, 20);
+  localStorage.setItem('nb_sessions', JSON.stringify(sessions));
+
+  // Render done state
+  document.getElementById('verdictText').textContent = verdict;
+  document.getElementById('doneMinutes').textContent = minutes;
+  document.getElementById('doneLogCount').textContent = logEntries.length;
+  document.getElementById('doneSleepDebt').textContent = sleepDebt;
+
+  if (isLateNight && minutes > 60) {
+    const w = document.getElementById('sleepWarning');
+    w.textContent = `You are past 1 hour into the late window. Garmin will log the deficit. The body battery does not negotiate. Ship what you have and sleep.`;
+    w.style.display = 'block';
+  }
+
+  if (logEntries.length > 0) {
+    const bi = document.getElementById('builtItems');
+    bi.innerHTML = `<div class="bi-label">Build log</div>` +
+      logEntries.map(e => `<div class="built-item"><span class="built-item-time">${e.time}</span><span>${escHtml(e.text)}</span></div>`).join('');
+  }
+
+  setState('done');
+  renderHistory();
+}
+
+function resetSession() {
+  document.getElementById('goalInput').value = '';
+  document.getElementById('doneInput').value = '';
+  document.getElementById('startBtn').disabled = true;
+  setState('idle');
+}
+
+function setState(s) {
+  ['idle','active','done'].forEach(x => {
+    document.getElementById('state' + x.charAt(0).toUpperCase() + x.slice(1)).className = x === s ? 'visible' : '';
+  });
+}
+
+function renderHistory() {
+  if (sessions.length === 0) return;
+  const section = document.getElementById('historySection');
+  const list = document.getElementById('historyList');
+  section.style.display = 'block';
+  list.innerHTML = sessions.map(s => {
+    const d = new Date(s.startTime);
+    const dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' ' +
+      d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+    const cls = s.worthIt ? 'hi-worth' : 'hi-meh';
+    return `<div class="history-item">
+      <div class="hi-indicator ${cls}"></div>
+      <div class="hi-body">
+        <div class="hi-goal">${escHtml(s.goal)}</div>
+        <div class="hi-meta">
+          <span>${s.minutes}m</span>
+          <span>${s.log.length} logs</span>
+          <span>${dateStr}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+setState('idle');
+renderHistory();
+</script>
+</body>
+</html>

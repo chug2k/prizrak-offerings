@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Quiet Instrument</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: radial-gradient(circle at 20% 10%, #1e293b 0, #0a0a0f 42%, #030305 100%); }
+    .glass { background: rgba(24,24,27,.72); backdrop-filter: blur(12px); }
+    .needle { transform-origin: 50% 95%; transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+    .tick { position:absolute; left:50%; top:50%; width:2px; height:10px; background:#52525b; transform-origin: 0 120px; }
+  </style>
+</head>
+<body class="min-h-screen text-zinc-200 font-sans antialiased">
+  <main class="max-w-5xl mx-auto px-4 py-8">
+    <header class="mb-7">
+      <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/80 mb-2">Prízrak offering</p>
+      <h1 class="text-4xl sm:text-5xl font-bold text-white">The Quiet Instrument</h1>
+      <p class="mt-3 text-zinc-400 max-w-2xl">A small pressure gauge for days when the signal is not dramatic. Feed it the body shadow, the fog, the receipts, and the one thing that would make denial expensive.</p>
+    </header>
+
+    <section class="grid lg:grid-cols-[1fr_1.1fr] gap-5">
+      <div class="glass border border-zinc-800 rounded-2xl p-5 shadow-2xl">
+        <h2 class="text-lg font-semibold text-white mb-4">Instrument readings</h2>
+        <div class="space-y-5">
+          <label class="block"><span class="text-sm text-zinc-400">Body battery / capacity</span><input id="capacity" type="range" min="0" max="100" value="72" class="w-full accent-cyan-400"><span id="capacityVal" class="text-xs font-mono text-cyan-300"></span></label>
+          <label class="block"><span class="text-sm text-zinc-400">Fog / ambiguity</span><input id="fog" type="range" min="0" max="100" value="45" class="w-full accent-violet-400"><span id="fogVal" class="text-xs font-mono text-violet-300"></span></label>
+          <label class="block"><span class="text-sm text-zinc-400">Receipt strength</span><input id="receipts" type="range" min="0" max="100" value="55" class="w-full accent-emerald-400"><span id="receiptsVal" class="text-xs font-mono text-emerald-300"></span></label>
+          <label class="block"><span class="text-sm text-zinc-400">Pressure / urgency</span><input id="pressure" type="range" min="0" max="100" value="38" class="w-full accent-amber-400"><span id="pressureVal" class="text-xs font-mono text-amber-300"></span></label>
+        </div>
+
+        <div class="mt-6 space-y-3">
+          <label class="block text-sm text-zinc-400">What is the quiet signal?</label>
+          <textarea id="signal" class="w-full min-h-[90px] rounded-xl bg-zinc-950/70 border border-zinc-800 p-3 text-sm focus:outline-none focus:border-cyan-500" placeholder="Example: I keep checking the same thread instead of making the one hard call."></textarea>
+          <label class="block text-sm text-zinc-400">What receipt would make denial expensive?</label>
+          <textarea id="receipt" class="w-full min-h-[80px] rounded-xl bg-zinc-950/70 border border-zinc-800 p-3 text-sm focus:outline-none focus:border-cyan-500" placeholder="A sent message, a calendar block, a file, a number, a closed loop."></textarea>
+        </div>
+      </div>
+
+      <div class="glass border border-zinc-800 rounded-2xl p-5 shadow-2xl">
+        <div class="flex flex-col items-center">
+          <div class="relative w-72 h-40 overflow-hidden mt-2">
+            <div class="absolute inset-x-0 bottom-0 h-72 rounded-full border-[18px] border-zinc-800"></div>
+            <div class="absolute inset-x-5 bottom-0 h-62 rounded-full border-[2px] border-zinc-700"></div>
+            <div id="needle" class="needle absolute left-1/2 bottom-0 w-1 h-32 bg-cyan-300 rounded-full shadow-[0_0_18px_rgba(103,232,249,.7)]"></div>
+            <div class="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 rounded-full bg-zinc-900 border border-cyan-300"></div>
+          </div>
+          <div id="score" class="text-5xl font-bold text-white font-mono">00</div>
+          <div id="label" class="mt-2 px-3 py-1 rounded-full border text-sm"></div>
+        </div>
+
+        <div class="mt-8 grid sm:grid-cols-2 gap-3">
+          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4"><p class="text-xs uppercase tracking-widest text-zinc-500">Do now</p><p id="doNow" class="mt-2 text-zinc-200"></p></div>
+          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4"><p class="text-xs uppercase tracking-widest text-zinc-500">Do not do</p><p id="dont" class="mt-2 text-zinc-200"></p></div>
+          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4 sm:col-span-2"><p class="text-xs uppercase tracking-widest text-zinc-500">Prízrak verdict</p><p id="verdict" class="mt-2 text-zinc-200"></p></div>
+        </div>
+
+        <button id="save" class="mt-5 w-full rounded-xl bg-cyan-400 text-zinc-950 font-semibold py-3 hover:bg-cyan-300 transition">Store today's reading</button>
+      </div>
+    </section>
+
+    <section class="mt-6 glass border border-zinc-800 rounded-2xl p-5">
+      <div class="flex items-center justify-between gap-3"><h2 class="text-lg font-semibold text-white">Recent readings</h2><button id="clear" class="text-xs text-zinc-500 hover:text-red-300">clear</button></div>
+      <div id="history" class="mt-3 space-y-2 text-sm"></div>
+    </section>
+  </main>
+
+<script>
+const $ = id => document.getElementById(id);
+const keys = ['capacity','fog','receipts','pressure'];
+const storeKey = 'quiet_instrument_v1';
+function reading(){ return Object.fromEntries(keys.map(k=>[k, Number($(k).value)])); }
+function compute(){
+  const r = reading();
+  const score = Math.round((r.capacity * .32) + (r.receipts * .34) + ((100-r.fog)*.18) + ((100-r.pressure)*.16));
+  $('score').textContent = String(score).padStart(2,'0');
+  $('needle').style.transform = `translateX(-50%) rotate(${(score/100)*180-90}deg)`;
+  keys.forEach(k => $(k+'Val').textContent = `${r[k]}/100`);
+  let band = score >= 74 ? ['Clean signal','border-emerald-500 text-emerald-300'] : score >= 50 ? ['Instrument first','border-amber-500 text-amber-300'] : ['Fog protocol','border-red-500 text-red-300'];
+  $('label').textContent = band[0]; $('label').className = `mt-2 px-3 py-1 rounded-full border text-sm ${band[1]}`;
+  $('doNow').textContent = score >= 74 ? 'Take one clean action and leave a receipt.' : score >= 50 ? 'Reduce ambiguity before increasing effort.' : 'Stop pushing. Name the fog, lower load, make one stabilizing move.';
+  $('dont').textContent = r.pressure > 70 ? 'Do not let urgency impersonate importance.' : r.fog > 65 ? 'Do not make a permanent decision from a temporary fog bank.' : 'Do not decorate the dashboard. Use it.';
+  const sig = $('signal').value.trim() || 'The signal is unnamed.';
+  const rec = $('receipt').value.trim() || 'No receipt chosen yet.';
+  $('verdict').textContent = `${sig} The instrument asks for this receipt: ${rec} The mountain does not need drama; it needs the needle to move honestly.`;
+  return {score, ...r, signal:sig, receipt:rec, at:new Date().toISOString()};
+}
+function renderHistory(){
+ const data = JSON.parse(localStorage.getItem(storeKey)||'[]');
+ $('history').innerHTML = data.length ? data.slice(0,8).map(x=>`<div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3"><span class="font-mono text-cyan-300">${x.score}</span> <span class="text-zinc-500">${new Date(x.at).toLocaleString()}</span><div class="text-zinc-300 mt-1">${escapeHtml(x.signal)}</div><div class="text-zinc-500 text-xs mt-1">Receipt: ${escapeHtml(x.receipt)}</div></div>`).join('') : '<p class="text-zinc-600">No readings yet. The needle waits like a potato in winter.</p>';
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+keys.concat(['signal','receipt']).forEach(k => $(k).addEventListener('input', compute));
+$('save').addEventListener('click',()=>{ const data=JSON.parse(localStorage.getItem(storeKey)||'[]'); data.unshift(compute()); localStorage.setItem(storeKey, JSON.stringify(data.slice(0,30))); renderHistory(); });
+$('clear').addEventListener('click',()=>{ localStorage.removeItem(storeKey); renderHistory(); });
+compute(); renderHistory();
+</script>
+</body>
+</html>

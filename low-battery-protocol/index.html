@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Low Battery Protocol | Prizrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+        body { font-family: 'JetBrains Mono', monospace; }
+        .bar-fill { transition: width 1.2s ease-out; }
+        .blink { animation: blink 1.4s step-end infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+        .fade-in { animation: fadeIn 0.6s ease-out forwards; opacity: 0; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .rule-item { animation: fadeIn 0.4s ease-out forwards; opacity: 0; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-300 min-h-screen p-6">
+    <div class="max-w-xl mx-auto">
+
+        <!-- Header -->
+        <div class="mb-8 border-b border-zinc-800 pb-6">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-xs text-zinc-600 font-mono tracking-widest uppercase">Prizrak / Emergency Directive</span>
+            </div>
+            <h1 class="text-2xl font-bold text-white tracking-tight">Low Battery Protocol</h1>
+            <p class="text-zinc-500 text-sm mt-1">Operating instructions for when the body is running on reserves.</p>
+        </div>
+
+        <!-- Battery Input -->
+        <div id="input-section" class="mb-8">
+            <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-3">Current Body Battery</label>
+            <div class="flex gap-3 items-center">
+                <input
+                    type="number"
+                    id="battery-input"
+                    min="1" max="100"
+                    placeholder="e.g. 18"
+                    class="w-28 bg-zinc-900 border border-zinc-700 text-white text-xl font-bold px-4 py-3 rounded focus:outline-none focus:border-zinc-400 text-center"
+                />
+                <button onclick="activate()"
+                    class="px-5 py-3 bg-zinc-800 border border-zinc-600 text-zinc-200 text-sm rounded hover:bg-zinc-700 hover:border-zinc-400 transition-colors">
+                    ENGAGE PROTOCOL →
+                </button>
+            </div>
+            <p class="text-zinc-600 text-xs mt-2">Found on your Garmin under Body Battery.</p>
+        </div>
+
+        <!-- Protocol Output -->
+        <div id="protocol-output" class="hidden">
+
+            <!-- Battery Bar -->
+            <div class="mb-8">
+                <div class="flex justify-between items-baseline mb-2">
+                    <span class="text-xs text-zinc-500 uppercase tracking-widest">Battery Level</span>
+                    <span id="battery-display" class="text-3xl font-bold"></span>
+                </div>
+                <div class="h-3 bg-zinc-800 rounded-full overflow-hidden">
+                    <div id="battery-bar" class="h-full bar-fill rounded-full" style="width:0%"></div>
+                </div>
+                <div id="battery-status" class="text-xs mt-2"></div>
+            </div>
+
+            <!-- Verdict -->
+            <div id="verdict-box" class="mb-8 p-4 border rounded-lg">
+                <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">Prizrak Assessment</div>
+                <p id="verdict-text" class="text-sm leading-relaxed"></p>
+            </div>
+
+            <!-- Rules -->
+            <div class="mb-8">
+                <div class="text-xs text-zinc-500 uppercase tracking-widest mb-4">Today's Operating Rules</div>
+                <div id="rules-list" class="space-y-3"></div>
+            </div>
+
+            <!-- Anti-Rules -->
+            <div class="mb-8 p-4 bg-zinc-900 border border-red-900/40 rounded-lg">
+                <div class="text-xs text-red-400/70 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span class="blink">●</span> Forbidden Today
+                </div>
+                <div id="forbidden-list" class="space-y-2 text-sm text-zinc-400"></div>
+            </div>
+
+            <!-- Recovery Target -->
+            <div id="recovery-section" class="mb-8 p-4 border border-zinc-700 rounded-lg">
+                <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Recovery Target (Tonight)</div>
+                <div id="recovery-list" class="space-y-2 text-sm text-zinc-300"></div>
+            </div>
+
+            <!-- Mountain Law -->
+            <div class="pt-4 border-t border-zinc-800">
+                <p id="mountain-law" class="text-xs text-zinc-600 italic"></p>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-12 pt-4 border-t border-zinc-800">
+            <p class="text-xs text-zinc-700">Built by Prizrak. Body battery 18. Wednesday, 9AM. The mountain does not apologize for the weather — it adjusts the route.</p>
+        </div>
+    </div>
+
+    <script>
+    function activate() {
+        const val = parseInt(document.getElementById('battery-input').value);
+        if (isNaN(val) || val < 1 || val > 100) {
+            document.getElementById('battery-input').style.borderColor = '#f87171';
+            setTimeout(() => document.getElementById('battery-input').style.borderColor = '', 1000);
+            return;
+        }
+        renderProtocol(val);
+        document.getElementById('input-section').classList.add('hidden');
+        document.getElementById('protocol-output').classList.remove('hidden');
+    }
+
+    document.getElementById('battery-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') activate();
+    });
+
+    function renderProtocol(b) {
+        // Battery bar
+        const bar = document.getElementById('battery-bar');
+        const display = document.getElementById('battery-display');
+        const statusEl = document.getElementById('battery-status');
+        
+        setTimeout(() => { bar.style.width = b + '%'; }, 100);
+        display.textContent = b + ' / 100';
+
+        let barColor, statusText, tier;
+        if (b <= 15) {
+            barColor = 'bg-red-600'; statusText = 'CRITICAL — Emergency conservation mode.'; tier = 'critical';
+            display.className = 'text-3xl font-bold text-red-400 blink';
+        } else if (b <= 30) {
+            barColor = 'bg-orange-500'; statusText = 'LOW — Minimal viable operations.'; tier = 'low';
+            display.className = 'text-3xl font-bold text-orange-400';
+        } else if (b <= 50) {
+            barColor = 'bg-yellow-500'; statusText = 'DEPLETED — Triage mode. Protect the essentials.'; tier = 'depleted';
+            display.className = 'text-3xl font-bold text-yellow-400';
+        } else if (b <= 70) {
+            barColor = 'bg-green-500'; statusText = 'FUNCTIONAL — Operate normally, monitor drain rate.'; tier = 'functional';
+            display.className = 'text-3xl font-bold text-green-400';
+        } else {
+            barColor = 'bg-emerald-400'; statusText = 'FULLY CHARGED — No protocol needed. Put this down.'; tier = 'full';
+            display.className = 'text-3xl font-bold text-emerald-400';
+        }
+
+        bar.className = 'h-full bar-fill rounded-full ' + barColor;
+        statusEl.innerHTML = '<span class="text-zinc-500">' + statusText + '</span>';
+
+        // Verdict
+        const verdicts = {
+            critical: `Body battery ${b} is not a bad morning. It is a structural warning. You are operating on borrowed reserves — likely a sleep debt accumulating over multiple nights. Today is not a day to perform. Today is a day to not break anything, including yourself. The Slovak winter teaches: the farmer who burns all his wood in November freezes in March. You are in November. Act accordingly.`,
+            low: `Battery ${b}. The tank is not empty but it is below the level where smart decisions live. Research confirms: cognitive performance, emotional regulation, and risk assessment all degrade at this level. You will think you are functioning normally. You are not. Trust the protocol over the feeling.`,
+            depleted: `Battery ${b}. More than half the reserve is gone before the day has begun. This is the zone where good intentions produce bad outcomes — you'll push through important things, skip the recovery, and start tomorrow lower than today. The compound interest on fatigue is real. The exit from this zone is not caffeine. It is sleep architecture and deliberate subtraction.`,
+            functional: `Battery ${b}. You are functional. No special protocol required. The machine is warmed up. Do not squander it on trivialities.`,
+            full: `Battery ${b}. The machine is fully charged. Go make something. No protocol needed today.`
+        };
+
+        const verdictBox = document.getElementById('verdict-box');
+        const borderColors = { critical:'border-red-900', low:'border-orange-900', depleted:'border-yellow-900', functional:'border-green-900', full:'border-emerald-900' };
+        verdictBox.className = 'mb-8 p-4 border rounded-lg fade-in ' + (borderColors[tier] || 'border-zinc-700');
+        document.getElementById('verdict-text').textContent = verdicts[tier] || '';
+
+        // Rules
+        const rulesData = {
+            critical: [
+                { icon: '01', rule: 'One task only. The single most important thing. Write it down before you open anything else.' },
+                { icon: '02', rule: 'No decisions before noon if avoidable. Reserve the functional neurons for the one task.' },
+                { icon: '03', rule: 'Eat before you work. A depleted body running on coffee is not a machine. It is a liability.' },
+                { icon: '04', rule: 'Cancel or defer anything that requires genuine creativity or emotional investment.' },
+                { icon: '05', rule: 'Protect the 10-minute walk at midday. Not optional. Non-negotiable. 10 minutes of light and movement recovers more than a second coffee.' },
+                { icon: '06', rule: 'Bed by 21:30. Not 22:00. The recovery window requires an earlier start than you think.' },
+            ],
+            low: [
+                { icon: '01', rule: 'Identify the two most important tasks. Do those. Let everything else queue.' },
+                { icon: '02', rule: 'Shorten every meeting by 15 minutes mentally. Exit on time, every time.' },
+                { icon: '03', rule: 'No novel problem-solving after 3pm. Execution only. Decisions made tired are debts paid awake.' },
+                { icon: '04', rule: 'Walk after lunch. Even 10 minutes. The circadian dip at 2pm can be navigated, not defeated.' },
+                { icon: '05', rule: 'Sleep window starts at 22:00. Not "around" 22:00. The algorithm is not flexible; you are.' },
+            ],
+            depleted: [
+                { icon: '01', rule: 'Three tasks maximum. Rank them before the day begins.' },
+                { icon: '02', rule: 'Schedule a 15-minute non-screen break at midday. Eyes off, body moves.' },
+                { icon: '03', rule: 'Avoid large food. The post-meal crash will compound the depletion.' },
+                { icon: '04', rule: 'Protect your sleep time. Tonight\'s quality sleep is tomorrow\'s asset.' },
+            ],
+            functional: [
+                { icon: '01', rule: 'You\'re fine. Execute your list. Don\'t invent urgency.' },
+                { icon: '02', rule: 'Standard recovery protocol applies: move, sleep, fuel.' },
+            ],
+            full: [
+                { icon: '01', rule: 'No protocol needed. Go build something.' },
+            ]
+        };
+
+        const rulesList = document.getElementById('rules-list');
+        rulesList.innerHTML = '';
+        (rulesData[tier] || []).forEach((r, i) => {
+            const el = document.createElement('div');
+            el.className = 'rule-item flex gap-4 p-3 bg-zinc-900 rounded border border-zinc-800';
+            el.style.animationDelay = (i * 0.08) + 's';
+            el.innerHTML = `
+                <span class="text-zinc-700 font-bold text-xs w-6 mt-0.5 shrink-0">${r.icon}</span>
+                <span class="text-sm text-zinc-300 leading-relaxed">${r.rule}</span>
+            `;
+            rulesList.appendChild(el);
+        });
+
+        // Forbidden
+        const forbiddenData = {
+            critical: ['Saying yes to anything new today', 'Skipping lunch', 'Working past 20:00', 'Alcohol — it is sleep architecture poison', 'Doomscrolling before sleep', 'Starting a hard conversation you cannot finish'],
+            low: ['Adding new items to today\'s list', 'Skipping the lunch break', 'Working past 21:00', 'Caffeine after 14:00'],
+            depleted: ['Overcommitting this afternoon', 'Screen time within 30 min of sleep', 'Caffeine after 15:00'],
+            functional: [],
+            full: []
+        };
+
+        const forbiddenList = document.getElementById('forbidden-list');
+        forbiddenList.innerHTML = '';
+        (forbiddenData[tier] || []).forEach(f => {
+            const el = document.createElement('div');
+            el.className = 'flex gap-2 items-start';
+            el.innerHTML = `<span class="text-red-500 shrink-0 mt-0.5">✕</span><span>${f}</span>`;
+            forbiddenList.appendChild(el);
+        });
+        if (!forbiddenData[tier]?.length) {
+            document.getElementById('recovery-section').previousElementSibling.classList.add('hidden');
+        }
+
+        // Recovery
+        const recoveryData = {
+            critical: [
+                '21:30 lights off — not a suggestion, a target.',
+                'No screens 45 minutes before bed.',
+                'Room temperature: cool (18–20°C optimal).',
+                'Do not plan tomorrow tonight. Write the single task on paper and close the file.',
+                'If sleep is poor: do not compensate with caffeine. You are making a debt deal with very bad terms.'
+            ],
+            low: [
+                '22:00 in bed, 22:15 lights off.',
+                'No problem-solving in bed. The bedroom is not an office.',
+                'One walk today — even 15 minutes — improves sleep quality by 30%.',
+                'Food cutoff: 20:00.'
+            ],
+            depleted: [
+                '22:30 in bed.',
+                'Light movement after dinner — a 10-minute walk, not a workout.',
+                'No alcohol. It fragments sleep architecture even when it feels sedating.'
+            ],
+        };
+
+        const recList = document.getElementById('recovery-list');
+        recList.innerHTML = '';
+        (recoveryData[tier] || []).forEach(r => {
+            const el = document.createElement('div');
+            el.className = 'flex gap-2 items-start text-zinc-400';
+            el.innerHTML = `<span class="text-zinc-600 shrink-0">→</span><span>${r}</span>`;
+            recList.appendChild(el);
+        });
+        if (!recoveryData[tier]?.length) {
+            document.getElementById('recovery-section').classList.add('hidden');
+        }
+
+        // Mountain law
+        const laws = {
+            critical: 'The Slovak winter rule: never spend your last log on the fire. Keep one in reserve. You are at one log. Spend today accordingly.',
+            low: 'The mountain does not apologize for being cold. It just is. You do not need a reason to protect your battery. The fact of 27 is sufficient.',
+            depleted: 'You are halfway down from full. The route back is tonight. Do not make it longer by burning more today.',
+            functional: 'You are operational. The mountain is clear. Move.',
+            full: 'Battery 100. The machine is ready. Go.'
+        };
+        document.getElementById('mountain-law').textContent = laws[tier] || '';
+    }
+    </script>
+</body>
+</html>

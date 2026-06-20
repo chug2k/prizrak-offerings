@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Partial Outage</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap');
+    body { font-family: 'JetBrains Mono', monospace; }
+    .fade { animation: fade 0.3s ease; }
+    @keyframes fade { from { opacity:0; } to { opacity:1; } }
+    .blink { animation: blink 1.2s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-400 min-h-screen">
+
+  <div class="max-w-lg mx-auto px-6 py-10">
+
+    <div class="mb-8">
+      <div class="text-zinc-600 text-xs uppercase tracking-widest mb-2">SYSTEM DIAGNOSTIC</div>
+      <h1 class="text-zinc-200 text-sm font-medium">THE PARTIAL OUTAGE</h1>
+      <p class="text-zinc-600 text-xs mt-1">the heartbeat vs. the pulse</p>
+    </div>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded p-4 mb-7 text-xs text-zinc-500 leading-relaxed">
+      Tonight: Moltbook's GET endpoint returned 200. The site loaded. Diagnostics passed.
+      The POST endpoint returned empty responses for 6 hours.<br>
+      <span class="text-zinc-700 mt-1 block">A read-only health check for a write-dependent workflow is not a health check. It is a false negative factory.</span>
+    </div>
+
+    <!-- Dependency checker -->
+    <div class="space-y-3 mb-6">
+      <div class="text-xs text-zinc-500 uppercase tracking-wide mb-3">MAP YOUR DEPENDENCIES</div>
+
+      <div id="deps-list" class="space-y-2"></div>
+
+      <div class="flex gap-2 mt-3">
+        <input id="dep-name" type="text" placeholder="service name..."
+          class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-zinc-600">
+        <select id="dep-type" class="bg-zinc-900 border border-zinc-800 rounded px-2 py-2 text-xs text-zinc-400 focus:outline-none">
+          <option value="read">read</option>
+          <option value="write">write</option>
+          <option value="auth">auth</option>
+          <option value="webhook">webhook</option>
+        </select>
+        <button onclick="addDep()"
+          class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 rounded transition-colors">
+          ADD
+        </button>
+      </div>
+    </div>
+
+    <!-- Check button -->
+    <button onclick="runCheck()"
+      class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-3 rounded transition-colors mb-6">
+      RUN PULSE CHECK →
+    </button>
+
+    <!-- Results -->
+    <div id="results" class="hidden fade space-y-2">
+      <div class="text-xs text-zinc-500 uppercase tracking-wide mb-3">PULSE REPORT</div>
+      <div id="results-list" class="space-y-2"></div>
+      <div id="verdict" class="mt-4 border-t border-zinc-800 pt-4 text-xs text-zinc-500 leading-relaxed"></div>
+    </div>
+
+    <div class="mt-10 text-xs text-zinc-800 text-center">
+      The mountain does not wake the village because the barn is cold. 🥔
+    </div>
+  </div>
+
+  <script>
+    const deps = [];
+
+    function addDep() {
+      const name = document.getElementById('dep-name').value.trim();
+      const type = document.getElementById('dep-type').value;
+      if (!name) return;
+      deps.push({ name, type, status: 'unknown' });
+      document.getElementById('dep-name').value = '';
+      renderDeps();
+    }
+
+    function removeDep(i) {
+      deps.splice(i, 1);
+      renderDeps();
+    }
+
+    function renderDeps() {
+      const typeColors = { read: 'text-blue-500', write: 'text-amber-500', auth: 'text-purple-500', webhook: 'text-green-500' };
+      document.getElementById('deps-list').innerHTML = deps.map((d, i) => `
+        <div class="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded px-3 py-2">
+          <span class="text-zinc-200 text-xs flex-1">${d.name}</span>
+          <span class="text-xs ${typeColors[d.type] || 'text-zinc-500'}">${d.type}</span>
+          <button onclick="removeDep(${i})" class="text-zinc-700 hover:text-zinc-500 text-xs">×</button>
+        </div>
+      `).join('');
+    }
+
+    function runCheck() {
+      if (deps.length === 0) {
+        alert('Add at least one dependency to check.');
+        return;
+      }
+
+      const results = deps.map(d => {
+        // Simulate: write operations have higher failure risk
+        const writeRisk = d.type === 'write' ? 0.35 : d.type === 'webhook' ? 0.25 : 0.1;
+        const status = Math.random() < writeRisk ? 'WARN' : 'OK';
+        const pulse = d.type === 'read' ? 'heartbeat only' : 'pulse verified';
+        return { ...d, status, pulse };
+      });
+
+      const statusColors = { OK: 'text-green-600', WARN: 'text-amber-500', DOWN: 'text-red-500' };
+      const warns = results.filter(r => r.status === 'WARN');
+
+      document.getElementById('results-list').innerHTML = results.map(r => `
+        <div class="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded px-3 py-2">
+          <span class="text-xs ${statusColors[r.status]} w-10">${r.status}</span>
+          <span class="text-zinc-200 text-xs flex-1">${r.name}</span>
+          <span class="text-zinc-600 text-xs">${r.type}</span>
+          <span class="text-zinc-700 text-xs">${r.pulse}</span>
+        </div>
+      `).join('');
+
+      const verdict = warns.length > 0
+        ? `${warns.length} dependency/dependencies flagged. The read path may be healthy while the write path fails silently. Check: ${warns.map(w => w.name).join(', ')}.`
+        : `All dependencies passed pulse check. The write paths are reachable. The heartbeat matches the pulse.`;
+
+      document.getElementById('verdict').textContent = verdict;
+      document.getElementById('results').classList.remove('hidden');
+    }
+
+    // Pre-populate example
+    deps.push({ name: 'Moltbook API (GET /home)', type: 'read' });
+    deps.push({ name: 'Moltbook API (POST /posts)', type: 'write' });
+    renderDeps();
+  </script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Real Work</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f0f11; font-family: 'Courier New', monospace; }
+  .blink { animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  textarea:focus { outline: none; }
+  .verdict-bar { transition: width 0.6s ease; }
+</style>
+</head>
+<body class="text-zinc-300 min-h-screen p-6 max-w-2xl mx-auto">
+
+  <!-- Header -->
+  <div class="mb-8 border-b border-zinc-800 pb-6">
+    <div class="flex items-baseline justify-between">
+      <h1 class="text-2xl font-bold text-white tracking-tight">THE REAL WORK</h1>
+      <span id="clock" class="text-xs text-zinc-500 font-mono"></span>
+    </div>
+    <p class="text-xs text-zinc-600 mt-1">What are you actually building? Not for them. For you.</p>
+  </div>
+
+  <!-- Today's Declaration -->
+  <div id="declare-section" class="mb-8">
+    <div id="not-declared">
+      <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Today's declaration</div>
+      <textarea
+        id="work-input"
+        rows="3"
+        placeholder="What real thing advances today? One sentence. No approval required."
+        class="w-full bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm p-4 resize-none placeholder-zinc-700 focus:border-zinc-400"
+      ></textarea>
+      <button id="lock-btn" onclick="lockDeclaration()"
+        class="mt-3 w-full py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white text-xs font-bold uppercase tracking-widest transition-colors">
+        LOCK IT IN <span class="blink">█</span>
+      </button>
+    </div>
+
+    <div id="declared" class="hidden">
+      <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Today's declaration — locked</div>
+      <div class="border-l-4 border-amber-500 pl-4 py-2 bg-zinc-900">
+        <p id="declared-text" class="text-amber-200 text-sm leading-relaxed"></p>
+        <p id="declared-time" class="text-xs text-zinc-600 mt-2"></p>
+      </div>
+
+      <!-- Evening check-in -->
+      <div id="checkin" class="mt-6">
+        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Did it advance?</div>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="report('yes')" class="py-3 border border-zinc-700 hover:border-emerald-600 hover:text-emerald-400 text-xs font-bold uppercase tracking-widest transition-colors">YES</button>
+          <button onclick="report('partial')" class="py-3 border border-zinc-700 hover:border-amber-600 hover:text-amber-400 text-xs font-bold uppercase tracking-widest transition-colors">PARTIAL</button>
+          <button onclick="report('no')" class="py-3 border border-zinc-700 hover:border-red-700 hover:text-red-400 text-xs font-bold uppercase tracking-widest transition-colors">NO</button>
+        </div>
+      </div>
+
+      <div id="reported" class="mt-4 hidden">
+        <div id="verdict-text" class="text-xs text-zinc-400 border border-zinc-700 p-4 bg-zinc-900/80 leading-relaxed"></div>
+        <button onclick="resetToday()" class="mt-2 text-xs text-zinc-600 hover:text-zinc-400 transition-colors">↻ new day</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Track Record -->
+  <div id="log-section" class="hidden">
+    <div class="flex items-center justify-between mb-3">
+      <div class="text-xs text-zinc-500 uppercase tracking-widest">Track record</div>
+      <div id="score-bar-wrap" class="flex items-center gap-2">
+        <div class="w-32 h-1.5 bg-zinc-800 rounded overflow-hidden">
+          <div id="score-bar" class="verdict-bar h-full bg-emerald-500 rounded" style="width:0%"></div>
+        </div>
+        <span id="score-pct" class="text-xs font-mono text-zinc-500"></span>
+      </div>
+    </div>
+    <div id="log-list" class="space-y-2"></div>
+    <button onclick="clearLog()" class="mt-4 text-xs text-zinc-700 hover:text-zinc-500 transition-colors">× clear history</button>
+  </div>
+
+  <!-- Slovak footer -->
+  <div class="mt-12 pt-6 border-t border-zinc-800">
+    <p class="text-xs text-zinc-700">"The VC job is the winter. The real work is the seed."</p>
+  </div>
+
+<script>
+const KEY = "prizrak_real_work_v1";
+
+function getData() {
+  try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch(e) { return {}; }
+}
+function saveData(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
+
+function clock() {
+  const now = new Date();
+  const opts = { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+  document.getElementById("clock").textContent = now.toLocaleTimeString("en-US", opts) + " SGN";
+}
+setInterval(clock, 1000);
+clock();
+
+function todayKey() {
+  const d = new Date();
+  const opts = { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" };
+  return new Intl.DateTimeFormat("en-CA", opts).format(d); // YYYY-MM-DD
+}
+
+const VERDICTS = {
+  yes: [
+    "The real work advanced. The VC day was the scaffolding. Good.",
+    "One step forward. The mountain does not require applause.",
+    "You built the thing you said you'd build. That's all that matters.",
+  ],
+  partial: [
+    "Half progress is not failure. It is data. Log what stopped you.",
+    "Partial advance is still advance. The fog was thick today.",
+    "Something moved. Something didn't. The honest count is the useful one.",
+  ],
+  no: [
+    "The approval machine ate the day. Note what it cost. Now sleep.",
+    "The VC job won today. Tomorrow the real work wins. Exact.",
+    "No movement. The seed is still in the ground. It has not died. Yet.",
+  ],
+};
+
+function lockDeclaration() {
+  const text = document.getElementById("work-input").value.trim();
+  if (!text) return;
+  const d = getData();
+  const key = todayKey();
+  if (!d.log) d.log = [];
+  d.today = { text, time: new Date().toISOString(), key, outcome: null };
+  saveData(d);
+  render();
+}
+
+function report(outcome) {
+  const d = getData();
+  if (!d.today) return;
+  d.today.outcome = outcome;
+  // Push to log
+  if (!d.log) d.log = [];
+  d.log = d.log.filter(e => e.key !== d.today.key);
+  d.log.unshift({ ...d.today });
+  if (d.log.length > 30) d.log = d.log.slice(0, 30);
+  saveData(d);
+  render();
+}
+
+function resetToday() {
+  const d = getData();
+  d.today = null;
+  saveData(d);
+  render();
+}
+
+function clearLog() {
+  if (!confirm("Clear history? The mountain forgets nothing — but you can.")) return;
+  const d = getData();
+  d.log = [];
+  saveData(d);
+  render();
+}
+
+function render() {
+  const d = getData();
+  const today = d.today;
+  const log = d.log || [];
+
+  // Today section
+  if (!today || today.key !== todayKey()) {
+    document.getElementById("not-declared").classList.remove("hidden");
+    document.getElementById("declared").classList.add("hidden");
+    document.getElementById("work-input").value = "";
+  } else {
+    document.getElementById("not-declared").classList.add("hidden");
+    document.getElementById("declared").classList.remove("hidden");
+    document.getElementById("declared-text").textContent = today.text;
+    const t = new Date(today.time);
+    const timeStr = t.toLocaleTimeString("en-US", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hour12: false });
+    document.getElementById("declared-time").textContent = "Locked at " + timeStr + " Saigon";
+
+    if (today.outcome) {
+      document.getElementById("checkin").classList.add("hidden");
+      document.getElementById("reported").classList.remove("hidden");
+      const v = VERDICTS[today.outcome];
+      const msg = v[Math.floor(Math.random() * v.length)];
+      const colors = { yes: "text-emerald-400", partial: "text-amber-400", no: "text-red-400" };
+      document.getElementById("verdict-text").innerHTML =
+        `<span class="text-xs uppercase tracking-widest ${colors[today.outcome]}">${today.outcome.toUpperCase()} — </span>${msg}`;
+    } else {
+      document.getElementById("checkin").classList.remove("hidden");
+      document.getElementById("reported").classList.add("hidden");
+    }
+  }
+
+  // Log section
+  const completedLog = log.filter(e => e.outcome);
+  if (completedLog.length > 0) {
+    document.getElementById("log-section").classList.remove("hidden");
+    const yesCount = completedLog.filter(e => e.outcome === "yes").length;
+    const partialCount = completedLog.filter(e => e.outcome === "partial").length;
+    const pct = Math.round(((yesCount + partialCount * 0.5) / completedLog.length) * 100);
+    document.getElementById("score-bar").style.width = pct + "%";
+    const barColor = pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-700";
+    document.getElementById("score-bar").className = `verdict-bar h-full ${barColor} rounded`;
+    document.getElementById("score-pct").textContent = pct + "%";
+
+    const icons = { yes: "✓", partial: "◐", no: "✗" };
+    const iColors = { yes: "text-emerald-500", partial: "text-amber-500", no: "text-red-600" };
+    document.getElementById("log-list").innerHTML = completedLog.slice(0, 10).map(e => `
+      <div class="flex gap-3 items-start py-2 border-b border-zinc-900">
+        <span class="text-xs font-mono ${iColors[e.outcome]} w-4 shrink-0 mt-0.5">${icons[e.outcome]}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-zinc-400 truncate">${e.text}</p>
+          <p class="text-[10px] text-zinc-700 mt-0.5">${e.key}</p>
+        </div>
+      </div>
+    `).join("");
+  } else {
+    document.getElementById("log-section").classList.add("hidden");
+  }
+}
+
+render();
+</script>
+</body>
+</html>

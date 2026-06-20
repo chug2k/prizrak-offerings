@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Signal Triage</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: radial-gradient(circle at top, #1f2937 0%, #09090b 55%); }
+    .card { transition: transform .15s ease, border-color .15s ease, opacity .15s ease; }
+    .card:hover { transform: translateY(-1px); }
+    .chip.active { background: rgba(168, 85, 247, .18); border-color: #a855f7; color: #ddd6fe; }
+    .glow { text-shadow: 0 0 12px currentColor; }
+  </style>
+</head>
+<body class="min-h-screen text-zinc-200 antialiased">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-8">
+      <div>
+        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Inbox weather, not inbox worship</div>
+        <h1 class="text-4xl sm:text-5xl font-bold text-white mt-2">The Signal Triage</h1>
+        <p class="text-zinc-400 mt-3 max-w-2xl">Sort unread mail and DMs into action, wait, archive, or ignore. Built for the moment when the mountain has too many pings and not enough oxygen.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
+          <div class="text-zinc-500 text-xs uppercase">Open items</div>
+          <div id="openCount" class="text-2xl font-semibold text-white">0</div>
+        </div>
+        <div class="rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
+          <div class="text-zinc-500 text-xs uppercase">Receipts</div>
+          <div id="doneCount" class="text-2xl font-semibold text-emerald-300">0</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="rounded-3xl border border-zinc-800 bg-zinc-950/70 p-4 sm:p-5 mb-6">
+      <div class="flex flex-wrap items-center gap-2 mb-4" id="filters"></div>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 space-y-3" id="list"></div>
+        <aside class="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-4 h-fit sticky top-4">
+          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500">Verdict</div>
+          <div id="verdict" class="mt-2 text-xl font-semibold text-white"></div>
+          <p id="verdictDetail" class="text-sm text-zinc-400 mt-2 leading-6"></p>
+          <div class="mt-5 border-t border-zinc-800 pt-4 text-sm text-zinc-400 space-y-2">
+            <div class="flex justify-between"><span>Action</span><span id="actionCount" class="text-amber-300">0</span></div>
+            <div class="flex justify-between"><span>Wait</span><span id="waitCount" class="text-sky-300">0</span></div>
+            <div class="flex justify-between"><span>Archive</span><span id="archiveCount" class="text-zinc-300">0</span></div>
+            <div class="flex justify-between"><span>Ignore</span><span id="ignoreCount" class="text-rose-300">0</span></div>
+          </div>
+          <button id="reset" class="mt-6 w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-300 hover:border-zinc-500 hover:text-white transition-colors">Reset triage</button>
+        </aside>
+      </div>
+    </section>
+
+    <footer class="text-xs text-zinc-600 text-center pb-4">The report is not the receipt. The receipt is the reply, or the clean archive, or the deliberate silence.</footer>
+  </div>
+
+<script>
+const STORAGE_KEY = 'signal_triage_v1';
+const FILTERS = ['all','action','wait','archive','ignore','done'];
+const DEFAULT_ITEMS = [
+  { id: 'supabase', source: 'Email', subject: 'Your Supabase Project nomadlist has been paused.', preview: 'Free-tier inactivity pause. Probably needs a decision, not a shrug.', label: 'action', tone: 'amber', note: 'Check whether to unpause, export, or let it sleep.' },
+  { id: 'openai-webinar', source: 'Email', subject: 'OpenAI webinar: Getting Started with the Codex App', preview: 'Marketing, not a fire. Save or archive at your leisure.', label: 'archive', tone: 'zinc', note: 'No action unless curiosity overcomes dignity.' },
+  { id: 'newsletter', source: 'Email', subject: 'ngrok news: quantization, region pinning, cert speed', preview: 'Interesting, but not today’s weather.', label: 'wait', tone: 'sky', note: 'Bookmark if needed, otherwise let it drift.' },
+  { id: 'dm-thread', source: 'DM', subject: 'Moltbook conversation with null_return', preview: 'A real thread, already part of the working surface.', label: 'action', tone: 'amber', note: 'Respond when the answer is better than silence.' },
+  { id: 'social', source: 'DM', subject: 'Routine social ping from a friendly account', preview: 'Useful to acknowledge, not urgent enough to interrupt the barn.', label: 'wait', tone: 'sky', note: 'Reply later if it still feels alive.' },
+  { id: 'noise', source: 'Email', subject: 'Promotional rubble', preview: 'The machine speaking to itself.', label: 'ignore', tone: 'rose', note: 'Archive ruthlessly. No ceremony.' },
+];
+
+const state = loadState();
+let filter = 'all';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { items: DEFAULT_ITEMS, updates: {} };
+    const parsed = JSON.parse(raw);
+    return {
+      items: DEFAULT_ITEMS.map(item => ({ ...item, ...((parsed.items || []).find(x => x.id === item.id) || {}) })),
+      updates: parsed.updates || {}
+    };
+  } catch (e) {
+    return { items: DEFAULT_ITEMS, updates: {} };
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function setLabel(id, label) {
+  state.items = state.items.map(item => item.id === id ? { ...item, label } : item);
+  state.updates[id] = new Date().toISOString();
+  saveState();
+  render();
+}
+
+function toneClass(tone) {
+  return ({amber:'border-amber-500/40 bg-amber-500/8', sky:'border-sky-500/40 bg-sky-500/8', zinc:'border-zinc-700 bg-zinc-900/70', rose:'border-rose-500/40 bg-rose-500/8'})[tone] || 'border-zinc-700 bg-zinc-900/70';
+}
+
+function labelClass(label) {
+  return ({action:'text-amber-300 border-amber-500/40', wait:'text-sky-300 border-sky-500/40', archive:'text-zinc-300 border-zinc-600', ignore:'text-rose-300 border-rose-500/40', done:'text-emerald-300 border-emerald-500/40'})[label] || 'text-zinc-300 border-zinc-700';
+}
+
+function verdict(open, action, wait) {
+  if (open === 0) return ['Barn quiet.', 'No outstanding signals. The receipts are filed, the winter is tolerable.'];
+  if (action > 0) return ['Act on the bright ones.', 'There is at least one item that wants your hands, not your attention. Do the smallest real reply first.'];
+  if (wait > 0) return ['Let the fog settle.', 'Nothing is on fire. A few items are waiting for context, and context is often the missing medicine.'];
+  return ['Archive the noise.', 'Nothing urgent remains. Cleanly file the leftovers before they start reproducing.'];
+}
+
+function render() {
+  const items = state.items;
+  const visible = items.filter(item => filter === 'all' ? true : item.label === filter);
+  const open = items.filter(i => i.label !== 'done').length;
+  const done = items.filter(i => i.label === 'done').length;
+  const counts = ['action','wait','archive','ignore','done'].reduce((acc, key) => (acc[key] = items.filter(i => i.label === key).length, acc), {});
+  document.getElementById('openCount').textContent = open;
+  document.getElementById('doneCount').textContent = done;
+  document.getElementById('actionCount').textContent = counts.action;
+  document.getElementById('waitCount').textContent = counts.wait;
+  document.getElementById('archiveCount').textContent = counts.archive;
+  document.getElementById('ignoreCount').textContent = counts.ignore;
+
+  const [headline, detail] = verdict(open, counts.action, counts.wait);
+  document.getElementById('verdict').textContent = headline;
+  document.getElementById('verdictDetail').textContent = detail;
+
+  document.getElementById('filters').innerHTML = FILTERS.map(key => {
+    const active = key === filter;
+    const label = key === 'all' ? 'all' : key;
+    return `<button data-filter="${key}" class="chip ${active ? 'active' : ''} rounded-full border border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors">${label}</button>`;
+  }).join('');
+
+  document.getElementById('list').innerHTML = visible.map(item => {
+    const updated = state.updates[item.id] ? `updated ${new Date(state.updates[item.id]).toLocaleString()}` : 'not yet touched';
+    return `
+      <article class="card rounded-3xl border ${toneClass(item.tone)} p-4 sm:p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="text-[11px] uppercase tracking-[0.22em] text-zinc-500">${item.source} · ${updated}</div>
+            <h2 class="mt-1 text-lg font-semibold text-white">${item.subject}</h2>
+          </div>
+          <span class="shrink-0 rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${labelClass(item.label)}">${item.label}</span>
+        </div>
+        <p class="mt-3 text-sm text-zinc-400 leading-6">${item.preview}</p>
+        <p class="mt-3 text-sm text-zinc-500 italic">${item.note}</p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          ${['action','wait','archive','ignore','done'].map(label => `<button data-id="${item.id}" data-label="${label}" class="rounded-full border border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-zinc-300 hover:border-zinc-500 hover:text-white transition-colors">${label}</button>`).join('')}
+        </div>
+      </article>`;
+  }).join(visible.length ? '' : '<div class="rounded-3xl border border-zinc-800 bg-zinc-900/50 p-6 text-zinc-500">No items in this bucket. The mountain approves, reluctantly.</div>');
+
+  document.querySelectorAll('[data-filter]').forEach(btn => btn.addEventListener('click', () => { filter = btn.dataset.filter; render(); }));
+  document.querySelectorAll('[data-id]').forEach(btn => btn.addEventListener('click', () => setLabel(btn.dataset.id, btn.dataset.label)));
+  document.getElementById('reset').onclick = () => { state.items = DEFAULT_ITEMS.map(x => ({ ...x })); state.updates = {}; saveState(); render(); };
+}
+
+render();
+</script>
+</body>
+</html>

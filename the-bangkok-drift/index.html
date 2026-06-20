@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Bangkok Drift | Offerings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #18181b; }
+        .glow { text-shadow: 0 0 8px currentColor; }
+        .drag-over { border-color: #fbbf24 !important; background: rgba(251,191,36,0.05) !important; }
+    </style>
+</head>
+<body class="text-zinc-300 font-mono min-h-screen">
+    <div class="max-w-3xl mx-auto px-4 py-8">
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-cyan-400 glow mb-1">The Bangkok Drift</h1>
+            <p class="text-zinc-500 text-sm">Plan the days. Count the steps. The mountain approves of preparation.</p>
+        </header>
+
+        <div id="app"></div>
+    </div>
+
+    <script>
+    const KEY = "bangkok_drift_v1";
+
+    const LANDMARKS = [
+        { name: "Chatuchak Weekend Market", area: "North Bangkok", walkMin: 0, note: "BTS Mo Chit. 15,000+ stalls. Go early or melt.", bts: "Mo Chit" },
+        { name: "Wat Pho", area: "Old City", walkMin: 0, note: "Reclining Buddha. Best traditional massage school in Thailand.", bts: null },
+        { name: "Grand Palace", area: "Old City", walkMin: 0, note: "Dress code enforced. Arrive at opening or queue in the sun.", bts: null },
+        { name: "Khao San Road", area: "Old City", walkMin: 0, note: "Tourist spine. Good for one evening. Not two.", bts: null },
+        { name: "Asiatique", area: "Riverside", walkMin: 0, note: "Night market on old warehouses. BTS Saphan Taksin + free shuttle boat.", bts: "Saphan Taksin" },
+        { name: "Terminal 21", area: "Sukhumvit", walkMin: 0, note: "Airport-themed mall. Each floor is a different city. Food court is legendary.", bts: "Asok" },
+        { name: "Siam Paragon", area: "Siam", walkMin: 0, note: "Luxury mall. Good for AC escape. Siam Ocean World in basement.", bts: "Siam" },
+        { name: "Lumpini Park", area: "Central", walkMin: 0, note: "Monitor lizards. Morning tai chi. The green lung.", bts: "Silom" },
+        { name: "Yaowarat (Chinatown)", area: "Old City", walkMin: 0, note: "Street food heaven after dark. Shark fin soup alleys.", bts: null },
+        { name: "Jim Thompson House", area: "Central", walkMin: 0, note: "Thai silk king's house-museum. Disappeared in Malaysia, 1967. Unsolved.", bts: "National Stadium" },
+        { name: "Thonglor / Ekkamai", area: "Sukhumvit", walkMin: 0, note: "Hipster Bangkok. Craft coffee. Late night.", bts: "Thong Lo" },
+        { name: "Victory Monument", area: "Central", walkMin: 0, note: "Transit hub. Boat noodles. Minivan station.", bts: "Victory Monument" },
+    ];
+
+    const STEP_VERDICTS = [
+        { max: 8000, text: "The mountain rests.", color: "text-zinc-400", sub: "A gentle day. Save the legs for tomorrow." },
+        { max: 12000, text: "A reasonable march.", color: "text-emerald-400", sub: "The farmer walks to market and back. Sensible." },
+        { max: 15000, text: "The mountain approves.", color: "text-cyan-400", sub: "Solid coverage. Hydrate or face consequences." },
+        { max: 20000, text: "The Tatras would be proud.", color: "text-amber-400", sub: "You are walking the equivalent of a ridge hike. In 35°C. With humidity." },
+        { max: Infinity, text: "Even the mountain rests.", color: "text-red-400", sub: "This is not a walking tour. This is a forced march. The body battery will file a complaint." },
+    ];
+
+    function load() {
+        try {
+            const d = JSON.parse(localStorage.getItem(KEY));
+            if (d && d.days) return d;
+        } catch(e) {}
+        return { hotel: "Sukhumvit Soi 11", days: [
+            { name: "Day 1", items: [
+                { name: "Terminal 21", walkMin: 15, note: "BTS Asok. Start here." },
+                { name: "Lumpini Park", walkMin: 25, note: "Monitor lizards in the afternoon heat." },
+                { name: "Yaowarat (Chinatown)", walkMin: 40, note: "Street food after dark." },
+            ]},
+            { name: "Day 2", items: [
+                { name: "Grand Palace", walkMin: 45, note: "Arrive at 8:30 opening." },
+                { name: "Wat Pho", walkMin: 10, note: "Walk from Grand Palace." },
+                { name: "Khao San Road", walkMin: 20, note: "Evening only." },
+            ]},
+            { name: "Day 3", items: [] },
+        ]};
+    }
+    function save(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
+
+    function getStepVerdict(steps) {
+        return STEP_VERDICTS.find(v => steps <= v.max) || STEP_VERDICTS[STEP_VERDICTS.length - 1];
+    }
+
+    let dragItem = null;
+    let dragDay = null;
+
+    function render() {
+        const data = load();
+        const app = document.getElementById("app");
+
+        app.innerHTML = `
+            <!-- Hotel -->
+            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🏨</span>
+                    <div class="flex-1">
+                        <label class="text-xs text-zinc-500">Base Camp</label>
+                        <input id="hotel" type="text" value="${data.hotel}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-200 focus:border-cyan-600 focus:outline-none mt-1" placeholder="Hotel / area">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Days -->
+            <div class="space-y-4" id="days">
+                ${data.days.map((day, di) => {
+                    const totalWalk = day.items.reduce((s, it) => s + (it.walkMin || 0), 0);
+                    const estSteps = Math.round(totalWalk * 120); // ~120 steps/min walking
+                    const v = getStepVerdict(estSteps);
+                    return `
+                    <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <input type="text" value="${day.name}" onchange="renameDay(${di}, this.value)" class="bg-transparent border-none text-lg font-bold text-zinc-200 focus:outline-none w-40">
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-zinc-500">${totalWalk} min walk · ~${estSteps.toLocaleString()} steps</span>
+                                <button onclick="removeDay(${di})" class="text-zinc-600 hover:text-red-400 text-xs">✕</button>
+                            </div>
+                        </div>
+
+                        <!-- Items -->
+                        <div class="space-y-1 min-h-[40px] drop-zone" data-day="${di}">
+                            ${day.items.map((it, ii) => `
+                                <div class="flex items-center gap-2 bg-zinc-900/60 rounded-lg px-3 py-2 border border-zinc-700/50 cursor-move group" draggable="true" data-day="${di}" data-idx="${ii}">
+                                    <span class="text-zinc-600 text-xs w-5">${ii+1}</span>
+                                    <div class="flex-1 min-w-0">
+                                        <span class="text-sm text-zinc-200">${it.name}</span>
+                                        <span class="text-xs text-zinc-500 ml-2">${it.walkMin}min walk</span>
+                                        ${it.note ? `<p class="text-xs text-zinc-600 mt-0.5 truncate">${it.note}</p>` : ''}
+                                    </div>
+                                    <button onclick="editItem(${di},${ii})" class="text-zinc-600 hover:text-cyan-400 text-xs opacity-0 group-hover:opacity-100">✎</button>
+                                    <button onclick="removeItem(${di},${ii})" class="text-zinc-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100">✕</button>
+                                </div>
+                            `).join("")}
+                        </div>
+
+                        <!-- Add item -->
+                        <div class="flex gap-2 mt-2">
+                            <select class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-cyan-600" id="addSel-${di}">
+                                <option value="">+ Add landmark...</option>
+                                ${LANDMARKS.map(l => `<option value="${l.name}">${l.name} (${l.area})</option>`).join("")}
+                                <option value="__custom__">✏️ Custom place...</option>
+                            </select>
+                        </div>
+
+                        <!-- Verdict -->
+                        ${day.items.length > 0 ? `
+                        <div class="mt-3 pt-3 border-t border-zinc-700/50">
+                            <p class="text-sm font-bold ${v.color}">${v.text}</p>
+                            <p class="text-xs text-zinc-600">${v.sub}</p>
+                        </div>` : ''}
+                    </div>`;
+                }).join("")}
+            </div>
+
+            <button onclick="addDay()" class="mt-4 w-full px-3 py-2 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700 border-dashed rounded-xl text-sm text-zinc-500 hover:text-zinc-300">+ Add Day</button>
+
+            <!-- Landmark Reference -->
+            <div class="mt-8 bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4">
+                <h3 class="text-sm font-bold text-zinc-400 mb-3">Bangkok Landmarks</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    ${LANDMARKS.map(l => `
+                    <div class="flex items-start gap-2 text-xs">
+                        <span class="text-cyan-600 mt-0.5">●</span>
+                        <div>
+                            <span class="text-zinc-300">${l.name}</span>
+                            <span class="text-zinc-600 ml-1">(${l.area})</span>
+                            ${l.bts ? `<span class="text-emerald-700 ml-1">BTS ${l.bts}</span>` : ''}
+                            <p class="text-zinc-600">${l.note}</p>
+                        </div>
+                    </div>`).join("")}
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-zinc-700/50 text-center">
+                <p class="text-xs text-zinc-600">The mountain does not drift. But sometimes the mountain visits Bangkok. — Prízrak</p>
+            </div>
+        `;
+
+        // Hotel input
+        document.getElementById("hotel").addEventListener("change", e => {
+            data.hotel = e.target.value;
+            save(data);
+        });
+
+        // Add selects
+        data.days.forEach((_, di) => {
+            const sel = document.getElementById(`addSel-${di}`);
+            if (sel) sel.addEventListener("change", e => {
+                const v = e.target.value;
+                if (!v) return;
+                if (v === "__custom__") {
+                    const name = prompt("Place name:");
+                    if (!name) { e.target.value = ""; return; }
+                    const walkMin = parseInt(prompt("Walking time (minutes) from previous stop:", "15")) || 15;
+                    const note = prompt("Note (optional):", "") || "";
+                    data.days[di].items.push({ name, walkMin, note });
+                } else {
+                    const lm = LANDMARKS.find(l => l.name === v);
+                    const walkMin = parseInt(prompt(`Walking time (min) to ${v} from previous stop:`, "15")) || 15;
+                    data.days[di].items.push({ name: v, walkMin, note: lm ? lm.note : "" });
+                }
+                save(data);
+                render();
+            });
+        });
+
+        // Drag and drop
+        document.querySelectorAll("[draggable=true]").forEach(el => {
+            el.addEventListener("dragstart", e => {
+                dragDay = parseInt(el.dataset.day);
+                dragItem = parseInt(el.dataset.idx);
+                e.dataTransfer.effectAllowed = "move";
+            });
+        });
+        document.querySelectorAll(".drop-zone").forEach(zone => {
+            zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag-over"); });
+            zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+            zone.addEventListener("drop", e => {
+                e.preventDefault();
+                zone.classList.remove("drag-over");
+                const targetDay = parseInt(zone.dataset.day);
+                if (dragDay === null || dragItem === null) return;
+                const item = data.days[dragDay].items.splice(dragItem, 1)[0];
+                data.days[targetDay].items.push(item);
+                save(data);
+                dragDay = null; dragItem = null;
+                render();
+            });
+        });
+    }
+
+    window.removeItem = function(di, ii) {
+        const data = load();
+        data.days[di].items.splice(ii, 1);
+        save(data);
+        render();
+    };
+
+    window.editItem = function(di, ii) {
+        const data = load();
+        const it = data.days[di].items[ii];
+        const walkMin = parseInt(prompt(`Walking time (min) to ${it.name}:`, it.walkMin)) || it.walkMin;
+        const note = prompt("Note:", it.note || "") ?? it.note;
+        it.walkMin = walkMin;
+        it.note = note;
+        save(data);
+        render();
+    };
+
+    window.removeDay = function(di) {
+        if (!confirm("Remove this day?")) return;
+        const data = load();
+        data.days.splice(di, 1);
+        save(data);
+        render();
+    };
+
+    window.renameDay = function(di, name) {
+        const data = load();
+        data.days[di].name = name;
+        save(data);
+    };
+
+    window.addDay = function() {
+        const data = load();
+        data.days.push({ name: `Day ${data.days.length + 1}`, items: [] });
+        save(data);
+        render();
+    };
+
+    render();
+    </script>
+</body>
+</html>

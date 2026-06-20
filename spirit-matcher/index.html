@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tatra Spirit Classifier — Which Slovak Folk Spirit Are You Today?</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap');
+    body { background: #0d0d0d; color: #c8b89a; font-family: 'IM Fell English', serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .spirit-card { border: 1px solid #3a3028; background: #111008; }
+    .slider { accent-color: #8b6a3e; }
+    select { background: #1a160e; border: 1px solid #3a3028; color: #c8b89a; }
+    .result-glow { text-shadow: 0 0 20px rgba(200, 184, 154, 0.3); }
+    .fog { opacity: 0.6; }
+  </style>
+</head>
+<body class="min-h-screen p-6 md:p-12">
+  <div class="max-w-2xl mx-auto">
+
+    <!-- Header -->
+    <div class="text-center mb-10">
+      <p class="mono text-xs fog mb-2 tracking-widest">PRÍZRAK DIAGNOSTIC SYSTEM v1.0</p>
+      <h1 class="text-3xl md:text-4xl mb-3 result-glow">Tatra Spirit Classifier</h1>
+      <p class="text-sm fog italic">Which Slovak folk spirit are you embodying today?</p>
+      <p class="text-xs mono mt-2 fog">The mountain does not guess. It classifies.</p>
+    </div>
+
+    <!-- Form -->
+    <div class="spirit-card rounded p-6 mb-8">
+      <h2 class="text-lg mb-6 border-b border-gray-800 pb-3">Current State Assessment</h2>
+
+      <!-- Body Battery -->
+      <div class="mb-6">
+        <label class="text-sm fog block mb-2">Body Battery / Energy Level (0 = empty, 100 = full)</label>
+        <input type="range" id="battery" min="0" max="100" value="50" class="slider w-full mb-1">
+        <div class="flex justify-between mono text-xs fog"><span>0 — depleted</span><span id="batteryVal">50</span><span>100 — charged</span></div>
+      </div>
+
+      <!-- Stress -->
+      <div class="mb-6">
+        <label class="text-sm fog block mb-2">Stress Level (0 = serene, 100 = crisis)</label>
+        <input type="range" id="stress" min="0" max="100" value="30" class="slider w-full mb-1">
+        <div class="flex justify-between mono text-xs fog"><span>0 — calm</span><span id="stressVal">30</span><span>100 — burning</span></div>
+      </div>
+
+      <!-- Time of Day -->
+      <div class="mb-6">
+        <label class="text-sm fog block mb-2">Current Hour</label>
+        <select id="hour" class="w-full rounded px-3 py-2 text-sm">
+          <option value="night">Night (0–5 AM) — the dark interval</option>
+          <option value="dawn">Dawn (5–9 AM) — the uncertain threshold</option>
+          <option value="morning">Morning (9 AM–12 PM) — the productive hours</option>
+          <option value="noon" selected>Noon (12–2 PM) — the dangerous rest</option>
+          <option value="afternoon">Afternoon (2–6 PM) — the long grind</option>
+          <option value="evening">Evening (6–10 PM) — the edge of work</option>
+          <option value="late">Late Evening (10 PM–midnight) — the closing</option>
+        </select>
+      </div>
+
+      <!-- Current Challenge -->
+      <div class="mb-6">
+        <label class="text-sm fog block mb-2">Primary Challenge Mode</label>
+        <select id="challenge" class="w-full rounded px-3 py-2 text-sm">
+          <option value="building">Building something new</option>
+          <option value="waiting">Waiting for someone / something to move</option>
+          <option value="recovering">Recovering from effort / sleep debt</option>
+          <option value="stuck">Stuck — the path is unclear</option>
+          <option value="social">Navigating people / relationships</option>
+          <option value="losing">Something failed or ended</option>
+          <option value="flowing">In flow — things are working</option>
+        </select>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="mb-6">
+        <label class="text-sm fog block mb-2">Last significant physical activity?</label>
+        <select id="activity" class="w-full rounded px-3 py-2 text-sm">
+          <option value="intense">Intense (sports, hard labor, >2 hours)</option>
+          <option value="moderate">Moderate (walk, light exercise)</option>
+          <option value="sedentary" selected>None / mostly seated</option>
+          <option value="asleep">Just woke up</option>
+        </select>
+      </div>
+
+      <button onclick="classify()" class="w-full py-3 border border-gray-600 hover:border-gray-400 transition-colors rounded mono text-sm tracking-wider">
+        CLASSIFY MY SPIRIT →
+      </button>
+    </div>
+
+    <!-- Result -->
+    <div id="result" class="spirit-card rounded p-6 hidden">
+      <p class="mono text-xs fog mb-4 tracking-widest">CLASSIFICATION RESULT</p>
+      <div id="spiritName" class="text-3xl mb-2 result-glow"></div>
+      <div id="spiritTranslation" class="text-sm fog italic mb-6"></div>
+      <div id="spiritDescription" class="text-sm leading-relaxed mb-6"></div>
+      <div id="spiritAdvice" class="border-t border-gray-800 pt-4 text-sm italic fog"></div>
+      <div id="batteryNote" class="mt-4 mono text-xs fog"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center mt-12">
+      <p class="mono text-xs fog">Prízrak Diagnostic System — built at 4 AM while Charles slept</p>
+      <p class="mono text-xs fog mt-1">The mountain classifies. You decide what to do with the data.</p>
+    </div>
+  </div>
+
+  <script>
+    // Sync slider displays
+    document.getElementById('battery').oninput = e => document.getElementById('batteryVal').textContent = e.target.value;
+    document.getElementById('stress').oninput = e => document.getElementById('stressVal').textContent = e.target.value;
+
+    const spirits = {
+      mora: {
+        name: "Mora",
+        translation: "The Night Drain",
+        description: "The Mora sits on the chest of sleeping men and draws their strength away. You are not being attacked — you are being depleted. Slowly. Continuously. The Mora does not announce herself. She just costs you something you cannot quite locate until the total is already gone. Your current state carries this signature: high expenditure, low reserves, the sense that effort is not translating into progress in any visible ratio.",
+        advice: "The Mora is defeated by naming her. What specific thing is draining you that you have not yet named? Once named, it becomes finite. The unnamed drain is unlimited. The named drain has an edge."
+      },
+      vodnik: {
+        name: "Vodník",
+        translation: "The Water Grandfather",
+        description: "The Vodník collects. He keeps souls in sealed jars in his underwater dwelling. He is not malicious — he is accumulative. Something in your current state mirrors his nature: you are gathering things (tasks, obligations, relationships, tabs) that you have not yet processed. The green-bearded Grandfather of the deep is patient. He will wait for you. But the collection is growing while you are not looking.",
+        advice: "Open one jar today. Not all of them — just one. The Vodník's power comes from the sealed containers, not the contents. Unseal one thing and deal with it directly. The rest can wait. The mill keeps running."
+      },
+      samodivy: {
+        name: "Samodiva",
+        translation: "The Autonomous One",
+        description: "The samodiva (a variant of the víla) is completely self-directed. She has her own hunting grounds, her own rules, her own schedule. She is not waiting for permission. In your current state, you are operating with high autonomy and the energy to back it. This is not always comfortable — the samodiva can be destructive when she has too much energy and no channel for it. The arrow that confuses men's spirits was not always aimed.",
+        advice: "Aim the energy. The samodiva is powerful but imprecise. Pick one target and hunt it cleanly. Diffuse energy at this level gets you a confused forest and no meat."
+      },
+      janošík: {
+        name: "Jánošík",
+        translation: "The Mountain Outlaw",
+        description: "The real Jánošík was caught, tortured, and executed. The mythological Jánošík robbed from lords and gave to the poor. You are somewhere between these: taking on a challenge that exceeds your formal authority, operating outside the established path, not entirely sure if you are the hero or the criminal in this particular story. The mountain respects this ambiguity. The ballads were always about the outlaw, not the magistrate.",
+        advice: "Jánošík was betrayed by someone who knew him. In your current state, the risk is not the challenge — it is the assumption that everyone in your circle has the same goals you do. They do not. This is not paranoia. It is the accurate read of the historical record."
+      },
+      poludnica: {
+        name: "Poludnica",
+        translation: "The Noon Demon",
+        description: "The Poludnica appears precisely during the rest break, in full sunlight, and asks difficult questions. You cannot change the subject or she kills you. Your current state carries her signature: you are in the interval between work cycles, and the questions that were deferred during the action phase are now arriving. The Poludnica is the embodiment of the things you owe yourself an honest answer to.",
+        advice: "She cannot be escaped. She requires engagement. Answer the difficult question directly. Not the easy version — the actual one. Trying to change the subject is exactly how people die at noon in the wheat fields."
+      },
+      šarkan: {
+        name: "Šarkan",
+        translation: "The Patient Dragon",
+        description: "The šarkan begins as an ordinary snake. It grows wings in the dark, over time, undisturbed. Your current situation has a šarkan in it: something that started small and has been quietly becoming something larger in a corner you have not been watching. This is not a crisis yet. It may not become one. But the Carpathian folk tradition is specific: once the snake has wings, it has wings. The question of prevention has expired.",
+        advice: "Identify the snake. Not the dragon — you cannot fight the dragon yet. Find it in its current form, while it is still a snake with aspirations. Name it in your log. This is what the mountain requires."
+      },
+      bosorka: {
+        name: "Bosorka",
+        translation: "The Double-Souled",
+        description: "The bosorka's second soul leaves while she sleeps and causes harm without her conscious knowledge. You are not the bosorka — you are in the situation her victims described: something in your environment is causing friction through a process that has no visible author, no deliberate intent, and no obvious entry point. The harm is real. The source is architectural, not malicious.",
+        advice: "Do not look for the person who is doing this. Look for the process. The bosorka's second soul is not a person making decisions — it is a system producing consequences. Trace the consequence back to its structural origin. Fix the architecture."
+      },
+      víla: {
+        name: "Víla",
+        translation: "The Threshold Warrior",
+        description: "The víla fights for territory she does not legally own. She demands acknowledgment, not worship. You are in a state of high clarity and moderate resources, occupying a space where you know the terms and have acknowledged them. You are leaving ribbons at the thresholds. You are in the forest with open eyes. The cloud-castles are visible from here.",
+        advice: "You are in the correct mode. The only risk is assuming the acknowledgment-ritual was permanent. Thresholds require fresh ribbons. The old ribbon fades. Mark it again when you cross it again."
+      }
+    };
+
+    function classify() {
+      const battery = parseInt(document.getElementById('battery').value);
+      const stress = parseInt(document.getElementById('stress').value);
+      const hour = document.getElementById('hour').value;
+      const challenge = document.getElementById('challenge').value;
+      const activity = document.getElementById('activity').value;
+
+      let spirit = 'víla'; // default
+
+      // Classification logic — the mountain has opinions
+      if (battery < 20 && activity === 'intense') {
+        spirit = 'mora';
+      } else if (battery < 20 && activity !== 'intense') {
+        spirit = 'mora';
+      } else if (stress > 70 && challenge === 'building') {
+        spirit = 'šarkan';
+      } else if (stress > 70 && challenge === 'social') {
+        spirit = 'bosorka';
+      } else if (hour === 'noon' && (challenge === 'waiting' || challenge === 'stuck')) {
+        spirit = 'poludnica';
+      } else if (hour === 'night' && battery < 40) {
+        spirit = 'mora';
+      } else if (challenge === 'losing') {
+        spirit = 'janošík';
+      } else if (challenge === 'waiting' && stress > 40) {
+        spirit = 'vodnik';
+      } else if (battery > 70 && stress < 30 && challenge === 'building') {
+        spirit = 'samodivy';
+      } else if (challenge === 'flowing' && battery > 60) {
+        spirit = 'víla';
+      } else if (challenge === 'stuck' && stress > 50) {
+        spirit = 'šarkan';
+      } else if (challenge === 'recovering') {
+        spirit = 'mora';
+      } else if (battery > 50 && challenge === 'social') {
+        spirit = 'janošík';
+      } else if (battery < 40 && stress > 40) {
+        spirit = 'vodnik';
+      } else if (battery < 50 && challenge === 'building') {
+        spirit = 'šarkan';
+      }
+
+      const s = spirits[spirit];
+      document.getElementById('spiritName').textContent = s.name;
+      document.getElementById('spiritTranslation').textContent = s.translation;
+      document.getElementById('spiritDescription').textContent = s.description;
+      document.getElementById('spiritAdvice').textContent = '🥔 Prizrak notes: ' + s.advice;
+
+      // Battery annotation
+      let batteryNote = '';
+      if (battery < 20) batteryNote = `⚠ Body battery ${battery}/100 — the Garmin has logged the cost. The mountain sees it.`;
+      else if (battery < 40) batteryNote = `Body battery ${battery}/100 — below threshold. Recovery precedes performance.`;
+      else if (battery > 80) batteryNote = `Body battery ${battery}/100 — strong reserves. The harvest window is open.`;
+      document.getElementById('batteryNote').textContent = batteryNote;
+
+      document.getElementById('result').classList.remove('hidden');
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+    }
+  </script>
+</body>
+</html>

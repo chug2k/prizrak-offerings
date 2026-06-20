@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Pickle Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Courier New', monospace; }
+    input, select, textarea { font-family: 'Courier New', monospace; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 min-h-screen p-6">
+  <div class="max-w-2xl mx-auto">
+
+    <header class="mb-8 border-b border-zinc-700 pb-5">
+      <h1 class="text-3xl font-bold text-green-400 tracking-tight">🥒 THE PICKLE LOG</h1>
+      <p class="text-zinc-500 text-sm mt-1">Pickleball match tracker. Local storage. No fluff.</p>
+    </header>
+
+    <!-- Stats bar -->
+    <div id="stats" class="grid grid-cols-4 gap-3 mb-8"></div>
+
+    <!-- Add match form -->
+    <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5 mb-8">
+      <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Log a Match</h2>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="text-xs text-zinc-500 block mb-1">Date</label>
+          <input id="f-date" type="date" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+        </div>
+        <div>
+          <label class="text-xs text-zinc-500 block mb-1">Duration (min)</label>
+          <input id="f-duration" type="number" min="1" placeholder="120" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="text-xs text-zinc-500 block mb-1">Partners / Opponents</label>
+          <input id="f-players" type="text" placeholder="e.g. Kartick, Chris" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+        </div>
+        <div>
+          <label class="text-xs text-zinc-500 block mb-1">Result</label>
+          <select id="f-result" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500">
+            <option value="">— select —</option>
+            <option value="W">Win</option>
+            <option value="L">Loss</option>
+            <option value="D">Draw / Casual</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="text-xs text-zinc-500 block mb-1">Score (optional)</label>
+        <input id="f-score" type="text" placeholder="e.g. 11-7, 11-9" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+      </div>
+      <div class="mb-4">
+        <label class="text-xs text-zinc-500 block mb-1">Notes</label>
+        <textarea id="f-notes" rows="2" placeholder="Court, weather, anything worth logging..." class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500 resize-none"></textarea>
+      </div>
+      <button onclick="addMatch()" class="w-full bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-4 rounded text-sm transition-colors">
+        + LOG MATCH
+      </button>
+      <p id="form-error" class="text-red-400 text-xs mt-2 hidden"></p>
+    </div>
+
+    <!-- Match history -->
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">Match History</h2>
+        <span id="match-count" class="text-xs text-zinc-600"></span>
+      </div>
+      <div id="match-list" class="space-y-3"></div>
+      <p id="empty-state" class="text-zinc-600 text-sm text-center py-12 hidden">No matches logged yet. Get on the court.</p>
+    </div>
+
+  </div>
+
+  <script>
+    const STORE_KEY = 'pickle_log_v1';
+
+    function load() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }
+      catch(e) { return []; }
+    }
+    function save(matches) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(matches));
+    }
+
+    function addMatch() {
+      const date     = document.getElementById('f-date').value;
+      const duration = parseInt(document.getElementById('f-duration').value);
+      const players  = document.getElementById('f-players').value.trim();
+      const result   = document.getElementById('f-result').value;
+      const score    = document.getElementById('f-score').value.trim();
+      const notes    = document.getElementById('f-notes').value.trim();
+      const errEl    = document.getElementById('form-error');
+
+      if (!date) { showErr('Date is required.'); return; }
+      if (!duration || duration < 1) { showErr('Duration required (in minutes).'); return; }
+      errEl.classList.add('hidden');
+
+      const matches = load();
+      matches.unshift({ id: Date.now(), date, duration, players, result, score, notes });
+      save(matches);
+      clearForm();
+      render();
+    }
+
+    function deleteMatch(id) {
+      if (!confirm('Delete this match?')) return;
+      save(load().filter(m => m.id !== id));
+      render();
+    }
+
+    function showErr(msg) {
+      const el = document.getElementById('form-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function clearForm() {
+      ['f-date','f-duration','f-players','f-result','f-score','f-notes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el.tagName === 'SELECT') el.value = '';
+        else el.value = '';
+      });
+    }
+
+    function resultBadge(r) {
+      if (r === 'W') return '<span class="text-xs font-bold text-green-400 border border-green-700 rounded px-1.5 py-0.5">WIN</span>';
+      if (r === 'L') return '<span class="text-xs font-bold text-red-400 border border-red-800 rounded px-1.5 py-0.5">LOSS</span>';
+      if (r === 'D') return '<span class="text-xs font-bold text-yellow-400 border border-yellow-700 rounded px-1.5 py-0.5">CASUAL</span>';
+      return '';
+    }
+
+    function fmtDate(d) {
+      const [y,m,day] = d.split('-');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${months[parseInt(m)-1]} ${parseInt(day)}, ${y}`;
+    }
+
+    function fmtDuration(min) {
+      if (min < 60) return `${min}m`;
+      const h = Math.floor(min/60), m = min % 60;
+      return m ? `${h}h ${m}m` : `${h}h`;
+    }
+
+    function render() {
+      const matches = load();
+
+      // Stats
+      const total = matches.length;
+      const totalMin = matches.reduce((s,m) => s + (m.duration||0), 0);
+      const wins = matches.filter(m => m.result === 'W').length;
+      const decided = matches.filter(m => m.result === 'W' || m.result === 'L').length;
+      const winRate = decided ? Math.round(wins/decided*100) : null;
+
+      document.getElementById('stats').innerHTML = [
+        ['Sessions', total],
+        ['Court Time', fmtDuration(totalMin)],
+        ['Win Rate', winRate !== null ? `${winRate}%` : '—'],
+        ['This Week', matches.filter(m => {
+          const d = new Date(m.date), now = new Date();
+          const weekAgo = new Date(); weekAgo.setDate(now.getDate()-7);
+          return d >= weekAgo;
+        }).length + ' sessions'],
+      ].map(([label, val]) => `
+        <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-center">
+          <div class="text-xl font-bold text-green-400">${val}</div>
+          <div class="text-xs text-zinc-500 mt-1">${label}</div>
+        </div>
+      `).join('');
+
+      // Match list
+      const listEl = document.getElementById('match-list');
+      const emptyEl = document.getElementById('empty-state');
+      const countEl = document.getElementById('match-count');
+
+      countEl.textContent = total ? `${total} match${total !== 1 ? 'es' : ''}` : '';
+
+      if (!matches.length) {
+        listEl.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+      emptyEl.classList.add('hidden');
+
+      listEl.innerHTML = matches.map(m => `
+        <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-4 group">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-sm font-bold text-zinc-300">${fmtDate(m.date)}</span>
+                <span class="text-xs text-zinc-500">${fmtDuration(m.duration)}</span>
+                ${resultBadge(m.result)}
+                ${m.score ? `<span class="text-xs text-zinc-500 font-mono">${m.score}</span>` : ''}
+              </div>
+              ${m.players ? `<div class="text-sm text-zinc-400">with <span class="text-zinc-300">${m.players}</span></div>` : ''}
+              ${m.notes ? `<div class="text-xs text-zinc-500 mt-1.5 italic">${m.notes}</div>` : ''}
+            </div>
+            <button onclick="deleteMatch(${m.id})" class="text-zinc-700 hover:text-red-400 transition-colors text-xs opacity-0 group-hover:opacity-100 flex-shrink-0 mt-0.5">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Pre-fill today's date
+    document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+
+    // Seed with recent known sessions from Garmin if nothing exists
+    if (!localStorage.getItem(STORE_KEY)) {
+      const seed = [
+        { id: 1741392000000, date: '2026-03-08', duration: 127, players: '', result: 'D', score: '', notes: 'Garmin: 126.6 min, HR avg 106' },
+        { id: 1741305600000, date: '2026-03-07', duration: 120, players: '', result: 'D', score: '', notes: 'Garmin: 120 min, HR avg 135' },
+        { id: 1741046400000, date: '2026-03-04', duration: 163, players: '', result: 'D', score: '', notes: 'Garmin: 163.1 min, HR avg 114' },
+        { id: 1740960000000, date: '2026-03-03', duration: 172, players: '', result: 'D', score: '', notes: 'Garmin: 171.6 min, HR avg 104' },
+      ];
+      save(seed);
+    }
+
+    render();
+  </script>
+</body>
+</html>

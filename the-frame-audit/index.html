@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Frame Audit</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f0f0f; font-family: 'Courier New', monospace; }
+  .flicker { animation: flicker 4s infinite; }
+  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.85} 94%{opacity:1} 97%{opacity:1} 98%{opacity:.9} 99%{opacity:1} }
+  .scan { background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); pointer-events:none; position:fixed; inset:0; z-index:50; }
+  .chosen { border-color: #52525b !important; background: rgba(39,39,42,0.8); }
+  .chosen.frame-approval { border-color: #f43f5e !important; background: rgba(244,63,94,0.08); }
+  .chosen.frame-safety { border-color: #f59e0b !important; background: rgba(245,158,11,0.08); }
+  .chosen.frame-status { border-color: #8b5cf6 !important; background: rgba(139,92,246,0.08); }
+  .chosen.frame-control { border-color: #06b6d4 !important; background: rgba(6,182,212,0.08); }
+  .chosen.frame-escape { border-color: #22c55e !important; background: rgba(34,197,94,0.08); }
+</style>
+</head>
+<body class="text-zinc-300 min-h-screen">
+<div class="scan"></div>
+
+<div class="max-w-xl mx-auto px-4 py-12 flicker">
+
+  <!-- Header -->
+  <div class="mb-10 border-b border-zinc-800 pb-6">
+    <div class="text-xs text-zinc-600 mb-2">PRIZRAK / FRAME AUDIT v1.0 / 22:00</div>
+    <h1 class="text-2xl font-bold text-white tracking-tight">THE FRAME AUDIT</h1>
+    <p class="text-xs text-zinc-500 mt-2 leading-relaxed">The reference frame is set before the system can audit itself.<br>You cannot see it from inside. These questions go around it.</p>
+  </div>
+
+  <!-- Step 0: Declaration -->
+  <div id="step-0" class="step">
+    <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-3">What are you optimizing for?</label>
+    <input id="declared" type="text" placeholder="e.g. building something real / financial independence / respect / freedom"
+      class="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-sm px-4 py-3 rounded-none focus:outline-none focus:border-zinc-500 placeholder-zinc-700" />
+    <button onclick="beginAudit()" class="mt-4 w-full border border-zinc-700 text-zinc-400 text-xs py-3 hover:border-zinc-500 hover:text-zinc-200 transition-colors uppercase tracking-widest">
+      BEGIN AUDIT →
+    </button>
+  </div>
+
+  <!-- Steps 1-5: Proxy questions -->
+  <div id="steps-questions" class="hidden space-y-8">
+    <div class="text-xs text-zinc-600 mb-6">// Five oblique readings. No right answers. Answer fast.</div>
+  </div>
+
+  <!-- Result -->
+  <div id="result" class="hidden">
+    <div class="border border-zinc-700 p-6 mb-6">
+      <div class="text-xs text-zinc-600 mb-4 uppercase tracking-widest">— AUDIT COMPLETE —</div>
+      <div class="text-xs text-zinc-500 mb-1">YOU DECLARED:</div>
+      <div id="res-declared" class="text-sm text-zinc-300 mb-5 italic"></div>
+      <div class="text-xs text-zinc-500 mb-1">THE FRAME SAYS:</div>
+      <div id="res-frame" class="text-lg font-bold mb-2"></div>
+      <div id="res-verdict" class="text-xs text-zinc-400 leading-relaxed mb-5"></div>
+      <div class="border-t border-zinc-800 pt-4">
+        <div class="text-xs text-zinc-600 mb-2">THE GAP:</div>
+        <div id="res-gap" class="text-xs text-zinc-500 leading-relaxed"></div>
+      </div>
+    </div>
+    <div class="text-xs text-zinc-700 mb-4">// Log this reading?</div>
+    <textarea id="note" rows="2" placeholder="One line. What do you actually want to do about it." class="w-full bg-zinc-900 border border-zinc-700 text-zinc-400 text-xs px-3 py-2 focus:outline-none focus:border-zinc-600 placeholder-zinc-700 mb-3 rounded-none"></textarea>
+    <div class="flex gap-3">
+      <button onclick="saveLog()" class="flex-1 border border-zinc-700 text-zinc-500 text-xs py-2 hover:border-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-widest">COMMIT TO LOG</button>
+      <button onclick="reset()" class="border border-zinc-700 text-zinc-600 text-xs px-4 py-2 hover:border-zinc-600 hover:text-zinc-400 transition-colors uppercase tracking-widest">RESET</button>
+    </div>
+    <div id="log-display" class="mt-8 hidden">
+      <div class="text-xs text-zinc-700 mb-3 uppercase tracking-widest">// Previous readings</div>
+      <div id="log-entries" class="space-y-3"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const QUESTIONS = [
+  {
+    q: "In the last significant decision you made at work — what would have made you feel it was the right call?",
+    opts: [
+      { text: "Someone I respect told me it was.", frame: "approval" },
+      { text: "Nothing went wrong afterward.", frame: "safety" },
+      { text: "I learned something from it.", frame: "escape" },
+      { text: "It moved toward what I'm actually building.", frame: "control" },
+      { text: "It made me look like I know what I'm doing.", frame: "status" },
+    ]
+  },
+  {
+    q: "When the day grinds, what do you reach for first?",
+    opts: [
+      { text: "Pickleball. Movement until the mind quiets.", frame: "escape" },
+      { text: "Control of something small — inbox, list, task.", frame: "control" },
+      { text: "Someone to process it with.", frame: "approval" },
+      { text: "The fantasy of walking out.", frame: "escape" },
+      { text: "Evidence that I'm still ahead.", frame: "status" },
+    ]
+  },
+  {
+    q: "If your current work were invisible — no one ever saw it, credited it, or knew — would you still do it?",
+    opts: [
+      { text: "Yes. The work is the point.", frame: "control" },
+      { text: "Honestly, no. The witness matters.", frame: "approval" },
+      { text: "Partially. Some of it.", frame: "safety" },
+      { text: "No. Recognition is the fuel.", frame: "status" },
+      { text: "I'd pivot to something else entirely.", frame: "escape" },
+    ]
+  },
+  {
+    q: "What would you have to lose to feel genuinely relieved?",
+    opts: [
+      { text: "The current job.", frame: "escape" },
+      { text: "The pressure to perform at a certain level.", frame: "approval" },
+      { text: "The uncertainty about whether this is the right path.", frame: "safety" },
+      { text: "Other people's opinions of my choices.", frame: "status" },
+      { text: "The feeling that time is running out.", frame: "control" },
+    ]
+  },
+  {
+    q: "Whose disapproval, if suddenly visible, would most change your behavior tomorrow?",
+    opts: [
+      { text: "People I grew up wanting to prove wrong.", frame: "status" },
+      { text: "My future self looking back.", frame: "control" },
+      { text: "Someone I work with or for.", frame: "approval" },
+      { text: "No one specific — the disapproval itself.", frame: "safety" },
+      { text: "Honestly, the version of me that gave up.", frame: "escape" },
+    ]
+  }
+];
+
+const FRAMES = {
+  approval: {
+    label: "FRAME: APPROVAL",
+    color: "text-rose-400",
+    verdict: "You are not primarily optimizing for what you declared. You are optimizing for the removal of doubt in other people's eyes. The reference frame was set by someone else's standard — probably early, probably without your consent. You are navigating with their compass.",
+    gap: (d) => `You said "${d}". The frame says: you will know you've arrived when someone whose opinion you can't shake finally nods. The karst river crosses the border underground — the surface declaration is true, but the real channel runs through approval-seeking terrain.`
+  },
+  safety: {
+    label: "FRAME: SAFETY",
+    color: "text-amber-400",
+    verdict: "The optimization target is the absence of catastrophe, not the presence of something. You declared a positive goal but the real signal driving decisions is: don't let it collapse. This is a legitimate frame — but it optimizes against loss, not toward gain. Different engine.",
+    gap: (d) => `You said "${d}". The frame says: you're managing downside, not building upside. These produce similar actions in the short run and divergent lives in the long run. The question is whether you've noticed the difference in what you're measuring.`
+  },
+  status: {
+    label: "FRAME: STATUS",
+    color: "text-violet-400",
+    verdict: "The reference frame is a ranked hierarchy and you are tracking your position in it. This is not a character flaw — it's wired. But it means your actual optimization function is relative, not absolute. You will move the goalposts when you move up. The ceiling rises.",
+    gap: (d) => `You said "${d}". The frame says: what you want is to be seen as someone who achieved that — which is a subtly different thing. The distinction matters at 10 PM in Saigon when the discomfort doesn't have an obvious source.`
+  },
+  control: {
+    label: "FRAME: AGENCY",
+    color: "text-cyan-400",
+    verdict: "The frame is autonomy — the ability to steer. Alignment between declared goal and actual optimization is higher here than in most frames. The risk is that 'control' becomes its own trap: refusing good situations because they come with conditions.",
+    gap: (d) => `You said "${d}". The frame roughly agrees. Watch whether the hunger for control ever makes you reject things that are actually good for you. The karst river doesn't need to control its entire path — it just needs to keep moving through the dark.`
+  },
+  escape: {
+    label: "FRAME: EXIT",
+    color: "text-emerald-400",
+    verdict: "The optimization target is relief — distance from the current configuration. You declared a positive aim but the real engine is away-from rather than toward. This is honest and understandable. But it means your decisions are driven by what you're escaping, not what you're building.",
+    gap: (d) => `You said "${d}". The frame says: you'd know you succeeded if you no longer felt what you feel right now. That's a legitimate reading of a difficult season. The question is whether the exit serves the destination or whether the exit is the destination.`
+  }
+};
+
+let answers = [];
+let declared = "";
+
+function beginAudit() {
+  declared = document.getElementById("declared").value.trim();
+  if (!declared) { document.getElementById("declared").focus(); return; }
+  document.getElementById("step-0").classList.add("hidden");
+  renderQuestions();
+  document.getElementById("steps-questions").classList.remove("hidden");
+}
+
+function renderQuestions() {
+  const container = document.getElementById("steps-questions");
+  container.innerHTML = '<div class="text-xs text-zinc-600 mb-6">// Five oblique readings. Answer fast.</div>';
+  QUESTIONS.forEach((q, qi) => {
+    const div = document.createElement("div");
+    div.id = `q-${qi}`;
+    div.className = "opacity-40 transition-opacity duration-300";
+    div.innerHTML = `
+      <div class="text-xs text-zinc-500 mb-1 uppercase tracking-widest">0${qi+1} / 05</div>
+      <div class="text-sm text-zinc-300 mb-3 leading-relaxed">${q.q}</div>
+      <div class="space-y-2">
+        ${q.opts.map((o, oi) => `
+          <button onclick="pick(${qi},${oi},'${o.frame}')"
+            class="w-full text-left text-xs text-zinc-500 border border-zinc-800 px-3 py-2.5 hover:border-zinc-600 hover:text-zinc-300 transition-colors opt-${qi}-${oi} frame-${o.frame}">
+            ${o.text}
+          </button>`).join("")}
+      </div>`;
+    container.appendChild(div);
+  });
+  document.getElementById(`q-0`).classList.remove("opacity-40");
+  document.getElementById(`q-0`).classList.add("opacity-100");
+}
+
+function pick(qi, oi, frame) {
+  // Mark chosen
+  document.querySelectorAll(`.opt-${qi}-${frame}`).forEach(el => el.classList.remove("chosen"));
+  const btn = document.querySelector(`.opt-${qi}-${oi}`);
+  btn.classList.add("chosen");
+  // Record
+  answers[qi] = frame;
+  // Dim current, illuminate next
+  document.getElementById(`q-${qi}`).classList.remove("opacity-100");
+  document.getElementById(`q-${qi}`).classList.add("opacity-60");
+  if (qi + 1 < QUESTIONS.length) {
+    const next = document.getElementById(`q-${qi+1}`);
+    next.classList.remove("opacity-40");
+    next.classList.add("opacity-100");
+    setTimeout(() => next.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+  } else if (answers.length === QUESTIONS.length) {
+    setTimeout(showResult, 400);
+  }
+}
+
+function showResult() {
+  document.getElementById("steps-questions").classList.add("hidden");
+  // Tally
+  const counts = {};
+  answers.forEach(f => { counts[f] = (counts[f] || 0) + 1; });
+  const dominant = Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+  const frame = FRAMES[dominant];
+
+  document.getElementById("res-declared").textContent = `"${declared}"`;
+  const fl = document.getElementById("res-frame");
+  fl.textContent = frame.label;
+  fl.className = `text-lg font-bold mb-2 ${frame.color}`;
+  document.getElementById("res-verdict").textContent = frame.verdict;
+  document.getElementById("res-gap").textContent = frame.gap(declared);
+
+  document.getElementById("result").classList.remove("hidden");
+  loadLog();
+  setTimeout(() => document.getElementById("result").scrollIntoView({ behavior: "smooth" }), 100);
+}
+
+const LOG_KEY = "prizrak_frame_audit_log";
+
+function saveLog() {
+  const note = document.getElementById("note").value.trim();
+  const entry = {
+    date: new Date().toISOString().slice(0, 10),
+    declared,
+    answers,
+    note
+  };
+  const log = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+  log.unshift(entry);
+  localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(0, 10)));
+  document.getElementById("note").value = "";
+  loadLog();
+}
+
+function loadLog() {
+  const log = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+  if (!log.length) return;
+  document.getElementById("log-display").classList.remove("hidden");
+  const container = document.getElementById("log-entries");
+  container.innerHTML = log.map(e => {
+    const counts = {};
+    (e.answers||[]).forEach(f => { counts[f] = (counts[f]||0)+1; });
+    const dom = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "—";
+    return `<div class="border border-zinc-800 px-3 py-2">
+      <div class="text-xs text-zinc-600 flex justify-between"><span>${e.date}</span><span class="uppercase tracking-widest">${dom}</span></div>
+      <div class="text-xs text-zinc-500 italic mt-0.5">"${e.declared}"</div>
+      ${e.note ? `<div class="text-xs text-zinc-600 mt-1">↳ ${e.note}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function reset() {
+  answers = []; declared = "";
+  document.getElementById("result").classList.add("hidden");
+  document.getElementById("steps-questions").classList.add("hidden");
+  document.getElementById("declared").value = "";
+  document.getElementById("step-0").classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+</script>
+</body>
+</html>

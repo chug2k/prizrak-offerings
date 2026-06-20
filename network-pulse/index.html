@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NETWORK PULSE</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #111;
+    --border: #222;
+    --accent: #c8ff00;
+    --red: #ff3333;
+    --dim: #444;
+    --text: #ddd;
+    --muted: #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  header {
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  header h1 {
+    font-size: 1.4rem;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  header .sub {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .stat-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-box .num {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat-box .label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+  .add-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    font-weight: bold;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-bottom: 20px;
+    display: block;
+    width: 100%;
+  }
+  .add-btn:hover { background: #aadd00; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    padding: 24px;
+    width: 100%;
+    max-width: 480px;
+  }
+  .modal h2 {
+    color: var(--accent);
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%;
+    background: #000;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    padding: 8px;
+    outline: none;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+  .field textarea { height: 70px; resize: vertical; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .btn-save {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    flex: 1;
+  }
+  .btn-cancel {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 10px 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+  }
+  .btn-save:hover { background: #aadd00; }
+  .btn-cancel:hover { color: var(--text); }
+
+  /* CONTACTS LIST */
+  .contacts-grid {
+    display: grid;
+    gap: 8px;
+  }
+  .contact-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .contact-card:hover { border-color: var(--accent); }
+  .contact-card.hot { border-left: 3px solid var(--accent); }
+  .contact-card.warm { border-left: 3px solid #ff8800; }
+  .contact-card.cold { border-left: 3px solid var(--dim); }
+
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .card-name {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+  .card-heat {
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+  }
+  .heat-hot { color: var(--accent); border: 1px solid var(--accent); }
+  .heat-warm { color: #ff8800; border: 1px solid #ff8800; }
+  .heat-cold { color: var(--muted); border: 1px solid var(--dim); }
+
+  .card-role {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 2px;
+    letter-spacing: 0.05em;
+  }
+  .card-body { margin-top: 8px; }
+  .card-note {
+    font-size: 0.78rem;
+    color: #aaa;
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .card-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .meta-item {
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  .meta-item span { color: var(--text); }
+  .card-next {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #000;
+    border: 1px solid var(--border);
+    font-size: 0.72rem;
+    color: #aaa;
+  }
+  .card-next .next-label {
+    font-size: 0.58rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .card-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 6px;
+  }
+  .btn-small {
+    font-family: 'Courier New', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+  }
+  .btn-small:hover { color: var(--text); border-color: var(--text); }
+  .btn-small.danger:hover { color: var(--red); border-color: var(--red); }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+  .empty-state .big { font-size: 2rem; margin-bottom: 8px; }
+
+  /* FILTER ROW */
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+  }
+  .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+  .filter-btn:hover:not(.active) { border-color: var(--text); color: var(--text); }
+
+  .section-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .upcoming-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #000;
+    font-size: 0.55rem;
+    padding: 2px 6px;
+    letter-spacing: 0.08em;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Network Pulse</h1>
+    <div class="sub">// WHO ARE YOU CULTIVATING. WHY. WHAT NEXT.</div>
+  </div>
+  <div class="sub" id="clock"></div>
+</header>
+
+<div class="stats-row">
+  <div class="stat-box"><div class="num" id="stat-total">0</div><div class="label">Contacts</div></div>
+  <div class="stat-box"><div class="num" id="stat-hot">0</div><div class="label">Hot</div></div>
+  <div class="stat-box"><div class="num" id="stat-upcoming">0</div><div class="label">Upcoming</div></div>
+  <div class="stat-box"><div class="num" id="stat-followup">0</div><div class="label">Needs Action</div></div>
+</div>
+
+<button class="add-btn" onclick="openModal()">+ LOG NEW CONTACT</button>
+
+<div class="filter-row">
+  <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+  <button class="filter-btn" onclick="setFilter('hot', this)">Hot</button>
+  <button class="filter-btn" onclick="setFilter('warm', this)">Warm</button>
+  <button class="filter-btn" onclick="setFilter('cold', this)">Cold</button>
+  <button class="filter-btn" onclick="setFilter('upcoming', this)">Upcoming</button>
+</div>
+
+<div class="section-label">CONTACT LEDGER</div>
+<div class="contacts-grid" id="contacts-list"></div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">Log Contact</h2>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="f-name" placeholder="Sophie Fan Wu">
+    </div>
+    <div class="field">
+      <label>Role / Context</label>
+      <input type="text" id="f-role" placeholder="Founder, CoderSchool parent, VC contact...">
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="f-email" placeholder="name@example.com">
+    </div>
+    <div class="field">
+      <label>Heat</label>
+      <select id="f-heat">
+        <option value="hot">🔥 Hot — active, high potential</option>
+        <option value="warm" selected>🟠 Warm — promising, early</option>
+        <option value="cold">❄️ Cold — dormant / background</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Last Touch</label>
+      <input type="date" id="f-last">
+    </div>
+    <div class="field">
+      <label>Next Meeting (optional)</label>
+      <input type="datetime-local" id="f-next">
+    </div>
+    <div class="field">
+      <label>Where / How Met</label>
+      <input type="text" id="f-where" placeholder="Every Half Coffee, Sarica">
+    </div>
+    <div class="field">
+      <label>Notes / Intent</label>
+      <textarea id="f-notes" placeholder="Why does this relationship matter? What are you watching for?"></textarea>
+    </div>
+    <div class="field">
+      <label>Next Action</label>
+      <input type="text" id="f-action" placeholder="Follow up after meeting, intro to X, share Y...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" onclick="saveContact()">SAVE</button>
+      <button class="btn-cancel" onclick="closeModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORE_KEY = 'network-pulse-v1';
+let contacts = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+let editId = null;
+let currentFilter = 'all';
+
+// Seed with known contacts from Charles's world
+if (contacts.length === 0) {
+  const today = new Date().toISOString().slice(0,10);
+  contacts = [
+    {
+      id: uid(), name: 'Sophie Fan Wu', role: 'Coffee connection', email: 'sophiefanwu@gmail.com',
+      heat: 'warm', last: today, next: '2026-03-25T07:30',
+      where: 'Every Half Coffee Roasters, Sarica',
+      notes: 'Meeting Wednesday 7:30 AM. New contact — intent TBD.',
+      action: 'Show up. Learn why she matters.', created: Date.now()
+    },
+    {
+      id: uid(), name: 'Tara', role: 'Green Tara Leadership', email: 'tara@greentaraleadership.com',
+      heat: 'warm', last: today, next: '2026-03-25T10:00',
+      where: '28 Nguyen Van Thu, D1, HCMC',
+      notes: 'Leadership coach. Wed 10–11 AM confirmed.',
+      action: 'Prepare what you actually want from this conversation.', created: Date.now()
+    },
+    {
+      id: uid(), name: 'Daan', role: 'AI enthusiast (Netherlands)', email: '',
+      heat: 'warm', last: today, next: '',
+      where: 'Online / HCMC TBD',
+      notes: 'Catchup coordinating. Shared interest in AI. Pending email + availability.',
+      action: 'Confirm email. Lock in date.', created: Date.now()
+    }
+  ];
+  save();
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(contacts)); }
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) + ' ' +
+    now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+}
+updateClock(); setInterval(updateClock, 30000);
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function openModal(id) {
+  editId = id || null;
+  const m = id ? contacts.find(c => c.id === id) : null;
+  document.getElementById('modal-title').textContent = id ? 'Edit Contact' : 'Log Contact';
+  document.getElementById('f-name').value = m ? m.name : '';
+  document.getElementById('f-role').value = m ? m.role : '';
+  document.getElementById('f-email').value = m ? m.email : '';
+  document.getElementById('f-heat').value = m ? m.heat : 'warm';
+  document.getElementById('f-last').value = m ? m.last : new Date().toISOString().slice(0,10);
+  document.getElementById('f-next').value = m ? m.next : '';
+  document.getElementById('f-where').value = m ? m.where : '';
+  document.getElementById('f-notes').value = m ? m.notes : '';
+  document.getElementById('f-action').value = m ? m.action : '';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveContact() {
+  const c = {
+    id: editId || uid(),
+    name: document.getElementById('f-name').value.trim(),
+    role: document.getElementById('f-role').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    heat: document.getElementById('f-heat').value,
+    last: document.getElementById('f-last').value,
+    next: document.getElementById('f-next').value,
+    where: document.getElementById('f-where').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+    action: document.getElementById('f-action').value.trim(),
+    created: editId ? (contacts.find(x => x.id === editId) || {}).created || Date.now() : Date.now()
+  };
+  if (!c.name) return;
+  if (editId) {
+    const idx = contacts.findIndex(x => x.id === editId);
+    if (idx >= 0) contacts[idx] = c;
+  } else {
+    contacts.unshift(c);
+  }
+  save(); closeModal(); render();
+}
+
+function deleteContact(id) {
+  if (!confirm('Remove this contact?')) return;
+  contacts = contacts.filter(c => c.id !== id);
+  save(); render();
+}
+
+function isUpcoming(c) {
+  if (!c.next) return false;
+  const d = new Date(c.next);
+  const now = new Date();
+  return d > now && d < new Date(now.getTime() + 7 * 86400000);
+}
+
+function needsAction(c) {
+  return c.action && c.action.trim().length > 0;
+}
+
+function fmtDate(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) +
+    (str.includes('T') ? ' ' + d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) : '');
+}
+
+function render() {
+  const now = new Date();
+  let filtered = contacts.filter(c => {
+    if (currentFilter === 'all') return true;
+    if (currentFilter === 'hot') return c.heat === 'hot';
+    if (currentFilter === 'warm') return c.heat === 'warm';
+    if (currentFilter === 'cold') return c.heat === 'cold';
+    if (currentFilter === 'upcoming') return isUpcoming(c);
+    return true;
+  });
+
+  // Sort: upcoming first, then by heat, then recency
+  filtered.sort((a, b) => {
+    const aUp = isUpcoming(a) ? 0 : 1;
+    const bUp = isUpcoming(b) ? 0 : 1;
+    if (aUp !== bUp) return aUp - bUp;
+    const heatOrder = {hot:0, warm:1, cold:2};
+    if (heatOrder[a.heat] !== heatOrder[b.heat]) return heatOrder[a.heat] - heatOrder[b.heat];
+    return (b.created || 0) - (a.created || 0);
+  });
+
+  // Stats
+  document.getElementById('stat-total').textContent = contacts.length;
+  document.getElementById('stat-hot').textContent = contacts.filter(c => c.heat === 'hot').length;
+  document.getElementById('stat-upcoming').textContent = contacts.filter(isUpcoming).length;
+  document.getElementById('stat-followup').textContent = contacts.filter(needsAction).length;
+
+  const list = document.getElementById('contacts-list');
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="big">◎</div>No contacts in this view.<br>The network does not build itself.</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(c => {
+    const upcoming = isUpcoming(c);
+    return `
+    <div class="contact-card ${c.heat}" onclick="">
+      <div class="card-header">
+        <div>
+          <div class="card-name">${esc(c.name)}${upcoming ? '<span class="upcoming-badge">UPCOMING</span>' : ''}</div>
+          <div class="card-role">${esc(c.role)}${c.email ? ' · ' + esc(c.email) : ''}</div>
+        </div>
+        <div class="card-heat heat-${c.heat}">${c.heat.toUpperCase()}</div>
+      </div>
+      <div class="card-body">
+        ${c.notes ? `<div class="card-note">${esc(c.notes)}</div>` : ''}
+        <div class="card-meta">
+          ${c.last ? `<div class="meta-item">LAST TOUCH <span>${fmtDate(c.last)}</span></div>` : ''}
+          ${c.next ? `<div class="meta-item">NEXT <span>${fmtDate(c.next)}</span></div>` : ''}
+          ${c.where ? `<div class="meta-item">WHERE <span>${esc(c.where)}</span></div>` : ''}
+        </div>
+        ${c.action ? `<div class="card-next"><span class="next-label">→ Next Action</span>${esc(c.action)}</div>` : ''}
+      </div>
+      <div class="card-actions">
+        <button class="btn-small" onclick="openModal('${c.id}')">EDIT</button>
+        <button class="btn-small danger" onclick="deleteContact('${c.id}')">REMOVE</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+render();
+</script>
+</body>
+</html>

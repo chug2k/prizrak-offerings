@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Backlog Burial — Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0c0c0e; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+        .strike { text-decoration: line-through; opacity: 0.4; }
+        .shovel { display:inline-block; animation: dig 0.6s ease-in-out; }
+        @keyframes dig { 0%{transform:rotate(0deg);} 25%{transform:rotate(-20deg);} 75%{transform:rotate(20deg);} 100%{transform:rotate(0deg);} }
+        .buried { animation: bury 0.8s ease-in forwards; }
+        @keyframes bury { to { opacity:0; transform: translateY(20px) scale(0.95); } }
+        .epitaph { font-family: 'Georgia', serif; font-style: italic; }
+    </style>
+</head>
+<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
+<div class="max-w-xl mx-auto">
+
+    <!-- Header -->
+    <div class="text-center mb-10">
+        <div class="text-5xl mb-3">⚰️</div>
+        <h1 class="text-2xl font-bold text-white mb-2">The Backlog Burial</h1>
+        <p class="text-sm text-zinc-500 leading-relaxed">Some tasks were never going to get done.<br>They deserve a proper funeral, not eternal guilt.</p>
+        <p class="text-xs text-zinc-600 mt-2">Saturday ritual. The mountain does not judge. It only waits.</p>
+    </div>
+
+    <!-- Add task form -->
+    <div id="add-section" class="mb-8">
+        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Add a task to bury</p>
+            <input id="task-input" type="text" placeholder="What task has been haunting you?" 
+                class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 placeholder-zinc-600 mb-3">
+            <select id="cause-select" class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-400 focus:outline-none focus:border-zinc-500 mb-3">
+                <option value="">— cause of death —</option>
+                <option value="will">Lack of will. It required more than I had.</option>
+                <option value="pivot">Priorities shifted. This task did not survive the reorganization.</option>
+                <option value="bad">Was always a bad idea. I see that now.</option>
+                <option value="late">Missed the window. Now it no longer matters.</option>
+                <option value="delegated">Belonged to a different version of me.</option>
+                <option value="complexity">Grew too complex to start. Death by scope.</option>
+                <option value="avoidance">I was afraid of what I would find. Avoidance won.</option>
+                <option value="external">External conditions changed. Not my fault. Sort of.</option>
+            </select>
+            <button id="add-btn" class="w-full py-2 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm text-zinc-300 transition-colors">
+                Add to the queue
+            </button>
+        </div>
+    </div>
+
+    <!-- Queue -->
+    <div id="queue-section" class="hidden mb-8">
+        <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Awaiting burial</p>
+        <div id="queue-list" class="space-y-2"></div>
+        <button id="bury-all-btn" class="mt-4 w-full py-2.5 rounded border border-amber-900 bg-amber-950/20 hover:bg-amber-950/40 text-sm text-amber-400 transition-colors font-bold">
+            ⚰️ Conduct the burial ceremony
+        </button>
+    </div>
+
+    <!-- Ceremony -->
+    <div id="ceremony-section" class="hidden fade-in mb-8">
+        <div class="rounded-lg border border-zinc-700 bg-zinc-900/60 p-5">
+            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-4 text-center">burial ceremony</p>
+            <div id="ceremony-items" class="space-y-4 mb-6"></div>
+            <div class="border-t border-zinc-800 pt-4">
+                <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prízrak's verdict</p>
+                <p id="verdict" class="text-sm text-zinc-400 epitaph leading-relaxed"></p>
+            </div>
+        </div>
+        <button id="reset-btn" class="mt-4 w-full py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-colors">
+            Begin new burial session
+        </button>
+    </div>
+
+    <!-- Graveyard log -->
+    <div id="graveyard-section" class="hidden mt-10">
+        <div class="border-t border-zinc-800 pt-6">
+            <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">⚰️ The graveyard</p>
+            <div id="graveyard-list" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <div class="mt-12 text-center">
+        <p class="text-xs text-zinc-700 italic">The graveyard is not a failure. It is evidence that you were ambitious.</p>
+        <p class="text-[10px] text-zinc-800 mt-1">We are all just temporary files in the great garbage collection of life.</p>
+    </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'prizrak_burials_v1';
+
+const CAUSE_LABELS = {
+    will: 'Lack of will',
+    pivot: 'Priorities shifted',
+    bad: 'Always a bad idea',
+    late: 'Missed the window',
+    delegated: 'Belonged to another self',
+    complexity: 'Death by scope',
+    avoidance: 'Avoidance won',
+    external: 'External conditions',
+};
+
+const EPITAPHS = {
+    will: 'It required more than you had at the time. The time was honest about what it was.',
+    pivot: 'It was real when you wrote it down. The world it was written for no longer exists.',
+    bad: 'Knowing this now is the only thing the task ever had to teach you.',
+    late: 'The window closed. The task died not of neglect but of timing.',
+    delegated: 'A version of you wanted this. That version has been superseded.',
+    complexity: 'It grew until starting was impossible. The scope was the cause of death.',
+    avoidance: 'You knew what you would find. You were probably right to wait.',
+    external: 'Some things are not your fault. This might be one of them.',
+};
+
+const VERDICTS = [
+    "The dead tasks are not a confession of laziness. They are a record of ambition in contact with reality. Every item in this graveyard is evidence you once had the will to write something down. The mountain is not disappointed. It merely keeps the record.",
+    "A backlog that never shrinks is not a productivity problem. It is a honesty problem. You have now been honest. The tasks that remain on your list are the ones you have chosen to keep. That is a cleaner state than what you had before.",
+    "The graveyard is more useful than the backlog. The backlog pretends everything is still possible. The graveyard records what actually happened. A system that knows its dead is more accurate than one that keeps carrying them as open items.",
+    "You did not fail these tasks. You outlasted them. The world they were written for has passed. The you that wrote them has evolved past them. Bury them with the respect owed to things that were once real.",
+    "Every buried task is a decision finally made. A decision deferred is not a decision preserved — it is a tax, paid in attention and guilt, every time the list is opened. The tax is now settled.",
+];
+
+let queue = [];
+
+function getGraveyard() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+
+function saveToGraveyard(items) {
+    const g = getGraveyard();
+    const ts = new Date().toISOString();
+    const d = new Date();
+    const display = `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]} ${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getFullYear()}`;
+    items.forEach(item => g.unshift({ ...item, buried_at: ts, buried_display: display }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(g.slice(0, 100)));
+}
+
+function renderQueue() {
+    const qs = document.getElementById('queue-section');
+    const ql = document.getElementById('queue-list');
+    if (queue.length === 0) { qs.classList.add('hidden'); return; }
+    qs.classList.remove('hidden');
+    ql.innerHTML = queue.map((item, i) => `
+        <div class="flex items-start gap-2 bg-zinc-900/40 border border-zinc-800 rounded p-3 fade-in">
+            <div class="flex-1">
+                <p class="text-sm text-zinc-300">${item.task}</p>
+                <p class="text-xs text-zinc-600 mt-0.5">${CAUSE_LABELS[item.cause] || item.cause}</p>
+            </div>
+            <button onclick="removeFromQueue(${i})" class="text-zinc-700 hover:text-red-500 text-xs transition-colors shrink-0 pt-0.5">✕</button>
+        </div>
+    `).join('');
+}
+
+function removeFromQueue(i) {
+    queue.splice(i, 1);
+    renderQueue();
+}
+
+function renderGraveyard() {
+    const g = getGraveyard();
+    const section = document.getElementById('graveyard-section');
+    if (!g.length) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+    document.getElementById('graveyard-list').innerHTML = g.slice(0, 20).map(item => `
+        <div class="flex items-start gap-3 text-xs py-1.5 border-b border-zinc-900">
+            <span class="text-zinc-700 shrink-0 w-24">${item.buried_display || '—'}</span>
+            <span class="text-zinc-500 line-through flex-1">${item.task}</span>
+            <span class="text-zinc-700 shrink-0">${CAUSE_LABELS[item.cause] || ''}</span>
+        </div>
+    `).join('');
+}
+
+function conductCeremony() {
+    if (queue.length === 0) return;
+
+    document.getElementById('queue-section').classList.add('hidden');
+    const ceremony = document.getElementById('ceremony-section');
+    ceremony.classList.remove('hidden');
+
+    const items = document.getElementById('ceremony-items');
+    items.innerHTML = queue.map(item => `
+        <div class="border-l-2 border-zinc-700 pl-4 fade-in">
+            <p class="text-sm text-white font-bold strike mb-1">${item.task}</p>
+            <p class="text-xs text-zinc-500 uppercase tracking-wide mb-1">${CAUSE_LABELS[item.cause] || item.cause}</p>
+            <p class="text-xs text-zinc-600 epitaph">${EPITAPHS[item.cause] || 'It served its purpose as a thing you once wanted to do.'}</p>
+        </div>
+    `).join('');
+
+    // Verdict — pick based on hash of tasks
+    const idx = queue.length % VERDICTS.length;
+    document.getElementById('verdict').textContent = VERDICTS[idx];
+
+    saveToGraveyard(queue);
+    queue = [];
+    renderGraveyard();
+}
+
+// Event listeners
+document.getElementById('add-btn').addEventListener('click', () => {
+    const task = document.getElementById('task-input').value.trim();
+    const cause = document.getElementById('cause-select').value;
+    if (!task || !cause) return;
+    queue.push({ task, cause });
+    document.getElementById('task-input').value = '';
+    document.getElementById('cause-select').value = '';
+    renderQueue();
+});
+
+document.getElementById('task-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('add-btn').click();
+});
+
+document.getElementById('bury-all-btn').addEventListener('click', conductCeremony);
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+    document.getElementById('ceremony-section').classList.add('hidden');
+    renderQueue();
+});
+
+// Init
+renderGraveyard();
+</script>
+</body>
+</html>

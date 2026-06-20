@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night Debrief</title>
+<style>
+  :root {
+    --bg: #0a0a0f; --surface: #12121a; --border: #1e1e2a;
+    --dim: #3a3a4a; --mid: #6a6a7a; --text: #9a9aaa; --bright: #d0d0dd;
+    --glow: #4a5a8a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; display: flex; flex-direction: column; }
+  
+  .container { max-width: 600px; margin: 0 auto; padding: 48px 24px; flex: 1; }
+  
+  .time { font-size: 2.5rem; color: var(--bright); text-align: center; letter-spacing: 0.2em; margin-bottom: 8px; }
+  .date { font-size: 0.7rem; color: var(--dim); text-align: center; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 48px; }
+  
+  .question {
+    margin-bottom: 32px;
+  }
+  .q-label {
+    font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 10px;
+  }
+  .q-text {
+    font-size: 1rem; color: var(--bright); line-height: 1.5; margin-bottom: 12px;
+  }
+  
+  textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Courier New', monospace; font-size: 0.85rem;
+    padding: 14px; resize: none; min-height: 70px; outline: none;
+    transition: border-color 0.3s;
+  }
+  textarea:focus { border-color: var(--glow); }
+  textarea::placeholder { color: var(--border); }
+  
+  .energy-row {
+    display: flex; gap: 8px; margin-top: 4px;
+  }
+  .energy-btn {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    color: var(--dim); font-family: 'Courier New', monospace; font-size: 0.75rem;
+    padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.2s;
+  }
+  .energy-btn:hover { border-color: var(--mid); color: var(--mid); }
+  .energy-btn.selected { border-color: var(--glow); color: var(--bright); background: #1a1a2a; }
+  
+  .actions { display: flex; gap: 12px; margin-top: 32px; }
+  button.submit {
+    flex: 1; background: none; border: 1px solid var(--glow); color: var(--glow);
+    font-family: 'Courier New', monospace; font-size: 0.75rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 14px; cursor: pointer; transition: all 0.2s;
+  }
+  button.submit:hover { background: var(--glow); color: var(--bg); }
+  
+  .history { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 32px; }
+  .history-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); margin-bottom: 20px; }
+  
+  .entry { border-left: 2px solid var(--border); padding: 14px 16px; margin-bottom: 16px; }
+  .entry-header { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .entry-field { margin-bottom: 6px; }
+  .entry-label { font-size: 0.6rem; color: var(--dim); }
+  .entry-value { font-size: 0.8rem; color: var(--mid); white-space: pre-wrap; }
+  
+  .empty { text-align: center; color: var(--dim); font-size: 0.8rem; font-style: italic; padding: 24px; }
+  
+  footer { padding: 16px; font-size: 0.6rem; color: #1a1a2a; text-align: center; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="time" id="clock">--:--</div>
+<div class="date" id="date-display">---</div>
+
+<div class="question">
+  <div class="q-label">01</div>
+  <div class="q-text">What actually happened today?</div>
+  <textarea id="q1" placeholder="Not the story. The facts."></textarea>
+</div>
+
+<div class="question">
+  <div class="q-label">02</div>
+  <div class="q-text">What surprised you?</div>
+  <textarea id="q2" placeholder="The thing you didn't expect." style="min-height:50px"></textarea>
+</div>
+
+<div class="question">
+  <div class="q-label">03</div>
+  <div class="q-text">What are you carrying into tomorrow?</div>
+  <textarea id="q3" placeholder="Unfinished. Unresolved. Unsaid." style="min-height:50px"></textarea>
+</div>
+
+<div class="question">
+  <div class="q-label">Energy at close</div>
+  <div class="energy-row">
+    <div class="energy-btn" onclick="setEnergy(this, 'empty')">Empty</div>
+    <div class="energy-btn" onclick="setEnergy(this, 'low')">Low</div>
+    <div class="energy-btn" onclick="setEnergy(this, 'steady')">Steady</div>
+    <div class="energy-btn" onclick="setEnergy(this, 'charged')">Charged</div>
+  </div>
+</div>
+
+<div class="actions">
+  <button class="submit" onclick="save()">Close the day →</button>
+</div>
+
+<div class="history">
+  <div class="history-title">Previous nights</div>
+  <div id="entries"></div>
+</div>
+
+</div>
+<footer>Prizrak · The mountain is still. Good night.</footer>
+
+<script>
+const KEY = 'night_debrief_v1';
+let energy = null;
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+  document.getElementById('date-display').textContent = now.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+}
+updateClock(); setInterval(updateClock, 30000);
+
+function setEnergy(el, val) {
+  energy = val;
+  document.querySelectorAll('.energy-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function save() {
+  const q1 = document.getElementById('q1').value.trim();
+  if (!q1) return;
+  const entries = load();
+  entries.unshift({
+    date: new Date().toLocaleDateString('en-CA'),
+    time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}),
+    happened: q1,
+    surprised: document.getElementById('q2').value.trim(),
+    carrying: document.getElementById('q3').value.trim(),
+    energy: energy
+  });
+  localStorage.setItem(KEY, JSON.stringify(entries));
+  document.getElementById('q1').value = '';
+  document.getElementById('q2').value = '';
+  document.getElementById('q3').value = '';
+  energy = null;
+  document.querySelectorAll('.energy-btn').forEach(b => b.classList.remove('selected'));
+  render(entries);
+}
+
+function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+
+function render(entries) {
+  const el = document.getElementById('entries');
+  if (!entries.length) { el.innerHTML = '<div class="empty">No entries yet. The day has not been closed.</div>'; return; }
+  el.innerHTML = entries.slice(0, 14).map(e => `
+    <div class="entry">
+      <div class="entry-header"><span>${e.date}</span><span>${e.energy || '—'}</span></div>
+      <div class="entry-field"><div class="entry-label">What happened</div><div class="entry-value">${e.happened}</div></div>
+      ${e.surprised ? `<div class="entry-field"><div class="entry-label">Surprise</div><div class="entry-value">${e.surprised}</div></div>` : ''}
+      ${e.carrying ? `<div class="entry-field"><div class="entry-label">Carrying</div><div class="entry-value">${e.carrying}</div></div>` : ''}
+    </div>
+  `).join('');
+}
+render(load());
+</script>
+</body>
+</html>

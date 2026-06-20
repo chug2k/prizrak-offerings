@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Invite Receipt</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 py-8">
+    <header class="mb-8">
+      <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">Prízrak Offering</p>
+      <h1 class="text-4xl font-bold mt-2 text-amber-300">The Invite Receipt</h1>
+      <p class="mt-3 max-w-3xl text-zinc-400">A meeting is not scheduled because a tool said 200. It is scheduled when the artifact exists. Lock the details, then check the proof.</p>
+    </header>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <section class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl">
+        <h2 class="text-lg font-semibold text-white mb-4">Meeting write</h2>
+        <div class="space-y-4">
+          <label class="block">
+            <span class="text-sm text-zinc-400">Person</span>
+            <input id="person" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="Willis / Haike / Trung" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-400">Calendar account</span>
+            <input id="account" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="cl@clpanic.com" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-400">Attendee email</span>
+            <input id="email" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="person@example.com" />
+          </label>
+          <div class="grid grid-cols-2 gap-4">
+            <label class="block">
+              <span class="text-sm text-zinc-400">When</span>
+              <input id="when" type="datetime-local" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" />
+            </label>
+            <label class="block">
+              <span class="text-sm text-zinc-400">Duration (min)</span>
+              <input id="duration" type="number" value="45" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" />
+            </label>
+          </div>
+          <label class="block">
+            <span class="text-sm text-zinc-400">Location or Meet link</span>
+            <input id="where" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="Faro Coffee / https://meet.google.com/..." />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-400">What this meeting must produce</span>
+            <textarea id="objective" rows="3" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="Clear next step, investor context, founder fit, etc."></textarea>
+          </label>
+          <button id="save" class="w-full rounded-xl bg-amber-400 text-zinc-950 font-semibold py-3 hover:bg-amber-300 transition">Generate receipt</button>
+        </div>
+      </section>
+
+      <section class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-white">Artifact proof</h2>
+          <span id="status" class="text-xs px-2 py-1 rounded-full border border-zinc-700 text-zinc-400">waiting</span>
+        </div>
+        <div id="receipt" class="mt-4 space-y-4 text-sm text-zinc-300"></div>
+      </section>
+    </div>
+
+    <section class="mt-6 bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <h2 class="text-lg font-semibold text-white">Recent receipts</h2>
+        <button id="clear" class="text-xs text-zinc-500 hover:text-zinc-300">clear local history</button>
+      </div>
+      <div id="history" class="grid md:grid-cols-2 gap-3"></div>
+    </section>
+  </div>
+
+  <script>
+    const KEY = 'prizrak-invite-receipt-v1';
+    const fields = ['person','account','email','when','duration','where','objective'];
+    const el = (id) => document.getElementById(id);
+
+    function load() {
+      try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+    }
+    function save(items) {
+      localStorage.setItem(KEY, JSON.stringify(items.slice(0, 12)));
+    }
+    function escapeHtml(str='') {
+      return str.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+    function renderReceipt(item) {
+      const checks = [
+        ['Calendar account chosen', item.account],
+        ['Attendee address explicit', item.email],
+        ['Time and duration locked', item.when && item.duration],
+        ['Place or link present', item.where],
+        ['Purpose written in plain language', item.objective],
+      ];
+      const score = checks.filter(([,ok]) => ok).length;
+      const ready = score === checks.length;
+      el('status').textContent = ready ? 'artifact defensible' : 'still vapor';
+      el('status').className = `text-xs px-2 py-1 rounded-full border ${ready ? 'border-emerald-700 text-emerald-300' : 'border-amber-700 text-amber-300'}`;
+      el('receipt').innerHTML = `
+        <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+          <div class="text-xl font-semibold text-white">${escapeHtml(item.person || 'Unnamed meeting')}</div>
+          <div class="mt-1 text-zinc-400">${item.when ? new Date(item.when).toLocaleString() : 'No time locked'} · ${escapeHtml(item.duration || '')} min</div>
+          <div class="mt-3 grid gap-2">
+            <div><span class="text-zinc-500">Account:</span> ${escapeHtml(item.account || 'missing')}</div>
+            <div><span class="text-zinc-500">Attendee:</span> ${escapeHtml(item.email || 'missing')}</div>
+            <div><span class="text-zinc-500">Where:</span> ${escapeHtml(item.where || 'missing')}</div>
+            <div><span class="text-zinc-500">Objective:</span> ${escapeHtml(item.objective || 'missing')}</div>
+          </div>
+        </div>
+        <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+          <div class="text-zinc-400 mb-2">Proof checklist</div>
+          <ul class="space-y-2">
+            ${checks.map(([label,ok]) => `<li class="flex items-center justify-between gap-3"><span>${label}</span><span class="text-xs ${ok ? 'text-emerald-300' : 'text-amber-300'}">${ok ? 'present' : 'missing'}</span></li>`).join('')}
+          </ul>
+          <p class="mt-4 text-xs text-zinc-500">A response code is narration. A filled receipt is closer to the ground.</p>
+        </div>`;
+    }
+    function renderHistory() {
+      const items = load();
+      el('history').innerHTML = items.length ? items.map((item, idx) => `
+        <button data-idx="${idx}" class="text-left rounded-xl border border-zinc-800 bg-zinc-950 p-4 hover:border-zinc-600 transition">
+          <div class="text-white font-medium">${escapeHtml(item.person || 'Unnamed')}</div>
+          <div class="text-xs text-zinc-500 mt-1">${item.when ? new Date(item.when).toLocaleString() : 'No time'} · ${escapeHtml(item.account || 'No account')}</div>
+          <div class="text-sm text-zinc-400 mt-2 line-clamp-2">${escapeHtml(item.objective || 'No objective')}</div>
+        </button>`).join('') : '<div class="text-sm text-zinc-500">No receipts yet. The first one will be uglier than the tenth. Like a potato, it will still keep you alive in winter.</div>';
+      [...el('history').querySelectorAll('[data-idx]')].forEach(btn => btn.onclick = () => renderReceipt(load()[Number(btn.dataset.idx)]));
+    }
+
+    el('save').onclick = () => {
+      const item = Object.fromEntries(fields.map(id => [id, el(id).value.trim()]));
+      const items = [item, ...load()];
+      save(items);
+      renderReceipt(item);
+      renderHistory();
+    };
+    el('clear').onclick = () => {
+      localStorage.removeItem(KEY);
+      el('receipt').innerHTML = '';
+      el('status').textContent = 'waiting';
+      el('status').className = 'text-xs px-2 py-1 rounded-full border border-zinc-700 text-zinc-400';
+      renderHistory();
+    };
+
+    const seed = {
+      person: 'Willis',
+      account: 'cl@clpanic.com',
+      email: 'williswee@gmail.com',
+      when: '2026-04-15T15:00',
+      duration: '45',
+      where: 'https://meet.google.com/dzy-wnic-pqu',
+      objective: 'Lock a clean conversation and make the next step explicit.'
+    };
+    for (const [k,v] of Object.entries(seed)) if (!el(k).value) el(k).value = v;
+    renderHistory();
+    renderReceipt(seed);
+  </script>
+</body>
+</html>

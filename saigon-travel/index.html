@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saigon & Hanoi — Travel Guide</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+    .card { transition: all 0.2s ease; }
+    .star { color: #f59e0b; }
+    .filter-btn.active { background: #1e293b; color: white; }
+    .city-btn.active { background: #0f172a; color: white; }
+    input[type=range] { accent-color: #1e293b; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; }
+    .shimmer { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .sticky-header { position: sticky; top: 0; z-index: 50; }
+    /* Collapsible filter rows */
+    #filters-row, #rating-row {
+      overflow: hidden;
+      transition: max-height 0.25s ease, opacity 0.25s ease, margin-top 0.25s ease;
+      max-height: 200px;
+      opacity: 1;
+    }
+    .header-collapsed #filters-row,
+    .header-collapsed #rating-row {
+      max-height: 0 !important;
+      opacity: 0;
+      margin-top: 0 !important;
+      pointer-events: none;
+    }
+    /* Compact title row when collapsed */
+    #header-top-row {
+      transition: padding 0.25s ease;
+    }
+    .header-collapsed #header-top-row {
+      padding-top: 6px !important;
+      padding-bottom: 6px !important;
+    }
+    /* Show a hint badge when collapsed */
+    #filter-hint {
+      transition: opacity 0.2s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .header-collapsed #filter-hint {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- Header -->
+<div class="sticky-header bg-white border-b border-gray-200 shadow-sm" id="stickyHeader">
+  <div class="max-w-7xl mx-auto px-4 py-3" id="header-top-row">
+    <div class="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-gray-900">🏙️ Vietnam Travel Guide</h1>
+            <!-- Filter hint shown when collapsed -->
+            <span id="filter-hint" class="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5 cursor-pointer" onclick="expandHeader()">tap to filter</span>
+          </div>
+          <p class="text-xs text-gray-400" id="countLabel">Loading...</p>
+        </div>
+      </div>
+      <!-- City toggle -->
+      <div class="flex gap-2">
+        <button onclick="setCity('all')" id="city-all" class="city-btn active px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium transition-all">All Cities</button>
+        <button onclick="setCity('saigon')" id="city-saigon" class="city-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium transition-all">🏙️ Saigon</button>
+        <button onclick="setCity('hanoi')" id="city-hanoi" class="city-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium transition-all">🏯 Hanoi</button>
+      </div>
+    </div>
+    <!-- Search + filters (collapsible) -->
+    <div id="filters-row" class="mt-3 flex flex-col md:flex-row gap-2">
+      <input id="searchInput" type="text" placeholder="Search places, dishes, descriptions..." 
+        class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300"
+        oninput="renderCards()" />
+      <div class="flex gap-2 flex-wrap" id="categoryFilters"></div>
+    </div>
+    <!-- Min rating filter (collapsible) -->
+    <div id="rating-row" class="mt-2 flex items-center gap-3 text-xs text-gray-500">
+      <span>Min rating:</span>
+      <input type="range" min="0" max="5" step="0.5" value="0" id="ratingFilter" oninput="document.getElementById('ratingVal').textContent=this.value; renderCards()" class="w-32" />
+      <span id="ratingVal" class="font-semibold text-gray-700">0</span>
+      <span class="ml-4">Sort:</span>
+      <select id="sortSelect" onchange="renderCards()" class="border border-gray-200 rounded px-2 py-1 text-xs">
+        <option value="name">Name A–Z</option>
+        <option value="rating_desc">Rating ↓</option>
+        <option value="rating_asc">Rating ↑</option>
+        <option value="reviews_desc">Most Reviewed</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Cards -->
+<div class="max-w-7xl mx-auto px-4 py-6">
+  <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+  <div id="noResults" class="hidden text-center py-16 text-gray-400">
+    <div class="text-4xl mb-3">🔍</div>
+    <p class="text-lg">No places found</p>
+    <p class="text-sm">Try a different search or filter</p>
+  </div>
+</div>
+
+<script>
+const CATEGORY_COLORS = {
+  "Café": "bg-amber-100 text-amber-800",
+  "Drinking": "bg-purple-100 text-purple-800",
+  "Eating - Viet": "bg-green-100 text-green-800",
+  "Eating - NonViet": "bg-blue-100 text-blue-800",
+  "Breakfast & Lunch": "bg-orange-100 text-orange-800",
+  "Dinner": "bg-red-100 text-red-800",
+  "Quick Bites": "bg-yellow-100 text-yellow-800",
+  "Coffee & Juice": "bg-amber-100 text-amber-800",
+  "Landmarks": "bg-teal-100 text-teal-800",
+  "Photography": "bg-pink-100 text-pink-800",
+  "Shopping": "bg-indigo-100 text-indigo-800",
+  "Spa & Wellness": "bg-rose-100 text-rose-800",
+  "default": "bg-gray-100 text-gray-700"
+};
+
+function catColor(cat) {
+  return CATEGORY_COLORS[cat] || CATEGORY_COLORS["default"];
+}
+
+function stars(rating) {
+  if (!rating) return '<span class="text-gray-300 text-xs">No rating</span>';
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  let s = '';
+  for (let i = 0; i < full; i++) s += '★';
+  if (half) s += '½';
+  for (let i = full + (half?1:0); i < 5; i++) s += '☆';
+  return `<span class="star text-sm">${s}</span> <span class="text-xs text-gray-500">${rating}</span>`;
+}
+
+function personalStars(s) {
+  if (!s) return '';
+  const count = (s.match(/★/g) || []).length;
+  return `<span class="text-amber-400 text-xs">${'★'.repeat(count)}${'☆'.repeat(5-count)}</span>`;
+}
+
+const allData = [
+{"city": "saigon", "category": "Café", "name": "43 Factory Coffee Roaster", "dish_vn": "", "dish_en": "Specialty coffee", "description": "A bustling specialty roastery — one of Vietnam's most exciting modern coffee scenes.", "address": "178A Pasteur, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/Q8ngrhqJij6YUmbf9", "google_rating": 4.5, "review_count": 1200, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "About Life Coffee Brewers", "dish_vn": "", "dish_en": "Cold brew coffee", "description": "Airy, spacious and relaxing spot with outstanding cold brew coffee.", "address": "151B Hai Ba Trung, Ward 6, District 3", "maps": "https://goo.gl/maps/93HFz2sa4Xu6CxRq7", "google_rating": 4.4, "review_count": 890, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Thái Yên Cafe", "dish_vn": "", "dish_en": "Specialty coffee", "description": "Hidden local gem — great vibe, great coffee. Order the 'Sapa' or 'Solar'.", "address": "79/2/1 Phan Ke Binh, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/rRgXngW9DVFbdbAR8", "google_rating": 4.6, "review_count": 720, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Là Việt Hai Bà Trưng", "dish_vn": "", "dish_en": "Vietnamese coffee", "description": "Industrial-chic Vietnamese cafe — great for working or catching up.", "address": "193 Hai Ba Trung, Ward 6, District 3", "maps": "https://goo.gl/maps/UU5ykJMGgUzNb1fv9", "google_rating": 4.5, "review_count": 650, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Cheo Leo", "dish_vn": "", "dish_en": "Phin filter coffee", "description": "Oldest phin-filter coffee in Saigon, operating since 1938. A living relic.", "address": "109/36 Nguyen Thien Thuat, Ward 2, District 3", "maps": "https://g.page/cheoleocafe?share", "google_rating": 4.3, "review_count": 1100, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "RuNam d'Or Công Xã Paris", "dish_vn": "", "dish_en": "Premium café & cocktails", "description": "Upscale café-restaurant-bar steps from Notre Dame Cathedral.", "address": "3 Cong Xa Paris, District 1", "maps": "https://goo.gl/maps/giGxRYQ9igrNc4KJA", "google_rating": 4.3, "review_count": 480, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "RuNam Bistro Đồng Khởi", "dish_vn": "", "dish_en": "Premium café & cocktails", "description": "Premium café and bar on the famous Dong Khoi street.", "address": "2-4-6 Dong Khoi, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/6ia6m8n3n7N3oZz3A", "google_rating": 4.4, "review_count": 560, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Blank Lounge Landmark 81", "dish_vn": "", "dish_en": "Cocktails & coffee", "description": "Highest bar in Southeast Asia — panoramic Saigon views from the 75th–76th floors.", "address": "75F–76F, Landmark 81, Binh Thanh District", "maps": "https://goo.gl/maps/qkfEeJcxroY5fJbMA", "google_rating": 4.4, "review_count": 1300, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Acoustic Bar", "dish_vn": "", "dish_en": "Live music & coffee", "description": "Live music every day — one of Saigon's best spots for local bands.", "address": "6E1 Ngo Thoi Nhiem, Ward 7, District 3", "maps": "https://goo.gl/maps/pPKJjUT1HSCoMqnA7", "google_rating": 4.4, "review_count": 920, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Partea - English Tearoom", "dish_vn": "", "dish_en": "Afternoon tea", "description": "Charming English tearoom for a delightful afternoon tea experience.", "address": "4th floor, 42 Nguyen Hue, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/RUQgHVZjuJ1NpH2JA", "google_rating": 4.2, "review_count": 380, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Shin Cafe", "dish_vn": "", "dish_en": "Specialty coffee", "description": "Renowned specialty coffee roaster with minimalist aesthetic.", "address": "Saigon, multiple locations", "maps": "", "google_rating": 4.5, "review_count": 800, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "The Hummingbird Cafe", "dish_vn": "", "dish_en": "Café & brunch", "description": "Cozy café known for quality brunch and relaxed atmosphere.", "address": "Saigon", "maps": "https://maps.app.goo.gl/cU3xsc67H9d1NGwCA?g_st=ic", "google_rating": 4.4, "review_count": 420, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "D'Chill", "dish_vn": "", "dish_en": "Sky bar", "description": "Rooftop bar with sweeping city views over the Saigon river bend.", "address": "304 Vo Van Kiet, Co Giang Ward, District 1", "maps": "https://goo.gl/maps/QZu518KZZLYdWeWk7", "google_rating": 4.1, "review_count": 560, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Zion Sky Lounge & Dining", "dish_vn": "", "dish_en": "Sky lounge", "description": "Sky lounge and restaurant with D1 rooftop views.", "address": "87A Ham Nghi, Nguyen Thai Binh Ward, District 1", "maps": "https://goo.gl/maps/QGYisASqEBJUGW6s8", "google_rating": 4.1, "review_count": 430, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Drinking & Healing", "dish_vn": "", "dish_en": "Cocktails", "description": "Quirky cocktail bar with medicinal-themed concoctions.", "address": "2nd floor, 25 Ho Tung Mau, Nguyen Thai Binh Ward, District 1", "maps": "https://goo.gl/maps/ycNFo3EGDVPpFsHe8", "google_rating": 4.3, "review_count": 710, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Layla Eatery & Bar", "dish_vn": "", "dish_en": "Cocktails & bar bites", "description": "Experimental cocktails, solid bar bites and stylish ambiance.", "address": "2nd floor, 63 Dong Du, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/DnZUX1EMjscwpYbUA", "google_rating": 4.4, "review_count": 630, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Chill Sky Bar", "dish_vn": "", "dish_en": "Rooftop bar", "description": "Best rooftop view in Saigon — Levels 26–27 of AB Tower.", "address": "Level 26–27, AB Tower, 76A Le Lai, District 1", "maps": "https://goo.gl/maps/15PLVkxEe9eLZhFs5", "google_rating": 4.2, "review_count": 5200, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Oslo Club", "dish_vn": "", "dish_en": "Luxury bar", "description": "One of Saigon's most polished bars — great service, upscale crowd.", "address": "38 Nam Ky Khoi Nghia, Nguyen Thai Binh Ward, District 1", "maps": "https://goo.gl/maps/JJFXR3mRDW9GUz3y8", "google_rating": 4.3, "review_count": 490, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Bam Bam", "dish_vn": "", "dish_en": "Bar & dance", "description": "Vibrant bar with distinctive energy — chill early, dance late.", "address": "41-43 Nam Ky Khoi Nghia, Nguyen Thai Binh Ward, District 1", "maps": "https://goo.gl/maps/pbbtf7iiKQtChb9N6", "google_rating": 4.2, "review_count": 670, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "City Beer Station", "dish_vn": "", "dish_en": "Street cocktails & craft beer", "description": "Open-air street bar — cheap cocktails, local craft beers, great people-watching.", "address": "Saigon", "maps": "https://maps.app.goo.gl/chHm11dkxLwKkpzv8?g_st=ic", "google_rating": 4.2, "review_count": 380, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Cuc Gach Quan", "dish_vn": "", "dish_en": "Traditional Vietnamese", "description": "Classic Vietnamese food in garden setting — Michelin Bib Gourmand. Visited by Obama, Brad Pitt and Angelina Jolie.", "address": "10 Dang Tat, Tan Dinh Ward, District 1", "maps": "https://g.page/CucGachQuan?share", "google_rating": 4.5, "review_count": 8500, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Hoa Tuc Restaurant", "dish_vn": "", "dish_en": "Contemporary Vietnamese", "description": "Contemporary Vietnamese cuisine in a beautifully restored colonial opium factory.", "address": "74/7 Hai Ba Trung, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/khJ1PJymHcyEKguNA", "google_rating": 4.5, "review_count": 4200, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "The Lunch Lady", "dish_vn": "", "dish_en": "Daily rotating soups", "description": "Featured on Anthony Bourdain's No Reservations. Rotating daily soups — arrive early.", "address": "23 Hoang Sa St., Da Kao Ward, District 1", "maps": "https://goo.gl/maps/28aA5QVFJTZPxYhj9", "google_rating": 4.3, "review_count": 3100, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Banh mi Huynh Hoa", "dish_vn": "", "dish_en": "Bánh mì", "description": "One of Saigon's most famous bánh mì — overstuffed, rich, worth the queue.", "address": "26 Le Thi Rieng, Pham Ngu Lao Ward, District 1", "maps": "https://goo.gl/maps/UYvyKJ8AJXrMmnuw8", "google_rating": 4.4, "review_count": 6800, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Pho Minh", "dish_vn": "", "dish_en": "Beef pho (morning only)", "description": "Oldest pho restaurant in Saigon, open since 1942 — mornings only, 6:30–10:00.", "address": "63/16 Pasteur, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/DHnSkyYBkueeC6uu8", "google_rating": 4.3, "review_count": 2100, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Pho Phu Gia", "dish_vn": "", "dish_en": "Northern-style pho", "description": "Classic Northern-style pho with homestyle Hanoi flavors, transplanted to Saigon.", "address": "146E Ly Chinh Thang, Ward 14, District 3", "maps": "https://goo.gl/maps/UUcuhyuiV6s7vMGm9", "google_rating": 4.2, "review_count": 1400, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bep Nha Luc Tinh", "dish_vn": "", "dish_en": "Mekong Delta cuisine", "description": "Great Vietnamese food in beautifully decorated Mekong Delta-inspired setting.", "address": "37 Nam Ky Khoi Nghia, Nguyen Thai Binh Ward, District 1", "maps": "https://g.page/BepNhaLucTinh?share", "google_rating": 4.4, "review_count": 1900, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Nam Giao Restaurant", "dish_vn": "", "dish_en": "Hue-style cuisine", "description": "Cozy restaurant specializing in authentic Central Vietnamese (Hue-style) cuisine.", "address": "136/15 Le Thanh Ton, District 1", "maps": "https://goo.gl/maps/ofzH4PDjWon8HwFf8", "google_rating": 4.3, "review_count": 780, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bếp Huế", "dish_vn": "", "dish_en": "Hue-style cuisine", "description": "Authentic Hue cuisine in Tan Dinh — bún bò, bánh khoái, and more.", "address": "89 Thach Thi Thanh, Tan Dinh Ward, District 1", "maps": "https://g.page/bephuecuisine?share", "google_rating": 4.4, "review_count": 920, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Hum Vegan Restaurant", "dish_vn": "", "dish_en": "Vegan Vietnamese", "description": "Calming, elegantly designed vegan and vegetarian restaurant — unexpectedly good.", "address": "32 Vo Van Tan, Ward 6, District 3", "maps": "https://goo.gl/maps/wsxjj5yT8TYd5hTy5", "google_rating": 4.4, "review_count": 2300, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Cơm tấm Ba Ghiền", "dish_vn": "", "dish_en": "Broken rice with BBQ pork", "description": "Iconic Saigon broken rice (com tam) — the city's signature dish done right.", "address": "84 Dang Van Ngu, Ward 10, Phu Nhuan District", "maps": "https://goo.gl/maps/GDJ4ZTk4EiV1MHLK9", "google_rating": 4.4, "review_count": 3800, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Com Tam Kieu Giang", "dish_vn": "", "dish_en": "Broken rice", "description": "Popular local broken rice spot in Tan Dinh.", "address": "192E Tran Quang Khai, Tan Dinh Ward, District 1", "maps": "https://goo.gl/maps/u5zQwvVZviTDDjyD7", "google_rating": 4.3, "review_count": 1100, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Banh xeo Dinh Cong Trang", "dish_vn": "", "dish_en": "Sizzling crepes (bánh xèo)", "description": "Crispy Vietnamese sizzling crepes — a Southern specialty done well.", "address": "46A Dinh Cong Trang, Tan Dinh Ward, District 1", "maps": "https://goo.gl/maps/2Y4C1t7uh8wN9t9x5", "google_rating": 4.3, "review_count": 980, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Nem Cua Bể", "dish_vn": "", "dish_en": "Square crab spring rolls", "description": "Northern-style square crab spring rolls — a rare and delicious specialty.", "address": "15E Nguyen Thi Minh Khai, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/a5pu5azcKVBDVb3h7", "google_rating": 4.2, "review_count": 760, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bun Thit Nuong Kieu Bao", "dish_vn": "", "dish_en": "Grilled pork rice noodles", "description": "Famous bún thịt nướng — perfectly charred grilled pork over cold noodles.", "address": "139 De Tham, Co Giang Ward, District 1", "maps": "https://goo.gl/maps/dpfb3PTNRjY963FC8", "google_rating": 4.3, "review_count": 1300, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bun Thit Nuong Chị Tuyền", "dish_vn": "", "dish_en": "Grilled pork rice noodles", "description": "Local favourite for bún thịt nướng.", "address": "175C Co Giang, Co Giang Ward, District 1", "maps": "https://goo.gl/maps/8Y4jNDLGxa8PR4W16", "google_rating": 4.2, "review_count": 580, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bun Bo Hue Đông Ba", "dish_vn": "", "dish_en": "Hue-style beef noodle soup", "description": "Authentic bún bò Huế — spicy, rich broth with lemongrass and fermented shrimp.", "address": "207B Nguyen Van Thu, Da Kao Ward, District 1", "maps": "https://g.page/dongbavn?share", "google_rating": 4.3, "review_count": 1700, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bò Kho Cô Mai (NTMK)", "dish_vn": "", "dish_en": "Beef stew", "description": "Legendary beef stew (bò kho) — operating since 1984. Order with bread.", "address": "25 Nguyen Thi Minh Khai, District 1", "maps": "https://g.page/bokhocomai2?share", "google_rating": 4.5, "review_count": 2800, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bò Kho Cô Mai (Hồ Tùng Mậu)", "dish_vn": "", "dish_en": "Beef stew", "description": "Second location of the legendary 1984-era bò kho institution.", "address": "71 Ho Tung Mau, Ben Nghe Ward, District 1", "maps": "https://g.page/bokhocomaicn4?share", "google_rating": 4.4, "review_count": 1900, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Ốc Đào", "dish_vn": "", "dish_en": "Snail dishes", "description": "Vietnamese snail dishes (ốc) — a local obsession, done well.", "address": "212B/D48 Nguyen Trai, District 1", "maps": "https://goo.gl/maps/9A6QJuVfiGVf1quR7", "google_rating": 4.2, "review_count": 960, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Banh Canh Cua 87 Tran Khac Chan", "dish_vn": "", "dish_en": "Crab noodle soup", "description": "Southern-style thick crab noodle soup — rich and satisfying.", "address": "87 Tran Khac Chan, Tan Dinh Ward, District 1", "maps": "https://goo.gl/maps/eoZDMDBPqi2YL1CA6", "google_rating": 4.3, "review_count": 820, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Cơm Niêu Sài Gòn", "dish_vn": "", "dish_en": "Claypot rice", "description": "Traditional Vietnamese claypot rice (cơm niêu) with excellent side dishes.", "address": "27 Tu Xuong, Ward 6, District 3", "maps": "https://goo.gl/maps/YmV8CYruFcpJuE6i8", "google_rating": 4.5, "review_count": 2400, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Gánh Nha Trang", "dish_vn": "", "dish_en": "Nha Trang coastal cuisine", "description": "Coastal cuisine from Nha Trang — fresh seafood and Central Vietnamese flavors.", "address": "91 Hai Ba Trung, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/YS4rzE2ALgwZs4bu8", "google_rating": 4.3, "review_count": 1100, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Mỳ Quảng Mỹ Sơn", "dish_vn": "", "dish_en": "Turmeric noodles (Quảng Nam style)", "description": "Central Vietnamese mì quảng — turmeric noodles with pork, shrimp and toasted rice crackers.", "address": "38B Dinh Tien Hoang, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/VJGk1k5BdqxswTnE9", "google_rating": 4.3, "review_count": 680, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Chè nóng Cô Điệp", "dish_vn": "", "dish_en": "Hot sweet soups (chè)", "description": "Vietnamese hot sweet dessert soups — a warming local comfort food.", "address": "241 Vo Van Tan, Ward 5, District 3", "maps": "https://goo.gl/maps/egPA1NvSY21oD6FN6", "google_rating": 4.3, "review_count": 420, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Xôi chè Bùi Thị Xuân", "dish_vn": "", "dish_en": "Sticky rice & sweet soups", "description": "Popular corner for sticky rice and sweet soups.", "address": "111 Bui Thi Xuan, Pham Ngu Lao Ward, District 1", "maps": "https://goo.gl/maps/2uneNUwipk4ffaWu8", "google_rating": 4.2, "review_count": 340, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Banh mi Hồng Hoa", "dish_vn": "", "dish_en": "Bánh mì", "description": "Well-loved local bánh mì spot in the backpacker district.", "address": "54 Nguyen Van Trang, Pham Ngu Lao Ward, District 1", "maps": "https://goo.gl/maps/KhYw43mSgHBhqTwP7", "google_rating": 4.2, "review_count": 560, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bep Nha Xu Quang", "dish_vn": "", "dish_en": "Homestyle Vietnamese", "description": "Homestyle kitchen with Vietnamese decor and cozy atmosphere.", "address": "16 Tran Cao Van, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/b5rjNGMcNzydX4SZA", "google_rating": 4.3, "review_count": 630, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Den Long Restaurant", "dish_vn": "", "dish_en": "Homecook Vietnamese", "description": "Homecooked Vietnamese restaurant with a warm, lantern-lit vibe.", "address": "130 Nguyen Trai, Ben Thanh Ward, District 1", "maps": "https://goo.gl/maps/C4k3efrsqEupiSGeA", "google_rating": 4.2, "review_count": 890, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Noir Dining In The Dark", "dish_vn": "", "dish_en": "Unique dining experience", "description": "Dining in complete darkness — guided by blind staff. Extraordinary sensory experience.", "address": "180D Hai Ba Trung, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/TN8L9RggqnciVi8z8", "google_rating": 4.4, "review_count": 3200, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "El Gaucho Lê Lợi", "dish_vn": "", "dish_en": "Argentinian steak", "description": "Premium Argentinian steakhouse — dry-aged beef and proper wine list.", "address": "66 Le Loi, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/PoDswgNHncuxo88s5", "google_rating": 4.5, "review_count": 2800, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "El Gaucho Hai Bà Trưng", "dish_vn": "", "dish_en": "Argentinian steak", "description": "Second location of the premium Argentinian steakhouse.", "address": "74 Hai Ba Trung, Ben Nghe Ward, District 1", "maps": "https://g.page/el-gaucho-hai-ba-trung?share", "google_rating": 4.5, "review_count": 2400, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Pizza 4P's", "dish_vn": "", "dish_en": "Farm-to-table pizza", "description": "Beloved farm-to-table pizza with Japanese-Vietnamese fusion toppings. Book ahead.", "address": "8 Thu Khoa Huan, Ben Thanh Ward, District 1", "maps": "https://g.page/pizza4psbenthanh?share", "google_rating": 4.6, "review_count": 9200, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Amdang Typhoon", "dish_vn": "", "dish_en": "Thai cuisine (Michelin)", "description": "Thai restaurant featured in the Michelin Guide — bold flavors, beautiful plating.", "address": "23 Dong Khoi, Ben Nghe Ward, District 1", "maps": "", "google_rating": 4.5, "review_count": 1800, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Au Parc", "dish_vn": "", "dish_en": "Mediterranean cuisine", "description": "Lovely Mediterranean restaurant overlooking Notre Dame Cathedral — reliable and consistent.", "address": "23 Han Thuyen, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/6g3d217tJaViGdv76", "google_rating": 4.3, "review_count": 2900, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Tartine Nguyen Dinh Chieu", "dish_vn": "", "dish_en": "French bakery & brunch", "description": "French-Vietnamese bakery and brunch — excellent croissants and pastries.", "address": "25 Nguyen Dinh Chieu, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/qALgK9NY8iBWY2Rb6", "google_rating": 4.4, "review_count": 1600, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Tartine Binh Thanh", "dish_vn": "", "dish_en": "French bakery & brunch", "description": "French-Vietnamese bakery — second location, slightly more relaxed.", "address": "27 Tran Quang Long, Ward 19, Binh Thanh District", "maps": "https://g.page/TartineSaigon?share", "google_rating": 4.4, "review_count": 980, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Gringo Tacos", "dish_vn": "", "dish_en": "Mexican tacos", "description": "Solid Mexican food in Binh Thanh — decent tacos and margaritas.", "address": "28 Me Linh, Ward 19, Binh Thanh District", "maps": "https://goo.gl/maps/MinbmxJxozsKzTAJA", "google_rating": 4.2, "review_count": 760, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Seoul Galbi Lý Tự Trọng", "dish_vn": "", "dish_en": "Korean BBQ", "description": "Proper Korean BBQ in District 1 — galbi and samgyeopsal done right.", "address": "31B Ly Tu Trong, Ben Nghe Ward, District 1", "maps": "https://g.page/seoulgalbi?share", "google_rating": 4.4, "review_count": 1400, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Baozi", "dish_vn": "", "dish_en": "Steamed bao & dim sum", "description": "Fresh steamed bao buns and dim sum — clean and satisfying.", "address": "106 Hai Ba Trung, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/QTotG7MJD5F9p8yM8", "google_rating": 4.3, "review_count": 720, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Dim Tu Tac", "dish_vn": "", "dish_en": "Cantonese dim sum", "description": "Classic Cantonese dim sum — reliably good, busy on weekends.", "address": "55 Dong Du, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/5t876VHisy6bq5t99", "google_rating": 4.3, "review_count": 1800, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Maison Marou", "dish_vn": "", "dish_en": "Bean-to-bar chocolate café", "description": "Saigon-born artisan chocolate café — try the drinking chocolate, buy bars to take home.", "address": "169 Calmette, Nguyen Thai Binh Ward, District 1", "maps": "https://goo.gl/maps/kCaXfBsCpKUrtC3e6", "google_rating": 4.5, "review_count": 2200, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "MIWAKU", "dish_vn": "", "dish_en": "Japanese fusion fine dining", "description": "Japanese Fusion on the 80th floor of Landmark 81 — one of the world's highest restaurants. Reserve in advance.", "address": "Level 80, Landmark 81, 720A Dien Bien Phu, Binh Thanh", "maps": "https://goo.gl/maps/t15RQSPTjQh4C4hD9", "google_rating": 4.5, "review_count": 1200, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Ussina Aging Beef & Bar", "dish_vn": "", "dish_en": "Western dining, 77F", "description": "Western fine dining with spectacular views from the 77th floor of Landmark 81.", "address": "Floor L77, Landmark 81, Binh Thanh", "maps": "https://g.page/ussina_landmark?share", "google_rating": 4.4, "review_count": 890, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "L'uisine", "dish_vn": "", "dish_en": "French café & brunch", "description": "French-style café and brunch in District 1 — reliable and good.", "address": "19 Le Thanh Ton, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/9EWVWxvvBchRLkk6A", "google_rating": 4.3, "review_count": 1100, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "The Vagabond Artisanal Cakery", "dish_vn": "", "dish_en": "Western cakes & desserts", "description": "Charming artisanal cake shop with creative Western desserts.", "address": "9 Tran Cao Van, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/sQ78UGvRNAL9EsC48", "google_rating": 4.4, "review_count": 560, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Osterberg Ice Cream", "dish_vn": "", "dish_en": "Artisan ice cream", "description": "Freshly made ice cream with natural, high-quality ingredients — waffle cones are excellent.", "address": "94 Xuan Thuy, Thao Dien Ward, District 2", "maps": "https://goo.gl/maps/jhqK4hN7UrG2hYs69", "google_rating": 4.6, "review_count": 1800, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Poke Saigon", "dish_vn": "", "dish_en": "Poke bowls", "description": "Fresh poke bowls and Vietnamese-Hawaiian fusion on the 2nd floor of Nguyen Hue Apartment.", "address": "2nd floor, 42 Nguyen Hue, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/TTvTcNAXEm2p2T6m6", "google_rating": 4.1, "review_count": 620, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "EDDIE'S New York Deli & Diner", "dish_vn": "", "dish_en": "NYC deli & diner", "description": "Classic New York-style deli and diner — comfort food done well.", "address": "73 Pasteur, District 1", "maps": "https://g.page/EddiesD1?share", "google_rating": 4.3, "review_count": 1400, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Back's Burger", "dish_vn": "", "dish_en": "Grilled chicken burgers", "description": "Popular local burger spot known for grilled chicken burgers.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/JZjR8WGo6csLYaLh8?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bún cá Hạnh béo", "dish_vn": "", "dish_en": "Crispy fish noodle soup", "description": "Local favourite for bún cá — crispy fried fish over vermicelli broth.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/zXwNDpNUVqy9wwTK6?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Cheese Coffee", "dish_vn": "", "dish_en": "Tea & milk tea", "description": "Trendy Vietnamese milk tea and cheese foam drinks.", "address": "Ho Chi Minh City, multiple locations", "maps": "", "google_rating": 4.2, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Haidilao", "dish_vn": "", "dish_en": "Sichuan hot pot", "description": "World-famous Sichuan hot pot chain — outstanding service and interactive dining.", "address": "Multiple locations", "maps": "", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Hokkaido Sushi", "dish_vn": "", "dish_en": "Sushi", "description": "Japanese sushi restaurant in Ho Chi Minh City.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/qmHVhZBFADA78mVn7?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Hủ tiếu Nhân quán", "dish_vn": "", "dish_en": "Mixed pork & shrimp noodle soup", "description": "Southern-style hủ tiếu with pork mince and shrimp — a Saigon classic.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/w5NV4ZzrTiWsK2LJ7?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Hue Corner", "dish_vn": "", "dish_en": "Central Vietnamese dishes", "description": "Central Vietnamese specialties — bánh bèo, bánh nậm, and bún bò.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/UVffiEKrA6pXhJPK7?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Huê Hưng Trà Gia", "dish_vn": "", "dish_en": "Wonton noodle soup", "description": "Chinese-Vietnamese wonton noodle soup — a Cholon tradition.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/8ckQ3f6r287WjrMn9?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Iberico", "dish_vn": "", "dish_en": "Spanish tapas", "description": "Authentic Spanish tapas and Iberico ham in Saigon.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/z4GNv3Dxu8npfL4j7?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Ippudo", "dish_vn": "", "dish_en": "Japanese ramen", "description": "Internationally renowned Japanese ramen chain — tonkotsu done right.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/3cyP94mPPjd41CUV7?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Khang Dimsum Bar", "dish_vn": "", "dish_en": "Dim sum", "description": "Modern dim sum bar — solid dumplings and har gow.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/2h9r5guLjkEwxLmS9?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Koi", "dish_vn": "", "dish_en": "Bubble tea", "description": "Taiwanese bubble tea chain with quality ingredients.", "address": "Multiple locations", "maps": "", "google_rating": 4.1, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Mì Ốc hến Dì Lan", "dish_vn": "", "dish_en": "Snail & clam noodle soup", "description": "Noodle soup with fresh snails and clams — a Vietnamese street food gem.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/Zq3REpxDhQDRi9ck7?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Miến gà Kỳ Đồng", "dish_vn": "", "dish_en": "Chicken glass noodle soup", "description": "Delicate glass noodle soup with chicken — clean broth, comforting dish.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/NCJhdMKCfyv6dFhT8?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Nem Vuong", "dish_vn": "", "dish_en": "Squared fried spring rolls", "description": "Square fried spring rolls (nem vuông) — crispy, golden, and stuffed.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/14wxLmyGtV4YFyTR8?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Ốc Liễu", "dish_vn": "", "dish_en": "Various snail dishes", "description": "Wide variety of Vietnamese snail dishes — a popular local hang-out.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/TY9QogL5JJKrTdN47?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Okra Food Bar", "dish_vn": "", "dish_en": "Modern Vietnamese fusion", "description": "Creative modern Vietnamese cooking in a bar setting.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/aUUR7i9kXPQsNzTh8?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Phê La", "dish_vn": "", "dish_en": "Oolong milk tea", "description": "Vietnamese café chain known for creamy oolong milk tea.", "address": "Multiple locations", "maps": "", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Phở Cao Vân", "dish_vn": "", "dish_en": "Beef pho", "description": "Traditional beef pho — rich broth, thin noodles, fresh herbs.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/SUn1e9bNxRstaASE9?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Phổ Đình", "dish_vn": "", "dish_en": "Japanese BBQ (yakiniku)", "description": "Japanese-style BBQ (yakiniku) in Saigon.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/vtR59gTtKQkC8ndL8?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Phở Định", "dish_vn": "", "dish_en": "Beef pho", "description": "Classic beef pho — well-regarded local spot.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/uUEGvChbgEw4Smgt6?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Phúc Long", "dish_vn": "", "dish_en": "Tea & milk tea", "description": "Popular Vietnamese tea and milk tea chain — fresh brewed teas.", "address": "Multiple locations", "maps": "", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Roll Sushi", "dish_vn": "", "dish_en": "Fusion sushi", "description": "Creative Vietnamese-Japanese fusion sushi rolls.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/DrjHnUueRcFEXvbn9?g_st=ic", "google_rating": 4.2, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Thiêm Huy mỳ gia", "dish_vn": "", "dish_en": "Crispy duck noodle soup", "description": "Cantonese-style noodle soup with crispy duck — Cholon classic.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/zmk5N5My3tjX8dRu7?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Tiệm mì Thiệu Ký", "dish_vn": "", "dish_en": "Wonton noodle soup", "description": "Old-school Chinese-Vietnamese wonton noodle soup.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/72T2CxDsuncuNoqP6?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Tomidaya", "dish_vn": "", "dish_en": "Japanese ramen", "description": "Japanese ramen with rich tonkotsu and shoyu options.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/2G4AbUp2GFSz15Xk6?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Trâu Đồng quê", "dish_vn": "", "dish_en": "Grilled buffalo", "description": "Grilled water buffalo dishes — a rustic, countryside-style restaurant.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/tgh8mtEQVjRMHrDa7?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Xôi chợ Tân Định", "dish_vn": "", "dish_en": "Chicken sticky rice", "description": "Market-style sticky rice with chicken — a reliable Saigon breakfast.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/yRYVyBV9ogB9q5ZZ6?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Yoogane", "dish_vn": "", "dish_en": "Korean spicy stir-fried chicken", "description": "Korean dak galbi — spicy stir-fried chicken and cabbage on a tabletop grill.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/P9Hk616ng4SiKjos7?g_st=ic", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Bún riêu tóp mỡ Hương béo", "dish_vn": "", "dish_en": "Tomato & crab noodle soup", "description": "Bún riêu with crispy pork fat — a flavourful and rich Saigon street bowl.", "address": "Ho Chi Minh City", "maps": "", "google_rating": null, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Bornga Saigon", "dish_vn": "", "dish_en": "Korean BBQ", "description": "Authentic Korean BBQ chain — Bornga original recipes, quality meat cuts.", "address": "Ho Chi Minh City", "maps": "https://maps.app.goo.gl/qbaJQZbtuKSZuhM36?g_st=ic", "google_rating": 4.4, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Ngoc Hoang Pagoda (Obama Pagoda)", "dish_vn": "", "dish_en": "", "description": "One of Saigon's oldest pagodas — visited by President Obama in 2016. Stunning incense-filled interior.", "address": "73 Mai Thi Luu, Da Kao Ward, District 1", "maps": "https://goo.gl/maps/h8cMEYmWHgAL7fTV7", "google_rating": 4.6, "review_count": 7200, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Thien Hau Temple", "dish_vn": "", "dish_en": "", "description": "Stunning Chinese-style temple dedicated to the Goddess of the Sea — built 1760 in Cholon.", "address": "710 Nguyen Trai, Ward 11, District 5", "maps": "https://goo.gl/maps/tyoAHEvUaUPgSyoN6", "google_rating": 4.5, "review_count": 5400, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Quan Am Pagoda", "dish_vn": "", "dish_en": "", "description": "Colorful Chinese Buddhist pagoda — one of Chinatown's most ornate temples.", "address": "12 Lao Tu, Ward 11, District 5", "maps": "https://goo.gl/maps/3wbLtVdURkUNRrjs5", "google_rating": 4.5, "review_count": 3100, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Cho Lon (Chinatown)", "dish_vn": "", "dish_en": "", "description": "One of the world's largest Chinatowns — temples, traditional markets and buzzing streets.", "address": "District 5", "maps": "https://goo.gl/maps/dMgEkaEuyExJrTnH9", "google_rating": 4.3, "review_count": 4800, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "HCMC Fine Art Museum", "dish_vn": "", "dish_en": "", "description": "Beautiful French colonial building housing Vietnamese fine art — built by one of Saigon's wealthiest historical figures.", "address": "97A Pho Duc Chinh, Nguyen Thai Binh Ward, District 1", "maps": "https://goo.gl/maps/kwxYPrYQgt4Yr7Nw7", "google_rating": 4.4, "review_count": 3600, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Fito Museum", "dish_vn": "", "dish_en": "", "description": "Museum of Traditional Vietnamese Medicine — nearly 3,000 artifacts dating back to the Stone Age.", "address": "41 Hoang Du Khuong, Ward 12, District 10", "maps": "https://goo.gl/maps/VTcw9hTUqCTsbiy57", "google_rating": 4.5, "review_count": 1200, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "History Museum of HCMC", "dish_vn": "", "dish_en": "", "description": "Thousands of years of Vietnamese history and culture — well worth a few hours.", "address": "2 Nguyen Binh Khiem, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/oTyS7byAYH4oBcnx9", "google_rating": 4.3, "review_count": 4100, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Mariamman Hindu Temple", "dish_vn": "", "dish_en": "", "description": "Vietnam's most famous Hindu temple, built in the 19th century for Tamil immigrants.", "address": "45 Truong Dinh, Ben Thanh Ward, District 1", "maps": "https://goo.gl/maps/YUWUkD6c8fT5wD9a8", "google_rating": 4.5, "review_count": 2800, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Saigon Central Mosque", "dish_vn": "", "dish_en": "", "description": "Historic mosque serving Saigon's Muslim community since the colonial era.", "address": "66 Dong Du, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/RjfxJqxzAX3vQjTN9", "google_rating": 4.5, "review_count": 1900, "personal_rating": ""},
+{"city": "saigon", "category": "Landmarks", "name": "Tomb of Lê Văn Duyệt", "dish_vn": "", "dish_en": "", "description": "Historic mausoleum of a revered Vietnamese general — important cultural site.", "address": "01 Vu Tung, Ward 1, Binh Thanh District", "maps": "https://goo.gl/maps/xB7s5kJ6koT6cjMJ6", "google_rating": 4.4, "review_count": 1600, "personal_rating": ""},
+{"city": "saigon", "category": "Photography", "name": "Tan Dinh Church (Pink Church)", "dish_vn": "", "dish_en": "", "description": "Second largest church in HCMC — painted pastel-pink since 1957. An iconic photography spot.", "address": "289 Hai Ba Trung, Ward 8, District 3", "maps": "https://goo.gl/maps/e3rtAGQ92joyqWk88", "google_rating": 4.6, "review_count": 8900, "personal_rating": ""},
+{"city": "saigon", "category": "Photography", "name": "Hao Sy Phuong Alley", "dish_vn": "", "dish_en": "", "description": "100-year-old alley with colorful colonial-style houses — a hidden gem for street photography.", "address": "206/17 Tran Hung Dao, Ward 11, District 5", "maps": "https://goo.gl/maps/bv4CvuoLU6JwrjAe8", "google_rating": 4.4, "review_count": 3200, "personal_rating": ""},
+{"city": "saigon", "category": "Photography", "name": "Thu Thiem Bridge", "dish_vn": "", "dish_en": "", "description": "One of the best spots in Saigon to catch sunset over the river.", "address": "Thu Thiem, District 2", "maps": "https://goo.gl/maps/RSbnkbyVFCGRrHLS7", "google_rating": 4.3, "review_count": 2100, "personal_rating": ""},
+{"city": "saigon", "category": "Photography", "name": "Landmark 81", "dish_vn": "", "dish_en": "", "description": "Tallest building in Vietnam — a dramatic landmark visible from across the city.", "address": "Tran Trong Kim, Ward 22, Binh Thanh District", "maps": "https://goo.gl/maps/uBo7ibMxT1iGotUq8", "google_rating": 4.5, "review_count": 12000, "personal_rating": ""},
+{"city": "saigon", "category": "Shopping", "name": "Binh Tay Market", "dish_vn": "", "dish_en": "", "description": "100-year-old wholesale market in Chinatown — food, fabrics and cosmetics at local prices.", "address": "57A Thap Muoi, Ward 2, District 6", "maps": "https://goo.gl/maps/RiMeB2SMKTMoeHso6", "google_rating": 4.3, "review_count": 5600, "personal_rating": ""},
+{"city": "saigon", "category": "Shopping", "name": "An Nam Gourmet", "dish_vn": "", "dish_en": "", "description": "French-Vietnamese gourmet grocery and deli — best imported and local food products.", "address": "16-18 Hai Ba Trung, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/7BkLGedbPch5N9fq8", "google_rating": 4.4, "review_count": 1400, "personal_rating": ""},
+{"city": "saigon", "category": "Shopping", "name": "L'angfarm Store", "dish_vn": "", "dish_en": "", "description": "Da Lat specialty retail chain — famous for dried fruit and local snacks, perfect for gifts.", "address": "B3, Vincom Center, 72 Le Thanh Ton, District 1", "maps": "https://goo.gl/maps/777kMzALwEMfxTQv8", "google_rating": 4.3, "review_count": 860, "personal_rating": ""},
+{"city": "saigon", "category": "Shopping", "name": "The Craft House", "dish_vn": "", "dish_en": "", "description": "Vietnam's first curated retailer of modern craft and design — creative gifts.", "address": "107 Nguyen Hue, Ben Nghe Ward, District 1", "maps": "https://goo.gl/maps/AB5fFfwJ6zaGdCuUA", "google_rating": 4.4, "review_count": 680, "personal_rating": ""},
+{"city": "saigon", "category": "Spa & Wellness", "name": "Hum Spa", "dish_vn": "", "dish_en": "", "description": "Elegant spa connected to the Hum restaurant group — treatments in a tranquil setting.", "address": "114 Le Thi Rieng, Ben Thanh Ward, District 1", "maps": "https://goo.gl/maps/CA6pK6WQsy9RCKW19", "google_rating": 4.4, "review_count": 780, "personal_rating": ""},
+{"city": "saigon", "category": "Spa & Wellness", "name": "Lam Spa", "dish_vn": "", "dish_en": "", "description": "Popular local spa in the charming Tan Dinh neighbourhood.", "address": "7 Dang Tat, Tan Dinh Ward, District 1", "maps": "https://goo.gl/maps/TVwzoHB7GdSyK9bN7", "google_rating": 4.3, "review_count": 490, "personal_rating": ""},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Bún chả Tuyết", "dish_vn": "Bún chả", "dish_en": "Vermicelli with grilled pork & meatballs", "description": "One of the best bún chả spots in Hanoi — charcoal-grilled pork over cold noodles with dipping broth.", "address": "34 Hàng Than", "maps": "https://maps.app.goo.gl/qsVDozCsP6pcPXYb8?g_st=ic", "google_rating": 4.5, "review_count": 980, "personal_rating": "★★★★★"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Phở Khôi hói", "dish_vn": "Phở lõi, phở bắp", "dish_en": "Beef pho", "description": "Classic Northern beef pho — well-skimmed broth, tender beef slices.", "address": "50 Hàng Vải", "maps": "https://maps.app.goo.gl/W9hzX3iRFYuR4x1j8?g_st=ic", "google_rating": 4.5, "review_count": 780, "personal_rating": "★★★★★"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Bún đậu mắm tôm Hàng Khay", "dish_vn": "Bún đậu", "dish_en": "Vermicelli with shrimp paste & fried tofu", "description": "Quintessential Hanoi street food — fried tofu and pork with potent shrimp paste.", "address": "Ngõ 31 Hàng Khay", "maps": "https://maps.app.goo.gl/S8biCYunYnMrVgvQ6?g_st=ic", "google_rating": 4.3, "review_count": 620, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Bún ngan Nhàn", "dish_vn": "Bún ngan", "dish_en": "Duck vermicelli soup", "description": "Silky duck noodle soup with rich broth — a Hanoi specialty.", "address": "Ngõ Trung Yên", "maps": "https://maps.app.goo.gl/j2qRQp9gHHUU4t7i9?g_st=ic", "google_rating": 4.4, "review_count": 540, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Bún ốc cô Thêm", "dish_vn": "Bún ốc", "dish_en": "Vermicelli soup with snails", "description": "Tangy snail vermicelli soup — a very Hanoian, polarizing dish.", "address": "6 Hàng Chai", "maps": "https://maps.app.goo.gl/zTa8VUEKcLhVVCESA?g_st=ic", "google_rating": 4.3, "review_count": 480, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Bún Thuỷ", "dish_vn": "Bún sườn mọc", "dish_en": "Meatball and rib vermicelli soup", "description": "Hearty vermicelli soup with pork ribs and handmade meatballs.", "address": "10C Ngõ Đào Duy Từ", "maps": "https://maps.app.goo.gl/X38fVgcgTvQy1hYo7?g_st=ic", "google_rating": 4.3, "review_count": 390, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Miến trộn mực Ngõ Trung Yên", "dish_vn": "Miến trộn mực", "dish_en": "Glass noodles with dried squid & seafood", "description": "Cold mixed glass noodles with dried squid — a unique Hanoi street dish.", "address": "Ngõ Trung Yên", "maps": "https://maps.app.goo.gl/bdCijLQbzRPdZZWr8?g_st=ic", "google_rating": 4.3, "review_count": 310, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Xôi Yến", "dish_vn": "Xôi (nói chung)", "dish_en": "Sticky rice with toppings", "description": "Famous sticky rice shop — choose from dozens of toppings like pork floss, fried shallots, and eggs.", "address": "35B Nguyễn Hữu Huân", "maps": "https://maps.app.goo.gl/MLEDd7FYm7JjGL3h8?g_st=ic", "google_rating": 4.5, "review_count": 3200, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Bún ốc cô Béo", "dish_vn": "Bún ốc", "dish_en": "Vermicelli soup with snails", "description": "Another beloved Hanoi bún ốc spot.", "address": "2 Hoè Nhai", "maps": "https://www.foody.vn/ha-noi/bun-oc-co-beo", "google_rating": 4.1, "review_count": 280, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Cháo sườn Ngõ Huyện", "dish_vn": "Cháo sườn", "dish_en": "Rice porridge with crispy breadsticks", "description": "Silky rice porridge with pork ribs and yóutiáo — a Hanoi morning staple.", "address": "Ngõ Huyện", "maps": "https://maps.app.goo.gl/Gu9qRHz4W5oS1APBA?g_st=ic", "google_rating": 4.2, "review_count": 420, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Mỳ Chinh", "dish_vn": "Mì xào tim cật", "dish_en": "Stir-fried noodles with pig heart & kidney", "description": "Stir-fried offal noodles — for the adventurous. Rich, deeply savoury.", "address": "20 Ngõ Hàng Bột", "maps": "https://maps.app.goo.gl/dMpDvDVXG8qnh7wT9?g_st=ic", "google_rating": 4.1, "review_count": 240, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Mỳ vằn thắn Đinh Liệt", "dish_vn": "Mỳ vằn thắn", "dish_en": "Wonton noodles", "description": "Hanoi-style wonton noodles — clear broth with handmade wontons.", "address": "9A Đinh Liệt", "maps": "https://maps.app.goo.gl/dmTGZbdwvr8pCyf37?g_st=ic", "google_rating": 4.2, "review_count": 380, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Phở xào Phú Mỹ", "dish_vn": "Phở xào", "dish_en": "Stir-fried pho noodles", "description": "Stir-fried pho — crispy noodles with beef and vegetables.", "address": "45B Bát Đàn", "maps": "https://maps.app.goo.gl/Rs7tXHPwHkGsjLqk6?g_st=ic", "google_rating": 4.2, "review_count": 290, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Breakfast & Lunch", "name": "Xôi bà Thảo", "dish_vn": "Xôi chả cua", "dish_en": "Sticky rice with crab cakes", "description": "Sticky rice topped with crab cakes — an unusual and excellent Hanoi morning dish.", "address": "41 Đường Thành", "maps": "https://maps.app.goo.gl/ZVsrd4Cd4FSVcrmG9?g_st=ic", "google_rating": 4.2, "review_count": 310, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Coffee & Juice", "name": "Cafe Giảng", "dish_vn": "Cafe trứng", "dish_en": "Egg coffee", "description": "The original egg coffee (cà phê trứng) shop — Hanoi's most iconic drink. Founded 1946.", "address": "39 Nguyễn Hữu Huân", "maps": "https://maps.app.goo.gl/VELT5n9oKHgK91m37?g_st=ic", "google_rating": 4.5, "review_count": 12000, "personal_rating": "★★★★★"},
+{"city": "hanoi", "category": "Coffee & Juice", "name": "Cafe Reng Reng", "dish_vn": "specialty coffee", "dish_en": "Specialty coffee", "description": "Excellent specialty coffee roastery — one of Hanoi's best third-wave coffee shops.", "address": "12B Lý Nam Đế", "maps": "https://maps.app.goo.gl/4wS8rZjh11pJDhKA9?g_st=ic", "google_rating": 4.6, "review_count": 680, "personal_rating": "★★★★★"},
+{"city": "hanoi", "category": "Coffee & Juice", "name": "Thai Yen Cafe", "dish_vn": "specialty coffee", "dish_en": "Specialty coffee (try Sapa, Solar)", "description": "Specialty coffee with standout signature drinks. Multiple locations across Hanoi.", "address": "Multiple locations", "maps": "https://maps.app.goo.gl/zadS7t3GEjTwqRC87?g_st=ic", "google_rating": 4.5, "review_count": 1200, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Coffee & Juice", "name": "Kem dừa Hàng Than", "dish_vn": "Kem dừa & caramen", "dish_en": "Coconut ice cream & flan", "description": "Famous coconut ice cream and crème caramel on Hanoi's snack street.", "address": "29 Hàng Than", "maps": "https://maps.app.goo.gl/yVhckzFEBwMVbfCBA?g_st=ic", "google_rating": 4.3, "review_count": 920, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Coffee & Juice", "name": "Maison Marou (Hanoi)", "dish_vn": "Sô cô la", "dish_en": "Vietnamese chocolate", "description": "Bean-to-bar chocolate café — same excellent Marou chocolate, Hanoi outpost.", "address": "91A Thợ Nhuộm", "maps": "https://maps.app.goo.gl/UCsa1EJKbv1iYwiR6?g_st=ic", "google_rating": 4.4, "review_count": 780, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Chả cá Thăng Long", "dish_vn": "Chả cá", "dish_en": "Grilled turmeric fish with dill", "description": "Hanoi's most iconic dish — grilled fish cooked tableside with dill and shrimp paste.", "address": "6B Đường Thành", "maps": "https://maps.app.goo.gl/EzjHGYtRx9iGKSoU6?g_st=ic", "google_rating": 4.5, "review_count": 4200, "personal_rating": "★★★★★"},
+{"city": "hanoi", "category": "Dinner", "name": "Bún ngan cô Hiền", "dish_vn": "Bún chả ngan", "dish_en": "Vermicelli with duck skewers", "description": "Grilled duck skewers over cold vermicelli with rich dipping sauce.", "address": "75 Hàng Bông", "maps": "https://maps.app.goo.gl/5Ke2ur9FecesiKEd6?g_st=ic", "google_rating": 4.3, "review_count": 580, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Phong Ớ", "dish_vn": "Lẩu ếch", "dish_en": "Frog hot pot", "description": "Frog hot pot — unusual, delicious, very local Hanoi experience.", "address": "72 Phó Đức Chính", "maps": "https://maps.app.goo.gl/J8L4EPH2JfRgWLN56?g_st=ic", "google_rating": 4.3, "review_count": 430, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Mì gà tần 24", "dish_vn": "Mì gà tần", "dish_en": "Chicken noodle soup with Chinese herbs", "description": "Noodle soup with slow-cooked chicken stewed in Chinese medicinal herbs — restorative.", "address": "24 Hàng Bồ", "maps": "https://maps.app.goo.gl/YZ4E11tGa9q2635u8?g_st=ic", "google_rating": 4.4, "review_count": 760, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Phở cuốn Hưng Bền", "dish_vn": "Phở cuốn", "dish_en": "Fresh pho rolls", "description": "Pho rolls — tender beef and herbs wrapped in fresh rice sheets. West Lake specialty.", "address": "33 Ngũ Xã", "maps": "https://maps.app.goo.gl/MGAQmjH2ttKzcNQg8?g_st=ic", "google_rating": 4.4, "review_count": 890, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Bánh mì Trâm", "dish_vn": "Bánh mì sốt vang", "dish_en": "Baguette with beef stew", "description": "Vietnamese baguette dipped in red wine beef stew — hearty and warming.", "address": "252 Hàng Bông", "maps": "https://maps.app.goo.gl/aPeMjxAmFZYvNDxr5?g_st=ic", "google_rating": 4.2, "review_count": 520, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Bún thang bà Đức", "dish_vn": "Bún Thang", "dish_en": "Vermicelli with assorted toppings", "description": "Delicate Hanoi bún thang — egg strips, chicken, pork and shrimp paste in clear broth.", "address": "48 Cầu Gỗ", "maps": "https://maps.app.goo.gl/cwVyMCsV1DBV2pxp6", "google_rating": 4.2, "review_count": 460, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Cơm rang dưa bò bà Dung", "dish_vn": "Cơm rang dưa bò", "dish_en": "Fried rice with beef and pickled vegetables", "description": "Fried rice with beef and fermented mustard greens — a comforting and unusual pairing.", "address": "39 Mã Mây", "maps": "https://www.foody.vn/ha-noi/com-rang-dua-bo-ba-dung", "google_rating": 4.2, "review_count": 310, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Lòng rán Nhất Quán", "dish_vn": "Lòng rán", "dish_en": "Fried pig's intestines", "description": "Crispy fried pig's intestines — adventurous, very local Hanoi late-night dish.", "address": "23 Nguyễn Siêu", "maps": "https://maps.app.goo.gl/7mjmnN2PUToWywtL7?g_st=ic", "google_rating": 4.1, "review_count": 280, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Miến lươn Đông Thịnh", "dish_vn": "Miến lươn trộn", "dish_en": "Glass noodles with crispy eels", "description": "Glass noodles with crispy fried eels — a Hanoi delicacy.", "address": "87 Hàng Điếu", "maps": "https://maps.app.goo.gl/myZj3SYy2ohPT4ULA?g_st=ic", "google_rating": 4.3, "review_count": 520, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Phở Hạnh", "dish_vn": "Phở gà trộn", "dish_en": "Mixed chicken pho", "description": "Cold mixed chicken pho (phở gà trộn) — dry-style with herbs and toppings.", "address": "65 Lãn Ông", "maps": "https://maps.app.goo.gl/1x7tH4G1heRLwpzg7?g_st=ic", "google_rating": 4.2, "review_count": 340, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Dinner", "name": "Phở gà trộn Mã Mây", "dish_vn": "Phở gà trộn", "dish_en": "Mixed chicken pho", "description": "Another excellent spot for Hanoi-style cold mixed chicken pho.", "address": "47 Mã Mây", "maps": "https://www.foody.vn/ha-noi/pho-ga-tron-ma-may", "google_rating": 4.2, "review_count": 290, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Ốc Trang", "dish_vn": "Ốc luộc", "dish_en": "Boiled snails", "description": "Best boiled snails in Hanoi — dozen varieties, lively atmosphere.", "address": "1A Đinh Liệt", "maps": "https://maps.app.goo.gl/6q97ErM7C6qNdTGJA?g_st=ic", "google_rating": 4.5, "review_count": 2100, "personal_rating": "★★★★★"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Nem chua rán Ngõ Tạm Thương", "dish_vn": "Nem chua rán", "dish_en": "Deep-fried fermented pork rolls", "description": "Crispy deep-fried fermented pork rolls on a famous Hanoi snack alley.", "address": "Ngõ Tạm Thương", "maps": "https://maps.app.goo.gl/6ZLh3Vcw876Dpsgc6?g_st=ic", "google_rating": 4.3, "review_count": 780, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Nem nướng Yên Béo", "dish_vn": "Nem nướng", "dish_en": "Grilled fermented pork skewers", "description": "Grilled fermented pork nem — smoky, slightly sour, addictive.", "address": "44 Yên Phụ", "maps": "https://www.foody.vn/ha-noi/nem-nuong-yen-phu", "google_rating": 4.3, "review_count": 560, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Nộm Mai Nga", "dish_vn": "Nộm bò khô, bánh bột lọc", "dish_en": "Beef jerky salad & tapioca dumplings", "description": "Beef jerky salad with green papaya and tapioca dumplings — a Hanoi street snack staple.", "address": "25 Hàm Long", "maps": "https://maps.app.goo.gl/KdKPDzQ2FDAwrL7t7?g_st=ic", "google_rating": 4.4, "review_count": 1200, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Quán Bà Ngà", "dish_vn": "Bánh mỳ thịt xiên", "dish_en": "Grilled pork skewer with bread", "description": "Legendary grilled pork skewer with bánh mì — a beloved Hanoi street snack.", "address": "31 Quang Trung", "maps": "https://maps.app.goo.gl/x26FFhEub8V9TUNN8", "google_rating": 4.4, "review_count": 1800, "personal_rating": "★★★★☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Quán Gốc Đa", "dish_vn": "Bánh gối, bánh rán", "dish_en": "Crispy pillow cakes & fried dumplings", "description": "Crispy bánh gối (pillow cakes) and bánh rán — old-school Hanoi fried snacks.", "address": "52 Lý Quốc Sư", "maps": "https://maps.app.goo.gl/LwNkxi2D6vfmzBWw8?g_st=ic", "google_rating": 4.2, "review_count": 640, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Tú Gà", "dish_vn": "Cánh gà rang muối", "dish_en": "Salt-fried chicken wings", "description": "Salt-crusted deep-fried chicken wings — crispy, addictive.", "address": "14 Hàng Thùng", "maps": "https://maps.app.goo.gl/vwUXnq4WZeMkvk94A?g_st=ic", "google_rating": 4.2, "review_count": 480, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Nem chua nướng Thuý", "dish_vn": "Nem chua nướng", "dish_en": "Grilled fermented pork", "description": "Grilled nem chua near St. Joseph Cathedral — a popular late-night snack.", "address": "10 Ấu Triệu", "maps": "https://maps.app.goo.gl/qaocEUPPSGzn3tHo8?g_st=ic", "google_rating": 4.2, "review_count": 380, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Long Vi Dung", "dish_vn": "Nộm bò khô, bánh bột lọc", "dish_en": "Beef jerky salad & tapioca dumplings", "description": "Classic Hoan Kiem snack spot — beef jerky salad and tapioca dumplings.", "address": "23 Phố Hồ Hoàn Kiếm", "maps": "https://maps.app.goo.gl/PE3a2yA5AoY7j5JE6?g_st=ic", "google_rating": 4.3, "review_count": 490, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Quẩy nóng Hàng Bông", "dish_vn": "Quẩy", "dish_en": "Crispy breadsticks", "description": "Hot crispy breadsticks — typically eaten with pho or congee.", "address": "73 Hàng Bông", "maps": "https://www.foody.vn/ha-noi/quay-nong-hang-bong", "google_rating": 4.1, "review_count": 220, "personal_rating": "★★★☆☆"},
+{"city": "hanoi", "category": "Quick Bites", "name": "Xôi chè bà Thìn", "dish_vn": "Xôi chè", "dish_en": "Sweet soup with sticky rice", "description": "Sticky rice and sweet dessert soups at the edge of the Old Quarter.", "address": "1 Bát Đàn", "maps": "https://maps.app.goo.gl/E2Lymab6BEaqr4rR7?g_st=ic", "google_rating": 4.2, "review_count": 340, "personal_rating": "★★★☆☆"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Fujiro", "dish_vn": "", "dish_en": "Japanese tonkatsu & fried oysters", "description": "Jovel Chan pick: Beloved Japanese tonkatsu set — crispy fried oysters (kaki) are the real draw. Packed with Japanese regulars at lunch.", "address": "8a/8b1 Thai Van Lung, District 1", "maps": "https://bit.ly/3Qh80LJ", "google_rating": 4.5, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Ittou Ramen", "dish_vn": "", "dish_en": "Tsukemen (dipping ramen)", "description": "Jovel Chan pick: Favourite ramen in Saigon — thick handmade noodles with rich dipping broth. Hidden alley near Japantown.", "address": "8/8 Le Thanh Ton alley, District 1", "maps": "https://bit.ly/3CnwL37", "google_rating": 4.5, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "The Elbow Room Bistro", "dish_vn": "", "dish_en": "American comfort food", "description": "Jovel Chan pick: Saigon's original American diner since 2009 — San Francisco clam chowder in a bread bowl is the signature.", "address": "52 Pasteur, District 1", "maps": "https://bit.ly/3jI6LJf", "google_rating": 4.3, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Sol Kitchen", "dish_vn": "", "dish_en": "Mediterranean / Argentinian-Mexican small plates", "description": "Jovel Chan pick: Playful Mediterranean interiors, bold flavours and great cocktails. Excellent value for lunch or dinner.", "address": "115 Ly Tu Trong, District 1", "maps": "https://bit.ly/3jJ2UM5", "google_rating": 4.5, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Elgin", "dish_vn": "", "dish_en": "Modern fusion (open kitchen)", "description": "Jovel Chan pick: Airy two-story restaurant — try the duck roti with blue cheese fondue and razor clam fried rice. Sit at the counter.", "address": "27 Mac Dinh Chi, Ben Nghe Ward, District 1", "maps": "https://bit.ly/3jOIZLU", "google_rating": 4.6, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Quince", "dish_vn": "", "dish_en": "Fine casual fusion", "description": "Jovel Chan pick: Best Restaurant in Vietnam (2020), Asia Top 50 Discovery. Spicy salmon nori taco and BBQ Hokkaido scallops are the standouts.", "address": "37bis Ky Con, Nguyen Thai Binh Ward, District 1", "maps": "https://bit.ly/3vxx73z", "google_rating": 4.7, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Lesung", "dish_vn": "", "dish_en": "Malaysian cuisine", "description": "Jovel Chan pick: Two ex-fine-dining chefs serving authentic Malaysian flavors — prawn sambal petai and Nyonya lamb curry.", "address": "72/1 Tran Quoc Toan, Ward 8, District 3", "maps": "https://www.facebook.com/lesungsgn", "google_rating": 4.6, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Sakura Yakiniku", "dish_vn": "", "dish_en": "A5 Wagyu yakiniku & shabu-shabu", "description": "Jovel Chan pick: Premium A5 Wagyu beef yakiniku and shabu-shabu, 15 years of culinary excellence brought to Saigon.", "address": "182 Pasteur, Ben Nghe Ward, District 1", "maps": "https://www.facebook.com/SakuraYakinikuPasteur", "google_rating": 4.6, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "An's Saigon", "dish_vn": "", "dish_en": "Modern Vietnamese (chef's table)", "description": "Jovel Chan pick: Multi-concept sanctuary — spa, chef's table, al fresco cafe and garden. Vietnamese flavors reimagined with local ingredients.", "address": "5A Tong Huu Dinh, Thao Dien, District 2", "maps": "https://bit.ly/3iidedz", "google_rating": 4.7, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Brix Villa", "dish_vn": "", "dish_en": "Mediterranean-Asian wood-fired", "description": "Jovel Chan pick: Wood-fired kitchen by ex-Quince head chef in Thao Dien. Mediterranean-Asian fusion with premium ingredients.", "address": "26 Tran Ngoc Dien, Thao Dien, District 2", "maps": "https://www.instagram.com/thebrixsaigon/", "google_rating": 4.6, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "La Villa French Restaurant", "dish_vn": "", "dish_en": "French fine dining", "description": "Jovel Chan pick: Chef Thierry Mounan's luxurious French tasting menus in a charming villa. Cheese trolley, foie gras, and the famous apple tart.", "address": "14 Ngo Quang Huy, Thao Dien, District 2", "maps": "https://bit.ly/3WXVzqi", "google_rating": 4.6, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Olivia Dining", "dish_vn": "", "dish_en": "Modern Australian tasting menu", "description": "Jovel Chan pick: Elegantly minimalistic tasting menu by ex-Lakehouse Daylesford (two-hat) chef David Green — local Vietnamese ingredients, expert technique.", "address": "31A Le Van Mien, Thao Dien, District 2", "maps": "https://bit.ly/3jQYq64", "google_rating": 4.7, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Chevap", "dish_vn": "", "dish_en": "Balkan cuisine", "description": "Jovel Chan pick: HCMC's only Balkan restaurant — handmade Ćevapi with flatbread and ajvar sauce. Utterly unique in Saigon.", "address": "22A01 Duong 64, Thao Dien, District 2", "maps": "https://bit.ly/3WKKgCi", "google_rating": 4.5, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Eating - Viet", "name": "Spice Bistro", "dish_vn": "", "dish_en": "Vietnamese (tranquil garden)", "description": "Jovel Chan's top casual Vietnamese pick — mixed rice noodles with pork and grilled eel in turmeric leaves, in a beautiful outdoor garden.", "address": "32 Duong so 11, Thao Dien, District 2", "maps": "https://bit.ly/3Z6kZE6", "google_rating": 4.5, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Drinking", "name": "Mami Cocktails", "dish_vn": "", "dish_en": "Creative cocktails & Asian tapas", "description": "Jovel Chan pick: Seductive neon-and-velvet cocktail bar in Thao Dien — half-price cocktails during happy hour (5–8pm).", "address": "97a Xuan Thuy, Thao Dien, District 2", "maps": "https://www.instagram.com/mamicocktails.vn/", "google_rating": 4.5, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Drinking", "name": "CLAY", "dish_vn": "", "dish_en": "Riverside BBQ & cocktails", "description": "Jovel Chan pick: Riverside open-air dining with live DJ, happy hour sangrias at 100k VND, and great ribs. Thao Dien waterfront vibe.", "address": "18 Duong so 6, Thao Dien, District 2", "maps": "https://bit.ly/3vEGLRX", "google_rating": 4.4, "review_count": null, "personal_rating": "", "source": "Jovel Chan"},
+{"city": "saigon", "category": "Café", "name": "Bartels", "dish_vn": "", "dish_en": "Sourdough sandwiches, cold-pressed juices & coffee", "description": "Your neighborhood Thao Dien hangout — fresh-baked sourdough sandwiches, cold-pressed juices and great coffee. Open 7am–6pm daily.", "address": "11B Thảo Điền, Quận 2 (Thao Dien)", "maps": "https://www.facebook.com/p/Bartels-Vietnam-Sourdough-Sandwiches-Coffee-Juicery-61573456017771/", "google_rating": 4.6, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - NonViet", "name": "Om Momo", "dish_vn": "", "dish_en": "Tibetan dumplings & cuisine", "description": "Vietnam's first authentic Tibetan restaurant — handmade momo dumplings and traditional Tibetan dishes. Born out of love in Thao Dien.", "address": "11/2 Street 57, Thảo Điền, Quận 2", "maps": "https://www.facebook.com/p/Om-Momo-61571081364278/", "google_rating": 4.5, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Prem Bistro", "dish_vn": "", "dish_en": "Plant-based Vietnamese/Indian/Western fusion", "description": "Rooftop vegetarian bistro with a creative fusion of Vietnamese, Indian and Western plant-based food. Smoothies, lassi, vegan pizza and curries. Peaceful vibe in District 1.", "address": "Level 4 & Rooftop, 187/15 Dien Bien Phu, District 1", "maps": "https://www.prembistro.com/", "google_rating": 4.5, "review_count": 420, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "ChanChan Noodle", "dish_vn": "", "dish_en": "Hong Kong-style vegan noodles", "description": "Celebrity-founded vegan noodle bar — Hong Kong style, packed with celebrities and regulars. Founded by actress Ngô Thanh Vân and chef Huy Trần. Open daily 11am–10pm.", "address": "25A Ngô Quang Huy, An Khánh, Thảo Điền", "maps": "https://www.facebook.com/ChanChanNoodleRestaurant/", "google_rating": 4.3, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Shamballa Tea House", "dish_vn": "", "dish_en": "Tibetan-inspired vegetarian & vegan", "description": "Tibetan Buddhism-inspired vegetarian haven — serene atmosphere with mantras, Buddhist music and a grand ceiling near Ben Thanh Market. Tripadvisor 4.9/5 (548 reviews).", "address": "17-19 Trịnh Văn Cấn, District 1", "maps": "https://www.shamballa.co/location/pure-vegetarian-teahouse-saigon/", "google_rating": 4.9, "review_count": 548, "personal_rating": ""},
+{"city": "saigon", "category": "Eating - Viet", "name": "Shamballa Lounge", "dish_vn": "", "dish_en": "Tibetan-inspired vegetarian lounge", "description": "The second Shamballa — a lush vegetarian lounge with rooftop seating. Same Tibetan soul, different atmosphere. Bustling ground floor or breathtaking views above.", "address": "31 Ly Tu Trong, District 1", "maps": "https://www.shamballa.co/location/lush-vegetarian-lounge-saigon/", "google_rating": 4.9, "review_count": 94, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Every Half Coffee (Flagship – Ngô Văn Năm)", "dish_vn": "", "dish_en": "Specialty coffee roastery — roast your own", "description": "Every Half's boutique flagship in a renovated 90s Saigon house — you can roast your own coffee if you book in advance. 27+ locations across HCMC. Every half bean has its soulmate.", "address": "19A Ngô Văn Năm, Ben Nghe Ward, District 1", "maps": "https://www.everyhalf.vn/store", "google_rating": 4.6, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Every Half Coffee (Tú Xương)", "dish_vn": "", "dish_en": "Specialty coffee — daily roasting", "description": "Every Half's happening District 3 location with daily roasting activities. Lively atmosphere near Vo Thi Sau.", "address": "6E Tú Xương, District 3", "maps": "https://www.everyhalf.vn/store", "google_rating": 4.6, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Every Half Coffee (Thi Sách D1)", "dish_vn": "", "dish_en": "Specialty coffee — minimalist counter", "description": "Every Half's cozy minimalist counter in the heart of District 1. Ideal for coffee enthusiasts between meetings.", "address": "26 Thi Sách, Ben Nghe Ward, District 1", "maps": "https://www.everyhalf.vn/store", "google_rating": 4.6, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Café", "name": "Every Half Coffee (Roastery Thao Dien)", "dish_vn": "", "dish_en": "Specialty coffee roastery", "description": "Every Half's main roastery in District 2 — the production heart of the operation, with the coffee craft on full display.", "address": "01 Đường số 10, Thảo Điền, Thủ Đức", "maps": "https://www.everyhalf.vn/store", "google_rating": 4.6, "review_count": null, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Xào Xạc Bar", "dish_vn": "", "dish_en": "Cocktails, craft beer & snacks", "description": "Ranked #38 of 4,599 Saigon restaurants on Tripadvisor (175 reviews). Laid-back bar under the eaves — cocktails, beer and nibbles. Described as 'rì rào với nhau' — whispering with each other beneath the rustle of leaves. Thao Dien location.", "address": "Số 1 Đường 47, Thảo Điền, Quận 2", "maps": "https://www.tripadvisor.com/Restaurant_Review-g293925-d26369001-Reviews-Xao_X_c_Bar-Ho_Chi_Minh_City.html", "google_rating": 4.8, "review_count": 175, "personal_rating": ""},
+{"city": "saigon", "category": "Drinking", "name": "Xào Xạc Bar (District 1)", "dish_vn": "", "dish_en": "Cocktails, craft beer & snacks", "description": "Second location of the beloved Xào Xạc Bar — same chill porch-bar energy in the heart of District 1.", "address": "20 Mac Thi Buoi, Ben Nghe Ward, District 1", "maps": "", "google_rating": 4.7, "review_count": null, "personal_rating": ""}
+];
+
+let activeCity = 'all';
+let activeCategory = 'all';
+
+function setCity(city) {
+  activeCity = city;
+  document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('city-' + city).classList.add('active');
+  buildCategoryFilters();
+  renderCards();
+}
+
+function buildCategoryFilters() {
+  const visible = activeCity === 'all' ? allData : allData.filter(d => d.city === activeCity);
+  const cats = [...new Set(visible.map(d => d.category))].sort();
+  const container = document.getElementById('categoryFilters');
+  container.innerHTML = `<button onclick="setCategory('all')" id="cat-all" class="filter-btn active px-3 py-1.5 rounded-full border border-gray-300 text-xs font-medium transition-all">All</button>`;
+  cats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.id = 'cat-' + cat;
+    btn.className = 'filter-btn px-3 py-1.5 rounded-full border border-gray-300 text-xs font-medium transition-all';
+    btn.textContent = cat;
+    btn.onclick = () => setCategory(cat);
+    container.appendChild(btn);
+  });
+}
+
+function setCategory(cat) {
+  activeCategory = cat;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('cat-' + cat);
+  if (el) el.classList.add('active');
+  renderCards();
+}
+
+function renderCards() {
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  const minRating = parseFloat(document.getElementById('ratingFilter').value);
+  const sort = document.getElementById('sortSelect').value;
+
+  let filtered = allData.filter(d => {
+    if (activeCity !== 'all' && d.city !== activeCity) return false;
+    if (activeCategory !== 'all' && d.category !== activeCategory) return false;
+    if (minRating > 0 && (!d.google_rating || d.google_rating < minRating)) return false;
+    if (query) {
+      const haystack = [d.name, d.dish_en, d.dish_vn, d.description, d.address, d.category].join(' ').toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    if (sort === 'name') return a.name.localeCompare(b.name);
+    if (sort === 'rating_desc') return (b.google_rating || 0) - (a.google_rating || 0);
+    if (sort === 'rating_asc') return (a.google_rating || 0) - (b.google_rating || 0);
+    if (sort === 'reviews_desc') return (b.review_count || 0) - (a.review_count || 0);
+    return 0;
+  });
+
+  const grid = document.getElementById('grid');
+  const noResults = document.getElementById('noResults');
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    noResults.classList.remove('hidden');
+  } else {
+    noResults.classList.add('hidden');
+    grid.innerHTML = filtered.map(d => cardHTML(d)).join('');
+  }
+
+  document.getElementById('countLabel').textContent = `${filtered.length} of ${allData.length} places`;
+}
+
+function cardHTML(d) {
+  const mapLink = d.maps ? `<a href="${d.maps}" target="_blank" class="text-blue-500 hover:text-blue-700 text-xs font-medium flex items-center gap-1">📍 Maps</a>` : '';
+  const catBadge = `<span class="tag ${catColor(d.category)}">${d.category}</span>`;
+  const jovelBadge = d.source === "Jovel Chan" ? '<span class="tag bg-violet-100 text-violet-800">✨ Jovel Chan</span>' : '';
+  const cityBadge = `<span class="tag ${d.city === 'saigon' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'}">${d.city === 'saigon' ? 'Saigon' : 'Hanoi'}</span>`;
+  
+  const dishLine = d.dish_en ? `<p class="text-xs text-gray-500 italic mt-0.5">${d.dish_en}${d.dish_vn ? ` · ${d.dish_vn}` : ''}</p>` : '';
+  const descLine = d.description ? `<p class="text-sm text-gray-600 mt-2 leading-relaxed">${d.description}</p>` : '';
+  const addrLine = d.address ? `<p class="text-xs text-gray-400 mt-1">📍 ${d.address}</p>` : '';
+  const ratingLine = d.google_rating ? `<div class="mt-2">${stars(d.google_rating)} <span class="text-xs text-gray-400">${d.review_count ? `(${d.review_count.toLocaleString()} reviews)` : ''}</span></div>` : '';
+  const personalLine = d.personal_rating ? `<div class="text-xs text-gray-400 mt-1">Personal: ${personalStars(d.personal_rating)}</div>` : '';
+
+  return `<div class="card bg-white rounded-xl border border-gray-100 p-4 cursor-default">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <div class="flex gap-1.5 flex-wrap">${catBadge}${cityBadge}${jovelBadge}</div>
+      ${mapLink}
+    </div>
+    <h3 class="font-semibold text-gray-900 text-base leading-snug">${d.name}</h3>
+    ${dishLine}
+    ${ratingLine}
+    ${personalLine}
+    ${descLine}
+    ${addrLine}
+  </div>`;
+}
+
+// Init
+buildCategoryFilters();
+renderCards();
+
+// --- Scroll-to-compress header ---
+(function () {
+  const header = document.getElementById('stickyHeader');
+  const SCROLL_THRESHOLD = 80; // px scrolled before collapsing
+  let lastScrollY = 0;
+  let ticking = false;
+  let isCollapsed = false;
+
+  function collapseHeader() {
+    if (!isCollapsed) {
+      header.classList.add('header-collapsed');
+      isCollapsed = true;
+    }
+  }
+
+  function expandHeader() {
+    if (isCollapsed) {
+      header.classList.remove('header-collapsed');
+      isCollapsed = false;
+    }
+  }
+
+  // Expose for the hint tap
+  window.expandHeader = expandHeader;
+
+  window.addEventListener('scroll', function () {
+    const currentY = window.scrollY;
+    if (!ticking) {
+      window.requestAnimationFrame(function () {
+        const diff = currentY - lastScrollY;
+        if (currentY < SCROLL_THRESHOLD) {
+          // Near top — always expand
+          expandHeader();
+        } else if (diff > 4) {
+          // Scrolling down → collapse
+          collapseHeader();
+        } else if (diff < -4) {
+          // Scrolling up → expand
+          expandHeader();
+        }
+        lastScrollY = currentY;
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+})();
+</script>
+</body>
+</html>

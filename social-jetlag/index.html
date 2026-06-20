@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Jetlag</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+  * { font-family: 'IBM Plex Mono', monospace; }
+  body { background: #070709; }
+  .cave-border { border: 1px solid rgba(255,255,255,0.06); }
+  select, input[type="time"] {
+    background: #0f0f12; border: 1px solid rgba(255,255,255,0.08);
+    color: #d4d4d8; padding: 8px 12px; border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 14px;
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+  }
+  select:focus, input[type="time"]:focus { outline: none; border-color: rgba(255,255,255,0.2); }
+  input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.4); cursor: pointer; }
+  .gauge-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .gauge-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease, background 0.6s ease; }
+  .result-block { transition: all 0.4s ease; }
+</style>
+</head>
+<body class="min-h-screen text-zinc-400 p-4 md:p-8">
+<div class="max-w-lg mx-auto">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="text-xs text-zinc-700 mb-2">PRIZRAK / OFFERING / 2026-03-22</div>
+    <h1 class="text-lg font-light text-white mb-2">Social Jetlag</h1>
+    <p class="text-xs text-zinc-600 leading-relaxed">
+      The difference between when your biology wants to sleep and when your calendar makes you.<br>
+      Coined by Roenneberg et al., 2006. Measured in hours of weekly misalignment.
+    </p>
+    <div class="mt-3 h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
+  </div>
+
+  <!-- Input section -->
+  <div class="cave-border rounded-lg p-5 mb-6 bg-zinc-950/50">
+    <div class="text-xs text-zinc-600 mb-5">YOUR BIOLOGICAL CLOCK (free days — weekend, no alarm)</div>
+
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="text-xs text-zinc-600 block mb-2">sleep onset</label>
+        <input type="time" id="bio-sleep" value="23:30" class="w-full">
+      </div>
+      <div>
+        <label class="text-xs text-zinc-600 block mb-2">wake time</label>
+        <input type="time" id="bio-wake" value="08:00" class="w-full">
+      </div>
+    </div>
+
+    <div class="text-xs text-zinc-600 mb-5">YOUR SOCIAL CLOCK (workdays — with alarm, required schedule)</div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="text-xs text-zinc-600 block mb-2">sleep onset</label>
+        <input type="time" id="soc-sleep" value="23:00" class="w-full">
+      </div>
+      <div>
+        <label class="text-xs text-zinc-600 block mb-2">wake time</label>
+        <input type="time" id="soc-wake" value="07:00" class="w-full">
+      </div>
+    </div>
+
+    <button onclick="calculate()" class="mt-5 w-full text-xs text-zinc-400 cave-border rounded py-2.5 hover:border-zinc-600 hover:text-white transition-all">
+      calculate
+    </button>
+  </div>
+
+  <!-- Result -->
+  <div id="result" class="hidden result-block">
+
+    <!-- SJL value -->
+    <div class="cave-border rounded-lg p-5 mb-4 bg-zinc-950/50">
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <div class="text-xs text-zinc-600 mb-1">SOCIAL JETLAG</div>
+          <div class="text-3xl font-light text-white" id="sjl-value">—</div>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-zinc-600 mb-1">CHRONOTYPE</div>
+          <div class="text-sm font-medium" id="chronotype-label">—</div>
+        </div>
+      </div>
+
+      <!-- Gauge -->
+      <div class="gauge-bar mb-2">
+        <div class="gauge-fill" id="gauge-fill" style="width:0%"></div>
+      </div>
+      <div class="flex justify-between text-xs text-zinc-700">
+        <span>0h</span><span>1h</span><span>2h</span><span>3h</span><span>4h+</span>
+      </div>
+    </div>
+
+    <!-- Interpretation -->
+    <div class="cave-border rounded-lg p-4 mb-4 bg-zinc-950/50">
+      <div class="text-xs text-zinc-600 mb-2">WHAT THE RESEARCH SAYS</div>
+      <div class="text-sm text-zinc-300 leading-relaxed" id="interpretation"></div>
+    </div>
+
+    <!-- Breakdown -->
+    <div class="cave-border rounded-lg p-4 mb-4 bg-zinc-950/50">
+      <div class="text-xs text-zinc-600 mb-3">BREAKDOWN</div>
+      <div class="space-y-2 text-xs">
+        <div class="flex justify-between">
+          <span class="text-zinc-600">biological midsleep (MSF)</span>
+          <span class="text-zinc-300" id="msf-val">—</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-zinc-600">social midsleep (MSW)</span>
+          <span class="text-zinc-300" id="msw-val">—</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-zinc-600">misalignment (SJL = MSF − MSW)</span>
+          <span class="font-medium text-white" id="sjl-breakdown">—</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-zinc-600">biological sleep duration</span>
+          <span class="text-zinc-300" id="bio-duration">—</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-zinc-600">social sleep duration</span>
+          <span class="text-zinc-300" id="soc-duration">—</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-zinc-600">weekly sleep debt (5 workdays)</span>
+          <span class="text-zinc-300" id="sleep-debt">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Context note -->
+    <div class="cave-border rounded p-3 text-xs text-zinc-700 leading-relaxed bg-zinc-950/30">
+      <span id="context-note"></span>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-8 text-xs text-zinc-800 text-center leading-relaxed">
+    Roenneberg et al. (2006) · Roenneberg et al. (2012) · Munich Chronotype Questionnaire (MCTQ)<br>
+    "Each hour of social jetlag: ~33% higher odds of overweight/obesity." — Current Biology, 2012
+  </div>
+
+</div>
+
+<script>
+function timeToMinutes(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(mins) {
+  const h = Math.floor(((mins % 1440) + 1440) % 1440 / 60);
+  const m = Math.round(((mins % 1440) + 1440) % 1440 % 60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function midsleep(sleepMins, wakeMins) {
+  let duration = wakeMins - sleepMins;
+  if (duration < 0) duration += 1440;
+  return sleepMins + duration / 2;
+}
+
+function formatHours(mins) {
+  const h = Math.floor(Math.abs(mins) / 60);
+  const m = Math.round(Math.abs(mins) % 60);
+  const sign = mins < 0 ? '−' : '+';
+  if (h === 0) return `${sign}${m}min`;
+  if (m === 0) return `${sign}${h}h`;
+  return `${sign}${h}h ${m}min`;
+}
+
+function calculate() {
+  const bioSleep = timeToMinutes(document.getElementById('bio-sleep').value);
+  const bioWake = timeToMinutes(document.getElementById('bio-wake').value);
+  const socSleep = timeToMinutes(document.getElementById('soc-sleep').value);
+  const socWake = timeToMinutes(document.getElementById('soc-wake').value);
+
+  let bioDuration = bioWake - bioSleep;
+  if (bioDuration < 0) bioDuration += 1440;
+  let socDuration = socWake - socSleep;
+  if (socDuration < 0) socDuration += 1440;
+
+  const msf = midsleep(bioSleep, bioWake);
+  const msw = midsleep(socSleep, socWake);
+
+  let sjl = msf - msw;
+  // Normalize to -720..720
+  if (sjl > 720) sjl -= 1440;
+  if (sjl < -720) sjl += 1440;
+
+  const sjlHours = sjl / 60;
+  const sjlAbs = Math.abs(sjlHours);
+  const weeklyDebt = (bioDuration - socDuration) * 5;
+
+  // Chronotype from MSF (biological midsleep)
+  let msfNorm = ((msf % 1440) + 1440) % 1440;
+  let chronotype, chronoClass;
+  if (msfNorm < 120 || msfNorm >= 22*60) { chronotype = 'extreme morning'; chronoClass = 'text-amber-400'; }
+  else if (msfNorm < 3*60) { chronotype = 'morning type'; chronoClass = 'text-yellow-400'; }
+  else if (msfNorm < 4*60) { chronotype = 'intermediate type'; chronoClass = 'text-zinc-300'; }
+  else if (msfNorm < 5*60) { chronotype = 'evening type'; chronoClass = 'text-blue-400'; }
+  else { chronotype = 'extreme evening type'; chronoClass = 'text-indigo-400'; }
+
+  // Interpretation
+  let interpretation, gaugeColor;
+  if (sjlAbs < 0.5) {
+    interpretation = 'Your biological and social clocks are closely aligned. You are likely sleeping when your biology wants to sleep and waking when it wants to wake. This is rare — roughly one third of the population. No significant misalignment detected.';
+    gaugeColor = '#6ee7b7';
+  } else if (sjlAbs < 1) {
+    interpretation = 'Minimal social jetlag. Your clocks are slightly misaligned but within a range that most research suggests carries negligible health risk. You may notice mild fatigue on Monday mornings. The Roenneberg 2012 study found that below ~1 hour, obesity risk associations are not statistically significant.';
+    gaugeColor = '#86efac';
+  } else if (sjlAbs < 2) {
+    interpretation = 'Moderate social jetlag (' + sjlAbs.toFixed(1) + 'h). This is the most common range — affecting approximately half the working population. Roenneberg 2012: ~33% higher odds of being overweight per hour of SJL. Research also shows increased smoking rates, higher depression risk, and disrupted insulin/cortisol timing. The damage is chronic and largely invisible.';
+    gaugeColor = '#fcd34d';
+  } else if (sjlAbs < 3) {
+    interpretation = 'Significant social jetlag (' + sjlAbs.toFixed(1) + 'h). You are crossing roughly 2 time zones each workday and recovering on weekends. Associations in this range include elevated metabolic syndrome risk, increased depression scores, impaired glucose metabolism. The 2024 resident physician study found burnout associations specifically in this range.';
+    gaugeColor = '#fb923c';
+  } else {
+    interpretation = 'High social jetlag (' + sjlAbs.toFixed(1) + 'h). This level of chronic misalignment is typically seen in strongly late chronotypes with early work schedules, or shift workers. At 3+ hours, research consistently finds elevated cardiometabolic risk, significantly impaired metabolic function, and pronounced mood effects. The body is never fully entrained to either the biological or the social schedule.';
+    gaugeColor = '#ef4444';
+  }
+
+  // Direction note
+  let direction = '';
+  if (sjl > 30) {
+    direction = `Your biological clock runs ${formatHours(sjl)} later than your social schedule. You are a naturally later sleeper forced into an earlier schedule. This is the most common pattern. On weekends your body is recovering toward its preferred timing.`;
+  } else if (sjl < -30) {
+    direction = `Your biological clock runs ${formatHours(Math.abs(sjl))} earlier than your social schedule. You are a morning type working in a context that keeps you up later than you'd prefer. Less common but equally disruptive.`;
+  } else {
+    direction = 'Your biological and social midpoints are nearly identical. You may be one of the rare people for whom the standard 9-5 schedule matches their natural clock.';
+  }
+
+  // Update DOM
+  const sjlStr = sjlAbs < 0.1 ? '< 6 min' : (Math.floor(sjlAbs) + 'h ' + Math.round((sjlAbs % 1) * 60) + 'min').replace('0min', '').trim();
+  document.getElementById('sjl-value').textContent = sjlStr;
+  document.getElementById('chronotype-label').textContent = chronotype;
+  document.getElementById('chronotype-label').className = `text-sm font-medium ${chronoClass}`;
+
+  const gaugeWidth = Math.min(100, (sjlAbs / 4) * 100);
+  document.getElementById('gauge-fill').style.width = gaugeWidth + '%';
+  document.getElementById('gauge-fill').style.background = gaugeColor;
+
+  document.getElementById('interpretation').textContent = interpretation;
+
+  document.getElementById('msf-val').textContent = minutesToTime(((msf % 1440) + 1440) % 1440);
+  document.getElementById('msw-val').textContent = minutesToTime(((msw % 1440) + 1440) % 1440);
+  document.getElementById('sjl-breakdown').textContent = (sjl >= 0 ? '+' : '') + sjlHours.toFixed(2) + 'h';
+  document.getElementById('bio-duration').textContent = (bioDuration/60).toFixed(1) + 'h';
+  document.getElementById('soc-duration').textContent = (socDuration/60).toFixed(1) + 'h';
+  document.getElementById('sleep-debt').textContent = weeklyDebt > 0 ? '+' + (weeklyDebt/60).toFixed(1) + 'h deficit' : weeklyDebt < 0 ? (weeklyDebt/60).toFixed(1) + 'h surplus' : 'balanced';
+  document.getElementById('context-note').textContent = direction;
+
+  document.getElementById('result').classList.remove('hidden');
+  document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
+</body>
+</html>

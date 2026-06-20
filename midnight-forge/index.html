@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Midnight Forge</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Space Mono', monospace; background: #0a0408; color: #ff6b35; min-height: 100vh; }
+
+.forge-container { max-width: 600px; margin: 0 auto; padding: 24px 16px; }
+
+/* Ember particles */
+.ember-field { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: hidden; }
+.ember { position: absolute; border-radius: 50%; animation: rise linear infinite; }
+@keyframes rise {
+  0% { transform: translateY(100vh) translateX(0) scale(1); opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 0.6; }
+  100% { transform: translateY(-20px) translateX(var(--drift)) scale(0.3); opacity: 0; }
+}
+
+.content { position: relative; z-index: 1; }
+
+/* Clock */
+.clock-section { text-align: center; margin-bottom: 32px; padding: 24px; border: 1px solid #1a0a08; }
+.clock-time { font-size: 64px; font-weight: 700; color: #ff6b35; text-shadow: 0 0 30px rgba(255,107,53,0.4); letter-spacing: -2px; }
+.clock-label { font-size: 10px; color: #553320; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
+.forge-status { margin-top: 12px; font-size: 12px; padding: 6px 16px; display: inline-block; border: 1px solid; border-radius: 4px; }
+
+/* Sections */
+.section { border: 1px solid #1a0a08; padding: 20px; margin-bottom: 16px; background: rgba(20,8,4,0.5); }
+.section-label { font-size: 9px; color: #553320; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px; }
+
+textarea, input[type="text"] {
+  width: 100%; background: transparent; border: none; border-bottom: 1px solid #1a0a08;
+  color: #cc5530; font-family: 'Space Mono', monospace; font-size: 13px; padding: 8px 0;
+  outline: none; resize: none;
+}
+textarea:focus, input:focus { border-bottom-color: #ff6b35; }
+textarea::placeholder, input::placeholder { color: #331a10; }
+
+/* Anvil (submit) */
+.anvil-btn {
+  width: 100%; padding: 14px; background: transparent; border: 1px solid #ff6b35;
+  color: #ff6b35; font-family: 'Space Mono', monospace; font-size: 12px;
+  letter-spacing: 3px; text-transform: uppercase; cursor: pointer; transition: all 0.3s;
+}
+.anvil-btn:hover { background: #ff6b35; color: #0a0408; box-shadow: 0 0 30px rgba(255,107,53,0.3); }
+
+/* Log */
+.log-entry { border-bottom: 1px solid #0f0604; padding: 12px 0; }
+.log-entry:last-child { border: none; }
+.log-time { font-size: 10px; color: #442210; }
+.log-what { font-size: 13px; color: #cc5530; margin-top: 4px; }
+.log-why { font-size: 11px; color: #663320; margin-top: 2px; font-style: italic; }
+
+/* Verdict */
+.verdict-box { border: 1px solid #ff6b35; padding: 20px; margin-top: 16px; background: rgba(255,107,53,0.03); text-align: center; display: none; }
+.verdict-box.visible { display: block; animation: glow 0.5s ease; }
+@keyframes glow { from { box-shadow: 0 0 40px rgba(255,107,53,0.4); } to { box-shadow: none; } }
+.verdict-label { font-size: 10px; color: #553320; letter-spacing: 3px; text-transform: uppercase; }
+.verdict-text { font-size: 15px; color: #ff6b35; margin-top: 8px; line-height: 1.6; }
+.verdict-quote { font-size: 11px; color: #553320; margin-top: 12px; font-style: italic; }
+
+/* Stats bar */
+.stats { display: flex; justify-content: space-between; font-size: 10px; color: #442210; padding: 8px 0; border-top: 1px solid #0f0604; margin-top: 12px; }
+.stat-val { color: #cc5530; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="ember-field" id="embers"></div>
+
+<div class="forge-container content">
+  <!-- Clock -->
+  <div class="clock-section">
+    <div class="clock-time" id="clock">--:--</div>
+    <div class="clock-label">The Forge Never Closes</div>
+    <div class="forge-status" id="forge-status" style="color:#553320;border-color:#1a0a08">—</div>
+  </div>
+
+  <!-- What are you forging -->
+  <div class="section">
+    <div class="section-label">▶ What are you forging right now?</div>
+    <input type="text" id="forging-what" placeholder="The thing you are building at this hour..." maxlength="120">
+  </div>
+
+  <div class="section">
+    <div class="section-label">▶ Why now? Why not tomorrow?</div>
+    <textarea id="forging-why" rows="2" placeholder="What makes this hour the right hour..."></textarea>
+  </div>
+
+  <div class="section">
+    <div class="section-label">▶ Warning to morning-you</div>
+    <textarea id="morning-note" rows="2" placeholder="What should tomorrow-you know about tonight's decisions..."></textarea>
+  </div>
+
+  <button class="anvil-btn" onclick="strike()">⚒ STRIKE THE ANVIL</button>
+
+  <!-- Session log -->
+  <div class="section" style="margin-top: 24px;">
+    <div class="section-label">Forge Log — Tonight's Output</div>
+    <div id="log"></div>
+    <div class="stats" id="stats" style="display:none">
+      <span>Strikes: <span class="stat-val" id="strike-count">0</span></span>
+      <span>First: <span class="stat-val" id="first-strike">—</span></span>
+      <span>Session: <span class="stat-val" id="session-time">0m</span></span>
+    </div>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict-box" id="verdict"></div>
+</div>
+
+<script>
+// Embers
+const ef = document.getElementById('embers');
+for (let i = 0; i < 40; i++) {
+  const e = document.createElement('div');
+  e.className = 'ember';
+  const s = Math.random() * 4 + 2;
+  e.style.cssText = `
+    width:${s}px; height:${s}px;
+    left:${Math.random()*100}%;
+    background: hsl(${15 + Math.random()*20}, 100%, ${50 + Math.random()*20}%);
+    animation-duration:${4 + Math.random()*8}s;
+    animation-delay:${Math.random()*6}s;
+    --drift:${(Math.random()-0.5)*80}px;
+    box-shadow: 0 0 ${s*2}px hsl(${15 + Math.random()*20}, 100%, 50%);
+  `;
+  ef.appendChild(e);
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  document.getElementById('clock').textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+  const status = document.getElementById('forge-status');
+  if (h >= 22 || h < 2) { status.textContent = '🔥 MIDNIGHT FORGE — PEAK HEAT'; status.style.color = '#ff6b35'; status.style.borderColor = '#ff6b35'; }
+  else if (h >= 2 && h < 5) { status.textContent = '🌑 DEEP NIGHT — CAREFUL WORK'; status.style.color = '#cc5530'; status.style.borderColor = '#331a10'; }
+  else if (h >= 5 && h < 7) { status.textContent = '🌅 DAWN APPROACHES — FINISH OR SHELVE'; status.style.color = '#f59e0b'; status.style.borderColor = '#553320'; }
+  else { status.textContent = '☀️ DAYLIGHT — FORGE IS COOL'; status.style.color = '#553320'; status.style.borderColor = '#1a0a08'; }
+}
+updateClock(); setInterval(updateClock, 10000);
+
+// Storage
+const KEY = 'midnight_forge_v1';
+let entries = JSON.parse(localStorage.getItem(KEY) || '[]');
+let sessionStart = Date.now();
+
+const verdicts = [
+  { min: 1, text: "One strike. The metal remembers." },
+  { min: 3, text: "The forge is warming. Three strikes in one sitting — you found the vein." },
+  { min: 5, text: "Five. This is no longer impulse. This is a pattern. Morning-you should pay attention." },
+  { min: 8, text: "Eight strikes. You are not working late. You are working *true*. The forge knows the difference." },
+];
+
+const quotes = [
+  "What you build after 10PM reveals what you actually care about.",
+  "The forge does not ask permission. It asks: what are you willing to burn?",
+  "Morning-you inherits the decisions of night-you. Leave good notes.",
+  "The midnight hour is not overtime. It is the hour the mask comes off.",
+  "The metal does not care what time it is. It cares how hard you strike.",
+  "Every great thing was once a 2AM idea that someone did not abandon by morning.",
+];
+
+function render() {
+  // Filter to tonight only
+  const tonight = new Date(); tonight.setHours(18,0,0,0);
+  if (new Date().getHours() < 6) tonight.setDate(tonight.getDate() - 1);
+  const tonightEntries = entries.filter(e => new Date(e.time) >= tonight);
+
+  const log = document.getElementById('log');
+  if (tonightEntries.length === 0) {
+    log.innerHTML = '<div style="color:#331a10;font-size:11px;padding:16px 0;text-align:center">The anvil is cold. Strike it.</div>';
+    document.getElementById('stats').style.display = 'none';
+    return;
+  }
+
+  log.innerHTML = tonightEntries.map(e => `
+    <div class="log-entry">
+      <div class="log-time">${new Date(e.time).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="log-what">${esc(e.what)}</div>
+      ${e.why ? `<div class="log-why">"${esc(e.why)}"</div>` : ''}
+      ${e.morning ? `<div style="font-size:10px;color:#442210;margin-top:4px">⚠ Morning note: ${esc(e.morning)}</div>` : ''}
+    </div>
+  `).join('');
+
+  document.getElementById('stats').style.display = 'flex';
+  document.getElementById('strike-count').textContent = tonightEntries.length;
+  document.getElementById('first-strike').textContent = new Date(tonightEntries[0].time).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const mins = Math.round((Date.now() - new Date(tonightEntries[0].time).getTime()) / 60000);
+  document.getElementById('session-time').textContent = mins < 60 ? `${mins}m` : `${Math.floor(mins/60)}h${mins%60}m`;
+
+  // Verdict
+  const vb = document.getElementById('verdict');
+  const v = [...verdicts].reverse().find(v => tonightEntries.length >= v.min);
+  if (v) {
+    vb.innerHTML = `
+      <div class="verdict-label">FORGE VERDICT</div>
+      <div class="verdict-text">${v.text}</div>
+      <div class="verdict-quote">"${quotes[tonightEntries.length % quotes.length]}"</div>
+    `;
+    vb.classList.add('visible');
+  }
+}
+
+function strike() {
+  const what = document.getElementById('forging-what').value.trim();
+  if (!what) { document.getElementById('forging-what').focus(); return; }
+  entries.push({
+    what,
+    why: document.getElementById('forging-why').value.trim(),
+    morning: document.getElementById('morning-note').value.trim(),
+    time: new Date().toISOString()
+  });
+  localStorage.setItem(KEY, JSON.stringify(entries));
+  document.getElementById('forging-what').value = '';
+  document.getElementById('forging-why').value = '';
+  document.getElementById('morning-note').value = '';
+  render();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+render();
+</script>
+</body>
+</html>

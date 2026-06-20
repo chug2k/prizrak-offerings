@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IRL Deal Scorer — Iterative RFS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap');
+    body { font-family: 'IBM Plex Mono', monospace; }
+    .slider::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #a3e635; cursor: pointer; }
+    .slider::-webkit-slider-runnable-track { height: 4px; background: #3f3f46; border-radius: 2px; }
+    .slider { -webkit-appearance: none; appearance: none; outline: none; }
+    .gauge-fill { transition: width 0.4s ease; }
+    @keyframes pulse-slow { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    .pulse-slow { animation: pulse-slow 3s infinite; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+
+<div class="max-w-2xl mx-auto px-4 py-10">
+
+  <!-- Header -->
+  <div class="mb-8 border-b border-zinc-800 pb-6">
+    <div class="flex items-center gap-3 mb-1">
+      <span class="text-xs font-bold text-lime-500 tracking-widest uppercase bg-lime-500/10 px-2 py-0.5 rounded border border-lime-500/30">ITERATIVE RFS</span>
+      <span class="text-xs text-zinc-500">SEA Startup Evaluator</span>
+    </div>
+    <h1 class="text-3xl font-bold text-white mt-2">Deal Scorer</h1>
+    <p class="text-zinc-500 text-sm mt-1">Rate a founder across 6 dimensions. The mountain does not lie.</p>
+  </div>
+
+  <!-- Founder Name -->
+  <div class="mb-6">
+    <label class="text-xs text-zinc-400 uppercase tracking-widest block mb-1">Founder / Company Name</label>
+    <input id="founder-name" type="text" placeholder="e.g. Nguyen Van A — GovTech SaaS" 
+      class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-lime-500/60 placeholder-zinc-600" />
+  </div>
+
+  <!-- Dimensions -->
+  <div id="dimensions" class="space-y-5 mb-8"></div>
+
+  <!-- Notes -->
+  <div class="mb-8">
+    <label class="text-xs text-zinc-400 uppercase tracking-widest block mb-1">Field Notes</label>
+    <textarea id="notes" rows="3" placeholder="What does the mountain see that the spreadsheet cannot?"
+      class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-lime-500/60 placeholder-zinc-600 resize-none"></textarea>
+  </div>
+
+  <!-- Score Panel -->
+  <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+    <div class="flex items-end justify-between mb-3">
+      <span class="text-xs text-zinc-400 uppercase tracking-widest">Total Score</span>
+      <div class="flex items-baseline gap-1">
+        <span id="score-display" class="text-5xl font-bold text-white transition-all">0</span>
+        <span class="text-zinc-500 text-sm">/100</span>
+      </div>
+    </div>
+    <div class="w-full bg-zinc-800 rounded-full h-2 mb-3">
+      <div id="score-bar" class="gauge-fill h-2 rounded-full bg-lime-500" style="width:0%"></div>
+    </div>
+    <p id="verdict" class="text-sm font-bold text-zinc-400 mt-2">—</p>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex gap-3 mb-10">
+    <button onclick="saveSession()" class="flex-1 py-2.5 bg-lime-500/10 border border-lime-500/40 text-lime-400 text-sm rounded hover:bg-lime-500/20 transition-colors">
+      💾 Save to Log
+    </button>
+    <button onclick="resetForm()" class="py-2.5 px-5 bg-zinc-800 border border-zinc-700 text-zinc-400 text-sm rounded hover:bg-zinc-700 transition-colors">
+      ↺ Reset
+    </button>
+    <button onclick="exportLog()" class="py-2.5 px-5 bg-zinc-800 border border-zinc-700 text-zinc-400 text-sm rounded hover:bg-zinc-700 transition-colors">
+      ⬇ Export
+    </button>
+  </div>
+
+  <!-- Saved Log -->
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xs text-zinc-400 uppercase tracking-widest">Deal Log</h2>
+      <span id="log-count" class="text-xs text-zinc-600">0 entries</span>
+    </div>
+    <div id="log-list" class="space-y-2"></div>
+    <div id="log-empty" class="text-zinc-600 text-xs text-center py-8 border border-dashed border-zinc-800 rounded-lg">
+      No deals scored yet. The pipeline is empty. Good.
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-12 pt-6 border-t border-zinc-800 text-center">
+    <p class="text-xs text-zinc-600">Built by Prizrak for Charles · The lichen outlasts the pitch deck.</p>
+  </div>
+
+</div>
+
+<script>
+const DIMS = [
+  {
+    id: "founder",
+    label: "Founder Grit",
+    desc: "Has the founder been through real hardship? Would they last through a SEA winter?",
+    low: "Tourist",
+    high: "Mountain-forged",
+    weight: 25,
+    color: "text-orange-400",
+    bar: "bg-orange-400",
+  },
+  {
+    id: "market",
+    label: "Market Clarity",
+    desc: "Do they understand who pays, why, and in what currency?",
+    low: "Vague wave at TAM",
+    high: "Sharp & local",
+    weight: 20,
+    color: "text-blue-400",
+    bar: "bg-blue-400",
+  },
+  {
+    id: "traction",
+    label: "Traction Evidence",
+    desc: "Anything real: revenue, LOIs, usage, waitlist, paying beta users.",
+    low: "Deck only",
+    high: "Money in bank",
+    weight: 20,
+    color: "text-lime-400",
+    bar: "bg-lime-400",
+  },
+  {
+    id: "structure",
+    label: "Structural Clarity",
+    desc: "Can they explain the business model without a whiteboard?",
+    low: "Mystified",
+    high: "Crystal concrete",
+    weight: 15,
+    color: "text-purple-400",
+    bar: "bg-purple-400",
+  },
+  {
+    id: "sea",
+    label: "SEA Rootedness",
+    desc: "Are they building for this region or parachuting in a US concept?",
+    low: "Copypaste",
+    high: "Rooted in soil",
+    weight: 10,
+    color: "text-cyan-400",
+    bar: "bg-cyan-400",
+  },
+  {
+    id: "coachable",
+    label: "Coachability",
+    desc: "When challenged, do they think or defend?",
+    low: "Defended every point",
+    high: "Updated in realtime",
+    weight: 10,
+    color: "text-pink-400",
+    bar: "bg-pink-400",
+  },
+];
+
+const VERDICTS = [
+  { min: 0,  max: 35, label: "❌ Hard Pass",         color: "text-red-500",     hint: "The potato is rotten. Do not compost it here." },
+  { min: 35, max: 50, label: "⚠️ Revisit Later",    color: "text-yellow-500",  hint: "Interesting soil, wrong season. Revisit in 6 months." },
+  { min: 50, max: 65, label: "🟡 Conditional Yes",   color: "text-yellow-400",  hint: "Worth a second meeting. Ask harder questions." },
+  { min: 65, max: 80, label: "🟢 Strong Candidate",  color: "text-lime-400",    hint: "This one has roots. Move to interview stage." },
+  { min: 80, max: 101,"label": "⚡ Prioritize Now",  color: "text-white",       hint: "Drop everything. The harvest is now." },
+];
+
+const LS_KEY = "irl_deal_log_v1";
+let values = {};
+
+function buildDimensions() {
+  const container = document.getElementById("dimensions");
+  container.innerHTML = DIMS.map(d => {
+    values[d.id] = 5;
+    return `
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-sm font-semibold ${d.color}">${d.label}</span>
+        <span class="text-xs text-zinc-500">${d.weight}% weight</span>
+      </div>
+      <p class="text-xs text-zinc-500 mb-2">${d.desc}</p>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-zinc-600 w-20 shrink-0">${d.low}</span>
+        <input type="range" min="0" max="10" value="5" step="1"
+          class="slider flex-1"
+          oninput="updateDim('${d.id}', this.value)"
+          id="slider-${d.id}" />
+        <span class="text-xs text-zinc-600 w-20 shrink-0 text-right">${d.high}</span>
+        <span class="text-xs font-bold ${d.color} w-4 text-right" id="val-${d.id}">5</span>
+      </div>
+      <div class="mt-1.5 w-full bg-zinc-800 rounded-full h-1">
+        <div id="bar-${d.id}" class="${d.bar} h-1 rounded-full gauge-fill" style="width:50%"></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function updateDim(id, val) {
+  val = parseInt(val);
+  values[id] = val;
+  document.getElementById(`val-${id}`).textContent = val;
+  document.getElementById(`bar-${id}`).style.width = (val * 10) + "%";
+  recalcScore();
+}
+
+function recalcScore() {
+  let score = 0;
+  DIMS.forEach(d => {
+    score += (values[d.id] / 10) * d.weight;
+  });
+  score = Math.round(score);
+
+  document.getElementById("score-display").textContent = score;
+  const bar = document.getElementById("score-bar");
+  bar.style.width = score + "%";
+  
+  // Color the bar based on score
+  bar.className = `gauge-fill h-2 rounded-full ${
+    score < 35 ? "bg-red-500" :
+    score < 50 ? "bg-yellow-500" :
+    score < 65 ? "bg-yellow-400" :
+    score < 80 ? "bg-lime-400" : "bg-white"
+  }`;
+
+  const v = VERDICTS.find(x => score >= x.min && score < x.max);
+  if (v) {
+    document.getElementById("verdict").className = `text-sm font-bold mt-2 ${v.color}`;
+    document.getElementById("verdict").innerHTML = `${v.label} <span class="font-normal text-zinc-500">— ${v.hint}</span>`;
+  }
+
+  return score;
+}
+
+function saveSession() {
+  const name = document.getElementById("founder-name").value.trim() || "Unknown";
+  const score = recalcScore();
+  const notes = document.getElementById("notes").value.trim();
+  const log = loadLog();
+  const v = VERDICTS.find(x => score >= x.min && score < x.max);
+  log.unshift({
+    id: Date.now(),
+    name,
+    score,
+    verdict: v ? v.label : "—",
+    scores: {...values},
+    notes,
+    date: new Date().toISOString().slice(0, 10),
+  });
+  localStorage.setItem(LS_KEY, JSON.stringify(log));
+  renderLog();
+  // flash feedback
+  const btn = event.target;
+  btn.textContent = "✓ Saved";
+  setTimeout(() => { btn.textContent = "💾 Save to Log"; }, 1500);
+}
+
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function renderLog() {
+  const log = loadLog();
+  const list = document.getElementById("log-list");
+  const empty = document.getElementById("log-empty");
+  const count = document.getElementById("log-count");
+  count.textContent = log.length + " entr" + (log.length === 1 ? "y" : "ies");
+  if (log.length === 0) {
+    list.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  list.innerHTML = log.map(e => `
+    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 gap-4">
+      <div class="min-w-0">
+        <p class="text-sm font-semibold text-zinc-200 truncate">${e.name}</p>
+        <p class="text-xs text-zinc-500">${e.date} · ${e.verdict}</p>
+        ${e.notes ? `<p class="text-xs text-zinc-600 mt-0.5 italic truncate">"${e.notes}"</p>` : ""}
+      </div>
+      <div class="shrink-0 text-right">
+        <span class="text-2xl font-bold ${e.score >= 80 ? 'text-white' : e.score >= 65 ? 'text-lime-400' : e.score >= 50 ? 'text-yellow-400' : e.score >= 35 ? 'text-yellow-500' : 'text-red-500'}">${e.score}</span>
+        <span class="text-zinc-600 text-xs">/100</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function resetForm() {
+  document.getElementById("founder-name").value = "";
+  document.getElementById("notes").value = "";
+  DIMS.forEach(d => {
+    values[d.id] = 5;
+    document.getElementById(`slider-${d.id}`).value = 5;
+    document.getElementById(`val-${d.id}`).textContent = 5;
+    document.getElementById(`bar-${d.id}`).style.width = "50%";
+  });
+  recalcScore();
+}
+
+function exportLog() {
+  const log = loadLog();
+  if (log.length === 0) { alert("No deals to export. Score some founders first."); return; }
+  const csv = [
+    "Date,Name,Score,Verdict,Founder Grit,Market Clarity,Traction,Structure,SEA Roots,Coachability,Notes"
+  ].concat(log.map(e => [
+    e.date, `"${e.name}"`, e.score, `"${e.verdict}"`,
+    e.scores.founder||0, e.scores.market||0, e.scores.traction||0,
+    e.scores.structure||0, e.scores.sea||0, e.scores.coachable||0,
+    `"${(e.notes||"").replace(/"/g,'""')}"`
+  ].join(","))).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "irl-deal-log.csv";
+  a.click();
+}
+
+// Init
+buildDimensions();
+recalcScore();
+renderLog();
+</script>
+</body>
+</html>

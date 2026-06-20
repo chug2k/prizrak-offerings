@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The One Clear Thing — Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0c0c0e; }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+        #thing-input { font-size: 1.1rem; line-height: 1.5; }
+        .done-line { text-decoration: line-through; opacity: 0.4; }
+        .glow { text-shadow: 0 0 20px rgba(251,191,36,0.3); }
+    </style>
+</head>
+<body class="text-zinc-300 font-mono antialiased min-h-screen flex flex-col items-center justify-center px-4 py-10">
+<div class="w-full max-w-md">
+
+    <!-- View: Set -->
+    <div id="set-view">
+        <div class="text-center mb-10">
+            <p id="greeting" class="text-xs text-zinc-600 uppercase tracking-widest mb-6"></p>
+            <h1 class="text-2xl font-bold text-white mb-3">What is the one clear thing?</h1>
+            <p class="text-xs text-zinc-600 leading-relaxed">The thing whose completion makes tomorrow defensible,<br>even if nothing else gets done.</p>
+        </div>
+
+        <div class="mb-4">
+            <textarea id="thing-input" rows="3" placeholder="Write it here. One thing only."
+                class="w-full bg-zinc-900/80 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-200 focus:outline-none focus:border-zinc-400 placeholder-zinc-700 transition-colors"></textarea>
+            <p id="char-hint" class="text-xs text-zinc-700 mt-1 text-right">Be specific enough that you will know when it is done.</p>
+        </div>
+
+        <div class="mb-6">
+            <label class="text-xs text-zinc-600 uppercase tracking-widest mb-2 block">Why does this one count?</label>
+            <input id="why-input" type="text" placeholder="Optional — but naming the reason sharpens the commitment"
+                class="w-full bg-zinc-900/60 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-400 focus:outline-none focus:border-zinc-700 placeholder-zinc-700">
+        </div>
+
+        <button id="set-btn" class="w-full py-3 rounded-lg border border-amber-800 bg-amber-950/20 hover:bg-amber-950/40 text-amber-400 font-bold text-sm transition-all">
+            Set this as tomorrow's one thing →
+        </button>
+
+        <div id="prev-section" class="hidden mt-10 fade-in">
+            <div class="border-t border-zinc-900 pt-6">
+                <p class="text-xs text-zinc-700 uppercase tracking-widest mb-3">Previous</p>
+                <div id="prev-list" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View: Locked -->
+    <div id="locked-view" class="hidden fade-in">
+        <div class="text-center mb-8">
+            <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Tomorrow's one thing</p>
+            <p id="locked-date" class="text-xs text-zinc-700 mb-6"></p>
+        </div>
+
+        <div class="rounded-xl border border-zinc-700 bg-zinc-900/60 p-6 mb-6 text-center">
+            <p id="locked-thing" class="text-white text-lg font-bold leading-relaxed glow mb-4"></p>
+            <p id="locked-why" class="text-xs text-zinc-600 italic hidden"></p>
+        </div>
+
+        <div class="text-center mb-8">
+            <p class="text-xs text-zinc-700 leading-relaxed max-w-xs mx-auto">This is the load-bearing thing. Everything else is context.<br>Return here when it is done.</p>
+        </div>
+
+        <button id="done-btn" class="w-full py-3 rounded-lg border border-emerald-900 bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400 font-bold text-sm transition-all mb-3">
+            ✓ Done
+        </button>
+        <button id="change-btn" class="w-full py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-all">
+            Change the thing
+        </button>
+    </div>
+
+    <!-- View: Done -->
+    <div id="done-view" class="hidden fade-in text-center">
+        <div class="text-5xl mb-6">✓</div>
+        <p class="text-white font-bold text-lg mb-2">Done.</p>
+        <p id="done-thing" class="text-zinc-500 text-sm done-line mb-6"></p>
+        <p class="text-xs text-zinc-600 italic leading-relaxed max-w-xs mx-auto mb-8" id="done-note"></p>
+        <button id="new-btn" class="px-6 py-2 rounded border border-zinc-700 text-sm text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-all">
+            Set the next one
+        </button>
+    </div>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'prizrak_one_thing';
+const DONE_NOTES = [
+    "The mountain does not celebrate. It simply notes that the thing is done and waits for the next.",
+    "One defensible day. That is enough. The accumulation of defensible days is a life.",
+    "Done is the only state that matters. Everything else is in-progress.",
+    "You chose one thing and completed it. This is rarer than it sounds.",
+    "Good. Now rest, or set the next one. The mountain does not have opinions about which.",
+];
+
+function getGreeting() {
+    const h = new Date().getHours();
+    if (h >= 21 || h < 4) return "Setting tomorrow's foundation";
+    if (h < 12) return "The day has not started yet";
+    return "Still time";
+}
+
+function getLockedDate() {
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const d = tomorrow;
+    return `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]} ${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`;
+}
+
+function getData() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+
+function renderPrev() {
+    const data = getData();
+    const history = data.history || [];
+    if (!history.length) return;
+    const section = document.getElementById('prev-section');
+    section.classList.remove('hidden');
+    document.getElementById('prev-list').innerHTML = history.slice(0,5).map(h => `
+        <div class="flex gap-3 text-xs py-1">
+            <span class="text-zinc-700 shrink-0">${h.date}</span>
+            <span class="${h.done ? 'text-zinc-600 line-through' : 'text-zinc-500'} flex-1">${h.thing}</span>
+            <span class="${h.done ? 'text-emerald-800' : 'text-zinc-800'}">${h.done ? '✓' : '—'}</span>
+        </div>
+    `).join('');
+}
+
+function showSetView() {
+    document.getElementById('set-view').classList.remove('hidden');
+    document.getElementById('locked-view').classList.add('hidden');
+    document.getElementById('done-view').classList.add('hidden');
+    document.getElementById('greeting').textContent = getGreeting();
+    renderPrev();
+}
+
+function showLockedView(thing, why) {
+    document.getElementById('set-view').classList.add('hidden');
+    document.getElementById('locked-view').classList.remove('hidden');
+    document.getElementById('done-view').classList.add('hidden');
+    document.getElementById('locked-thing').textContent = thing;
+    document.getElementById('locked-date').textContent = getLockedDate();
+    const whyEl = document.getElementById('locked-why');
+    if (why) { whyEl.textContent = why; whyEl.classList.remove('hidden'); }
+    else whyEl.classList.add('hidden');
+}
+
+function showDoneView(thing) {
+    document.getElementById('set-view').classList.add('hidden');
+    document.getElementById('locked-view').classList.add('hidden');
+    document.getElementById('done-view').classList.remove('hidden');
+    document.getElementById('done-thing').textContent = thing;
+    document.getElementById('done-note').textContent = DONE_NOTES[Math.floor(Math.random() * DONE_NOTES.length)];
+}
+
+// Init
+const data = getData();
+if (data.current && !data.current.done) {
+    showLockedView(data.current.thing, data.current.why);
+} else {
+    showSetView();
+}
+
+// Set button
+document.getElementById('set-btn').addEventListener('click', () => {
+    const thing = document.getElementById('thing-input').value.trim();
+    if (!thing) {
+        document.getElementById('thing-input').style.borderColor = '#7f1d1d';
+        setTimeout(() => document.getElementById('thing-input').style.borderColor = '', 1500);
+        return;
+    }
+    const why = document.getElementById('why-input').value.trim();
+    const d = getData();
+    const prev = d.current;
+    const history = d.history || [];
+    if (prev) history.unshift(prev);
+    const now = new Date();
+    const newItem = {
+        thing, why,
+        date: `${now.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]}`,
+        set_at: now.toISOString(),
+        done: false
+    };
+    saveData({ current: newItem, history: history.slice(0, 20) });
+    showLockedView(thing, why);
+});
+
+// Done button
+document.getElementById('done-btn').addEventListener('click', () => {
+    const d = getData();
+    if (d.current) {
+        d.current.done = true;
+        d.current.done_at = new Date().toISOString();
+        const thing = d.current.thing;
+        const history = d.history || [];
+        history.unshift(d.current);
+        saveData({ current: null, history: history.slice(0, 20) });
+        showDoneView(thing);
+    }
+});
+
+// Change button
+document.getElementById('change-btn').addEventListener('click', showSetView);
+
+// New button
+document.getElementById('new-btn').addEventListener('click', () => {
+    document.getElementById('thing-input').value = '';
+    document.getElementById('why-input').value = '';
+    showSetView();
+});
+</script>
+</body>
+</html>

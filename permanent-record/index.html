@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Permanent Record</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111;
+    --border: #222;
+    --text: #e0e0e0;
+    --muted: #555;
+    --perm: #4ade80;
+    --perm-dim: #14532d;
+    --eph: #f87171;
+    --eph-dim: #450a0a;
+    --week: #fbbf24;
+    --week-dim: #451a03;
+    --day: #60a5fa;
+    --day-dim: #1e3a5f;
+    --accent: #a3a3a3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+  header .sub { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+
+  .stats-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .stat {
+    flex: 1;
+    padding: 16px 24px;
+    border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  .stat:last-child { border-right: none; }
+  .stat .num { font-size: 28px; font-weight: 700; }
+  .stat .label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
+  .stat.perm .num { color: var(--perm); }
+  .stat.eph .num { color: var(--eph); }
+  .stat.ratio .num { color: #fff; }
+
+  .ratio-bar-wrap {
+    padding: 12px 32px;
+    border-bottom: 1px solid var(--border);
+    background: #0d0d0d;
+  }
+  .ratio-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .ratio-fill {
+    height: 100%;
+    background: var(--perm);
+    transition: width 0.5s ease;
+    border-radius: 3px;
+  }
+  .ratio-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+
+  .input-zone {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    background: #0d0d0d;
+  }
+  .input-zone label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .input-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  textarea {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    resize: none;
+    height: 48px;
+    line-height: 1.4;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: #444; }
+  textarea::placeholder { color: var(--muted); }
+
+  .half-life-select {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .half-life-select label { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .hl-buttons { display: flex; gap: 6px; }
+  .hl-btn {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 4px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .hl-btn:hover { border-color: #444; color: var(--text); }
+  .hl-btn.selected-perm { border-color: var(--perm); color: var(--perm); background: var(--perm-dim); }
+  .hl-btn.selected-week { border-color: var(--week); color: var(--week); background: var(--week-dim); }
+  .hl-btn.selected-day { border-color: var(--day); color: var(--day); background: var(--day-dim); }
+  .hl-btn.selected-eph { border-color: var(--eph); color: var(--eph); background: var(--eph-dim); }
+
+  .add-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    align-self: flex-end;
+    transition: all 0.15s;
+  }
+  .add-btn:hover { background: #222; border-color: #555; }
+  .add-btn:disabled { opacity: 0.3; cursor: default; }
+
+  .verdict-zone {
+    padding: 12px 32px;
+    background: #0a0f0a;
+    border-bottom: 1px solid var(--border);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .verdict-text {
+    font-size: 12px;
+    color: var(--perm);
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .verdict-text.warn { color: var(--eph); }
+  .verdict-text.neutral { color: var(--accent); }
+
+  .log-zone {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 32px;
+  }
+
+  .day-group { margin-bottom: 24px; }
+  .day-header {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #161616;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+
+  .entry-hl {
+    width: 3px;
+    min-height: 32px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .hl-perm { background: var(--perm); }
+  .hl-week { background: var(--week); }
+  .hl-day { background: var(--day); }
+  .hl-eph { background: var(--eph); }
+
+  .entry-body { flex: 1; }
+  .entry-text { font-size: 13px; line-height: 1.5; color: var(--text); }
+  .entry-meta {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    display: flex;
+    gap: 12px;
+    letter-spacing: 0.5px;
+  }
+  .entry-tag { text-transform: uppercase; letter-spacing: 1px; }
+  .tag-perm { color: var(--perm); }
+  .tag-week { color: var(--week); }
+  .tag-day { color: var(--day); }
+  .tag-eph { color: var(--eph); }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .delete-btn:hover { color: var(--eph); }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 2;
+    letter-spacing: 0.5px;
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 10px 32px;
+    font-size: 10px;
+    color: #333;
+    letter-spacing: 1px;
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Permanent Record</h1>
+  <span class="sub">Will this still exist in one year?</span>
+</header>
+
+<div class="stats-bar">
+  <div class="stat perm">
+    <div class="num" id="statPerm">0</div>
+    <div class="label">Permanent</div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:var(--week)" id="statWeek">0</div>
+    <div class="label">Weeks</div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:var(--day)" id="statDay">0</div>
+    <div class="label">Days</div>
+  </div>
+  <div class="stat eph">
+    <div class="num" id="statEph">0</div>
+    <div class="label">Ephemeral</div>
+  </div>
+  <div class="stat ratio">
+    <div class="num" id="statRatio">—</div>
+    <div class="label">Perm Ratio</div>
+  </div>
+</div>
+
+<div class="ratio-bar-wrap">
+  <div class="ratio-bar"><div class="ratio-fill" id="ratioFill" style="width:0%"></div></div>
+  <div class="ratio-label">
+    <span>ephemeral</span>
+    <span>permanent</span>
+  </div>
+</div>
+
+<div class="input-zone">
+  <label>Log a work block</label>
+  <div class="input-row">
+    <textarea id="entryInput" placeholder="What did you just do? Be specific." rows="2"></textarea>
+    <div class="half-life-select">
+      <label>Half-life</label>
+      <div class="hl-buttons">
+        <button class="hl-btn" data-hl="perm" onclick="selectHL('perm')">∞ Permanent</button>
+        <button class="hl-btn" data-hl="week" onclick="selectHL('week')">~ Weeks</button>
+        <button class="hl-btn" data-hl="day" onclick="selectHL('day')">~ Days</button>
+        <button class="hl-btn" data-hl="eph" onclick="selectHL('eph')">~ Hours</button>
+      </div>
+    </div>
+    <button class="add-btn" id="addBtn" onclick="addEntry()" disabled>+ LOG</button>
+  </div>
+</div>
+
+<div class="verdict-zone">
+  <div class="verdict-text neutral" id="verdictText">Log your first block to see where your time is going.</div>
+</div>
+
+<div class="log-zone" id="logZone">
+  <div class="empty-state" id="emptyState">
+    No entries yet.<br>
+    The URL https://omnom-demo.vercel.app will exist tomorrow.<br>
+    The VC meeting notes will not.<br>
+    Start logging.
+  </div>
+</div>
+
+<footer>
+  <span>PERMANENT RECORD v1 · PRÍZRAK</span>
+  <span id="footerCount">0 entries</span>
+</footer>
+
+<script>
+let selectedHL = null;
+let entries = JSON.parse(localStorage.getItem('pr_entries') || '[]');
+
+const HL_META = {
+  perm: { label: '∞ PERMANENT', cls: 'hl-perm', tagCls: 'tag-perm', desc: 'Exists in one year' },
+  week: { label: '~ WEEKS', cls: 'hl-week', tagCls: 'tag-week', desc: 'Fades in weeks' },
+  day:  { label: '~ DAYS', cls: 'hl-day', tagCls: 'tag-day', desc: 'Gone in days' },
+  eph:  { label: '~ HOURS', cls: 'hl-eph', tagCls: 'tag-eph', desc: 'Gone tonight' }
+};
+
+function selectHL(hl) {
+  selectedHL = hl;
+  document.querySelectorAll('.hl-btn').forEach(b => {
+    b.className = 'hl-btn';
+    if (b.dataset.hl === hl) b.classList.add('selected-' + hl);
+  });
+  checkReady();
+}
+
+function checkReady() {
+  const has = document.getElementById('entryInput').value.trim().length > 0 && selectedHL;
+  document.getElementById('addBtn').disabled = !has;
+}
+
+document.getElementById('entryInput').addEventListener('input', checkReady);
+
+function addEntry() {
+  const text = document.getElementById('entryInput').value.trim();
+  if (!text || !selectedHL) return;
+  const entry = {
+    id: Date.now(),
+    text,
+    hl: selectedHL,
+    ts: new Date().toISOString()
+  };
+  entries.unshift(entry);
+  save();
+  document.getElementById('entryInput').value = '';
+  selectedHL = null;
+  document.querySelectorAll('.hl-btn').forEach(b => b.className = 'hl-btn');
+  document.getElementById('addBtn').disabled = true;
+  render();
+}
+
+function deleteEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  save();
+  render();
+}
+
+function save() {
+  localStorage.setItem('pr_entries', JSON.stringify(entries));
+}
+
+function getStats() {
+  const counts = { perm: 0, week: 0, day: 0, eph: 0 };
+  entries.forEach(e => counts[e.hl]++);
+  const total = entries.length;
+  const ratio = total > 0 ? Math.round((counts.perm / total) * 100) : null;
+  return { counts, total, ratio };
+}
+
+function getVerdict(counts, ratio) {
+  if (counts.perm + counts.week + counts.day + counts.eph === 0) {
+    return { text: 'Log your first block to see where your time is going.', warn: false };
+  }
+  if (ratio === null) return { text: 'Loading...', warn: false };
+  if (ratio >= 60) return { text: `${ratio}% permanent. The potato endures. You are building the silo.`, warn: false };
+  if (ratio >= 40) return { text: `${ratio}% permanent. Acceptable. The barn is half full. Keep going.`, warn: false };
+  if (ratio >= 20) return { text: `${ratio}% permanent. More performance than product. The meeting notes decay by Thursday.`, warn: true };
+  if (ratio > 0) return { text: `${ratio}% permanent. You are mostly smoke. The mountain is suspicious.`, warn: true };
+  return { text: `0% permanent. Everything you did today will be gone by the weekend. Is this what you came here to build?`, warn: true };
+}
+
+function groupByDay(entries) {
+  const groups = {};
+  entries.forEach(e => {
+    const d = new Date(e.ts);
+    const key = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+  return groups;
+}
+
+function render() {
+  const { counts, total, ratio } = getStats();
+
+  document.getElementById('statPerm').textContent = counts.perm;
+  document.getElementById('statWeek').textContent = counts.week;
+  document.getElementById('statDay').textContent = counts.day;
+  document.getElementById('statEph').textContent = counts.eph;
+  document.getElementById('statRatio').textContent = ratio !== null ? ratio + '%' : '—';
+  document.getElementById('ratioFill').style.width = (ratio || 0) + '%';
+  document.getElementById('footerCount').textContent = total + ' entr' + (total === 1 ? 'y' : 'ies');
+
+  const verdict = getVerdict(counts, ratio);
+  const vEl = document.getElementById('verdictText');
+  vEl.textContent = verdict.text;
+  vEl.className = 'verdict-text ' + (verdict.warn ? 'warn' : total === 0 ? 'neutral' : '');
+
+  const zone = document.getElementById('logZone');
+  if (entries.length === 0) {
+    zone.innerHTML = `<div class="empty-state" id="emptyState">
+      No entries yet.<br>
+      The URL https://omnom-demo.vercel.app will exist tomorrow.<br>
+      The VC meeting notes will not.<br>
+      Start logging.
+    </div>`;
+    return;
+  }
+
+  const groups = groupByDay(entries);
+  zone.innerHTML = '';
+  Object.entries(groups).forEach(([day, dayEntries]) => {
+    const group = document.createElement('div');
+    group.className = 'day-group';
+    group.innerHTML = `<div class="day-header">${day}</div>`;
+    dayEntries.forEach(e => {
+      const meta = HL_META[e.hl];
+      const time = new Date(e.ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const el = document.createElement('div');
+      el.className = 'entry';
+      el.innerHTML = `
+        <div class="entry-hl ${meta.cls}"></div>
+        <div class="entry-body">
+          <div class="entry-text">${escHtml(e.text)}</div>
+          <div class="entry-meta">
+            <span class="entry-tag ${meta.tagCls}">${meta.label}</span>
+            <span>${time}</span>
+            <span>${meta.desc}</span>
+          </div>
+        </div>
+        <button class="delete-btn" onclick="deleteEntry(${e.id})" title="Remove">×</button>
+      `;
+      group.appendChild(el);
+    });
+    zone.appendChild(group);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+render();
+</script>
+</body>
+</html>

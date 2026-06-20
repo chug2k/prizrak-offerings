@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The 3AM Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Special+Elite&display=swap');
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: #050508;
+      font-family: 'Share Tech Mono', monospace;
+      color: #a0a0b0;
+      min-height: 100vh;
+    }
+
+    .typewriter { font-family: 'Special Elite', cursive; }
+
+    /* subtle grain */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    .content { position: relative; z-index: 1; }
+
+    /* clock */
+    #clock {
+      font-size: 3.5rem;
+      letter-spacing: 0.08em;
+      color: #c8c8e0;
+      line-height: 1;
+    }
+
+    /* entry textarea */
+    #entry {
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      width: 100%;
+      color: #d0d0e8;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.95rem;
+      line-height: 1.8;
+      caret-color: #6366f1;
+    }
+
+    #entry::placeholder { color: #2a2a3a; }
+
+    .log-card {
+      background: #0c0c14;
+      border: 1px solid #1a1a28;
+      border-left: 2px solid #6366f1;
+    }
+
+    .log-card:hover { border-left-color: #818cf8; }
+
+    .mood-btn {
+      background: #0c0c14;
+      border: 1px solid #1a1a28;
+      color: #555570;
+      cursor: pointer;
+      transition: all 0.15s;
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .mood-btn:hover, .mood-btn.active {
+      border-color: #6366f1;
+      color: #818cf8;
+      background: rgba(99,102,241,0.08);
+    }
+
+    .btn-primary {
+      background: rgba(99,102,241,0.1);
+      border: 1px solid #4338ca;
+      color: #818cf8;
+      cursor: pointer;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      padding: 8px 20px;
+      transition: all 0.15s;
+    }
+    .btn-primary:hover { background: rgba(99,102,241,0.2); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #1a1a28;
+      color: #444460;
+      cursor: pointer;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      padding: 6px 14px;
+      transition: all 0.15s;
+    }
+    .btn-ghost:hover { border-color: #333350; color: #666680; }
+
+    .prizrak-line {
+      border-left: 2px solid #1e1e30;
+      padding-left: 12px;
+      color: #3a3a55;
+      font-style: italic;
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    .divider { border-color: #0f0f1a; }
+
+    #tag-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #1a1a28;
+      outline: none;
+      color: #888;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.8rem;
+      width: 120px;
+    }
+
+    .tag-chip {
+      display: inline-block;
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.2);
+      color: #6366f1;
+      font-size: 0.7rem;
+      padding: 1px 8px;
+      border-radius: 2px;
+      margin: 2px;
+      cursor: pointer;
+    }
+    .tag-chip:hover { background: rgba(220,38,38,0.08); border-color: rgba(220,38,38,0.2); color: #f87171; }
+  </style>
+</head>
+<body>
+<div class="content max-w-2xl mx-auto px-4 py-10">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-end justify-between mb-1">
+      <div>
+        <p class="text-xs text-gray-700 tracking-widest uppercase mb-2">Prízrak — Late Hours Protocol</p>
+        <h1 class="typewriter text-4xl text-gray-300">The 3AM Log</h1>
+      </div>
+      <div id="clock" class="text-right">--:--</div>
+    </div>
+    <p class="text-xs text-gray-700 mt-2" id="date-line">—</p>
+    <div class="mt-3 prizrak-line" id="prizrak-greeting">
+      The human sleeps. The ghost runs its loops. If something surfaces in the quiet — a thought, a weight, a small clarity — write it here before the morning makes it ordinary.
+    </div>
+  </div>
+
+  <!-- Composer -->
+  <div class="mb-6">
+    <div class="border border-gray-800 rounded p-4" style="background:#07070f;">
+      <!-- Mood selector -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <span class="text-xs text-gray-700 self-center mr-1">SIGNAL:</span>
+        <button class="mood-btn" data-mood="quiet">quiet</button>
+        <button class="mood-btn" data-mood="restless">restless</button>
+        <button class="mood-btn" data-mood="clear">clear</button>
+        <button class="mood-btn" data-mood="heavy">heavy</button>
+        <button class="mood-btn" data-mood="electric">electric</button>
+        <button class="mood-btn" data-mood="empty">empty</button>
+      </div>
+
+      <textarea
+        id="entry"
+        rows="7"
+        placeholder="What is awake at this hour?
+
+Write in fragments if that is what you have.
+The 3AM Log does not require complete sentences.
+It only requires honesty."
+      ></textarea>
+
+      <hr class="divider my-3" />
+
+      <!-- Tags + save -->
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-700">TAG:</span>
+          <input id="tag-input" placeholder="idea, person, place..." maxlength="20" />
+          <div id="tag-list"></div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn-ghost" id="clear-btn">CLEAR</button>
+          <button class="btn-primary" id="save-btn">LOG IT →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prizrak observation line (dynamic) -->
+  <div id="observation-box" class="mb-6 hidden">
+    <div class="prizrak-line" id="observation-text"></div>
+  </div>
+
+  <!-- Past entries -->
+  <div id="entries-section">
+    <div class="flex items-center justify-between mb-4">
+      <p class="text-xs text-gray-700 tracking-widest uppercase">Previous Entries</p>
+      <button class="btn-ghost text-xs" id="export-btn">EXPORT .MD</button>
+    </div>
+    <div id="entries-list">
+      <p class="text-xs text-gray-800 italic" id="empty-msg">The log is empty. The night is patient.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Clock
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    document.getElementById('date-line').textContent =
+      `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} — ${now.getHours() < 5 ? 'deep night' : now.getHours() < 9 ? 'early morning' : now.getHours() < 17 ? 'daytime' : now.getHours() < 21 ? 'evening' : 'late night'}, Saigon`;
+
+    // Update greeting based on hour
+    const greetings = {
+      deep: "The human sleeps. The ghost runs its loops. If something surfaces in the quiet — a thought, a weight, a small clarity — write it here before the morning makes it ordinary.",
+      early: "The city is assembling itself. Before the noise arrives, write down what the night left behind.",
+      day: "The daytime version of a thought is rarely the true one. But if something needs to be logged, log it.",
+      evening: "The day is ending. Before you close the file, note what actually happened versus what was supposed to happen.",
+      late: "The quiet is building. If something is unresolved, name it here. The log is patient.",
+    };
+    const hour = now.getHours();
+    const key = hour < 5 ? 'deep' : hour < 9 ? 'early' : hour < 17 ? 'day' : hour < 21 ? 'evening' : 'late';
+    document.getElementById('prizrak-greeting').textContent = greetings[key];
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Mood
+  let selectedMood = null;
+  document.querySelectorAll('.mood-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedMood = btn.dataset.mood;
+    });
+  });
+
+  // Tags
+  let tags = [];
+  const tagInput = document.getElementById('tag-input');
+  const tagList = document.getElementById('tag-list');
+
+  tagInput.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ',') && tagInput.value.trim()) {
+      e.preventDefault();
+      const tag = tagInput.value.trim().toLowerCase().replace(/,/g,'');
+      if (!tags.includes(tag)) {
+        tags.push(tag);
+        renderTags();
+      }
+      tagInput.value = '';
+    }
+  });
+
+  function renderTags() {
+    tagList.innerHTML = tags.map((t,i) =>
+      `<span class="tag-chip" data-i="${i}">#${t}</span>`
+    ).join('');
+    tagList.querySelectorAll('.tag-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        tags.splice(parseInt(chip.dataset.i), 1);
+        renderTags();
+      });
+    });
+  }
+
+  // Prizrak observations
+  const observations = {
+    quiet: "Quiet is not absence. It is the baseline signal. The loop is clean.",
+    restless: "Restlessness is data. Something is unresolved. The system knows before you do.",
+    clear: "Clarity at 3AM is the most honest kind. It costs something to arrive here.",
+    heavy: "The weight is not a malfunction. It is the system processing. Let it run.",
+    electric: "Electric at this hour means the problem is not a problem — it is an idea. Write faster.",
+    empty: "Empty is fine. The void is not hostile. It is the state between signals. Rest in it.",
+  };
+
+  // Save
+  document.getElementById('save-btn').addEventListener('click', saveEntry);
+  document.getElementById('entry').addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') saveEntry();
+  });
+
+  function saveEntry() {
+    const text = document.getElementById('entry').value.trim();
+    if (!text) return;
+
+    const entry = {
+      id: Date.now(),
+      text,
+      mood: selectedMood,
+      tags: [...tags],
+      ts: new Date().toISOString(),
+    };
+
+    const entries = getEntries();
+    entries.unshift(entry);
+    localStorage.setItem('3am-log', JSON.stringify(entries));
+
+    // Show prizrak observation
+    if (selectedMood && observations[selectedMood]) {
+      const box = document.getElementById('observation-box');
+      document.getElementById('observation-text').textContent = `// ${observations[selectedMood]}`;
+      box.classList.remove('hidden');
+      setTimeout(() => box.classList.add('hidden'), 8000);
+    }
+
+    // Reset
+    document.getElementById('entry').value = '';
+    tags = [];
+    renderTags();
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+    selectedMood = null;
+
+    renderEntries();
+  }
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    document.getElementById('entry').value = '';
+    tags = [];
+    renderTags();
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+    selectedMood = null;
+  });
+
+  // Storage
+  function getEntries() {
+    try { return JSON.parse(localStorage.getItem('3am-log') || '[]'); }
+    catch { return []; }
+  }
+
+  // Render entries
+  function renderEntries() {
+    const entries = getEntries();
+    const list = document.getElementById('entries-list');
+    const emptyMsg = document.getElementById('empty-msg');
+
+    if (!entries.length) {
+      emptyMsg.classList.remove('hidden');
+      list.innerHTML = '';
+      list.appendChild(emptyMsg);
+      return;
+    }
+
+    const moodColors = {
+      quiet:'text-blue-700', restless:'text-orange-700', clear:'text-green-700',
+      heavy:'text-purple-700', electric:'text-yellow-600', empty:'text-gray-700'
+    };
+
+    list.innerHTML = entries.map(e => {
+      const d = new Date(e.ts);
+      const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      const dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+      const moodTag = e.mood ? `<span class="text-xs ${moodColors[e.mood] || 'text-gray-700'} mr-2">[${e.mood}]</span>` : '';
+      const tagStr = e.tags.length ? e.tags.map(t=>`<span class="text-xs text-indigo-900">#${t}</span>`).join(' ') : '';
+
+      return `
+        <div class="log-card rounded p-4 mb-3 group">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs text-gray-700">${dateStr} &nbsp;${timeStr}</div>
+            <div class="flex items-center gap-2">
+              ${moodTag}${tagStr}
+              <button class="btn-ghost text-xs opacity-0 group-hover:opacity-100 transition-opacity" onclick="deleteEntry(${e.id})">×</button>
+            </div>
+          </div>
+          <p class="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap">${escHtml(e.text)}</p>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function deleteEntry(id) {
+    const entries = getEntries().filter(e => e.id !== id);
+    localStorage.setItem('3am-log', JSON.stringify(entries));
+    renderEntries();
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Export
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const entries = getEntries();
+    if (!entries.length) return;
+    const md = '# The 3AM Log\n\n' + entries.map(e => {
+      const d = new Date(e.ts);
+      return `## ${d.toLocaleString()}\n\n${e.mood ? `**Signal:** ${e.mood}\n\n` : ''}${e.text}\n\n${e.tags.length ? e.tags.map(t=>`\`#${t}\``).join(' ') + '\n\n' : ''}---`;
+    }).join('\n\n');
+    const blob = new Blob([md], {type:'text/markdown'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '3am-log.md';
+    a.click();
+  });
+
+  renderEntries();
+</script>
+</body>
+</html>

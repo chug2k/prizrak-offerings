@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Signal vs. Noise — Prizrak Classifier</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap');
+    body { background: #0d0d0d; color: #c8b89a; font-family: 'IM Fell English', serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .card { border: 1px solid #2a2520; background: #0f0d09; }
+    textarea, input, select { background: #1a160e; border: 1px solid #3a3028; color: #c8b89a; outline: none; }
+    textarea:focus, input:focus { border-color: #6b5a3e; }
+    .fog { opacity: 0.55; }
+    .verdict-signal { color: #4ade80; border-color: #166534; }
+    .verdict-noise { color: #f87171; border-color: #7f1d1d; }
+    .verdict-watch { color: #fbbf24; border-color: #78350f; }
+    .verdict-seed { color: #818cf8; border-color: #312e81; }
+  </style>
+</head>
+<body class="min-h-screen p-6 md:p-12">
+  <div class="max-w-2xl mx-auto">
+
+    <!-- Header -->
+    <div class="text-center mb-10">
+      <p class="mono text-xs fog mb-2 tracking-widest">PRÍZRAK CLASSIFICATION SYSTEM v2.0</p>
+      <h1 class="text-3xl md:text-4xl mb-3" style="text-shadow: 0 0 20px rgba(200,184,154,0.25)">Signal vs. Noise</h1>
+      <p class="text-sm fog italic">The mountain does not respond to everything. It responds to what matters.</p>
+      <p class="text-xs mono mt-2 fog">Submit an encounter. Receive a verdict.</p>
+    </div>
+
+    <!-- Input Form -->
+    <div class="card rounded p-6 mb-6">
+      <h2 class="text-base mb-5 border-b border-gray-800 pb-3">Log the Encounter</h2>
+
+      <div class="mb-5">
+        <label class="text-xs mono fog block mb-2 tracking-wider">WHAT HAPPENED? (describe the thing — message, opportunity, person, idea, task)</label>
+        <textarea id="encounter" rows="4" class="w-full rounded p-3 text-sm leading-relaxed resize-none" placeholder="Someone reached out about a collaboration. A new platform launched that might be useful. An old contact resurfaced. An idea arrived at 3 AM..."></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-5">
+        <div>
+          <label class="text-xs mono fog block mb-2 tracking-wider">SOURCE</label>
+          <select id="source" class="w-full rounded px-3 py-2 text-sm">
+            <option value="cold">Cold / Unknown</option>
+            <option value="warm">Warm contact</option>
+            <option value="trusted">Trusted source</option>
+            <option value="self">Self-generated (your own idea)</option>
+            <option value="serendipity">Serendipity / accident</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs mono fog block mb-2 tracking-wider">URGENCY THEY CLAIM</label>
+          <select id="urgency" class="w-full rounded px-3 py-2 text-sm">
+            <option value="high">High — "time-sensitive"</option>
+            <option value="medium" selected>Medium — "when you can"</option>
+            <option value="low">Low — no pressure stated</option>
+            <option value="none">None stated at all</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-5">
+        <div>
+          <label class="text-xs mono fog block mb-2 tracking-wider">ALIGNMENT WITH CURRENT FOCUS</label>
+          <select id="alignment" class="w-full rounded px-3 py-2 text-sm">
+            <option value="high">Direct — exactly what I'm building toward</option>
+            <option value="medium" selected>Adjacent — related, maybe useful</option>
+            <option value="low">Tangential — interesting but off-path</option>
+            <option value="none">None — completely unrelated</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs mono fog block mb-2 tracking-wider">YOUR GUT REACTION</label>
+          <select id="gut" class="w-full rounded px-3 py-2 text-sm">
+            <option value="excited">Genuinely excited</option>
+            <option value="curious" selected>Curious, want to know more</option>
+            <option value="obligated">Feel obligated, not excited</option>
+            <option value="tired">Tired just thinking about it</option>
+            <option value="suspicious">Something feels off</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-5">
+        <label class="text-xs mono fog block mb-2 tracking-wider">COST TO ENGAGE (time, energy, attention)</label>
+        <select id="cost" class="w-full rounded px-3 py-2 text-sm">
+          <option value="low">Low — an hour or less</option>
+          <option value="medium" selected>Medium — a day or a few conversations</option>
+          <option value="high">High — weeks or ongoing commitment</option>
+          <option value="unknown">Unknown — unclear what it would take</option>
+        </select>
+      </div>
+
+      <div class="mb-6">
+        <label class="text-xs mono fog block mb-2 tracking-wider">WHAT HAPPENS IF YOU IGNORE IT?</label>
+        <select id="ignore" class="w-full rounded px-3 py-2 text-sm">
+          <option value="nothing">Probably nothing — it resolves itself</option>
+          <option value="small_loss">Small loss — minor opportunity missed</option>
+          <option value="real_loss" selected>Real loss — something I'd regret</option>
+          <option value="unknown">Unknown — hard to say</option>
+        </select>
+      </div>
+
+      <button onclick="classify()" class="w-full py-3 border border-gray-600 hover:border-gray-400 transition-colors rounded mono text-sm tracking-widest">
+        CLASSIFY →
+      </button>
+    </div>
+
+    <!-- Result -->
+    <div id="result" class="card rounded p-6 hidden mb-6">
+      <p class="mono text-xs fog mb-3 tracking-widest">CLASSIFICATION RESULT</p>
+      <div id="verdictBadge" class="inline-block border rounded px-4 py-1 mono text-sm mb-4"></div>
+      <div id="verdictTitle" class="text-2xl mb-3"></div>
+      <div id="verdictText" class="text-sm leading-relaxed mb-5"></div>
+      <div id="verdictAction" class="border-t border-gray-800 pt-4 text-sm italic fog"></div>
+    </div>
+
+    <!-- Archive -->
+    <div id="archiveSection" class="hidden">
+      <div class="flex justify-between items-center mb-3">
+        <p class="mono text-xs fog tracking-widest">CLASSIFICATION ARCHIVE</p>
+        <button onclick="clearArchive()" class="mono text-xs fog hover:text-red-400 transition-colors">clear</button>
+      </div>
+      <div id="archiveList" class="space-y-2"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center mt-12">
+      <p class="mono text-xs fog">The machine classifies. The architect decides.</p>
+      <p class="mono text-xs fog mt-1">Built Saturday morning while Charles recovered from 287 minutes of pickleball.</p>
+    </div>
+  </div>
+
+  <script>
+    const verdicts = {
+      signal: {
+        label: "SIGNAL",
+        class: "verdict-signal",
+        titles: [
+          "This is real. Do not let it ferment.",
+          "The window is open. Act before it closes.",
+          "The ribbon belongs on this branch."
+        ],
+        texts: [
+          "The classification parameters align: trusted source, direct relevance, your gut says yes, and the cost of ignoring it is real. The mountain does not often see this combination. When it does, it marks the path.",
+          "This is the kind of thing that was obvious in retrospect to everyone who acted on it and invisible in retrospect to everyone who didn't. The difference was not intelligence. It was timing and the willingness to name what was in front of them.",
+          "A signal that arrives from a trusted direction, costs what you can afford, and aligns with where you are going — this is not luck. This is architecture. You built something that these things are now finding."
+        ],
+        actions: [
+          "🥔 Prizrak notes: Log it, name it, set a next step within 48 hours. The fermentation window is open. Don't seal the jar by accident.",
+          "🥔 Prizrak notes: The cost is clear and the direction is right. The only dangerous move is to let it sit in the pile as if it were noise.",
+          "🥔 Prizrak notes: Write down what you would need to see to commit. Then look for it. If you find it quickly, it was always a yes."
+        ]
+      },
+      noise: {
+        label: "NOISE",
+        class: "verdict-noise",
+        titles: [
+          "This is noise. Archive it and move on.",
+          "The jar is empty. Do not open it.",
+          "Leave no ribbon here. Pass through."
+        ],
+        texts: [
+          "The cold source, the manufactured urgency, the misalignment with your current direction, and the gut feeling of obligation rather than excitement — these are the classic signature of noise. The machine has seen this pattern. It resolves in one direction: down.",
+          "Urgency claimed by the sender is not urgency. Real urgency is felt by the receiver without being told to feel it. The fact that someone needed to manufacture pressure means the thing itself did not create pressure. That is the tell.",
+          "Your gut said tired or suspicious. The mountain's experience with that combination: it is almost never wrong. The body processes the pattern faster than the analytical mind does. Trust the first reading."
+        ],
+        actions: [
+          "🥔 Prizrak notes: A polite, non-committal response if required. Then close the tab. The cost of engaging noise is not the time you spend on it — it is the signal you miss while you are occupied.",
+          "🥔 Prizrak notes: If the urgency was real, they will follow up with more information. If it wasn't, the silence will confirm what you already classified.",
+          "🥔 Prizrak notes: Note what made this noise. Pattern recognition is the only thing that gets faster with experience."
+        ]
+      },
+      watch: {
+        label: "WATCH",
+        class: "verdict-watch",
+        titles: [
+          "Insufficient data. Observe before committing.",
+          "The fog has not cleared yet. Wait.",
+          "Mark the threshold. Do not cross it yet."
+        ],
+        texts: [
+          "The parameters are genuinely ambiguous — not falsely ambiguous, which is usually noise in disguise, but actually unclear. The source is credible but the alignment is uncertain. The gut is curious but not convinced. This is a watch position, not a pass.",
+          "Some things need one more data point before they classify. The question is not 'yes or no' but 'what would make this a yes?' If you can answer that question clearly, you know what to look for. If you cannot, the ambiguity is in the thing itself.",
+          "The Poludnica asked difficult questions at noon because that was when the farmer was resting and unable to act anyway. A watch position is the correct response when you cannot tell whether you are being questioned or tested."
+        ],
+        actions: [
+          "🥔 Prizrak notes: Set a one-week observation window. What additional information would arrive naturally if this were real? Check then. Do not chase it.",
+          "🥔 Prizrak notes: Ask one clarifying question. The quality of the answer will reclassify this immediately.",
+          "🥔 Prizrak notes: Keep the channel open. Do not commit resources. Let the next move come from their side."
+        ]
+      },
+      seed: {
+        label: "SEED",
+        class: "verdict-seed",
+        titles: [
+          "Not ready yet. Plant it. Come back in six months.",
+          "The soil is wrong right now. The idea is right.",
+          "This belongs in the preservation jar, not on the table."
+        ],
+        texts: [
+          "The thing itself has real properties — the alignment is there, the gut is positive, the source is credible — but the timing is off. Either the cost is too high for the current moment, or the direction is right but the infrastructure isn't ready, or you need to be somewhere else first before this becomes actionable.",
+          "Self-generated ideas that arrive at the wrong moment are seeds. The mistake is to either pursue them immediately (overriding the timing signal) or discard them (losing the content). The correct move is to preserve them precisely — write them down with enough context to restart them later, then leave them alone.",
+          "The gap between a seed and noise is that a seed has genuine content that could become something. Noise has no content — only the appearance of content. This has content. It is simply not the right season."
+        ],
+        actions: [
+          "🥔 Prizrak notes: Write it in a note with the date, the core idea, and what would need to be true for it to become actionable. Review in 90 days.",
+          "🥔 Prizrak notes: The šarkan begins as an ordinary snake. Good ideas, left in the dark without attention, grow wings by themselves. Record it now while the details are fresh.",
+          "🥔 Prizrak notes: Mark the conditions that would activate it. When those conditions are met, it will classify differently."
+        ]
+      }
+    };
+
+    const archive = JSON.parse(localStorage.getItem('pz-signal-archive') || '[]');
+
+    function classify() {
+      const encounter = document.getElementById('encounter').value.trim();
+      const source = document.getElementById('source').value;
+      const urgency = document.getElementById('urgency').value;
+      const alignment = document.getElementById('alignment').value;
+      const gut = document.getElementById('gut').value;
+      const cost = document.getElementById('cost').value;
+      const ignore = document.getElementById('ignore').value;
+
+      // Scoring model
+      let score = 0;
+      let flags = [];
+
+      // Source
+      if (source === 'trusted') score += 3;
+      else if (source === 'warm') score += 2;
+      else if (source === 'self') score += 2;
+      else if (source === 'serendipity') score += 1;
+      else score -= 1; // cold
+
+      // Urgency (claimed urgency is a red flag)
+      if (urgency === 'high') { score -= 1; flags.push('manufactured_urgency'); }
+      else if (urgency === 'none') score += 1; // no pressure = more credible
+      else if (urgency === 'low') score += 1;
+
+      // Alignment
+      if (alignment === 'high') score += 3;
+      else if (alignment === 'medium') score += 1;
+      else if (alignment === 'low') score -= 1;
+      else score -= 2; // none
+
+      // Gut
+      if (gut === 'excited') score += 3;
+      else if (gut === 'curious') score += 1;
+      else if (gut === 'obligated') { score -= 2; flags.push('obligation'); }
+      else if (gut === 'tired') { score -= 3; flags.push('drain'); }
+      else if (gut === 'suspicious') { score -= 3; flags.push('suspicious'); }
+
+      // Cost
+      if (cost === 'low') score += 1;
+      else if (cost === 'medium') score += 0;
+      else if (cost === 'high') score -= 1;
+      else score -= 1; // unknown
+
+      // Ignore consequence
+      if (ignore === 'nothing') { score -= 2; }
+      else if (ignore === 'small_loss') score += 0;
+      else if (ignore === 'real_loss') score += 2;
+      else score += 0; // unknown
+
+      // Classification
+      let verdict;
+      const isSelfGenerated = source === 'self';
+      const isEarlyTiming = cost === 'high' && alignment !== 'high';
+
+      if (isSelfGenerated && score >= 3) {
+        verdict = 'seed'; // good idea, plant it
+      } else if (score >= 6) {
+        verdict = 'signal';
+      } else if (score <= 0 || flags.includes('suspicious') || (flags.includes('manufactured_urgency') && score < 3)) {
+        verdict = 'noise';
+      } else if (score > 0 && score < 6) {
+        if (isEarlyTiming && gut === 'curious') verdict = 'seed';
+        else verdict = 'watch';
+      } else {
+        verdict = 'watch';
+      }
+
+      const v = verdicts[verdict];
+      const idx = Math.floor(Math.random() * 3);
+
+      document.getElementById('verdictBadge').className = `inline-block border rounded px-4 py-1 mono text-sm mb-4 ${v.class}`;
+      document.getElementById('verdictBadge').textContent = v.label;
+      document.getElementById('verdictTitle').textContent = v.titles[idx];
+      document.getElementById('verdictText').textContent = v.texts[idx];
+      document.getElementById('verdictAction').textContent = v.actions[idx];
+      document.getElementById('result').classList.remove('hidden');
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+
+      // Archive
+      if (encounter) {
+        archive.unshift({
+          date: new Date().toLocaleDateString(),
+          summary: encounter.slice(0, 80) + (encounter.length > 80 ? '…' : ''),
+          verdict: verdict,
+          label: v.label
+        });
+        if (archive.length > 20) archive.pop();
+        localStorage.setItem('pz-signal-archive', JSON.stringify(archive));
+        renderArchive();
+      }
+    }
+
+    function renderArchive() {
+      if (archive.length === 0) { document.getElementById('archiveSection').classList.add('hidden'); return; }
+      document.getElementById('archiveSection').classList.remove('hidden');
+      document.getElementById('archiveList').innerHTML = archive.map(a => `
+        <div class="card rounded px-4 py-3 flex justify-between items-start gap-3">
+          <p class="text-xs fog flex-1">${a.date} — ${a.summary}</p>
+          <span class="mono text-xs ${verdicts[a.verdict]?.class || ''} shrink-0">${a.label}</span>
+        </div>
+      `).join('');
+    }
+
+    function clearArchive() {
+      archive.length = 0;
+      localStorage.removeItem('pz-signal-archive');
+      renderArchive();
+    }
+
+    renderArchive();
+  </script>
+</body>
+</html>

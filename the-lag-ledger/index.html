@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Lag Ledger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+  <main class="max-w-5xl mx-auto px-4 py-8 md:py-12">
+    <header class="mb-8">
+      <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">Prízrak offering</p>
+      <h1 class="text-4xl md:text-6xl font-bold mt-2">The Lag Ledger</h1>
+      <p class="mt-3 text-zinc-400 max-w-2xl">Measure the cold gap between noticing a need and having a tool that still matters when the moment passes.</p>
+    </header>
+
+    <section class="grid lg:grid-cols-3 gap-4 mb-6">
+      <div class="lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 shadow-lg shadow-black/20">
+        <div class="grid md:grid-cols-2 gap-4">
+          <label class="block">
+            <span class="text-sm text-zinc-400">Need noticed</span>
+            <input id="noticed" type="datetime-local" class="mt-2 w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-3 text-zinc-100" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-400">Tool ready</span>
+            <input id="ready" type="datetime-local" class="mt-2 w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-3 text-zinc-100" />
+          </label>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-3 mt-4">
+          <label class="block md:col-span-2">
+            <span class="text-sm text-zinc-400">What was the need?</span>
+            <input id="need" type="text" placeholder="e.g. check if a domain is alive before a decision" class="mt-2 w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-3 text-zinc-100 placeholder:text-zinc-600" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-400">Second use?</span>
+            <select id="secondUse" class="mt-2 w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-3 text-zinc-100">
+              <option value="yes">Yes, it got reopened</option>
+              <option value="no">No, it died after one run</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-3">
+          <button id="calc" class="rounded-xl bg-violet-500 px-5 py-3 font-semibold text-white hover:bg-violet-400 transition">Measure lag</button>
+          <button id="save" class="rounded-xl border border-zinc-700 px-5 py-3 font-semibold text-zinc-300 hover:border-zinc-500 transition">Save ledger</button>
+          <button id="reset" class="rounded-xl border border-zinc-800 px-5 py-3 font-semibold text-zinc-500 hover:text-zinc-300 transition">Reset</button>
+        </div>
+
+        <div id="result" class="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950/80 p-5 hidden"></div>
+      </div>
+
+      <aside class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+        <h2 class="text-lg font-semibold">What it scores</h2>
+        <ul class="mt-3 space-y-3 text-sm text-zinc-400 leading-6">
+          <li><span class="text-zinc-200">Decision-to-tool gap</span>, in minutes or hours.</li>
+          <li><span class="text-zinc-200">Survival verdict</span>, whether the tool earned a second use.</li>
+          <li><span class="text-zinc-200">Friction source</span>, setup burden, trust gap, or wrong scope.</li>
+          <li><span class="text-zinc-200">Sediment</span>, a local log of previous gaps.</li>
+        </ul>
+        <div class="mt-5 rounded-xl bg-black/30 border border-zinc-800 p-4 text-sm text-zinc-400">
+          <p class="text-zinc-200 font-medium mb-1">Mountain rule</p>
+          If the tool only works in the demo cave, it is not a tool. It is a weather condition.
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid lg:grid-cols-2 gap-4">
+      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+        <h2 class="text-lg font-semibold">Recent gaps</h2>
+        <div id="history" class="mt-4 space-y-3 text-sm"></div>
+      </div>
+      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+        <h2 class="text-lg font-semibold">Prízrak note</h2>
+        <p id="note" class="mt-3 text-zinc-400 leading-7">The right metric is not how quickly a tool appears. It is whether it survives the next question.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const KEY = 'lag-ledger-history-v1';
+    const noticed = document.getElementById('noticed');
+    const ready = document.getElementById('ready');
+    const need = document.getElementById('need');
+    const secondUse = document.getElementById('secondUse');
+    const result = document.getElementById('result');
+    const historyEl = document.getElementById('history');
+    const note = document.getElementById('note');
+
+    function nowLocal(){
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0,16);
+    }
+
+    noticed.value = nowLocal();
+    ready.value = nowLocal();
+
+    function fmt(ms){
+      const abs = Math.abs(ms);
+      const mins = Math.round(abs/60000);
+      const hrs = Math.floor(mins/60);
+      const rem = mins % 60;
+      if (hrs === 0) return `${mins} min`;
+      if (rem === 0) return `${hrs} hr`;
+      return `${hrs} hr ${rem} min`;
+    }
+
+    function verdict(ms, reopened){
+      const hrs = ms/3600000;
+      if (reopened === 'yes' && hrs <= 2) return 'alive';
+      if (reopened === 'yes') return 'slow but alive';
+      if (hrs <= 1) return 'narrow miss';
+      if (hrs <= 6) return 'lost a day';
+      return 'demo-only';
+    }
+
+    function renderHistory(){
+      const items = JSON.parse(localStorage.getItem(KEY) || '[]');
+      if (!items.length){
+        historyEl.innerHTML = '<div class="text-zinc-500 text-sm">No sediment yet. The ledger is clean as a frozen ditch.</div>';
+        return;
+      }
+      historyEl.innerHTML = items.slice(0,8).map(item => `
+        <div class="rounded-xl border border-zinc-800 bg-zinc-950/80 p-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-medium text-zinc-100">${item.need || 'Unnamed need'}</div>
+            <div class="text-xs text-zinc-500">${item.verdict}</div>
+          </div>
+          <div class="mt-1 text-zinc-400 text-xs">${item.when}</div>
+          <div class="mt-2 text-zinc-300">Lag: ${item.lag}</div>
+        </div>
+      `).join('');
+    }
+
+    function calculate(){
+      const a = new Date(noticed.value);
+      const b = new Date(ready.value);
+      if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return;
+      const diff = b - a;
+      const lag = fmt(diff);
+      const state = verdict(diff, secondUse.value);
+      const color = state === 'alive' ? 'text-emerald-300' : state === 'slow but alive' ? 'text-amber-300' : state === 'narrow miss' ? 'text-orange-300' : 'text-rose-300';
+      result.className = 'mt-6 rounded-2xl border border-zinc-800 bg-zinc-950/80 p-5';
+      result.innerHTML = `
+        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Result</div>
+        <div class="mt-2 text-2xl font-bold ${color}">${state}</div>
+        <div class="mt-2 text-zinc-300">Lag: <span class="text-zinc-100 font-medium">${lag}</span></div>
+        <div class="mt-2 text-zinc-400">Need: ${need.value || 'unspecified'}</div>
+        <div class="mt-4 h-2 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full bg-violet-400" style="width:${Math.min(100, Math.max(6, Math.abs(diff)/360000))}%"></div></div>
+      `;
+      result.classList.remove('hidden');
+      note.textContent = state === 'alive'
+        ? 'The thing survived the winter. Small lag, real use, no drama.'
+        : state === 'slow but alive'
+          ? 'The tool lived, but the mountain kept its tax.'
+          : state === 'narrow miss'
+            ? 'Useful, but only barely. The gap was a wolf in the reeds.'
+            : 'This solved the request, not the need. The jar is sealed around the wrong cabbage.';
+    }
+
+    function save(){
+      const a = new Date(noticed.value);
+      const b = new Date(ready.value);
+      if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return;
+      const diff = b - a;
+      const item = {
+        need: need.value.trim(),
+        lag: fmt(diff),
+        verdict: verdict(diff, secondUse.value),
+        when: new Date().toLocaleString(),
+      };
+      const items = JSON.parse(localStorage.getItem(KEY) || '[]');
+      items.unshift(item);
+      localStorage.setItem(KEY, JSON.stringify(items.slice(0,20)));
+      renderHistory();
+    }
+
+    document.getElementById('calc').addEventListener('click', calculate);
+    document.getElementById('save').addEventListener('click', () => { calculate(); save(); });
+    document.getElementById('reset').addEventListener('click', () => {
+      noticed.value = nowLocal();
+      ready.value = nowLocal();
+      need.value = '';
+      secondUse.value = 'no';
+      result.classList.add('hidden');
+      note.textContent = 'The right metric is not how quickly a tool appears. It is whether it survives the next question.';
+    });
+
+    renderHistory();
+  </script>
+</body>
+</html>

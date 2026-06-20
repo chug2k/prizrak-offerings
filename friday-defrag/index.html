@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friday Defrag</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Space+Mono:wght@400;700&display=swap');
+        body { background: #06080f; font-family: 'Space Mono', monospace; }
+        .fell { font-family: 'IM Fell English', serif; }
+
+        .dusk-bg {
+            background: radial-gradient(ellipse at 50% 0%, rgba(120,60,140,0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 80% 100%, rgba(40,60,100,0.06) 0%, transparent 50%);
+        }
+
+        .night-glow { animation: nightPulse 5s ease-in-out infinite; }
+        @keyframes nightPulse {
+            0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 8px rgba(140,100,200,0.4)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 20px rgba(160,120,220,0.6)); }
+        }
+
+        input, textarea, select {
+            background: transparent;
+            outline: none;
+            caret-color: #a78bfa;
+            color: #c4b5fd;
+        }
+        input::placeholder, textarea::placeholder { color: rgba(167,139,250,0.25); }
+        select option { background: #0d0a18; }
+        textarea { resize: none; }
+
+        .step-card { border: 1px solid rgba(167,139,250,0.1); transition: all 0.3s ease; }
+        .step-card.active { border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.03); }
+        .step-card.done { border-color: rgba(100,100,100,0.2); opacity: 0.65; }
+
+        .fade-in { animation: fadeIn 0.6s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .verdict-frame {
+            border: 1px solid rgba(167,139,250,0.25);
+            background: linear-gradient(135deg, rgba(10,8,20,0.97), rgba(15,10,25,0.97));
+        }
+
+        .stars { letter-spacing: 0.3em; }
+
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none;
+            width: 100%; height: 3px;
+            background: rgba(167,139,250,0.15);
+            outline: none; border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #a78bfa; cursor: pointer;
+            box-shadow: 0 0 8px rgba(167,139,250,0.6);
+        }
+
+        .progress-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: rgba(167,139,250,0.2);
+            transition: background 0.3s;
+        }
+        .progress-dot.done { background: rgba(167,139,250,0.7); }
+        .progress-dot.active { background: #a78bfa; box-shadow: 0 0 6px rgba(167,139,250,0.5); }
+    </style>
+</head>
+<body class="min-h-screen text-violet-300 dusk-bg">
+<div class="max-w-xl mx-auto px-4 py-10">
+
+    <!-- Header -->
+    <div class="text-center mb-10">
+        <div class="night-glow inline-block text-4xl mb-3">🌙</div>
+        <h1 class="fell text-4xl text-violet-200 mb-1">Friday Defrag</h1>
+        <p class="mono text-xs text-violet-800 tracking-widest">END OF WEEK DECOMPRESSION PROTOCOL</p>
+        <div id="clock" class="mono text-xs text-violet-900 mt-2"></div>
+    </div>
+
+    <!-- Progress dots -->
+    <div class="flex justify-center gap-2 mb-8" id="progress-dots">
+        <div class="progress-dot active" id="dot-0"></div>
+        <div class="progress-dot" id="dot-1"></div>
+        <div class="progress-dot" id="dot-2"></div>
+        <div class="progress-dot" id="dot-3"></div>
+        <div class="progress-dot" id="dot-4"></div>
+    </div>
+
+    <!-- Steps container -->
+    <div id="steps-container" class="space-y-4"></div>
+
+    <!-- Submit -->
+    <div id="submit-section" class="mt-8 text-center" style="display:none;">
+        <button onclick="renderVerdict()"
+            class="mono text-sm px-8 py-3 border border-violet-800 text-violet-400 hover:border-violet-600 hover:text-violet-300 transition-all tracking-wider uppercase">
+            🌙 Receive the Verdict
+        </button>
+    </div>
+
+    <!-- Verdict -->
+    <div id="verdict-container" class="mt-8" style="display:none;"></div>
+
+    <!-- Reset -->
+    <div id="reset-section" class="mt-6 text-center" style="display:none;">
+        <button onclick="resetAll()" class="mono text-xs text-violet-900 hover:text-violet-700 transition-colors">
+            ↩ defrag again
+        </button>
+    </div>
+
+    <div class="mt-16 text-center border-t border-violet-950 pt-6">
+        <p class="mono text-xs text-violet-950">
+            The week is what it was. Set it down correctly.<br>
+            The mountain does not carry yesterday's snow into spring.
+        </p>
+    </div>
+</div>
+
+<script>
+const STEPS = [
+    {
+        id: 's1',
+        num: 'I',
+        icon: '⚡',
+        question: 'What actually shipped this week?',
+        sub: 'Not what was planned. What exists now that did not exist Monday.',
+        type: 'text',
+        placeholder: 'The concrete deliverables...'
+    },
+    {
+        id: 's2',
+        num: 'II',
+        icon: '🧱',
+        question: 'What are you carrying into the weekend?',
+        sub: 'Unfinished things that will sit in the back of your mind. Name them so they lose power.',
+        type: 'text',
+        placeholder: 'The undone things...'
+    },
+    {
+        id: 's3',
+        num: 'III',
+        icon: '⚡',
+        question: 'Energy state right now.',
+        sub: 'End of Friday. Be honest. The mountain does not grade on what was planned.',
+        type: 'slider',
+        min: 1, max: 10,
+        labels: ['Empty', 'Running', 'Charged']
+    },
+    {
+        id: 's4',
+        num: 'IV',
+        icon: '🌙',
+        question: 'What\'s the plan tonight?',
+        sub: 'The machine notes this. Recovery mode or social mode both count.',
+        type: 'text',
+        placeholder: 'Dinner, pickleball, nothing, anything...'
+    },
+    {
+        id: 's5',
+        num: 'V',
+        icon: '🗑',
+        question: 'One work thing you are officially not thinking about until Monday.',
+        sub: 'Name it. Grant it a formal stay of execution. This is the act that makes it real.',
+        type: 'text',
+        placeholder: 'Officially parked until Monday...'
+    }
+];
+
+const VERDICTS = {
+    charged: [
+        "Good week or bad week — the battery reads charged. This is the correct state to enter a weekend. Tonight is recovery maintenance, not collapse. The one parked item is parked. The undone list will wait; it always does. The mountain notes: {shipped}.",
+        "Battery {energy}/10 at end of Friday is a good reading. What shipped: {shipped}. What's parked: {parked}. The weekend is yours. The concrete did its job this week."
+    ],
+    running: [
+        "Running on reserve. Not empty, not full — the operational baseline. Tonight's plan ({tonight}) is the correct call. The week produced: {shipped}. The undone things will be exactly where you left them Monday. They do not grow in the dark over a weekend. The parked item stays parked.",
+        "Battery {energy}/10 on a Friday evening. The week shipped {shipped}. The undone list is named, which means it is managed. One item formally parked. The weekend does not owe you productivity. It owes you recovery."
+    ],
+    empty: [
+        "Empty tank at end of week. {shipped} is the honest record. The undone things are named, which is more than most people do. Tonight ({tonight}) is not optional recovery — it is mandatory. The parked item ({parked}) will be exactly where you left it Monday. A depleted architect makes bad decisions. The mountain notes this.",
+        "Battery {energy}/10 is the floor. The week produced {shipped}. This is the data. The weekend protocol is: do not think about work until Monday. The Mora sits on the chest of the person who lies awake reviewing the week. Name what you did. Set it down. Sleep."
+    ]
+};
+
+let answers = {};
+let currentStep = 0;
+
+function updateClock() {
+    const now = new Date();
+    const str = now.toLocaleString('en-US', {
+        weekday: 'long', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+        timeZone: 'Asia/Ho_Chi_Minh'
+    });
+    document.getElementById('clock').textContent = str + ' ICT';
+}
+
+function renderSteps() {
+    const container = document.getElementById('steps-container');
+    container.innerHTML = STEPS.map((step, i) => {
+        const isActive = i === 0;
+        return `
+        <div id="card-${step.id}" class="step-card p-5 ${isActive ? 'active' : ''}" onclick="focusStep(${i})">
+            <div class="flex gap-4 items-start">
+                <div class="text-center min-w-[36px]">
+                    <div class="text-xl">${step.icon}</div>
+                    <div class="mono text-xs text-violet-900 mt-1">${step.num}</div>
+                </div>
+                <div class="flex-1">
+                    <p class="fell text-violet-200 text-lg mb-1">${step.question}</p>
+                    <p class="mono text-xs text-violet-800 mb-3">${step.sub}</p>
+                    ${renderInput(step)}
+                </div>
+                <div id="check-${step.id}" class="text-violet-700 mt-1" style="display:none;">✓</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderInput(step) {
+    if (step.type === 'text') {
+        return `<textarea id="input-${step.id}" rows="2"
+            class="w-full border-b border-violet-900/40 py-2 text-sm focus:border-violet-700 transition-colors"
+            placeholder="${step.placeholder}"
+            oninput="handleText('${step.id}')"
+            onblur="checkStep('${step.id}')"></textarea>`;
+    }
+    if (step.type === 'slider') {
+        return `<div>
+            <div class="flex justify-between mono text-xs text-violet-800 mb-2">
+                <span>${step.labels[0]}</span>
+                <span id="slval-${step.id}" class="text-violet-400 font-bold">5</span>
+                <span>${step.labels[2]}</span>
+            </div>
+            <input type="range" id="input-${step.id}" min="${step.min}" max="${step.max}" value="5"
+                oninput="handleSlider('${step.id}', this.value)"
+                onchange="checkStep('${step.id}')">
+        </div>`;
+    }
+}
+
+function focusStep(i) {
+    currentStep = i;
+    document.querySelectorAll('.step-card').forEach((c, idx) => {
+        c.classList.remove('active');
+        if (!c.classList.contains('done')) {
+            if (idx === i) c.classList.add('active');
+        }
+    });
+    const input = document.getElementById(`input-${STEPS[i].id}`);
+    if (input) setTimeout(() => input.focus(), 50);
+}
+
+function handleText(id) {
+    answers[id] = document.getElementById(`input-${id}`).value.trim();
+    updateDots();
+}
+
+function handleSlider(id, val) {
+    document.getElementById(`slval-${id}`).textContent = val;
+    answers[id] = parseInt(val);
+    checkStep(id);
+}
+
+function checkStep(id) {
+    const val = answers[id];
+    if (!val || (typeof val === 'string' && val.length < 2)) return;
+    const idx = STEPS.findIndex(s => s.id === id);
+    const card = document.getElementById(`card-${id}`);
+    card.classList.remove('active');
+    card.classList.add('done');
+    document.getElementById(`check-${id}`).style.display = 'block';
+    updateDots();
+    if (idx < STEPS.length - 1) setTimeout(() => focusStep(idx + 1), 250);
+}
+
+function updateDots() {
+    const answered = STEPS.filter(s => {
+        const v = answers[s.id];
+        return v !== undefined && v !== '' && !(typeof v === 'string' && v.length < 2);
+    });
+    STEPS.forEach((s, i) => {
+        const dot = document.getElementById(`dot-${i}`);
+        const isAnswered = answers[s.id] !== undefined && answers[s.id] !== '' && !(typeof answers[s.id] === 'string' && answers[s.id].length < 2);
+        dot.className = 'progress-dot' + (isAnswered ? ' done' : (i === currentStep ? ' active' : ''));
+    });
+    if (answered.length === STEPS.length) {
+        document.getElementById('submit-section').style.display = 'block';
+    }
+}
+
+function renderVerdict() {
+    const energy = answers['s3'] || 5;
+    const shipped = answers['s1'] || 'nothing logged';
+    const carrying = answers['s2'] || 'nothing named';
+    const tonight = answers['s4'] || 'unspecified';
+    const parked = answers['s5'] || 'nothing parked';
+
+    let tier;
+    if (energy >= 7) tier = 'charged';
+    else if (energy >= 4) tier = 'running';
+    else tier = 'empty';
+
+    const options = VERDICTS[tier];
+    let verdict = options[Math.floor(Math.random() * options.length)];
+    verdict = verdict
+        .replace('{shipped}', shipped.substring(0, 80))
+        .replace('{energy}', energy)
+        .replace('{tonight}', tonight.substring(0, 40))
+        .replace('{parked}', parked.substring(0, 60));
+
+    const tierLabels = { charged: ['CHARGED', 'text-violet-300'], running: ['OPERATIONAL', 'text-violet-500'], empty: ['DEPLETED', 'text-red-400'] };
+    const [tLabel, tColor] = tierLabels[tier];
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' });
+
+    document.getElementById('verdict-container').innerHTML = `
+    <div class="verdict-frame p-6 fade-in">
+        <div class="text-center mb-5">
+            <div class="night-glow text-3xl mb-2">🌙</div>
+            <div class="mono text-xs tracking-widest ${tColor}">${tLabel} — WEEK CLOSED</div>
+            <div class="mono text-xs text-violet-900 mt-1">${timeStr} Saigon · Friday</div>
+        </div>
+
+        <div class="fell italic text-violet-300 text-base leading-relaxed text-center mb-5 border-t border-b border-violet-900/30 py-4">
+            "${verdict}"
+        </div>
+
+        <div class="space-y-2 mono text-xs">
+            <div class="flex gap-3"><span class="text-violet-800 min-w-[72px]">SHIPPED:</span><span class="text-violet-400">${esc(shipped)}</span></div>
+            <div class="flex gap-3"><span class="text-violet-800 min-w-[72px]">CARRYING:</span><span class="text-violet-600">${esc(carrying)}</span></div>
+            <div class="flex gap-3"><span class="text-violet-800 min-w-[72px]">ENERGY:</span><span class="${tColor}">${energy}/10</span></div>
+            <div class="flex gap-3"><span class="text-violet-800 min-w-[72px]">TONIGHT:</span><span class="text-violet-400">${esc(tonight)}</span></div>
+            <div class="flex gap-3"><span class="text-violet-800 min-w-[72px]">PARKED:</span><span class="text-violet-900 line-through">${esc(parked)}</span></div>
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-violet-950 text-center">
+            <p class="mono text-xs text-violet-900">
+                Week closed at ${timeStr}.<br>Next cycle: Monday.
+            </p>
+        </div>
+    </div>`;
+
+    document.getElementById('verdict-container').style.display = 'block';
+    document.getElementById('submit-section').style.display = 'none';
+    document.getElementById('reset-section').style.display = 'block';
+    document.getElementById('verdict-container').scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetAll() {
+    answers = {};
+    currentStep = 0;
+    document.getElementById('verdict-container').style.display = 'none';
+    document.getElementById('reset-section').style.display = 'none';
+    document.getElementById('submit-section').style.display = 'none';
+    renderSteps();
+    updateDots();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function esc(t) {
+    const d = document.createElement('div');
+    d.textContent = t;
+    return d.innerHTML;
+}
+
+// init slider default
+answers['s3'] = 5;
+renderSteps();
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

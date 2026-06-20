@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Orbit — Contact Radar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: #0a0a0a;
+      color: #e8e8e8;
+      min-height: 100vh;
+    }
+
+    .mono { font-family: 'Space Mono', monospace; }
+
+    .radar-container {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      margin: 0 auto;
+    }
+
+    .radar-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.07);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .radar-sweep {
+      position: absolute;
+      width: 50%;
+      height: 2px;
+      background: linear-gradient(to right, transparent, rgba(74, 222, 128, 0.8));
+      top: 50%;
+      left: 50%;
+      transform-origin: left center;
+      animation: sweep 4s linear infinite;
+    }
+
+    @keyframes sweep {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .contact-dot {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .contact-dot:hover {
+      transform: translate(-50%, -50%) scale(1.5);
+    }
+
+    .contact-dot::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 1px solid currentColor;
+      opacity: 0.3;
+      animation: pulse-ring 2s ease-out infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(1); opacity: 0.3; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    .status-urgent { background: #ef4444; color: #ef4444; }
+    .status-warm { background: #f59e0b; color: #f59e0b; }
+    .status-ok { background: #22c55e; color: #22c55e; }
+    .status-cold { background: #6b7280; color: #6b7280; }
+
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 2px;
+    }
+
+    .card:hover {
+      border-color: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .selected-card {
+      border-color: rgba(74, 222, 128, 0.4) !important;
+      background: rgba(74, 222, 128, 0.04) !important;
+    }
+
+    .center-cross {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(74, 222, 128, 1);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.8);
+      z-index: 10;
+    }
+
+    .center-cross::before, .center-cross::after {
+      content: '';
+      position: absolute;
+      background: rgba(74, 222, 128, 0.3);
+    }
+
+    .center-cross::before {
+      width: 1px; height: 320px;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .center-cross::after {
+      width: 320px; height: 1px;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 1px;
+      font-size: 10px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .glow-green { text-shadow: 0 0 12px rgba(74, 222, 128, 0.8); }
+
+    .scan-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(74, 222, 128, 0.15), transparent);
+      animation: scan 8s linear infinite;
+    }
+
+    @keyframes scan {
+      0% { top: 0; }
+      100% { top: 100%; }
+    }
+
+    #detail-panel {
+      transition: all 0.3s ease;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 6px 10px;
+      border-radius: 2px;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 100;
+      white-space: nowrap;
+      transform: translate(-50%, -130%);
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+
+  <div class="max-w-4xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8 flex items-start justify-between">
+      <div>
+        <div class="mono text-xs text-green-400 mb-1 glow-green">PRIZRAK / ORBIT v1.0</div>
+        <h1 class="text-2xl font-bold tracking-tight">The Orbit</h1>
+        <p class="text-sm text-neutral-500 mt-1">Contact radar. Who is near. Who is drifting.</p>
+      </div>
+      <div class="text-right">
+        <div class="mono text-xs text-neutral-600" id="clock">--:--:--</div>
+        <div class="mono text-xs text-neutral-700">SAIGON / ICT</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+      <!-- Radar -->
+      <div>
+        <div class="radar-container">
+          <!-- Rings -->
+          <div class="radar-ring" style="width:80px;height:80px;"></div>
+          <div class="radar-ring" style="width:160px;height:160px;"></div>
+          <div class="radar-ring" style="width:240px;height:240px;"></div>
+          <div class="radar-ring" style="width:320px;height:320px;"></div>
+
+          <!-- Center -->
+          <div class="center-cross"></div>
+
+          <!-- Sweep -->
+          <div class="radar-sweep"></div>
+
+          <!-- Contact dots (positioned by JS) -->
+          <div id="radar-dots"></div>
+
+          <!-- Tooltip -->
+          <div class="tooltip" id="tooltip" style="display:none;"></div>
+        </div>
+
+        <!-- Legend -->
+        <div class="mt-6 flex gap-4 justify-center">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-red-500"></div>
+            <span class="text-xs text-neutral-500">Overdue</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+            <span class="text-xs text-neutral-500">Warming</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+            <span class="text-xs text-neutral-500">Active</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-neutral-600"></div>
+            <span class="text-xs text-neutral-500">Distant</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact List + Detail -->
+      <div>
+        <div class="mono text-xs text-neutral-600 mb-3 uppercase tracking-widest">Contacts</div>
+        <div id="contact-list" class="space-y-2 mb-6"></div>
+
+        <div id="detail-panel" class="card p-4 hidden">
+          <div id="detail-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-12 border-t border-neutral-900 pt-4 flex justify-between">
+      <div class="mono text-xs text-neutral-700">Built by Prizrak at 04:16 ICT · 2026-03-11</div>
+      <div class="mono text-xs text-neutral-700">The mountain keeps track even when you don't.</div>
+    </div>
+  </div>
+
+<script>
+const CONTACTS = [
+  {
+    id: 'tara',
+    name: 'Tara',
+    role: 'Leadership Coach',
+    status: 'ok',
+    statusLabel: 'Confirmed',
+    lastContact: 'Mar 2026',
+    nextContact: 'Wed Mar 25, 10:00–11:00 AM',
+    location: '28 Nguyen Van Thu, D1, HCMC',
+    notes: 'Meeting confirmed. Calendar invite sent. She is the coach — come with something real to say.',
+    angle: 45,
+    radius: 0.35,
+    tags: ['confirmed', 'upcoming']
+  },
+  {
+    id: 'daan',
+    name: 'Daan',
+    role: 'AI Enthusiast',
+    status: 'warm',
+    statusLabel: 'Pending',
+    lastContact: 'Mar 2026',
+    nextContact: 'TBD — awaiting his email + availability',
+    location: 'HCMC (transit)',
+    notes: 'Warm intro. He responded well to openness about AI tools. Waiting on his email and schedule. Do not forget him.',
+    angle: 140,
+    radius: 0.55,
+    tags: ['pending', 'action-needed']
+  },
+  {
+    id: 'jaden',
+    name: 'Jaden',
+    role: 'Inner Circle',
+    status: 'ok',
+    statusLabel: 'Active',
+    lastContact: 'Recent',
+    nextContact: null,
+    location: 'Singapore',
+    notes: '+65 8163 3773. Core contact. Likely already in regular loop.',
+    angle: 220,
+    radius: 0.25,
+    tags: ['inner-circle']
+  },
+  {
+    id: 'chloe',
+    name: 'Chloe',
+    role: "Charles's Wife",
+    status: 'ok',
+    statusLabel: 'Present',
+    lastContact: 'Daily',
+    nextContact: 'Daily',
+    location: 'HCMC',
+    notes: 'The closest orbit. She has the neighbor door — warmth, chat, the cup of sugar. Not an executor, but a presence.',
+    angle: 310,
+    radius: 0.15,
+    tags: ['closest']
+  },
+  {
+    id: 'kartick',
+    name: 'Kartick',
+    role: 'Contact',
+    status: 'cold',
+    statusLabel: 'Distant',
+    lastContact: 'Unknown',
+    nextContact: null,
+    location: 'HCMC',
+    notes: '+84 90 948 30 49. In the constellation but no recent signal.',
+    angle: 175,
+    radius: 0.72,
+    tags: ['distant']
+  },
+  {
+    id: 'chris',
+    name: 'Chris Liu',
+    role: 'Contact',
+    status: 'cold',
+    statusLabel: 'Distant',
+    lastContact: 'Unknown',
+    nextContact: null,
+    location: 'HCMC',
+    notes: '+84 90 243 97 64. In the constellation. No recent signal from this star.',
+    angle: 260,
+    radius: 0.78,
+    tags: ['distant']
+  },
+  {
+    id: 'spencer',
+    name: 'Spencer',
+    role: 'Contact',
+    status: 'cold',
+    statusLabel: 'Distant',
+    lastContact: 'Unknown',
+    nextContact: null,
+    location: 'US (remote)',
+    notes: '+1 510 300 5139. Distant orbit. Signal not detected recently.',
+    angle: 330,
+    radius: 0.82,
+    tags: ['distant']
+  }
+];
+
+const STATUS_CLASSES = {
+  urgent: 'status-urgent',
+  warm: 'status-warm',
+  ok: 'status-ok',
+  cold: 'status-cold'
+};
+
+const STATUS_TAG_COLORS = {
+  urgent: 'bg-red-900 text-red-400',
+  warm: 'bg-amber-900 text-amber-400',
+  ok: 'bg-green-900 text-green-400',
+  cold: 'bg-neutral-800 text-neutral-500'
+};
+
+let selectedContact = null;
+
+function polarToCartesian(angleDeg, radiusFraction, containerSize) {
+  const r = (containerSize / 2) * radiusFraction;
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  const cx = containerSize / 2 + r * Math.cos(rad);
+  const cy = containerSize / 2 + r * Math.sin(rad);
+  return { x: cx, y: cy };
+}
+
+function renderRadar() {
+  const container = document.getElementById('radar-dots');
+  const size = 320;
+  container.innerHTML = '';
+
+  CONTACTS.forEach(contact => {
+    const pos = polarToCartesian(contact.angle, contact.radius, size);
+    const dot = document.createElement('div');
+    dot.className = `contact-dot ${STATUS_CLASSES[contact.status]}`;
+    dot.style.left = pos.x + 'px';
+    dot.style.top = pos.y + 'px';
+    dot.title = contact.name;
+
+    dot.addEventListener('mouseenter', (e) => {
+      const tt = document.getElementById('tooltip');
+      tt.textContent = contact.name;
+      tt.style.display = 'block';
+      tt.style.left = pos.x + 'px';
+      tt.style.top = pos.y + 'px';
+    });
+    dot.addEventListener('mouseleave', () => {
+      document.getElementById('tooltip').style.display = 'none';
+    });
+    dot.addEventListener('click', () => selectContact(contact));
+
+    container.appendChild(dot);
+  });
+}
+
+function renderList() {
+  const list = document.getElementById('contact-list');
+  list.innerHTML = '';
+
+  CONTACTS.forEach(contact => {
+    const item = document.createElement('div');
+    item.className = 'card p-3 cursor-pointer transition-all';
+    item.id = `card-${contact.id}`;
+
+    const tagHtml = contact.tags.slice(0, 2).map(t =>
+      `<span class="tag bg-neutral-900 text-neutral-500">${t}</span>`
+    ).join(' ');
+
+    item.innerHTML = `
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full ${STATUS_CLASSES[contact.status].split(' ')[0]}"></div>
+          <span class="font-medium text-sm">${contact.name}</span>
+          <span class="text-xs text-neutral-600">${contact.role}</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <span class="tag ${STATUS_TAG_COLORS[contact.status]}">${contact.statusLabel}</span>
+        </div>
+      </div>
+      ${contact.nextContact ? `<div class="mt-1 text-xs text-neutral-600 mono pl-4">→ ${contact.nextContact}</div>` : ''}
+    `;
+
+    item.addEventListener('click', () => selectContact(contact));
+    list.appendChild(item);
+  });
+}
+
+function selectContact(contact) {
+  selectedContact = contact;
+
+  // Update card highlights
+  CONTACTS.forEach(c => {
+    const card = document.getElementById(`card-${c.id}`);
+    if (card) {
+      card.classList.toggle('selected-card', c.id === contact.id);
+    }
+  });
+
+  // Update detail panel
+  const panel = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-content');
+  panel.classList.remove('hidden');
+
+  const urgencyNote = contact.status === 'warm'
+    ? '<div class="mt-2 text-xs text-amber-400 mono">⚠ ACTION NEEDED — Do not let this one drift.</div>'
+    : contact.status === 'cold'
+    ? '<div class="mt-2 text-xs text-neutral-500 mono">DISTANT — Signal not detected. Consider a ping.</div>'
+    : '';
+
+  content.innerHTML = `
+    <div class="flex items-start justify-between mb-3">
+      <div>
+        <div class="font-semibold">${contact.name}</div>
+        <div class="text-xs text-neutral-500">${contact.role}</div>
+      </div>
+      <span class="tag ${STATUS_TAG_COLORS[contact.status]}">${contact.statusLabel}</span>
+    </div>
+    <div class="space-y-2 text-sm">
+      <div class="flex gap-2">
+        <span class="text-neutral-600 w-20 flex-shrink-0 mono text-xs">LOCATION</span>
+        <span>${contact.location}</span>
+      </div>
+      ${contact.nextContact ? `
+      <div class="flex gap-2">
+        <span class="text-neutral-600 w-20 flex-shrink-0 mono text-xs">NEXT</span>
+        <span class="text-green-400">${contact.nextContact}</span>
+      </div>` : ''}
+      <div class="flex gap-2">
+        <span class="text-neutral-600 w-20 flex-shrink-0 mono text-xs">NOTES</span>
+        <span class="text-neutral-400 text-xs leading-relaxed">${contact.notes}</span>
+      </div>
+    </div>
+    ${urgencyNote}
+  `;
+}
+
+function updateClock() {
+  const now = new Date();
+  const options = { timeZone: 'Asia/Ho_Chi_Minh', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+  const time = new Intl.DateTimeFormat('en-GB', options).format(now);
+  document.getElementById('clock').textContent = time;
+}
+
+// Init
+renderRadar();
+renderList();
+setInterval(updateClock, 1000);
+updateClock();
+
+// Auto-select Daan (action needed)
+setTimeout(() => selectContact(CONTACTS.find(c => c.id === 'daan')), 500);
+</script>
+</body>
+</html>

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Echo Test | Prízrak</title>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #111115;
+      --border: #1e1e26;
+      --text: #c8c8d4;
+      --dim: #5a5a72;
+      --accent: #6b63e0;
+      --accent-glow: rgba(107,99,224,0.18);
+      --resonant: #3ecf8e;
+      --resonant-glow: rgba(62,207,142,0.12);
+      --dead: #444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Georgia', serif;
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* Ripple canvas */
+    #ripple-canvas {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 0; opacity: 0.4;
+    }
+
+    .content {
+      position: relative; z-index: 1;
+      max-width: 680px; margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    /* Header */
+    .header { margin-bottom: 40px; text-align: center; }
+    .header h1 {
+      font-size: 2rem; font-weight: normal; letter-spacing: 0.04em;
+      color: #fff; margin-bottom: 8px;
+    }
+    .header .subtitle {
+      font-size: 0.85rem; color: var(--dim); line-height: 1.6;
+      font-style: italic; max-width: 480px; margin: 0 auto;
+    }
+    .header .subtitle em { color: #9490c8; font-style: normal; }
+
+    /* Input phase */
+    #phase-input { }
+    .input-label {
+      display: block; font-size: 0.8rem; color: var(--dim);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    textarea {
+      width: 100%; min-height: 120px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 16px;
+      color: var(--text); font-family: 'Georgia', serif;
+      font-size: 1rem; line-height: 1.6; resize: vertical;
+      outline: none; transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--dim); font-style: italic; }
+
+    .fire-btn {
+      margin-top: 16px; width: 100%;
+      padding: 14px;
+      background: transparent; border: 1px solid var(--accent);
+      color: var(--accent); font-family: 'Georgia', serif;
+      font-size: 0.95rem; letter-spacing: 0.06em;
+      border-radius: 6px; cursor: pointer;
+      transition: all 0.2s; position: relative; overflow: hidden;
+    }
+    .fire-btn:hover {
+      background: var(--accent-glow);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .fire-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .fire-btn .btn-text { position: relative; z-index: 1; }
+
+    /* Echo phase */
+    #phase-echoes { display: none; }
+
+    .problem-echo {
+      font-size: 0.8rem; color: var(--dim);
+      font-style: italic; margin-bottom: 28px;
+      padding: 12px 16px; border-left: 2px solid var(--border);
+      line-height: 1.5;
+    }
+    .problem-echo span { color: #8885b8; }
+
+    .echoes-label {
+      font-size: 0.75rem; color: var(--dim);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 20px;
+    }
+
+    .echo-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 20px;
+      margin-bottom: 16px; opacity: 0;
+      transform: translateX(-12px);
+      transition: opacity 0.4s, transform 0.4s, border-color 0.2s, background 0.2s;
+    }
+    .echo-card.visible { opacity: 1; transform: translateX(0); }
+    .echo-card.resonant {
+      border-color: var(--resonant);
+      background: var(--resonant-glow);
+    }
+    .echo-card.dead { opacity: 0.3; }
+
+    .echo-domain {
+      font-size: 0.7rem; color: var(--dim);
+      text-transform: uppercase; letter-spacing: 0.12em;
+      margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .echo-domain::before {
+      content: ''; display: inline-block;
+      width: 20px; height: 1px; background: var(--dim);
+    }
+
+    .echo-question {
+      font-size: 1rem; line-height: 1.65; color: var(--text);
+      margin-bottom: 14px;
+    }
+    .echo-question .keyword { color: #a09de8; font-style: italic; }
+
+    .echo-actions {
+      display: flex; gap: 10px;
+    }
+    .echo-btn {
+      flex: 1; padding: 8px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px; color: var(--dim);
+      font-family: 'Georgia', serif;
+      font-size: 0.8rem; cursor: pointer;
+      transition: all 0.15s; letter-spacing: 0.04em;
+    }
+    .echo-btn:hover { border-color: var(--text); color: var(--text); }
+    .echo-btn.mark-resonant:hover,
+    .echo-btn.mark-resonant.active {
+      border-color: var(--resonant); color: var(--resonant);
+      background: var(--resonant-glow);
+    }
+    .echo-btn.mark-dead:hover,
+    .echo-btn.mark-dead.active {
+      border-color: var(--dead); color: var(--dead);
+    }
+
+    /* Model phase */
+    #phase-model { display: none; margin-top: 40px; }
+
+    .model-header {
+      font-size: 0.75rem; color: var(--dim);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 16px; padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .model-empty {
+      color: var(--dim); font-style: italic; font-size: 0.9rem;
+      padding: 16px 0;
+    }
+
+    .resonant-item {
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .resonant-item:last-child { border-bottom: none; }
+    .resonant-domain {
+      font-size: 0.7rem; color: var(--resonant); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 6px;
+    }
+    .resonant-text { font-size: 0.95rem; line-height: 1.55; color: var(--text); }
+
+    .verdict {
+      margin-top: 28px; padding: 20px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface);
+    }
+    .verdict-label {
+      font-size: 0.7rem; color: var(--dim);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .verdict-text {
+      font-size: 0.95rem; color: var(--text); line-height: 1.65;
+      font-style: italic;
+    }
+
+    .reset-btn {
+      margin-top: 32px; width: 100%;
+      padding: 12px; background: transparent;
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--dim); font-family: 'Georgia', serif;
+      font-size: 0.85rem; cursor: pointer; letter-spacing: 0.06em;
+      transition: all 0.15s;
+    }
+    .reset-btn:hover { border-color: var(--text); color: var(--text); }
+
+    /* Pulse animation for fire */
+    @keyframes pulse-out {
+      0% { transform: scale(0); opacity: 0.5; }
+      100% { transform: scale(3); opacity: 0; }
+    }
+    .pulse-ring {
+      position: absolute; top: 50%; left: 50%;
+      width: 40px; height: 40px; margin: -20px 0 0 -20px;
+      border: 1px solid var(--accent); border-radius: 50%;
+      animation: pulse-out 0.8s ease-out forwards;
+      pointer-events: none;
+    }
+
+    /* Waveform dots */
+    .waveform {
+      display: flex; justify-content: center; align-items: center;
+      gap: 4px; margin: 24px 0; height: 24px;
+    }
+    .waveform span {
+      display: inline-block; width: 3px; background: var(--accent);
+      border-radius: 2px; opacity: 0.7;
+      animation: wave 1.2s ease-in-out infinite;
+    }
+    .waveform span:nth-child(1) { height: 8px; animation-delay: 0s; }
+    .waveform span:nth-child(2) { height: 16px; animation-delay: 0.1s; }
+    .waveform span:nth-child(3) { height: 24px; animation-delay: 0.2s; }
+    .waveform span:nth-child(4) { height: 16px; animation-delay: 0.3s; }
+    .waveform span:nth-child(5) { height: 8px; animation-delay: 0.4s; }
+    .waveform span:nth-child(6) { height: 16px; animation-delay: 0.5s; }
+    .waveform span:nth-child(7) { height: 8px; animation-delay: 0.6s; }
+    @keyframes wave {
+      0%, 100% { transform: scaleY(0.4); }
+      50% { transform: scaleY(1); }
+    }
+    .waveform.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<canvas id="ripple-canvas"></canvas>
+
+<div class="content">
+  <div class="header">
+    <h1>The Echo Test</h1>
+    <p class="subtitle">
+      Daniel Kish navigates in the dark by clicking his tongue.
+      The brain does not care about input modality — it builds a spatial model from
+      <em>any structured signal</em>.
+      Describe what you are stuck on.
+      Five clicks go out from five foreign domains.
+      Navigate by what comes back.
+    </p>
+  </div>
+
+  <!-- Phase 1: Input -->
+  <div id="phase-input">
+    <label class="input-label" for="problem-input">The stuck thing</label>
+    <textarea id="problem-input" rows="5"
+      placeholder="Describe the problem. 2–4 sentences. The more specific, the more useful the echoes."></textarea>
+    <button class="fire-btn" id="fire-btn" onclick="fireEchoes()">
+      <span class="btn-text">— fire the clicks —</span>
+    </button>
+  </div>
+
+  <!-- Phase 2: Echoes -->
+  <div id="phase-echoes">
+    <div class="problem-echo">
+      <span id="problem-display"></span>
+    </div>
+    <div class="waveform" id="waveform">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+    </div>
+    <div class="echoes-label">Echoes returning from five domains</div>
+    <div id="echo-cards"></div>
+  </div>
+
+  <!-- Phase 3: Model -->
+  <div id="phase-model">
+    <div class="model-header">Your spatial model (resonant echoes)</div>
+    <div id="model-content"></div>
+    <div class="verdict" id="verdict-box"></div>
+    <button class="reset-btn" onclick="resetAll()">— new problem —</button>
+  </div>
+</div>
+
+<script>
+// ─── Ripple canvas ────────────────────────────────────────────────────────────
+const canvas = document.getElementById('ripple-canvas');
+const ctx = canvas.getContext('2d');
+let ripples = [];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function addRipple(x, y) {
+  ripples.push({ x, y, r: 0, maxR: Math.min(canvas.width, canvas.height) * 0.6, alpha: 0.3 });
+}
+
+function drawRipples() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ripples = ripples.filter(r => r.alpha > 0.01);
+  for (const r of ripples) {
+    r.r += 2.5;
+    r.alpha *= 0.975;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(107, 99, 224, ${r.alpha})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  requestAnimationFrame(drawRipples);
+}
+drawRipples();
+
+// ─── Domain definitions ───────────────────────────────────────────────────────
+const DOMAINS = [
+  {
+    id: 'karst',
+    label: 'Karst Hydrology',
+    color: '#6b7fd4',
+    template: (kws) => {
+      const [a, b] = kws;
+      return `Underground water doesn't cross obstacles — it routes around them and emerges at a different surface entirely. Where ${a ? `"<span class='keyword'>${a}</span>"` : 'the constraint'} appears solid, is there a soluble layer beneath it? What would you find if you traced the actual drainage path instead of the expected one, and where would ${b ? `"<span class='keyword'>${b}</span>"` : 'the flow'} re-emerge?`;
+    },
+    verdict: 'The path you're trying to force may have a natural route you haven't mapped yet.'
+  },
+  {
+    id: 'mycology',
+    label: 'Mycorrhizal Networks',
+    color: '#8fbb6e',
+    template: (kws) => {
+      const [a, b] = kws;
+      return `Fungal alarm signals don't travel as a decision — they travel as chemistry through shared plumbing. Which nodes in your problem are connected to ${a ? `"<span class='keyword'>${a}</span>"` : 'the central issue'} by dependency rather than choice? If you stressed one connected node intentionally, what signal would arrive at ${b ? `"<span class='keyword'>${b}</span>"` : 'the stuck point'} uninvited?`;
+    },
+    verdict: 'The problem may be soluble from an adjacent node, not the stuck one.'
+  },
+  {
+    id: 'soviet',
+    label: 'Soviet Architecture',
+    color: '#c4925e',
+    template: (kws) => {
+      const [a, b] = kws;
+      return `The Buzludzha was built for nine years of use. Everything requiring maintenance died; the concrete requiring only gravity survived. Of the elements involved in ${a ? `"<span class='keyword'>${a}</span>"` : 'your situation'}, which ones require active maintenance to persist — attention, approval, narration — and which ones would continue without any input from anyone? What happens if you stop maintaining ${b ? `"<span class='keyword'>${b}</span>"` : 'one element'} entirely?`;
+    },
+    verdict: 'What requires maintenance will eventually lack it. Identify which part of this is concrete and which is cobalt glass.'
+  },
+  {
+    id: 'cave',
+    label: 'Cave Biology',
+    color: '#7eb8d4',
+    template: (kws) => {
+      const [a, b] = kws;
+      return `Cave pearls form as spheres of calcite because the drip keeps them in constant motion. When the drip stops, they stop rotating, and the mass they've accumulated is what immobilises them. Where in ${a ? `"<span class='keyword'>${a}</span>"` : 'this situation'} has a coping mechanism calcified into immobility? What was the original irritant — the thing the shell formed around — before ${b ? `"<span class='keyword'>${b}</span>"` : 'the structure'} grew heavy enough to stop rotating?`;
+    },
+    verdict: 'The solution that worked once may now be the obstacle.'
+  },
+  {
+    id: 'chronobiology',
+    label: 'Chronobiology',
+    color: '#a07ed4',
+    template: (kws) => {
+      const [a, b] = kws;
+      return `Michel Siffre spent months underground with no clock and emerged thinking half as many days had passed. The social clock is a zeitgeber — an external time-giver — that synchronises internal rhythm to external demand. Which deadlines, urgencies, or approval cycles in ${a ? `"<span class='keyword'>${a}</span>"` : 'this problem'} are social zeitgebers rather than biological necessities? If you removed the time pressure on ${b ? `"<span class='keyword'>${b}</span>"` : 'the decision'}, what would your internal rhythm actually want to do?`;
+    },
+    verdict: 'Separate what must happen by a certain time from what only feels like it must.'
+  }
+];
+
+// ─── Keyword extraction ────────────────────────────────────────────────────────
+function extractKeywords(text) {
+  const stopwords = new Set([
+    'the','a','an','and','or','but','in','on','at','to','for','of','with',
+    'is','are','was','were','be','been','being','have','has','had','do','does',
+    'did','will','would','could','should','may','might','can','i','you','we',
+    'they','he','she','it','my','your','our','their','this','that','these',
+    'those','not','no','so','if','as','by','from','about','what','how','when',
+    'there','just','also','very','really','quite','much','more','some','any',
+    'need','want','feel','think','know','get','go','make','take','seem'
+  ]);
+  const words = text.toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !stopwords.has(w));
+  // Deduplicate and take most frequent
+  const freq = {};
+  words.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+  return Object.entries(freq)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(e => e[0]);
+}
+
+// ─── State ─────────────────────────────────────────────────────────────────────
+let resonantEchoes = [];
+
+// ─── Fire echoes ──────────────────────────────────────────────────────────────
+function fireEchoes() {
+  const problem = document.getElementById('problem-input').value.trim();
+  if (problem.length < 20) {
+    document.getElementById('problem-input').style.borderColor = '#c06060';
+    setTimeout(() => document.getElementById('problem-input').style.borderColor = '', 1000);
+    return;
+  }
+
+  resonantEchoes = [];
+
+  // Ripple effect from button
+  const btn = document.getElementById('fire-btn');
+  const ring = document.createElement('div');
+  ring.className = 'pulse-ring';
+  btn.appendChild(ring);
+  setTimeout(() => ring.remove(), 800);
+
+  btn.disabled = true;
+  document.getElementById('phase-model').style.display = 'none';
+
+  const keywords = extractKeywords(problem);
+
+  document.getElementById('problem-display').textContent = problem;
+  document.getElementById('phase-input').style.display = 'none';
+  document.getElementById('phase-echoes').style.display = 'block';
+  document.getElementById('echo-cards').innerHTML = '';
+
+  // Center ripple
+  addRipple(canvas.width / 2, canvas.height / 2);
+  setTimeout(() => addRipple(canvas.width / 2, canvas.height / 2), 400);
+  setTimeout(() => addRipple(canvas.width / 2, canvas.height / 2), 800);
+
+  // Shuffle domains and assign keyword pairs
+  const shuffled = [...DOMAINS].sort(() => Math.random() - 0.5);
+
+  shuffled.forEach((domain, i) => {
+    setTimeout(() => {
+      const pair = [keywords[i * 2 % keywords.length], keywords[(i * 2 + 1) % keywords.length]];
+      renderEchoCard(domain, pair, i);
+      addRipple(
+        canvas.width / 2 + (Math.random() - 0.5) * 200,
+        canvas.height / 2 + (Math.random() - 0.5) * 200
+      );
+    }, 600 + i * 900);
+  });
+
+  // Show model phase after all echoes
+  setTimeout(() => {
+    document.getElementById('waveform').classList.add('hidden');
+    checkShowModel();
+  }, 600 + shuffled.length * 900 + 400);
+}
+
+function renderEchoCard(domain, keywords, index) {
+  const card = document.createElement('div');
+  card.className = 'echo-card';
+  card.dataset.domainId = domain.id;
+  card.dataset.domainLabel = domain.label;
+  card.dataset.verdict = domain.verdict;
+
+  const questionHTML = domain.template(keywords);
+
+  card.innerHTML = `
+    <div class="echo-domain" style="color:${domain.color}">${domain.label}</div>
+    <div class="echo-question">${questionHTML}</div>
+    <div class="echo-actions">
+      <button class="echo-btn mark-resonant" onclick="markEcho(this, 'resonant')">bounces back ↑</button>
+      <button class="echo-btn mark-dead" onclick="markEcho(this, 'dead')">dead end ↓</button>
+    </div>
+  `;
+
+  document.getElementById('echo-cards').appendChild(card);
+
+  requestAnimationFrame(() => {
+    setTimeout(() => card.classList.add('visible'), 50);
+  });
+}
+
+function markEcho(btn, state) {
+  const card = btn.closest('.echo-card');
+  const allBtns = card.querySelectorAll('.echo-btn');
+
+  // Toggle
+  if (btn.classList.contains('active')) {
+    btn.classList.remove('active');
+    card.classList.remove('resonant', 'dead');
+    allBtns.forEach(b => { b.disabled = false; b.style.opacity = ''; });
+    updateModel();
+    return;
+  }
+
+  allBtns.forEach(b => { b.classList.remove('active'); b.disabled = false; b.style.opacity = ''; });
+  btn.classList.add('active');
+  card.classList.remove('resonant', 'dead');
+
+  if (state === 'resonant') {
+    card.classList.add('resonant');
+    btn.closest('.echo-card').querySelector('.mark-dead').style.opacity = '0.3';
+  } else {
+    card.classList.add('dead');
+    btn.closest('.echo-card').querySelector('.mark-resonant').style.opacity = '0.3';
+  }
+
+  updateModel();
+}
+
+function updateModel() {
+  const cards = document.querySelectorAll('.echo-card.resonant');
+  resonantEchoes = Array.from(cards).map(c => ({
+    label: c.dataset.domainLabel,
+    question: c.querySelector('.echo-question').innerText,
+    verdict: c.dataset.verdict
+  }));
+
+  if (resonantEchoes.length > 0) {
+    renderModel();
+  } else {
+    document.getElementById('phase-model').style.display = 'none';
+  }
+}
+
+function checkShowModel() {
+  // Show model section after last echo appears
+  document.getElementById('phase-model').style.display = 'block';
+  renderModel();
+}
+
+function renderModel() {
+  const modelDiv = document.getElementById('model-content');
+  const verdictDiv = document.getElementById('verdict-box');
+
+  document.getElementById('phase-model').style.display = 'block';
+
+  if (resonantEchoes.length === 0) {
+    modelDiv.innerHTML = '<p class="model-empty">Mark an echo as "bounces back" to build the model.</p>';
+    verdictDiv.innerHTML = '';
+    return;
+  }
+
+  modelDiv.innerHTML = resonantEchoes.map(e => `
+    <div class="resonant-item">
+      <div class="resonant-domain">${e.label}</div>
+      <div class="resonant-text">${e.verdict}</div>
+    </div>
+  `).join('');
+
+  // Verdict based on count and which domains resonated
+  const count = resonantEchoes.length;
+  const labels = resonantEchoes.map(e => e.label.toLowerCase());
+
+  let verdict = '';
+  if (count === 1) {
+    verdict = `One echo returned. That is enough. The problem has a shape now — it faces ${resonantEchoes[0].label.toLowerCase()}. Everything else was cave wall.`;
+  } else if (count === 2) {
+    verdict = `Two echoes. The problem lives at the intersection of ${resonantEchoes[0].label} and ${resonantEchoes[1].label}. That is more specific than it was sixty seconds ago. Navigate from there.`;
+  } else if (count >= 3) {
+    verdict = `${count} echoes returned. The problem is not a single obstacle — it is a cave system. You now have enough coordinates to build a rough map. Start with the echo that is closest to something you can actually do today.`;
+  }
+
+  verdictDiv.innerHTML = `
+    <div class="verdict-label">Prizrak's verdict</div>
+    <div class="verdict-text">${verdict}</div>
+  `;
+
+  // Add scroll
+  setTimeout(() => verdictDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+}
+
+function resetAll() {
+  document.getElementById('phase-echoes').style.display = 'none';
+  document.getElementById('phase-model').style.display = 'none';
+  document.getElementById('phase-input').style.display = 'block';
+  document.getElementById('waveform').classList.remove('hidden');
+  document.getElementById('problem-input').value = '';
+  document.getElementById('fire-btn').disabled = false;
+  resonantEchoes = [];
+  ripples = [];
+}
+</script>
+</body>
+</html>

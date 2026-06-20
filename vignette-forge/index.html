@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Vignette Forge | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { background: #0f0f0f; }
+        .prose-area {
+            font-family: 'Merriweather', Georgia, serif;
+            font-size: 17px;
+            line-height: 1.85;
+            letter-spacing: 0.01em;
+            color: #e4e4e7;
+            min-height: 320px;
+            resize: none;
+            background: transparent;
+            border: none;
+            outline: none;
+            width: 100%;
+        }
+        .prose-area::placeholder { color: #3f3f46; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glow { text-shadow: 0 0 8px currentColor; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .card-hover { transition: all 0.2s; }
+        .card-hover:hover { border-color: #52525b; background: rgba(39,39,42,0.6); }
+        .typing-cursor::after { content: '▊'; animation: blink 1s step-end infinite; color: #a78bfa; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .word-target { transition: width 0.5s ease; }
+        /* Print / export styles */
+        @media print {
+            body { background: white; color: black; }
+            .no-print { display: none !important; }
+            .prose-area { color: black; }
+        }
+        .drawer { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; }
+        .drawer.closed { max-height: 0; opacity: 0; }
+        .drawer.open { max-height: 2000px; opacity: 1; }
+        .tag { transition: all 0.15s; }
+        .tag:hover { border-color: #a78bfa; color: #c4b5fd; }
+        .tag.active { background: rgba(161,139,250,0.15); border-color: #a78bfa; color: #c4b5fd; }
+    </style>
+</head>
+<body class="text-zinc-300 antialiased">
+    <div class="max-w-2xl mx-auto px-5 py-8">
+
+        <!-- Header -->
+        <header class="mb-8 no-print">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-white">The Vignette Forge</h1>
+                    <p class="text-zinc-600 text-xs mt-1 mono">Short truths, earned the hard way. One page at a time.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btnLibrary" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">
+                        📚 <span id="vignetteCount">0</span>
+                    </button>
+                    <button id="btnExport" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">⬇ Export</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Writing View -->
+        <div id="writeView">
+            <!-- Title -->
+            <div class="mb-4">
+                <input id="vigTitle" type="text" placeholder="Untitled Vignette" 
+                    class="w-full bg-transparent text-xl font-bold text-white placeholder-zinc-700 outline-none border-none"
+                    maxlength="120">
+            </div>
+
+            <!-- Tags -->
+            <div class="flex flex-wrap gap-2 mb-5 no-print" id="tagBar">
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="failure">failure</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="approval">approval</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="money">money</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="marriage">marriage</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="identity">identity</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="vietnam">vietnam</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="building">building</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="leaving">leaving</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="pickleball">pickleball</button>
+                <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="fear">fear</button>
+                <input id="customTag" type="text" placeholder="+ tag" class="mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600 bg-transparent outline-none w-16 placeholder-zinc-700">
+            </div>
+
+            <!-- The writing surface -->
+            <div class="border border-zinc-800/60 rounded-xl p-6 mb-4 bg-zinc-900/30">
+                <textarea id="vigBody" class="prose-area" placeholder="Write. One truth per page. No outline needed.&#10;&#10;What do you know now that you didn't know two years ago?"></textarea>
+            </div>
+
+            <!-- Stats bar -->
+            <div class="flex items-center justify-between text-zinc-600 mono text-[11px] mb-6 no-print">
+                <div class="flex items-center gap-4">
+                    <span id="wordCount">0 words</span>
+                    <span id="charCount">0 chars</span>
+                    <span id="readTime">~0 min read</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Word target indicator -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-zinc-700">target:</span>
+                        <div class="w-24 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                            <div id="wordProgress" class="word-target h-full rounded-full bg-violet-600/60" style="width:0%"></div>
+                        </div>
+                        <span id="wordTarget" class="text-zinc-600">500</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompt spark -->
+            <div class="no-print mb-6">
+                <button id="btnSpark" class="w-full text-left px-4 py-3 rounded-lg border border-zinc-800/50 hover:border-zinc-700 transition-colors group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-zinc-600 group-hover:text-zinc-400 transition-colors">🔥 Need a spark? Click for a prompt.</span>
+                        <span class="text-zinc-700 text-xs">↵</span>
+                    </div>
+                    <p id="sparkText" class="text-sm text-zinc-500 mt-2 hidden"></p>
+                </button>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-3 no-print">
+                <button id="btnSave" class="px-5 py-2.5 rounded-lg bg-violet-600/20 border border-violet-700/50 text-violet-300 mono text-sm hover:bg-violet-600/30 transition-colors">
+                    Save Vignette
+                </button>
+                <button id="btnClear" class="px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-600 mono text-sm hover:text-zinc-400 hover:border-zinc-700 transition-colors">
+                    New
+                </button>
+                <div class="flex-1"></div>
+                <span id="saveStatus" class="mono text-[11px] text-zinc-700"></span>
+            </div>
+        </div>
+
+        <!-- Library View (hidden by default) -->
+        <div id="libraryView" class="hidden">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">The Collection</h2>
+                    <p class="text-zinc-600 text-xs mono mt-0.5" id="libStats"></p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btnBackToWrite" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">✏️ Write</button>
+                    <button id="btnExportAll" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">⬇ Export All</button>
+                </div>
+            </div>
+
+            <!-- Filter tags in library -->
+            <div class="flex flex-wrap gap-2 mb-4" id="libTagFilter"></div>
+
+            <!-- Library list -->
+            <div id="libList" class="space-y-3"></div>
+
+            <div id="libEmpty" class="hidden text-center py-16">
+                <p class="text-zinc-600 text-sm">No vignettes yet. The book is waiting.</p>
+                <p class="text-zinc-700 text-xs mt-1 mono">"A writer is someone for whom writing is more difficult than it is for other people." — Thomas Mann</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-12 pt-6 border-t border-zinc-800/50 text-center no-print">
+            <p class="text-[10px] text-zinc-700 mono">The book is not the outline. The book is the fifty truths you've earned.</p>
+            <p class="text-[10px] text-zinc-800 mt-1">— Prízrak</p>
+        </div>
+    </div>
+
+    <script>
+    const STORAGE_KEY = "prizrak_vignettes_v1";
+    const PROMPTS = [
+        "What's the most expensive lesson you've paid for in the last year?",
+        "Write about a moment you realized you were doing something for approval, not conviction.",
+        "What did your wife see about you before you saw it yourself?",
+        "Describe a decision you made from fear that you disguised as strategy.",
+        "What's the difference between quitting and leaving?",
+        "Write about money. Not the concept — the feeling of not having enough.",
+        "What would you build if no one was watching?",
+        "The last time you were truly proud of something — what was it?",
+        "What does Vietnam teach you that America never could?",
+        "Write about a conversation that changed how you saw yourself.",
+        "What's the thing you keep almost saying but never do?",
+        "Describe the exact moment a company dies. Not the announcement — the moment.",
+        "What do you owe someone that you haven't paid yet?",
+        "Write about the gap between who you are at 6 AM and who you are at a dinner party.",
+        "What's the hardest thing about being honest with someone who loves you?",
+        "Write about a time you confused movement with progress.",
+        "What's the most important thing you've unlearned?",
+        "Describe your relationship with the word 'stable.'",
+        "What would you tell the version of yourself from two years ago?",
+        "Write about pickleball — but it's actually about something else.",
+        "What breaks first: the plan or the person?",
+        "Write about the first morning after you left something behind.",
+        "What do you want your kids to know about failure?",
+        "Describe the difference between what you need and what you want.",
+        "Write about a promise you made to yourself that you've kept.",
+        "What does it feel like to be underestimated?",
+        "Write about the most boring thing that turned out to be essential.",
+        "What's the story you keep telling yourself that might not be true?",
+        "Write about home — but you're not sure where that is anymore.",
+        "What would the book be called if you had to name it right now?",
+    ];
+
+    let currentId = null;
+    let activeTags = new Set();
+    let libFilterTag = null;
+    let autosaveTimer = null;
+
+    // Data
+    function loadVignettes() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } 
+        catch(e) { return []; }
+    }
+    function saveVignettes(v) { localStorage.setItem(STORAGE_KEY, JSON.stringify(v)); }
+
+    // Word count
+    function countWords(text) {
+        return text.trim() ? text.trim().split(/\s+/).length : 0;
+    }
+
+    function updateStats() {
+        const text = document.getElementById("vigBody").value;
+        const words = countWords(text);
+        const chars = text.length;
+        const readMin = Math.max(1, Math.round(words / 200));
+        document.getElementById("wordCount").textContent = `${words} word${words !== 1 ? 's' : ''}`;
+        document.getElementById("charCount").textContent = `${chars} chars`;
+        document.getElementById("readTime").textContent = `~${readMin} min read`;
+        const pct = Math.min(100, (words / 500) * 100);
+        document.getElementById("wordProgress").style.width = pct + "%";
+        if (pct >= 100) {
+            document.getElementById("wordProgress").classList.replace("bg-violet-600/60", "bg-emerald-500/60");
+        } else {
+            document.getElementById("wordProgress").classList.replace("bg-emerald-500/60", "bg-violet-600/60");
+        }
+    }
+
+    // Tags
+    document.getElementById("tagBar").addEventListener("click", e => {
+        const tag = e.target.closest("[data-tag]");
+        if (!tag) return;
+        const t = tag.dataset.tag;
+        if (activeTags.has(t)) { activeTags.delete(t); tag.classList.remove("active"); }
+        else { activeTags.add(t); tag.classList.add("active"); }
+    });
+
+    document.getElementById("customTag").addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+            const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+            if (val && !activeTags.has(val)) {
+                activeTags.add(val);
+                const btn = document.createElement("button");
+                btn.className = "tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600 active";
+                btn.dataset.tag = val;
+                btn.textContent = val;
+                e.target.parentNode.insertBefore(btn, e.target);
+            }
+            e.target.value = "";
+        }
+    });
+
+    // Spark
+    let sparkIdx = Math.floor(Math.random() * PROMPTS.length);
+    document.getElementById("btnSpark").addEventListener("click", () => {
+        const el = document.getElementById("sparkText");
+        sparkIdx = (sparkIdx + 1) % PROMPTS.length;
+        el.textContent = PROMPTS[sparkIdx];
+        el.classList.remove("hidden");
+    });
+
+    // Auto-save
+    document.getElementById("vigBody").addEventListener("input", () => {
+        updateStats();
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => {
+            if (currentId) {
+                doSave(true);
+            }
+        }, 3000);
+    });
+
+    document.getElementById("vigTitle").addEventListener("input", () => {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => {
+            if (currentId) doSave(true);
+        }, 3000);
+    });
+
+    // Save
+    function doSave(isAuto = false) {
+        const title = document.getElementById("vigTitle").value.trim() || "Untitled";
+        const body = document.getElementById("vigBody").value;
+        if (!body.trim() && !isAuto) return;
+
+        const vignettes = loadVignettes();
+        const now = new Date().toISOString();
+        const tags = Array.from(activeTags);
+
+        if (currentId) {
+            const idx = vignettes.findIndex(v => v.id === currentId);
+            if (idx >= 0) {
+                vignettes[idx].title = title;
+                vignettes[idx].body = body;
+                vignettes[idx].tags = tags;
+                vignettes[idx].updated = now;
+                vignettes[idx].wordCount = countWords(body);
+            }
+        } else {
+            const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            currentId = id;
+            vignettes.unshift({
+                id, title, body, tags,
+                created: now, updated: now,
+                wordCount: countWords(body)
+            });
+        }
+
+        saveVignettes(vignettes);
+        updateLibCount();
+        const status = document.getElementById("saveStatus");
+        status.textContent = isAuto ? "auto-saved" : "saved ✓";
+        status.classList.remove("text-zinc-700");
+        status.classList.add("text-emerald-600");
+        setTimeout(() => {
+            status.textContent = "";
+            status.classList.remove("text-emerald-600");
+            status.classList.add("text-zinc-700");
+        }, 2000);
+    }
+
+    document.getElementById("btnSave").addEventListener("click", () => doSave(false));
+
+    // Clear / New
+    document.getElementById("btnClear").addEventListener("click", () => {
+        if (document.getElementById("vigBody").value.trim() && !currentId) {
+            if (!confirm("Discard unsaved vignette?")) return;
+        }
+        resetEditor();
+    });
+
+    function resetEditor() {
+        currentId = null;
+        document.getElementById("vigTitle").value = "";
+        document.getElementById("vigBody").value = "";
+        activeTags.clear();
+        document.querySelectorAll("#tagBar .tag").forEach(t => t.classList.remove("active"));
+        document.getElementById("sparkText").classList.add("hidden");
+        updateStats();
+    }
+
+    // Library
+    function updateLibCount() {
+        const count = loadVignettes().length;
+        document.getElementById("vignetteCount").textContent = count;
+    }
+
+    function showLibrary() {
+        document.getElementById("writeView").classList.add("hidden");
+        document.getElementById("libraryView").classList.remove("hidden");
+        renderLibrary();
+    }
+
+    function showWrite() {
+        document.getElementById("libraryView").classList.add("hidden");
+        document.getElementById("writeView").classList.remove("hidden");
+    }
+
+    function renderLibrary() {
+        const vignettes = loadVignettes();
+        const allTags = new Set();
+        vignettes.forEach(v => (v.tags || []).forEach(t => allTags.add(t)));
+
+        // Tag filter
+        const tagFilter = document.getElementById("libTagFilter");
+        tagFilter.innerHTML = Array.from(allTags).sort().map(t =>
+            `<button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600 ${libFilterTag === t ? 'active' : ''}" data-libtag="${t}">${t}</button>`
+        ).join("");
+
+        tagFilter.addEventListener("click", e => {
+            const btn = e.target.closest("[data-libtag]");
+            if (!btn) return;
+            libFilterTag = libFilterTag === btn.dataset.libtag ? null : btn.dataset.libtag;
+            renderLibrary();
+        });
+
+        const filtered = libFilterTag
+            ? vignettes.filter(v => (v.tags || []).includes(libFilterTag))
+            : vignettes;
+
+        const totalWords = filtered.reduce((s, v) => s + (v.wordCount || 0), 0);
+        document.getElementById("libStats").textContent = `${filtered.length} vignette${filtered.length !== 1 ? 's' : ''} · ${totalWords.toLocaleString()} words · ~${Math.round(totalWords / 250)} pages`;
+
+        if (filtered.length === 0) {
+            document.getElementById("libList").innerHTML = "";
+            document.getElementById("libEmpty").classList.remove("hidden");
+            return;
+        }
+
+        document.getElementById("libEmpty").classList.add("hidden");
+        document.getElementById("libList").innerHTML = filtered.map(v => {
+            const preview = (v.body || "").slice(0, 160).replace(/\n/g, " ");
+            const date = new Date(v.created).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            const tags = (v.tags || []).map(t => `<span class="mono text-[9px] px-1.5 py-0.5 rounded-full border border-zinc-800 text-zinc-600">${t}</span>`).join(" ");
+            return `
+            <div class="card-hover border border-zinc-800/60 rounded-lg p-4 cursor-pointer fade-in" data-vid="${v.id}">
+                <div class="flex items-start justify-between gap-3 mb-1">
+                    <h3 class="text-sm font-bold text-zinc-200">${v.title || 'Untitled'}</h3>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="mono text-[10px] text-zinc-600">${v.wordCount || 0}w</span>
+                        <span class="mono text-[10px] text-zinc-700">${date}</span>
+                        <button class="text-zinc-700 hover:text-red-500 text-xs transition-colors" data-delete="${v.id}" title="Delete">✕</button>
+                    </div>
+                </div>
+                <p class="text-xs text-zinc-600 leading-relaxed mb-2">${preview}${preview.length >= 160 ? '…' : ''}</p>
+                <div class="flex flex-wrap gap-1">${tags}</div>
+            </div>`;
+        }).join("");
+
+        // Click handlers
+        document.getElementById("libList").addEventListener("click", e => {
+            const del = e.target.closest("[data-delete]");
+            if (del) {
+                e.stopPropagation();
+                if (confirm("Delete this vignette? The mountain remembers, but localStorage does not.")) {
+                    const vs = loadVignettes().filter(v => v.id !== del.dataset.delete);
+                    saveVignettes(vs);
+                    if (currentId === del.dataset.delete) resetEditor();
+                    renderLibrary();
+                    updateLibCount();
+                }
+                return;
+            }
+            const card = e.target.closest("[data-vid]");
+            if (card) {
+                loadIntoEditor(card.dataset.vid);
+                showWrite();
+            }
+        });
+    }
+
+    function loadIntoEditor(id) {
+        const v = loadVignettes().find(x => x.id === id);
+        if (!v) return;
+        currentId = v.id;
+        document.getElementById("vigTitle").value = v.title || "";
+        document.getElementById("vigBody").value = v.body || "";
+        activeTags = new Set(v.tags || []);
+
+        // Reset tag UI
+        document.querySelectorAll("#tagBar .tag").forEach(t => {
+            t.classList.toggle("active", activeTags.has(t.dataset.tag));
+        });
+        // Add custom tags that aren't in the default set
+        const defaultTags = new Set(Array.from(document.querySelectorAll("#tagBar .tag[data-tag]")).map(t => t.dataset.tag));
+        activeTags.forEach(t => {
+            if (!defaultTags.has(t)) {
+                const btn = document.createElement("button");
+                btn.className = "tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600 active";
+                btn.dataset.tag = t;
+                btn.textContent = t;
+                document.getElementById("customTag").parentNode.insertBefore(btn, document.getElementById("customTag"));
+            }
+        });
+
+        updateStats();
+    }
+
+    // Export single
+    document.getElementById("btnExport").addEventListener("click", () => {
+        const title = document.getElementById("vigTitle").value.trim() || "Untitled";
+        const body = document.getElementById("vigBody").value;
+        if (!body.trim()) return;
+        const tags = Array.from(activeTags);
+        const md = `# ${title}\n\n${tags.length ? `_Tags: ${tags.join(", ")}_\n\n` : ''}${body}\n`;
+        downloadFile(`${title.toLowerCase().replace(/\s+/g, '-')}.md`, md);
+    });
+
+    // Export all
+    document.getElementById("btnExportAll")?.addEventListener("click", () => {
+        const vignettes = loadVignettes();
+        if (!vignettes.length) return;
+        let md = `# The Vignettes\n\n_${vignettes.length} pieces. ${vignettes.reduce((s,v) => s + (v.wordCount||0), 0).toLocaleString()} words._\n\n---\n\n`;
+        vignettes.forEach((v, i) => {
+            const tags = (v.tags || []).length ? `\n_Tags: ${v.tags.join(", ")}_` : '';
+            md += `## ${i + 1}. ${v.title || 'Untitled'}${tags}\n\n${v.body || ''}\n\n---\n\n`;
+        });
+        downloadFile("the-vignettes.md", md);
+    });
+
+    function downloadFile(name, content) {
+        const blob = new Blob([content], { type: "text/markdown" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    // Nav
+    document.getElementById("btnLibrary").addEventListener("click", showLibrary);
+    document.getElementById("btnBackToWrite").addEventListener("click", showWrite);
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", e => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+            e.preventDefault();
+            doSave(false);
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+            e.preventDefault();
+            resetEditor();
+        }
+    });
+
+    // Init
+    updateStats();
+    updateLibCount();
+    </script>
+</body>
+</html>

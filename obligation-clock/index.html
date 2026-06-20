@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Obligation Clock | Prizrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap');
+    body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #d4d4d4; }
+    .mono { font-family: 'Share Tech Mono', monospace; }
+
+    .obligation-card { border: 1px solid #27272a; border-radius: 10px; background: #0f0f0f; transition: border-color 0.3s; }
+    .obligation-card.pressure-low { border-left: 3px solid #27272a; }
+    .obligation-card.pressure-polite { border-left: 3px solid #22d3ee; }
+    .obligation-card.pressure-assertive { border-left: 3px solid #f59e0b; }
+    .obligation-card.pressure-critical { border-left: 3px solid #ef4444; }
+    .obligation-card.pressure-dead { border-left: 3px solid #52525b; opacity: 0.5; }
+
+    .pressure-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; flex-shrink: 0;
+    }
+
+    .gauge-track { height: 4px; background: #27272a; border-radius: 2px; overflow: hidden; }
+    .gauge-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+
+    input, select, textarea {
+      background: #18181b; border: 1px solid #3f3f46; border-radius: 8px;
+      color: #e4e4e7; outline: none; font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #71717a; }
+
+    .add-btn { background: transparent; border: 1px solid #3f3f46; color: #a1a1aa;
+      border-radius: 8px; font-family: 'Share Tech Mono', monospace;
+      cursor: pointer; transition: all 0.15s; }
+    .add-btn:hover { border-color: #71717a; color: #e4e4e7; }
+
+    .action-btn { font-family: 'Share Tech Mono', monospace; font-size: 11px;
+      padding: 3px 8px; border-radius: 5px; border: 1px solid #3f3f46;
+      background: transparent; color: #71717a; cursor: pointer; transition: all 0.15s; }
+    .action-btn:hover { border-color: #a1a1aa; color: #e4e4e7; }
+    .action-btn.resolve { border-color: #16a34a; color: #4ade80; }
+    .action-btn.resolve:hover { background: #14532d; }
+
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+    .fade-in { animation: fadeIn 0.3s ease; }
+
+    .empty-state { border: 1px dashed #27272a; border-radius: 10px; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+<div class="max-w-2xl mx-auto">
+
+  <!-- Header -->
+  <div class="mb-8 border-b border-zinc-800 pb-5">
+    <div class="flex items-start justify-between flex-wrap gap-3">
+      <div>
+        <h1 class="text-2xl font-semibold text-white mono">The Obligation Clock</h1>
+        <p class="text-zinc-500 text-sm mt-1">Track what others owe you. Waiting is information. Pressure builds on a schedule.</p>
+      </div>
+      <div id="summary-badges" class="flex gap-2 flex-wrap"></div>
+    </div>
+  </div>
+
+  <!-- Add Form -->
+  <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
+    <div class="mono text-xs text-zinc-500 uppercase tracking-widest mb-4">Log an Obligation</div>
+    <div class="space-y-3">
+      <div class="flex gap-3">
+        <input type="text" id="ob-person" placeholder="Who owes you something?" class="flex-1 px-3 py-2">
+        <select id="ob-type" class="mono text-xs px-3 py-2 w-36">
+          <option value="reply">Reply</option>
+          <option value="decision">Decision</option>
+          <option value="deliverable">Deliverable</option>
+          <option value="intro">Intro</option>
+          <option value="payment">Payment</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <input type="text" id="ob-what" placeholder="What exactly? Be specific." class="w-full px-3 py-2">
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="mono text-xs text-zinc-600 block mb-1">Sent / asked on</label>
+          <input type="date" id="ob-date" class="w-full px-3 py-2 mono text-sm">
+        </div>
+        <div class="flex-1">
+          <label class="mono text-xs text-zinc-600 block mb-1">Stakes</label>
+          <select id="ob-stakes" class="w-full px-3 py-2 mono text-xs">
+            <option value="low">Low — nice to have</option>
+            <option value="medium" selected>Medium — matters</option>
+            <option value="high">High — blocking</option>
+            <option value="critical">Critical — urgent</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end">
+        <button onclick="addObligation()" class="add-btn px-5 py-2 text-sm">+ Start Clock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pressure Legend -->
+  <div class="flex gap-4 mb-5 flex-wrap">
+    <span class="flex items-center gap-1.5 text-xs text-zinc-500"><span class="pressure-dot" style="background:#27272a"></span>Waiting (0–2d)</span>
+    <span class="flex items-center gap-1.5 text-xs text-zinc-500"><span class="pressure-dot" style="background:#22d3ee"></span>Polite nudge (3–5d)</span>
+    <span class="flex items-center gap-1.5 text-xs text-zinc-500"><span class="pressure-dot" style="background:#f59e0b"></span>Assertive follow-up (6–10d)</span>
+    <span class="flex items-center gap-1.5 text-xs text-zinc-500"><span class="pressure-dot" style="background:#ef4444"></span>Critical (10d+)</span>
+  </div>
+
+  <!-- Obligations List -->
+  <div id="obligations-container">
+    <div class="empty-state p-10 text-center">
+      <div class="mono text-zinc-600 text-sm">No obligations tracked. Either you are owed nothing, or nothing has been counted. Both are problems.</div>
+    </div>
+  </div>
+
+  <!-- Resolved Archive -->
+  <div id="resolved-section" class="hidden mt-8">
+    <div class="flex items-center justify-between mb-3">
+      <span class="mono text-xs text-zinc-600 uppercase tracking-widest">Resolved</span>
+      <button onclick="toggleResolved()" class="mono text-xs text-zinc-600 hover:text-zinc-400" id="toggle-resolved-btn">hide</button>
+    </div>
+    <div id="resolved-list" class="space-y-2"></div>
+  </div>
+
+  <div class="text-center mono text-xs text-zinc-700 pb-4 mt-8">
+    Waiting is not passive. It is a resource being consumed by another party. Track it.
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'obligation_clock_v1';
+let obligations = [];
+let showResolved = true;
+
+const PRESSURE_THRESHOLDS = { low: [0,2], polite: [3,5], assertive: [6,10], critical: [11, Infinity] };
+const TYPE_ICONS = { reply:'📨', decision:'⚖️', deliverable:'📦', intro:'🤝', payment:'💰', other:'📌' };
+const STAKES_COLORS = { low:'text-zinc-500', medium:'text-amber-500', high:'text-orange-500', critical:'text-red-500' };
+
+function getDaysWaiting(dateStr) {
+  const sent = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now - sent) / (1000 * 60 * 60 * 24));
+  return Math.max(0, diff);
+}
+
+function getPressure(days, stakes) {
+  const multiplier = stakes === 'critical' ? 1.5 : stakes === 'high' ? 1.2 : stakes === 'low' ? 0.7 : 1;
+  const effective = days * multiplier;
+  if (effective <= 2) return 'low';
+  if (effective <= 5) return 'polite';
+  if (effective <= 10) return 'assertive';
+  return 'critical';
+}
+
+function getPressureAction(pressure, person, what) {
+  const p = person || 'them';
+  const w = what || 'this';
+  const actions = {
+    low: `Still fresh. No action needed yet. The clock is running.`,
+    polite: `Time for a gentle ping. "Hey ${p}, just checking in on ${w}." Friendly. No pressure in the words, but the message is sent.`,
+    assertive: `Polite has passed. Follow up directly: "I need a decision on ${w} by end of week." Name the date. The ambiguity is costing you.`,
+    critical: `This has been waiting too long. Either escalate, set a hard deadline, or officially close the obligation and adjust your plans accordingly. Silence at this stage is an answer.`,
+  };
+  return actions[pressure];
+}
+
+function getPressureColor(p) {
+  return { low:'#27272a', polite:'#22d3ee', assertive:'#f59e0b', critical:'#ef4444', dead:'#52525b' }[p];
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+
+function addObligation() {
+  const person = document.getElementById('ob-person').value.trim();
+  const what = document.getElementById('ob-what').value.trim();
+  const date = document.getElementById('ob-date').value;
+  const type = document.getElementById('ob-type').value;
+  const stakes = document.getElementById('ob-stakes').value;
+
+  if (!person || !date) return;
+
+  obligations.unshift({
+    id: Date.now(),
+    person, what, date, type, stakes,
+    resolved: false, resolvedAt: null,
+    notes: '',
+  });
+
+  document.getElementById('ob-person').value = '';
+  document.getElementById('ob-what').value = '';
+  document.getElementById('ob-type').value = 'reply';
+  document.getElementById('ob-stakes').value = 'medium';
+
+  save();
+  render();
+}
+
+function resolve(id) {
+  const ob = obligations.find(o => o.id === id);
+  if (ob) { ob.resolved = true; ob.resolvedAt = new Date().toISOString().slice(0,10); }
+  save();
+  render();
+}
+
+function remove(id) {
+  obligations = obligations.filter(o => o.id !== id);
+  save();
+  render();
+}
+
+function snooze(id) {
+  const ob = obligations.find(o => o.id === id);
+  if (!ob) return;
+  // Move the sent date forward 3 days (resets the clock for polite follow-up)
+  const d = new Date(ob.date + 'T00:00:00');
+  d.setDate(d.getDate() + 3);
+  ob.date = d.toISOString().slice(0,10);
+  save();
+  render();
+}
+
+function toggleResolved() {
+  showResolved = !showResolved;
+  document.getElementById('resolved-list').style.display = showResolved ? '' : 'none';
+  document.getElementById('toggle-resolved-btn').textContent = showResolved ? 'hide' : 'show';
+}
+
+function render() {
+  const active = obligations.filter(o => !o.resolved);
+  const resolved = obligations.filter(o => o.resolved);
+
+  // Summary badges
+  const counts = { low:0, polite:0, assertive:0, critical:0 };
+  active.forEach(o => { const p = getPressure(getDaysWaiting(o.date), o.stakes); counts[p]++; });
+  const badgeColors = { polite:'bg-cyan-900 text-cyan-400', assertive:'bg-amber-900 text-amber-400', critical:'bg-red-900 text-red-400' };
+  const labels = { polite:'nudge', assertive:'follow up', critical:'critical' };
+  let badges = '';
+  ['critical','assertive','polite'].forEach(p => {
+    if (counts[p] > 0) badges += `<span class="mono text-xs px-2 py-1 rounded-full ${badgeColors[p]}">${counts[p]} ${labels[p]}</span>`;
+  });
+  if (active.length === 0) badges = '<span class="mono text-xs text-zinc-600">clear queue</span>';
+  document.getElementById('summary-badges').innerHTML = badges;
+
+  // Active list
+  const container = document.getElementById('obligations-container');
+  if (active.length === 0) {
+    container.innerHTML = `<div class="empty-state p-10 text-center"><div class="mono text-zinc-600 text-sm">No obligations tracked. Either you are owed nothing, or nothing has been counted. Both are problems.</div></div>`;
+  } else {
+    // Sort: critical first, then by days desc
+    const sorted = [...active].sort((a,b) => {
+      const pa = getPressure(getDaysWaiting(a.date), a.stakes);
+      const pb = getPressure(getDaysWaiting(b.date), b.stakes);
+      const rank = {critical:0, assertive:1, polite:2, low:3};
+      if (rank[pa] !== rank[pb]) return rank[pa] - rank[pb];
+      return getDaysWaiting(b.date) - getDaysWaiting(a.date);
+    });
+
+    container.innerHTML = sorted.map(o => {
+      const days = getDaysWaiting(o.date);
+      const pressure = getPressure(days, o.stakes);
+      const color = getPressureColor(pressure);
+      const pct = Math.min(100, (days / 14) * 100);
+      const action = getPressureAction(pressure, o.person, o.what);
+      const icon = TYPE_ICONS[o.type] || '📌';
+
+      return `<div class="obligation-card pressure-${pressure} p-4 mb-3 fade-in">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <span class="text-sm font-medium text-zinc-200">${o.person}</span>
+              <span class="mono text-xs text-zinc-500">${icon} ${o.type}</span>
+              <span class="mono text-xs ${STAKES_COLORS[o.stakes]}">${o.stakes}</span>
+              <span class="mono text-xs text-zinc-600">since ${formatDate(o.date)}</span>
+            </div>
+            ${o.what ? `<div class="text-sm text-zinc-400 mb-2 truncate">${o.what}</div>` : ''}
+            <div class="gauge-track mb-2">
+              <div class="gauge-fill" style="width:${pct}%; background:${color}"></div>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="pressure-dot" style="background:${color}"></span>
+              <span class="mono text-xs" style="color:${color}">${days}d waiting</span>
+              <span class="text-zinc-600 text-xs">·</span>
+              <span class="mono text-xs text-zinc-500 uppercase">${pressure}</span>
+            </div>
+            <div class="text-xs text-zinc-500 italic">${action}</div>
+          </div>
+          <div class="flex flex-col gap-1.5 flex-shrink-0">
+            <button class="action-btn resolve" onclick="resolve(${o.id})">✓ resolved</button>
+            <button class="action-btn" onclick="snooze(${o.id})">snooze 3d</button>
+            <button class="action-btn" onclick="remove(${o.id})">✕ drop</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Resolved section
+  if (resolved.length > 0) {
+    document.getElementById('resolved-section').classList.remove('hidden');
+    document.getElementById('resolved-list').innerHTML = resolved.map(o => `
+      <div class="flex items-center gap-3 text-xs text-zinc-600 mono py-1 border-b border-zinc-900">
+        <span class="text-zinc-500">✓</span>
+        <span>${o.person}</span>
+        <span class="text-zinc-700">·</span>
+        <span>${o.what || o.type}</span>
+        <span class="text-zinc-700 ml-auto">${o.resolvedAt ? formatDate(o.resolvedAt) : ''}</span>
+        <button class="text-zinc-700 hover:text-zinc-500" onclick="remove(${o.id})">✕</button>
+      </div>`).join('');
+  } else {
+    document.getElementById('resolved-section').classList.add('hidden');
+  }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(obligations));
+}
+
+function load() {
+  try {
+    obligations = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch(e) { obligations = []; }
+}
+
+// Set today as default date
+document.getElementById('ob-date').value = new Date().toISOString().slice(0,10);
+
+// Keyboard shortcut
+document.getElementById('ob-what').addEventListener('keydown', e => { if (e.key === 'Enter') addObligation(); });
+
+load();
+render();
+
+// Refresh pressure every minute (days don't change, but just in case)
+setInterval(render, 60000);
+</script>
+</body>
+</html>

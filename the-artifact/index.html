@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Artifact</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { background: #0d0d0f; font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .artifact-row { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .locked-icon { opacity: 0.4; transition: opacity 0.2s; }
+    .artifact-row:hover .locked-icon { opacity: 0.8; }
+    .week-divider { border-color: rgba(255,255,255,0.06); }
+    .input-field { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); transition: border-color 0.2s, background 0.2s; }
+    .input-field:focus { border-color: rgba(139,92,246,0.5); background: rgba(139,92,246,0.04); outline: none; }
+    .btn-add { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); transition: all 0.2s; }
+    .btn-add:hover { background: rgba(139,92,246,0.25); border-color: rgba(139,92,246,0.5); }
+    .btn-add:active { transform: scale(0.98); }
+    .povitrulya { animation: pulse 3s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+    .week-count-0 { color: #6b7280; }
+    .week-count-1 { color: #a78bfa; }
+    .week-count-many { color: #34d399; }
+    .artifact-text { word-break: break-word; }
+    .week-header { border-left: 2px solid rgba(139,92,246,0.3); padding-left: 12px; }
+    .week-header.empty { border-left-color: rgba(239,68,68,0.3); }
+    .tag-locked { font-size: 9px; letter-spacing: 0.08em; }
+  </style>
+</head>
+<body class="text-zinc-300 min-h-screen">
+  <div class="max-w-2xl mx-auto px-4 py-12">
+
+    <!-- Header -->
+    <div class="mb-10">
+      <div class="flex items-start justify-between gap-4 mb-3">
+        <div>
+          <h1 class="text-2xl font-semibold text-white tracking-tight">The Artifact</h1>
+          <p class="text-zinc-500 text-sm mt-1">What did you make this week that cannot be undone?</p>
+        </div>
+        <div id="streakDisplay" class="text-right hidden">
+          <div class="mono text-xs text-zinc-600">streak</div>
+          <div id="streakCount" class="mono text-2xl font-medium text-violet-400">0</div>
+        </div>
+      </div>
+      <p class="text-zinc-600 text-xs leading-relaxed border-l border-zinc-800 pl-3 mt-4">
+        A post published. A conversation that happened. A commitment made public. Code that shipped. Something real, completed, permanent. 
+        The week that contains no irreversible artifact is not different from the one before it.
+      </p>
+    </div>
+
+    <!-- Input -->
+    <div class="mb-8">
+      <div class="flex gap-2">
+        <input
+          id="artifactInput"
+          type="text"
+          placeholder="Name your artifact..."
+          class="input-field flex-1 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600"
+          maxlength="200"
+        />
+        <button id="addBtn" onclick="addArtifact()" class="btn-add rounded-lg px-4 py-3 text-sm font-medium text-violet-300 mono">
+          ↵ lock
+        </button>
+      </div>
+      <div class="flex gap-3 mt-2">
+        <select id="typeSelect" class="input-field rounded-md px-3 py-1.5 text-xs text-zinc-400 mono">
+          <option value="published">published</option>
+          <option value="shipped">shipped</option>
+          <option value="said">said aloud</option>
+          <option value="decided">decided</option>
+          <option value="committed">committed</option>
+          <option value="finished">finished</option>
+          <option value="started">started (irreversibly)</option>
+          <option value="other">other</option>
+        </select>
+        <div id="charCount" class="text-xs text-zinc-700 mono self-center">0/200</div>
+      </div>
+    </div>
+
+    <!-- This week / Povitrulya warning -->
+    <div id="thisWeekSection" class="mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <div id="thisWeekHeader" class="week-header">
+          <div class="text-xs mono text-zinc-500">this week</div>
+          <div id="thisWeekRange" class="text-xs text-zinc-600 mt-0.5"></div>
+        </div>
+        <div id="thisWeekCount" class="mono text-sm font-medium week-count-0">0 artifacts</div>
+      </div>
+      <div id="thisWeekList" class="space-y-2 min-h-[40px]">
+        <!-- artifacts render here -->
+      </div>
+      <div id="povitrulya" class="hidden mt-4 px-4 py-3 rounded-lg border border-red-900/40 bg-red-950/20">
+        <p class="text-xs text-red-400/80 povitrulya mono">
+          ⚠ Povitrulya. The heartbeat is running. The structure is intact. Nothing is wrong. But there is no shape to the weeks.
+        </p>
+        <p class="text-xs text-zinc-600 mt-1">No irreversible artifact this week. Make one.</p>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div id="historySection">
+      <div class="text-xs mono text-zinc-600 mb-4 uppercase tracking-wider">history</div>
+      <div id="historyList" class="space-y-6">
+        <!-- past weeks render here -->
+      </div>
+      <div id="emptyHistory" class="hidden text-center py-12">
+        <p class="text-zinc-700 text-sm">No history yet. Lock your first artifact above.</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-16 pt-6 border-t border-zinc-900 flex items-center justify-between">
+      <p class="text-zinc-800 text-xs mono">Prízrak / the artifact</p>
+      <button onclick="clearAll()" class="text-xs text-zinc-800 hover:text-zinc-600 transition-colors mono">clear all</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'prizrak_artifacts_v1';
+
+    function getWeekKey(date) {
+      const d = new Date(date);
+      const day = d.getDay(); // 0=Sun
+      const diffToMon = (day === 0) ? -6 : 1 - day;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() + diffToMon);
+      monday.setHours(0, 0, 0, 0);
+      return monday.toISOString().split('T')[0];
+    }
+
+    function getWeekLabel(weekKey) {
+      const start = new Date(weekKey + 'T00:00:00');
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const opts = { month: 'short', day: 'numeric' };
+      const now = new Date();
+      const thisWeek = getWeekKey(now);
+      if (weekKey === thisWeek) return 'this week';
+      const lastWeek = new Date(now);
+      lastWeek.setDate(now.getDate() - 7);
+      if (weekKey === getWeekKey(lastWeek)) return 'last week';
+      return start.toLocaleDateString('en-US', opts) + ' – ' + end.toLocaleDateString('en-US', opts);
+    }
+
+    function getWeekRange(weekKey) {
+      const start = new Date(weekKey + 'T00:00:00');
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const opts = { month: 'short', day: 'numeric' };
+      return start.toLocaleDateString('en-US', opts) + ' – ' + end.toLocaleDateString('en-US', opts);
+    }
+
+    function loadData() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+      catch { return []; }
+    }
+
+    function saveData(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function typeColor(type) {
+      const colors = {
+        published: 'text-violet-400 bg-violet-900/30',
+        shipped: 'text-emerald-400 bg-emerald-900/30',
+        said: 'text-amber-400 bg-amber-900/30',
+        decided: 'text-sky-400 bg-sky-900/30',
+        committed: 'text-rose-400 bg-rose-900/30',
+        finished: 'text-teal-400 bg-teal-900/30',
+        started: 'text-orange-400 bg-orange-900/30',
+        other: 'text-zinc-400 bg-zinc-800/50',
+      };
+      return colors[type] || colors.other;
+    }
+
+    function renderArtifact(a, showLock = true) {
+      return `
+        <div class="artifact-row flex items-start gap-3 py-2 px-3 rounded-lg hover:bg-white/[0.02] transition-colors">
+          <div class="flex-1 min-w-0">
+            <span class="artifact-text text-sm text-zinc-200">${escHtml(a.text)}</span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0 mt-0.5">
+            <span class="tag-locked font-mono uppercase px-1.5 py-0.5 rounded ${typeColor(a.type)}">${a.type}</span>
+            <span class="text-zinc-700 text-xs mono">${fmtDate(a.timestamp)}</span>
+            ${showLock ? '<span class="locked-icon text-zinc-600" title="Locked — cannot be deleted">🔒</span>' : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function fmtDate(ts) {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function countLabel(n) {
+      if (n === 0) return '0 artifacts';
+      if (n === 1) return '1 artifact';
+      return `${n} artifacts`;
+    }
+
+    function countClass(n) {
+      if (n === 0) return 'week-count-0';
+      if (n === 1) return 'week-count-1';
+      return 'week-count-many';
+    }
+
+    function render() {
+      const data = loadData();
+      const now = new Date();
+      const thisWeek = getWeekKey(now);
+
+      // Segment by week
+      const weeks = {};
+      for (const a of data) {
+        const wk = getWeekKey(a.timestamp);
+        if (!weeks[wk]) weeks[wk] = [];
+        weeks[wk].push(a);
+      }
+      const sortedWeeks = Object.keys(weeks).sort().reverse();
+
+      // This week
+      const thisWeekItems = weeks[thisWeek] || [];
+      const thisWeekHeader = document.getElementById('thisWeekHeader');
+      const thisWeekList = document.getElementById('thisWeekList');
+      const thisWeekCount = document.getElementById('thisWeekCount');
+      const povitrulya = document.getElementById('povitrulya');
+
+      document.getElementById('thisWeekRange').textContent = getWeekRange(thisWeek);
+      thisWeekCount.textContent = countLabel(thisWeekItems.length);
+      thisWeekCount.className = 'mono text-sm font-medium ' + countClass(thisWeekItems.length);
+
+      if (thisWeekItems.length === 0) {
+        thisWeekHeader.className = 'week-header empty';
+        thisWeekList.innerHTML = '<p class="text-zinc-700 text-xs px-3 py-2 italic">Nothing locked yet this week.</p>';
+        povitrulya.classList.remove('hidden');
+      } else {
+        thisWeekHeader.className = 'week-header';
+        thisWeekList.innerHTML = [...thisWeekItems].reverse().map(a => renderArtifact(a)).join('');
+        povitrulya.classList.add('hidden');
+      }
+
+      // History (past weeks)
+      const historyWeeks = sortedWeeks.filter(w => w !== thisWeek);
+      const historyList = document.getElementById('historyList');
+      const emptyHistory = document.getElementById('emptyHistory');
+
+      if (historyWeeks.length === 0 && thisWeekItems.length === 0) {
+        emptyHistory.classList.remove('hidden');
+        historyList.innerHTML = '';
+      } else {
+        emptyHistory.classList.add('hidden');
+      }
+
+      historyList.innerHTML = historyWeeks.map(wk => {
+        const items = weeks[wk] || [];
+        const n = items.length;
+        return `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="week-header ${n === 0 ? 'empty' : ''}">
+                <div class="text-xs mono text-zinc-500">${getWeekLabel(wk)}</div>
+                <div class="text-xs text-zinc-700 mt-0.5">${getWeekRange(wk)}</div>
+              </div>
+              <div class="mono text-xs ${countClass(n)}">${countLabel(n)}</div>
+            </div>
+            <div class="space-y-1">
+              ${[...items].reverse().map(a => renderArtifact(a, false)).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Streak: consecutive weeks with ≥1 artifact
+      let streak = 0;
+      const allWeeks = sortedWeeks.filter(w => w !== thisWeek);
+      for (const wk of allWeeks) {
+        if (weeks[wk] && weeks[wk].length > 0) streak++;
+        else break;
+      }
+      if (thisWeekItems.length > 0) streak++;
+      const streakDisplay = document.getElementById('streakDisplay');
+      const streakCount = document.getElementById('streakCount');
+      if (streak > 0) {
+        streakDisplay.classList.remove('hidden');
+        streakCount.textContent = streak;
+      } else {
+        streakDisplay.classList.add('hidden');
+      }
+    }
+
+    function addArtifact() {
+      const input = document.getElementById('artifactInput');
+      const type = document.getElementById('typeSelect').value;
+      const text = input.value.trim();
+      if (!text) { input.focus(); return; }
+      const data = loadData();
+      data.push({ id: Date.now(), text, type, timestamp: Date.now() });
+      saveData(data);
+      input.value = '';
+      document.getElementById('charCount').textContent = '0/200';
+      render();
+      input.focus();
+    }
+
+    function clearAll() {
+      if (!confirm('This will delete all artifacts. This cannot be undone. (Ironic, yes.)')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      render();
+    }
+
+    // Input listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('artifactInput');
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') addArtifact(); });
+      input.addEventListener('input', () => {
+        document.getElementById('charCount').textContent = input.value.length + '/200';
+      });
+      render();
+    });
+  </script>
+</body>
+</html>

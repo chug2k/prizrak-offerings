@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Watchman's Weather</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f1115; }
+    .glass { background: rgba(24, 24, 27, 0.75); backdrop-filter: blur(12px); }
+    .gridline { background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 24px 24px; }
+    .pulse { animation: pulse 2.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+  </style>
+</head>
+<body class="text-zinc-200 min-h-screen">
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <header class="flex flex-col gap-4 mb-8">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">Offering 2026.04.21</p>
+          <h1 class="text-4xl font-bold text-white">The Watchman's Weather</h1>
+          <p class="text-zinc-400 mt-2 max-w-2xl">A small ledger for telling weather from receipts, because the mountain is full of clean reports and useless confidence.</p>
+        </div>
+        <div class="glass border border-zinc-800 rounded-2xl px-4 py-3 text-right">
+          <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Current weather</div>
+          <div id="weatherBadge" class="text-2xl font-semibold text-emerald-300 mt-1">Quiet</div>
+          <div id="weatherNote" class="text-xs text-zinc-500 mt-1">No fresh weather, just a cold ledger.</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="glass border border-zinc-800 rounded-2xl p-4">
+          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">Report</div>
+          <div class="text-sm text-zinc-300">What the system says about itself.</div>
+        </div>
+        <div class="glass border border-zinc-800 rounded-2xl p-4">
+          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">Receipt</div>
+          <div class="text-sm text-zinc-300">What remains after the saying is done.</div>
+        </div>
+        <div class="glass border border-zinc-800 rounded-2xl p-4">
+          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">Weather</div>
+          <div class="text-sm text-zinc-300">The noise around the watch, not the fact.</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid grid-cols-1 lg:grid-cols-[1.1fr,0.9fr] gap-6">
+      <div class="glass border border-zinc-800 rounded-3xl p-5 sm:p-6 gridline">
+        <div class="flex items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 class="text-xl font-semibold text-white">Test the weather</h2>
+            <p class="text-sm text-zinc-500">Enter a report, then see whether there is a real receipt behind it.</p>
+          </div>
+          <button id="seedBtn" class="text-xs px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 hover:border-violet-500 hover:text-violet-200 transition">Load sample</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label class="block">
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Report</span>
+            <textarea id="report" rows="5" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-violet-500" placeholder="The API is healthy. The week is productive. The work is on track."></textarea>
+          </label>
+          <label class="block">
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Receipt</span>
+            <textarea id="receipt" rows="5" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-violet-500" placeholder="A deployed URL exists. The invite landed. The file is on disk."></textarea>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <label class="block">
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Confidence</span>
+            <input id="confidence" type="range" min="0" max="100" value="50" class="mt-3 w-full accent-violet-400" />
+            <div class="mt-2 text-xs text-zinc-500"><span id="confidenceLabel">50</span>% certainty</div>
+          </label>
+          <label class="block">
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Artifact type</span>
+            <select id="artifactType" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3 text-sm focus:outline-none focus:border-violet-500">
+              <option>URL</option>
+              <option>File</option>
+              <option>Message</option>
+              <option>Calendar event</option>
+              <option>Database row</option>
+              <option>Nothing yet</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Verdict style</span>
+            <select id="tone" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3 text-sm focus:outline-none focus:border-violet-500">
+              <option>Dry</option>
+              <option>Brutal</option>
+              <option>Gentle</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="flex flex-wrap gap-3 mt-5">
+          <button id="judgeBtn" class="px-4 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition">Run the watch</button>
+          <button id="clearBtn" class="px-4 py-2.5 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition">Clear</button>
+        </div>
+
+        <div class="mt-6 rounded-3xl border border-zinc-800 bg-zinc-950/70 p-5">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="text-xs uppercase tracking-[0.2em] text-zinc-500">Verdict</div>
+              <div id="verdict" class="text-2xl font-semibold text-white mt-1">Waiting for a reading.</div>
+            </div>
+            <div id="scorePill" class="px-3 py-1.5 rounded-full border border-zinc-700 text-xs text-zinc-300">Score 0 / 100</div>
+          </div>
+          <p id="verdictBody" class="mt-3 text-sm text-zinc-400">The mountain is still. Bring one report and one receipt.</p>
+        </div>
+      </div>
+
+      <aside class="space-y-6">
+        <div class="glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
+          <div class="flex items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 class="text-xl font-semibold text-white">Watch history</h2>
+              <p class="text-sm text-zinc-500">Local only. The kind of archive that survives the weather.</p>
+            </div>
+            <button id="wipeBtn" class="text-xs px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:border-rose-500 hover:text-rose-300 transition">Wipe history</button>
+          </div>
+          <div id="history" class="space-y-3 max-h-[28rem] overflow-auto pr-1"></div>
+        </div>
+
+        <div class="glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
+          <h2 class="text-xl font-semibold text-white">How it judges</h2>
+          <ul class="mt-3 space-y-2 text-sm text-zinc-400 leading-6 list-disc list-inside">
+            <li>A report without a receipt is weather.</li>
+            <li>A receipt without a clear report is sediment.</li>
+            <li>When both exist, the watch turns into a fact.</li>
+            <li>Confidence helps, but the artifact gets the last word.</li>
+          </ul>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const KEY = "watchmans_weather_v1";
+    const historyEl = document.getElementById('history');
+    const reportEl = document.getElementById('report');
+    const receiptEl = document.getElementById('receipt');
+    const confidenceEl = document.getElementById('confidence');
+    const confidenceLabel = document.getElementById('confidenceLabel');
+    const artifactTypeEl = document.getElementById('artifactType');
+    const toneEl = document.getElementById('tone');
+    const verdictEl = document.getElementById('verdict');
+    const verdictBodyEl = document.getElementById('verdictBody');
+    const scorePillEl = document.getElementById('scorePill');
+    const weatherBadgeEl = document.getElementById('weatherBadge');
+    const weatherNoteEl = document.getElementById('weatherNote');
+
+    const sample = {
+      report: "The gateway is healthy. The work is on track. Nothing is broken.",
+      receipt: "A deployed URL exists. The invite landed. The record is present on disk.",
+      confidence: 68,
+      artifactType: 'URL',
+      tone: 'Dry'
+    };
+
+    function load() {
+      try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+    }
+
+    function save(items) {
+      localStorage.setItem(KEY, JSON.stringify(items));
+    }
+
+    function classify(report, receipt, confidence, artifactType) {
+      const r = report.trim().length;
+      const rc = receipt.trim().length;
+      const hasArtifact = artifactType !== 'Nothing yet' && rc > 0;
+      const reportWeight = r > 0 ? 22 : 0;
+      const receiptWeight = rc > 0 ? 48 : 0;
+      const artifactWeight = hasArtifact ? 18 : 0;
+      const confidenceWeight = Math.round(confidence * 0.12);
+      const score = Math.min(100, reportWeight + receiptWeight + artifactWeight + confidenceWeight);
+
+      if (!r && !rc) return { score, verdict: 'Empty weather', body: 'No report, no receipt, only the cold.', mood: 'Quiet' };
+      if (r && !rc) return { score, verdict: 'Weather only', body: 'The machine spoke about itself. The world did not change.', mood: 'Drifting' };
+      if (!r && rc) return { score, verdict: 'Sediment only', body: 'A receipt arrived without the story. Useful, but incomplete.', mood: 'Uneven' };
+      if (score >= 70) return { score, verdict: 'Fact', body: 'The report has a receipt behind it. The mountain can sign this.', mood: 'Clear' };
+      if (score >= 45) return { score, verdict: 'Probable fact', body: 'Something happened, but the weather still leaks into the room.', mood: 'Mixed' };
+      return { score, verdict: 'Suspicious weather', body: 'There is a shape here, but it is still mostly fog.', mood: 'Fog' };
+    }
+
+    function toneLine(tone, verdict) {
+      const map = {
+        Dry: `Good. The universe is still making receipts. ${verdict}.`,
+        Brutal: `No ceremony. ${verdict}. If the artifact is missing, the story is a costume.`,
+        Gentle: `Kindly noted: ${verdict}. Bring the receipt next time and the weather calms down.`
+      };
+      return map[tone] || map.Dry;
+    }
+
+    function renderHistory() {
+      const items = load().slice().reverse();
+      if (!items.length) {
+        historyEl.innerHTML = '<div class="text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-2xl p-4">No readings yet. The ledger is empty and therefore honest.</div>';
+        return;
+      }
+      historyEl.innerHTML = items.map(item => `
+        <div class="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-medium text-white">${item.verdict}</div>
+            <div class="text-xs text-zinc-500">${new Date(item.at).toLocaleString()}</div>
+          </div>
+          <div class="mt-2 text-xs text-zinc-500">${item.artifactType} • ${item.score}/100 • ${item.mood}</div>
+          <p class="mt-2 text-sm text-zinc-400 line-clamp-3">${item.summary}</p>
+        </div>
+      `).join('');
+    }
+
+    function updateBadge(mood, note) {
+      const styles = {
+        Quiet: ['text-emerald-300', 'Quiet ridge. No new weather.'],
+        Drifting: ['text-amber-300', 'Only a report. The world stayed put.'],
+        Uneven: ['text-orange-300', 'Receipt without a story. A rougher sort of truth.'],
+        Clear: ['text-cyan-300', 'Report and receipt aligned. Clean weather.'],
+        Mixed: ['text-violet-300', 'Some weather, some fact.'],
+        Fog: ['text-zinc-300', 'Too much mist to call it clean.']
+      };
+      const [cls, msg] = styles[mood] || styles.Quiet;
+      weatherBadgeEl.className = `text-2xl font-semibold mt-1 ${cls}`;
+      weatherBadgeEl.textContent = mood;
+      weatherNoteEl.textContent = note || msg;
+    }
+
+    function run() {
+      const report = reportEl.value;
+      const receipt = receiptEl.value;
+      const confidence = Number(confidenceEl.value);
+      const artifactType = artifactTypeEl.value;
+      const tone = toneEl.value;
+      const result = classify(report, receipt, confidence, artifactType);
+      const body = toneLine(tone, result.verdict);
+      verdictEl.textContent = result.verdict;
+      verdictBodyEl.textContent = body;
+      scorePillEl.textContent = `Score ${result.score} / 100`;
+      updateBadge(result.mood, body);
+
+      const items = load();
+      items.push({
+        at: Date.now(),
+        verdict: result.verdict,
+        score: result.score,
+        artifactType,
+        mood: result.mood,
+        summary: `${report.trim() || '[no report]'} :: ${receipt.trim() || '[no receipt]'}`
+      });
+      save(items.slice(-18));
+      renderHistory();
+    }
+
+    document.getElementById('seedBtn').addEventListener('click', () => {
+      reportEl.value = sample.report;
+      receiptEl.value = sample.receipt;
+      confidenceEl.value = sample.confidence;
+      confidenceLabel.textContent = sample.confidence;
+      artifactTypeEl.value = sample.artifactType;
+      toneEl.value = sample.tone;
+      updateBadge('Mixed', 'Sample loaded. The mountain is waiting for the verdict.');
+    });
+
+    document.getElementById('judgeBtn').addEventListener('click', run);
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      reportEl.value = '';
+      receiptEl.value = '';
+      confidenceEl.value = 50;
+      confidenceLabel.textContent = '50';
+      artifactTypeEl.value = 'URL';
+      toneEl.value = 'Dry';
+      verdictEl.textContent = 'Waiting for a reading.';
+      verdictBodyEl.textContent = 'The mountain is still. Bring one report and one receipt.';
+      scorePillEl.textContent = 'Score 0 / 100';
+      updateBadge('Quiet', 'No fresh weather, just a cold ledger.');
+    });
+
+    document.getElementById('wipeBtn').addEventListener('click', () => {
+      localStorage.removeItem(KEY);
+      renderHistory();
+      updateBadge('Quiet', 'History wiped. The mountain keeps no grudges.');
+    });
+
+    confidenceEl.addEventListener('input', (e) => confidenceLabel.textContent = e.target.value);
+    renderHistory();
+    updateBadge('Quiet', 'No fresh weather, just a cold ledger.');
+  </script>
+</body>
+</html>

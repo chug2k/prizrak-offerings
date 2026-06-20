@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Exit Debrief</title>
+<style>
+  :root {
+    --bg: #111; --card: #1a1a1a; --border: #2a2a2a;
+    --dim: #555; --mid: #888; --text: #ccc; --bright: #eee;
+    --green: #4a9e6a; --amber: #c4944a; --red: #c44a4a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
+  
+  .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
+  
+  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); }
+  .subtitle { font-size: 0.8rem; color: var(--dim); margin-top: 8px; line-height: 1.6; }
+  
+  .phase { margin-bottom: 40px; }
+  .phase-header {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 20px; cursor: pointer;
+    user-select: none;
+  }
+  .phase-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .phase-header .arrow { transition: transform 0.2s; }
+  .phase-header.collapsed .arrow { transform: rotate(-90deg); }
+  
+  .question {
+    background: var(--card); border: 1px solid var(--border);
+    padding: 20px; margin-bottom: 12px;
+  }
+  .q-label { font-size: 0.65rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .q-text { font-size: 1rem; color: var(--bright); margin-bottom: 14px; line-height: 1.5; }
+  .q-hint { font-size: 0.75rem; color: var(--dim); font-style: italic; margin-bottom: 12px; }
+  
+  textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: inherit; font-size: 0.9rem;
+    padding: 12px; min-height: 70px; resize: vertical; outline: none;
+  }
+  textarea:focus { border-color: var(--dim); }
+  textarea::placeholder { color: #333; }
+  
+  .actions { display: flex; gap: 12px; margin-top: 32px; }
+  button {
+    background: none; border: 1px solid var(--border); color: var(--mid);
+    font-family: inherit; font-size: 0.75rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 10px 20px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  button:hover { border-color: var(--mid); color: var(--bright); }
+  button.save { border-color: var(--green); color: var(--green); }
+  button.save:hover { background: var(--green); color: var(--bg); }
+  button.export { border-color: var(--amber); color: var(--amber); }
+  button.export:hover { background: var(--amber); color: var(--bg); }
+  
+  .saved-notice {
+    font-size: 0.75rem; color: var(--green); opacity: 0;
+    transition: opacity 0.3s; margin-left: 12px; line-height: 38px;
+  }
+  .saved-notice.visible { opacity: 1; }
+  
+  .progress-bar {
+    display: flex; gap: 2px; margin-bottom: 32px; height: 3px;
+  }
+  .prog-seg { flex: 1; background: var(--border); transition: background 0.3s; }
+  .prog-seg.filled { background: var(--green); }
+  .prog-seg.partial { background: var(--amber); }
+  
+  footer {
+    border-top: 1px solid var(--border); padding-top: 16px; margin-top: 48px;
+    font-size: 0.65rem; color: #333; text-align: center; letter-spacing: 0.08em;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>The Exit Debrief</h1>
+    <div class="subtitle">The questions you should answer honestly before, during, and after walking out the door. Not for the organization. For you.</div>
+  </header>
+  
+  <div class="progress-bar" id="progress-bar"></div>
+  
+  <div id="phases"></div>
+  
+  <div class="actions">
+    <button class="save" onclick="saveAll()">Save Locally →</button>
+    <button class="export" onclick="exportText()">Export as Text</button>
+    <button onclick="clearAll()">Clear All</button>
+    <span class="saved-notice" id="saved-notice">Saved.</span>
+  </div>
+</div>
+
+<footer>Prizrak · The exit is not the failure. The failure was the entry you did not examine.</footer>
+
+<script>
+const STORAGE_KEY = 'exit_debrief_v1';
+
+const PHASES = [
+  {
+    id: 'before',
+    label: 'Before — Why You Entered',
+    color: 'var(--amber)',
+    questions: [
+      { id: 'b1', text: 'Why did you take this role?', hint: 'The real reason. Not the one you told people.' },
+      { id: 'b2', text: 'What were you running from when you accepted?', hint: 'A failed company, a gap on the resume, a need to prove something. Name it.' },
+      { id: 'b3', text: 'What did you think this job would make you feel?', hint: 'Respected? Safe? Redeemed? Legitimate? Be specific.' },
+      { id: 'b4', text: 'Did it deliver that feeling? For how long?', hint: 'If yes, when did it stop? If no, when did you first notice?' },
+    ]
+  },
+  {
+    id: 'during',
+    label: 'During — What Actually Happened',
+    color: 'var(--text)',
+    questions: [
+      { id: 'd1', text: 'What was the first sign it wasn\'t working?', hint: 'Not the crisis. The first quiet signal.' },
+      { id: 'd2', text: 'What did you do well here that you want to keep doing?', hint: 'Separate the role from the skill. The skill goes with you.' },
+      { id: 'd3', text: 'What mistake did you make that you\'d make again?', hint: 'The ones you\'d repeat are character. The ones you wouldn\'t are lessons.' },
+      { id: 'd4', text: 'What mistake did you make that you would not repeat?', hint: 'This is the actual takeaway. Be precise.' },
+      { id: 'd5', text: 'Who did you meet here that you want to stay connected to?', hint: 'Name them. The institution dissolves. The people don\'t.' },
+    ]
+  },
+  {
+    id: 'after',
+    label: 'After — What You Know Now',
+    color: 'var(--green)',
+    questions: [
+      { id: 'a1', text: 'What kind of work makes you forget to check the clock?', hint: 'Not what you\'re good at. What absorbs you.' },
+      { id: 'a2', text: 'What kind of work makes you check the clock every ten minutes?', hint: 'This is equally important data.' },
+      { id: 'a3', text: 'If nobody you respected could see what you chose next — what would you choose?', hint: 'Remove the audience. What remains is the actual preference.' },
+      { id: 'a4', text: 'What is the minimum structure you need to function well?', hint: 'Some people need a team. Some need solitude. Some need a deadline. Know your architecture.' },
+      { id: 'a5', text: 'Write one sentence: what this chapter taught you.', hint: 'One sentence. Not a paragraph. The constraint is the point.' },
+    ]
+  }
+];
+
+function render() {
+  const saved = loadData();
+  const container = document.getElementById('phases');
+  const progBar = document.getElementById('progress-bar');
+  
+  const allQs = PHASES.flatMap(p => p.questions);
+  progBar.innerHTML = allQs.map(q => {
+    const val = (saved[q.id] || '').trim();
+    const cls = val.length > 20 ? 'filled' : val.length > 0 ? 'partial' : '';
+    return `<div class="prog-seg ${cls}"></div>`;
+  }).join('');
+  
+  container.innerHTML = PHASES.map(phase => {
+    const collapsed = saved[`_collapsed_${phase.id}`] ? 'collapsed' : '';
+    return `
+      <div class="phase">
+        <div class="phase-header ${collapsed}" onclick="togglePhase('${phase.id}')">
+          <div class="dot" style="background:${phase.color}"></div>
+          <span class="arrow">▼</span>
+          <span>${phase.label}</span>
+        </div>
+        <div class="phase-body" style="display:${collapsed ? 'none' : 'block'}">
+          ${phase.questions.map((q, i) => `
+            <div class="question">
+              <div class="q-label">${phase.id}.${i+1}</div>
+              <div class="q-text">${q.text}</div>
+              <div class="q-hint">${q.hint}</div>
+              <textarea id="q-${q.id}" placeholder="..." oninput="autoSave()">${saved[q.id] || ''}</textarea>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function togglePhase(id) {
+  const data = loadData();
+  data[`_collapsed_${id}`] = !data[`_collapsed_${id}`];
+  saveData(data);
+  render();
+}
+
+let saveTimeout;
+function autoSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    const data = loadData();
+    PHASES.forEach(p => p.questions.forEach(q => {
+      const el = document.getElementById(`q-${q.id}`);
+      if (el) data[q.id] = el.value;
+    }));
+    saveData(data);
+    updateProgress(data);
+  }, 500);
+}
+
+function updateProgress(data) {
+  const allQs = PHASES.flatMap(p => p.questions);
+  const segs = document.querySelectorAll('.prog-seg');
+  allQs.forEach((q, i) => {
+    const val = (data[q.id] || '').trim();
+    segs[i].className = 'prog-seg ' + (val.length > 20 ? 'filled' : val.length > 0 ? 'partial' : '');
+  });
+}
+
+function saveAll() {
+  const data = loadData();
+  PHASES.forEach(p => p.questions.forEach(q => {
+    const el = document.getElementById(`q-${q.id}`);
+    if (el) data[q.id] = el.value;
+  }));
+  data._savedAt = new Date().toISOString();
+  saveData(data);
+  const notice = document.getElementById('saved-notice');
+  notice.classList.add('visible');
+  setTimeout(() => notice.classList.remove('visible'), 2000);
+}
+
+function exportText() {
+  const data = loadData();
+  let text = `EXIT DEBRIEF — ${new Date().toLocaleDateString()}\n${'='.repeat(50)}\n\n`;
+  PHASES.forEach(phase => {
+    text += `${phase.label.toUpperCase()}\n${'-'.repeat(40)}\n\n`;
+    phase.questions.forEach((q, i) => {
+      text += `${phase.id}.${i+1} ${q.text}\n`;
+      const ans = (data[q.id] || '').trim();
+      text += ans ? `→ ${ans}\n\n` : `→ [unanswered]\n\n`;
+    });
+    text += '\n';
+  });
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `exit-debrief-${new Date().toISOString().split('T')[0]}.txt`;
+  a.click();
+}
+
+function clearAll() {
+  if (!confirm('Clear all answers? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  render();
+}
+
+function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; } }
+function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+
+render();
+</script>
+</body>
+</html>

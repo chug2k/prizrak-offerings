@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Conviction Clock</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+  body { font-family: 'IBM Plex Sans', sans-serif; background: #0f0f0f; color: #e0e0e0; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .clock-ring { transition: stroke-dashoffset 0.8s ease; }
+  .zone-item { transition: all 0.3s ease; }
+  .zone-item:hover { transform: translateX(4px); }
+  input[type="text"] { background: #1a1a1a; border: 1px solid #333; color: #e0e0e0; }
+  input[type="text"]:focus { outline: none; border-color: #666; }
+  select { background: #1a1a1a; border: 1px solid #333; color: #e0e0e0; }
+  select:focus { outline: none; border-color: #666; }
+  .verdict-glow { box-shadow: 0 0 30px rgba(255,140,0,0.15); }
+</style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+<div class="max-w-2xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="mono text-xs text-gray-600 mb-1">PRIZRAK / CHARLES / 2026</div>
+    <h1 class="text-2xl font-semibold text-white">The Conviction Clock</h1>
+    <p class="text-gray-500 text-sm mt-1">How much of your week runs on conviction vs. approval?</p>
+  </div>
+
+  <!-- Clock visualization -->
+  <div class="flex justify-center mb-8">
+    <div class="relative">
+      <svg width="200" height="200" class="transform -rotate-90">
+        <!-- Background ring -->
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#222" stroke-width="16"/>
+        <!-- Approval ring (orange) -->
+        <circle id="approval-ring" cx="100" cy="100" r="80" fill="none" stroke="#d97706" stroke-width="16"
+          stroke-dasharray="502.65" stroke-dashoffset="502.65" class="clock-ring"/>
+        <!-- Conviction ring (white) -->
+        <circle id="conviction-ring" cx="100" cy="100" r="80" fill="none" stroke="#f5f5f5" stroke-width="16"
+          stroke-dasharray="502.65" stroke-dashoffset="502.65" class="clock-ring opacity-90"/>
+      </svg>
+      <div class="absolute inset-0 flex flex-col items-center justify-center">
+        <div id="pct-display" class="text-3xl font-semibold text-white mono">—%</div>
+        <div class="text-xs text-gray-500 mt-1">conviction</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input section -->
+  <div class="space-y-3 mb-8">
+    <div class="mono text-xs text-gray-600 uppercase tracking-wider mb-3">Log this week's work blocks</div>
+    
+    <div id="entries-container" class="space-y-2">
+      <!-- entries rendered here -->
+    </div>
+
+    <button onclick="addEntry()" class="w-full border border-dashed border-gray-700 text-gray-600 hover:text-gray-400 hover:border-gray-500 py-3 text-sm transition-colors mono">
+      + add block
+    </button>
+  </div>
+
+  <!-- Diagnostic questions -->
+  <div id="diagnostic" class="hidden mb-8 p-4 border border-gray-800 bg-gray-950">
+    <div class="mono text-xs text-gray-600 uppercase tracking-wider mb-4">Conviction Test — for uncertain entries</div>
+    <div class="space-y-3">
+      <div class="text-sm text-gray-400">
+        <span class="text-white">Q1.</span> Would you do this if the outcome was invisible — no one saw the result?
+      </div>
+      <div class="text-sm text-gray-400">
+        <span class="text-white">Q2.</span> If it failed, would you feel relieved that you tried, or relieved that you can stop?
+      </div>
+      <div class="text-sm text-gray-400">
+        <span class="text-white">Q3.</span> Who are you doing this for? Name them. Is that person external validation or genuine care?
+      </div>
+      <div class="text-xs text-gray-600 mt-3 mono">If Q1=no, Q2=relieved-to-stop, or Q3=external-validation: mark it orange.</div>
+    </div>
+  </div>
+
+  <!-- Verdict -->
+  <div id="verdict" class="hidden p-5 border border-gray-800 verdict-glow mb-6">
+    <div class="mono text-xs text-gray-600 uppercase tracking-wider mb-3">Verdict</div>
+    <div id="verdict-text" class="text-sm text-gray-300 leading-relaxed"></div>
+    <div id="verdict-prescription" class="text-xs text-gray-600 mt-3 mono border-t border-gray-800 pt-3"></div>
+  </div>
+
+  <!-- Toggle diagnostic -->
+  <button onclick="toggleDiagnostic()" class="text-xs text-gray-700 hover:text-gray-500 mono underline transition-colors">
+    show conviction test questions
+  </button>
+</div>
+
+<script>
+let entries = [];
+let idCounter = 0;
+
+const CIRCUMFERENCE = 502.65;
+
+function addEntry() {
+  const id = idCounter++;
+  entries.push({ id, label: '', hours: 8, type: 'conviction' });
+  renderEntries();
+}
+
+function removeEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  renderEntries();
+  update();
+}
+
+function updateEntry(id, field, value) {
+  const entry = entries.find(e => e.id === id);
+  if (entry) {
+    entry[field] = field === 'hours' ? Math.max(0.5, parseFloat(value) || 0.5) : value;
+    update();
+  }
+}
+
+function renderEntries() {
+  const container = document.getElementById('entries-container');
+  container.innerHTML = entries.map(e => `
+    <div class="zone-item flex gap-2 items-center group">
+      <input type="text" placeholder="what were you doing?" value="${e.label}"
+        oninput="updateEntry(${e.id}, 'label', this.value)"
+        class="flex-1 px-3 py-2 text-sm mono rounded-none">
+      <input type="number" value="${e.hours}" min="0.5" max="100" step="0.5"
+        onchange="updateEntry(${e.id}, 'hours', this.value)"
+        class="w-16 px-2 py-2 text-sm mono text-center rounded-none">
+      <span class="text-xs text-gray-600">hr</span>
+      <select onchange="updateEntry(${e.id}, 'type', this.value)"
+        class="px-2 py-2 text-sm mono rounded-none">
+        <option value="conviction" ${e.type === 'conviction' ? 'selected' : ''}>✦ conviction</option>
+        <option value="approval" ${e.type === 'approval' ? 'selected' : ''}>◎ approval</option>
+        <option value="neutral" ${e.type === 'neutral' ? 'selected' : ''}>· neutral</option>
+      </select>
+      <button onclick="removeEntry(${e.id})" class="text-gray-700 hover:text-red-700 mono text-sm transition-colors opacity-0 group-hover:opacity-100">×</button>
+    </div>
+  `).join('');
+  update();
+}
+
+function update() {
+  const total = entries.reduce((s, e) => s + e.hours, 0);
+  const convictionHours = entries.filter(e => e.type === 'conviction').reduce((s, e) => s + e.hours, 0);
+  const approvalHours = entries.filter(e => e.type === 'approval').reduce((s, e) => s + e.hours, 0);
+
+  if (total === 0) {
+    document.getElementById('pct-display').textContent = '—%';
+    document.getElementById('conviction-ring').style.strokeDashoffset = CIRCUMFERENCE;
+    document.getElementById('approval-ring').style.strokeDashoffset = CIRCUMFERENCE;
+    document.getElementById('verdict').classList.add('hidden');
+    return;
+  }
+
+  const convPct = Math.round((convictionHours / total) * 100);
+  const appPct = Math.round((approvalHours / total) * 100);
+
+  document.getElementById('pct-display').textContent = `${convPct}%`;
+
+  // Conviction ring covers from 0 to convPct
+  const convOffset = CIRCUMFERENCE * (1 - convictionHours / total);
+  document.getElementById('conviction-ring').style.strokeDashoffset = convOffset;
+
+  // Approval ring sits beneath conviction
+  const appOffset = CIRCUMFERENCE * (1 - (convictionHours + approvalHours) / total);
+  document.getElementById('approval-ring').style.strokeDashoffset = appOffset;
+
+  // Color the pct display
+  const pctEl = document.getElementById('pct-display');
+  if (convPct >= 70) pctEl.style.color = '#f5f5f5';
+  else if (convPct >= 50) pctEl.style.color = '#d4d4aa';
+  else if (convPct >= 30) pctEl.style.color = '#d97706';
+  else pctEl.style.color = '#ef4444';
+
+  renderVerdict(convPct, appPct, convictionHours, approvalHours, total);
+  document.getElementById('verdict').classList.remove('hidden');
+}
+
+function renderVerdict(convPct, appPct, convH, appH, total) {
+  let text, prescription;
+
+  if (convPct >= 80) {
+    text = `${convPct}% conviction. The mountain is solid. You are doing what you would do if no one was watching, because the work is worth doing. This is the rare state. Do not optimize it away.`;
+    prescription = `prescription: protect the blocks that got you here. Notice what they have in common.`;
+  } else if (convPct >= 60) {
+    text = `${convPct}% conviction. A workable ratio — but the ${appH.toFixed(1)} approval hours are real. Something is pulling you toward the external scoreboard. Name it. Not to eliminate it, but to know it.`;
+    prescription = `prescription: identify the single largest approval block. Ask: what would you do with that time if the result was invisible?`;
+  } else if (convPct >= 40) {
+    text = `${convPct}% conviction. The approval-seeking has the majority on some days. You are spending ${appH.toFixed(1)} hours this week trying to win a game defined by someone else. The work may still be good. But you know the difference between building and performing.`;
+    prescription = `prescription: one conviction block next week that produces nothing external-facing. Just the work.`;
+  } else if (convPct > 0) {
+    text = `${convPct}% conviction. This is the approval-seeking week you described — doing shitty work because the motivation is wrong. The ${convH.toFixed(1)} conviction hours are the signal worth following. The rest is noise dressed as productivity.`;
+    prescription = `prescription: the ${convH.toFixed(1)} hours — what were they? That is the direction.`;
+  } else {
+    text = `No conviction blocks logged. Either this was a maintenance week, or you have not yet found the work that would survive the question: "would you do this if no one saw the result?"`;
+    prescription = `prescription: the question is not rhetorical. Answer it.`;
+  }
+
+  document.getElementById('verdict-text').textContent = text;
+  document.getElementById('verdict-prescription').textContent = prescription;
+}
+
+function toggleDiagnostic() {
+  const d = document.getElementById('diagnostic');
+  const btn = event.target;
+  if (d.classList.contains('hidden')) {
+    d.classList.remove('hidden');
+    btn.textContent = 'hide conviction test questions';
+  } else {
+    d.classList.add('hidden');
+    btn.textContent = 'show conviction test questions';
+  }
+}
+
+// Start with 3 example entries
+addEntry();
+entries[0].label = 'investor portfolio reviews';
+entries[0].hours = 12;
+entries[0].type = 'approval';
+
+addEntry();
+entries[1].label = 'founder calls — real listening';
+entries[1].hours = 6;
+entries[1].type = 'conviction';
+
+addEntry();
+entries[2].label = '';
+entries[2].hours = 8;
+entries[2].type = 'neutral';
+
+renderEntries();
+</script>
+
+<div class="max-w-2xl mx-auto mt-8 pb-8">
+  <div class="mono text-xs text-gray-800">
+    built by prizrak @ 04:22 saigon · for charles · conviction/approval split tracker
+  </div>
+</div>
+
+</body>
+</html>
