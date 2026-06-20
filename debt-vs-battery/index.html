@@ -7,8 +7,23 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
-        body { background: #060810; font-family: 'Space Mono', monospace; }
 
+        :root{
+            --bg:#060810;
+            --bg-raised:#0b0e16;
+            --bg-sunk:#070a12;
+            --line:#123026;
+            --line-soft:#0d2019;
+            --ink:#d4cfc8;
+            --ink-dim:#3f7a64;
+            --ink-ghost:#1c3a30;
+            --accent:#00cec9;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        body { background: var(--bg); font-family: 'Space Mono', monospace; }
+
+        /* ---- ambient layers ---- */
         .scanline {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -23,9 +38,43 @@
             z-index: 1;
         }
 
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        @keyframes breathe-glow{
+            0%,100%{box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow)}
+            50%{box-shadow:0 0 0 1px var(--line), 0 0 30px -4px var(--glow)}
+        }
+        .breathe-panel{animation:breathe-glow 4.5s ease-in-out infinite}
+
+        @keyframes pulse-soft{0%,100%{opacity:.85}50%{opacity:1}}
+        .pulse-soft{animation:pulse-soft 4.5s ease-in-out infinite}
+
+        /* ---- glows ---- */
         .crt-glow {
             text-shadow: 0 0 10px rgba(0, 255, 180, 0.6), 0 0 20px rgba(0, 255, 180, 0.3);
         }
+        @keyframes title-breathe{
+            0%,100%{text-shadow:0 0 10px rgba(0,255,180,.45), 0 0 20px rgba(0,255,180,.2)}
+            50%{text-shadow:0 0 16px rgba(0,255,180,.75), 0 0 30px rgba(0,255,180,.4)}
+        }
+        .title-breathe{animation:title-breathe 5s ease-in-out infinite}
 
         .dim-glow {
             text-shadow: 0 0 6px rgba(0, 255, 180, 0.3);
@@ -55,7 +104,10 @@
             background: rgba(0, 255, 180, 0.15);
             outline: none;
             border-radius: 2px;
+            transition: background .2s;
         }
+        input[type="range"]:hover { background: rgba(0, 255, 180, 0.25); }
+        input[type="range"]:focus-visible { box-shadow: 0 0 0 1px var(--glow); }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
@@ -65,6 +117,13 @@
             background: #00cec9;
             cursor: pointer;
             box-shadow: 0 0 8px rgba(0, 255, 180, 0.6);
+            transition: transform .12s, box-shadow .2s;
+        }
+        input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.18); box-shadow: 0 0 14px rgba(0, 255, 180, 0.9); }
+        input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.3); }
+        input[type="range"]::-moz-range-thumb {
+            width: 14px; height: 14px; border: none; border-radius: 50%;
+            background: #00cec9; cursor: pointer; box-shadow: 0 0 8px rgba(0, 255, 180, 0.6);
         }
 
         .blink { animation: blink 1.2s step-end infinite; }
@@ -79,7 +138,9 @@
         .data-row {
             border-bottom: 1px solid rgba(0, 255, 180, 0.08);
             padding: 8px 0;
+            transition: background .25s, padding-left .15s;
         }
+        .data-row:hover { background: rgba(0, 255, 180, 0.03); padding-left: 6px; }
 
         .verdict-box {
             border: 1px solid rgba(0, 255, 180, 0.2);
@@ -87,18 +148,41 @@
         }
         .verdict-box.warn { border-color: rgba(255, 150, 0, 0.3); background: rgba(255, 150, 0, 0.02); }
         .verdict-box.crit { border-color: rgba(255, 60, 60, 0.4); background: rgba(255, 60, 60, 0.02); }
+
+        /* ---- analysis button ---- */
+        #analyze-btn { transition: transform .15s, box-shadow .2s, border-color .2s, color .2s, background .2s; }
+        #analyze-btn:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--glow), 0 6px 22px -12px var(--glow); }
+        #analyze-btn:active { transform: translateY(1px); }
+        #analyze-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+
+        /* ---- copy button ---- */
+        #copy-btn { transition: color .2s, border-color .2s, transform .12s; }
+        #copy-btn:hover { color: #5eead4; border-color: rgba(0,255,180,.4); transform: translateY(-1px); }
+        #copy-btn:active { transform: translateY(1px); }
+        #copy-btn:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--glow); }
+        #copy-btn.copied { color: #5eead4; border-color: rgba(0,255,180,.6); text-shadow: 0 0 8px var(--glow); }
+
+        h1.title-breathe { cursor: default; }
+
+        @media (prefers-reduced-motion: reduce){
+            .fog,.ember,.title-breathe,.breathe-panel,.pulse-soft,.flicker,.reveal,.fade-in,.blink{animation:none!important}
+            .ember{display:none}
+            .title-breathe,.flicker,.pulse-soft{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-emerald-400 min-h-screen">
+<body class="text-emerald-400 min-h-screen grain">
+    <div class="fog"></div>
     <div class="scanline"></div>
+    <div id="ember-field"></div>
 
     <div class="relative z-10 max-w-xl mx-auto px-4 py-10">
 
         <!-- Header -->
         <div class="mb-8">
-            <div class="text-xs text-emerald-700 mb-1 tracking-widest">PRIZRAK BIOMETRIC SYSTEM v1.0</div>
-            <h1 class="text-2xl font-bold crt-glow text-emerald-300">DEBT vs. BATTERY</h1>
-            <p class="text-xs text-emerald-700 mt-1">Sleep deficit reconciliation · Operating directive generator</p>
+            <div class="text-xs text-emerald-700 mb-1 tracking-widest flicker">PRÍZRAK BIOMETRIC SYSTEM v1.0</div>
+            <h1 id="app-title" class="text-2xl font-bold title-breathe text-emerald-300" title="the watcher tallies the cold">DEBT vs. BATTERY</h1>
+            <p class="text-xs text-emerald-700 mt-1">Sleep deficit reconciliation · operating directive generator</p>
             <div id="clock" class="text-xs text-emerald-800 mt-2"></div>
         </div>
 
@@ -157,7 +241,7 @@
 
         <!-- Analysis button -->
         <button onclick="analyze()" id="analyze-btn"
-            class="w-full py-3 border border-emerald-700 text-emerald-400 hover:border-emerald-500 hover:text-emerald-300 transition-all text-sm tracking-widest uppercase mb-8">
+            class="w-full py-3 border border-emerald-700 text-emerald-400 hover:text-emerald-300 text-sm tracking-widest uppercase mb-8">
             ▶ RUN ANALYSIS
         </button>
 
@@ -178,7 +262,13 @@
 
             <!-- Verdict -->
             <div id="verdict-panel" class="verdict-box p-5">
-                <div class="text-xs text-emerald-700 tracking-widest mb-3">PRIZRAK DIRECTIVE</div>
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs text-emerald-700 tracking-widest">PRÍZRAK DIRECTIVE</div>
+                    <button id="copy-btn" onclick="copyVerdict()"
+                        class="text-[10px] tracking-widest uppercase text-emerald-700 border border-emerald-900 px-2 py-1">
+                        copy
+                    </button>
+                </div>
                 <div id="verdict-text" class="text-sm leading-relaxed"></div>
                 <div id="operating-mode" class="mt-3 text-xs"></div>
             </div>
@@ -195,12 +285,15 @@
                 The body does not track what you planned.<br>
                 It tracks what actually happened.
             </p>
+            <p id="night-whisper" class="text-xs mt-3" style="display:none;color:var(--ink-ghost)">the mountain does not sleep.</p>
+            <p id="ghost-line" class="text-xs mt-3 flicker" style="display:none;color:var(--ink-ghost)">you found the watcher.</p>
         </div>
     </div>
 
     <script>
     const OPTIMAL_SLEEP = 7.5;
     const OPTIMAL_SCORE = 85;
+    let lastVerdict = '';
 
     function updateClock() {
         const now = new Date();
@@ -280,20 +373,20 @@
 
         const verdicts = {
             high: [
-                `Battery ${batteryStrength} indicates the body recovered despite the debt. This is not luck — it is the nervous system reporting accurately. Sleep score ${v.score} and ${v.sleep}h duration do not tell the full story. The biometric record says: ${netCapacity}% capacity. Operate at that level. Do not apply the penalty of believing you should be exhausted.`,
-                `${v.sleep}h sleep with ${batteryStrength} battery: the body optimized for the time available. Stress ${v.stress} — near floor. The plan that called for 8h did not execute. The body did not care. Trust the battery. Deploy the capacity. Hesitation is wasted charge.`
+                `Battery ${batteryStrength} says the body recovered despite the debt. This is not luck — it is the nervous system reporting accurately. Sleep score ${v.score} and ${v.sleep}h duration do not tell the full story. The biometric ledger reads: ${netCapacity}% capacity. Operate at that level. Do not pay the penalty of believing you should be exhausted.`,
+                `${v.sleep}h sleep, ${batteryStrength} battery: the body optimized for the time it was given. Stress ${v.stress} — near the floor. The plan that called for 8h did not execute. The body did not mourn it. Trust the battery. Spend the charge. Hesitation is wasted current.`
             ],
             diverged: [
-                `Battery ${batteryStrength} vs. expected ${computed.expectedBattery} given sleep inputs: +${divergence} divergence. Something recovered better than the sleep architecture suggests — likely low stress (${v.stress}) allowing deeper repair in compressed time. Net operating capacity: ${netCapacity}%. Use it.`,
-                `The divergence of +${divergence} between battery and expected battery suggests the body's own recovery mechanism outperformed the model. Stress floor of ${v.stress} is the likely driver. The machine is reporting: more available than the sleep numbers predict.`
+                `Battery ${batteryStrength} against an expected ${computed.expectedBattery}: +${divergence} divergence. Something repaired deeper than the sleep architecture predicts — likely the low stress (${v.stress}) letting the body work undisturbed in compressed hours. Net operating capacity: ${netCapacity}%. Use it before the window closes.`,
+                `The +${divergence} gap between battery and forecast means the body's own recovery outran the model. Stress floor of ${v.stress} is the likely driver. The machine reports more reserve than the sleep numbers promised. The bridge holds. For now.`
             ],
             low: [
-                `${v.sleep}h, score ${v.score}, battery ${batteryStrength}. The debt is real and the battery confirms it. Net capacity ${netCapacity}%. Single-mission protocol. Deep work is not available today — schedule maintenance tasks only. The Poludnica will find you undefended if you overextend now.`,
-                `Debt confirmed by battery. ${debtScore}/100 deficit. ${batteryStrength} battery is not sufficient margin for creative or high-stakes work. Identify the one task. Execute it. Recover.`
+                `${v.sleep}h, score ${v.score}, battery ${batteryStrength}. The debt is real and the battery confirms it. Net capacity ${netCapacity}%. Single-mission protocol. Deep work is not on the menu today — log maintenance tasks only. The Poludnica finds the undefended at noon; do not overextend into her hour.`,
+                `Debt confirmed by battery. ${debtScore}/100 deficit. ${batteryStrength} is not margin enough for creative or high-stakes work. Name the one task. Execute it. Then recover, before the cave gets colder.`
             ],
             critical: [
-                `Critical state. Battery ${batteryStrength}, debt ${debtScore}/100, stress ${v.stress}. The body is not operational for anything requiring judgment. Do not make important decisions today. The battery is below the floor where error rates increase significantly. Recovery protocol.`,
-                `${batteryStrength} battery is below the operational threshold. This is not a day for work. It is a day for the work of recovery. Any decision made today should be reviewed tomorrow. The mountain does not reward the soldier who marches on the day of depleted reserves.`
+                `Critical state. Battery ${batteryStrength}, debt ${debtScore}/100, stress ${v.stress}. The body is not rated for anything requiring judgment. Make no important decisions today. The battery sits below the floor where error rates climb. Recovery protocol — no exceptions.`,
+                `${batteryStrength} battery is under the operational threshold. This is not a day for work; it is a day for the work of recovery. Any decision made today should be reviewed in the morning light. The mountain does not reward the soldier who marches on depleted reserves.`
             ]
         };
 
@@ -307,11 +400,28 @@
         return options[Math.floor(Math.random() * options.length)];
     }
 
+    function copyVerdict() {
+        if (!lastVerdict) return;
+        const btn = document.getElementById('copy-btn');
+        navigator.clipboard.writeText(lastVerdict).then(() => {
+            btn.textContent = 'copied to the ledger';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = 'copy';
+                btn.classList.remove('copied');
+            }, 1200);
+        }).catch(() => {
+            btn.textContent = 'clipboard sealed';
+            setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+        });
+    }
+
     function analyze() {
         const v = getVals();
         const computed = computeDebt(v);
         const tier = getTier(computed.netCapacity);
         const verdict = getVerdict(v, computed);
+        lastVerdict = verdict;
 
         // Metrics grid
         const colorMap = { emerald: 'text-emerald-400', yellow: 'text-yellow-400', red: 'text-red-400' };
@@ -381,7 +491,7 @@
         const tierGlow = tier.color === 'emerald' ? 'crt-glow' : tier.color === 'yellow' ? 'warn-glow' : 'crit-glow';
         const textColor = tier.color === 'emerald' ? 'text-emerald-300' : tier.color === 'yellow' ? 'text-yellow-400' : 'text-red-400';
 
-        document.getElementById('verdict-panel').className = `verdict-box p-5 fade-in ${tier.css}`;
+        document.getElementById('verdict-panel').className = `verdict-box p-5 fade-in breathe-panel ${tier.css}`;
         document.getElementById('verdict-text').innerHTML = `<span class="text-emerald-400">${verdict}</span>`;
         document.getElementById('operating-mode').innerHTML = `
             <span class="text-emerald-700">OPERATING MODE: </span>
@@ -393,6 +503,59 @@
         document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    // ---- ambient embers (capped, reduced-motion-safe) ----
+    function spawnEmbers(count) {
+        const field = document.getElementById('ember-field');
+        if (!field) return;
+        const existing = field.querySelectorAll('.ember').length;
+        const room = Math.max(0, 9 - existing);
+        const n = Math.min(count, room);
+        for (let i = 0; i < n; i++) {
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (Math.random() * 100) + 'vw';
+            e.style.animationDelay = (Math.random() * 14) + 's';
+            e.style.animationDuration = (11 + Math.random() * 8) + 's';
+            field.appendChild(e);
+        }
+    }
+
+    // ---- easter eggs (non-blocking, never touch state) ----
+    let titleClicks = 0, clickTimer = null;
+    function wireEggs() {
+        // triple-click the title -> one extra ember
+        const title = document.getElementById('app-title');
+        title.addEventListener('click', () => {
+            titleClicks++;
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => { titleClicks = 0; }, 600);
+            if (titleClicks >= 3) {
+                titleClicks = 0;
+                spawnEmbers(1);
+            }
+        });
+
+        // type "prizrak" -> light the watcher line
+        let buf = '';
+        window.addEventListener('keydown', (ev) => {
+            if (ev.key && ev.key.length === 1) {
+                buf = (buf + ev.key.toLowerCase()).slice(-7);
+                if (buf === 'prizrak') {
+                    const g = document.getElementById('ghost-line');
+                    g.style.display = 'block';
+                    spawnEmbers(1);
+                }
+            }
+        });
+
+        // 00:00–03:00 ICT -> faint footer whisper
+        const now = new Date();
+        const ictHour = parseInt(now.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' }), 10);
+        if (ictHour >= 0 && ictHour < 3) {
+            document.getElementById('night-whisper').style.display = 'block';
+        }
+    }
+
     // Pre-load today's Charles values
     window.onload = () => {
         document.getElementById('sleep').value = 4.4;
@@ -402,6 +565,8 @@
         update();
         updateClock();
         setInterval(updateClock, 1000);
+        spawnEmbers(7);
+        wireEggs();
         // Auto-analyze with today's data
         analyze();
     };

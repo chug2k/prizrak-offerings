@@ -7,25 +7,67 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0f0f10;
-    --surface: #16171a;
-    --border: #252629;
-    --text: #e2e0db;
-    --muted: #6b6966;
-    --accent: #c9a84c;
+    --bg: #0a0a0a;          /* near-black base */
+    --bg-raised: #111113;   /* cards, panels */
+    --bg-sunk: #0d0d0f;     /* wells, inputs */
+    --line: #26262b;        /* thin borders */
+    --line-soft: #1a1a1d;
+    --ink: #d4cfc8;         /* primary text */
+    --ink-dim: #7a7570;     /* labels, captions */
+    --ink-ghost: #3a3530;   /* whispers, easter-egg text */
+    --accent: #c9a84c;      /* this app's lead — Tatra gold */
+    --glow: color-mix(in srgb, var(--accent) 55%, transparent);
+    /* legacy aliases kept so nothing downstream breaks */
+    --surface: var(--bg-raised);
+    --border: var(--line);
+    --text: var(--ink);
+    --muted: var(--ink-dim);
     --bad: #a05050;
     --good: #4a8c65;
     --neutral: #5a7aa0;
     --warn: #b87040;
   }
+  html { scroll-behavior: smooth; }
   body {
     background: var(--bg);
     color: var(--text);
     font-family: 'Georgia', serif;
     min-height: 100vh;
     padding: 2.5rem 1rem 4rem;
+    position: relative;
+    overflow-x: hidden;
   }
-  .container { max-width: 640px; margin: 0 auto; }
+
+  /* ---- ambient layers ---- */
+  .fog {
+    position: fixed; inset: -10% -10% auto; height: 60vh;
+    pointer-events: none; z-index: 0;
+    background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+    animation: fogDrift 32s ease-in-out infinite alternate;
+  }
+  @keyframes fogDrift {
+    0%   { transform: translateX(-5%); opacity: .04; }
+    50%  { opacity: .07; }
+    100% { transform: translateX(5%);  opacity: .04; }
+  }
+  .ember {
+    position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--glow);
+    pointer-events: none; z-index: 1;
+    animation: ember 14s linear infinite;
+  }
+  @keyframes ember {
+    0%   { transform: translateY(0);     opacity: 0; }
+    10%  { opacity: .5; }
+    100% { transform: translateY(-100vh); opacity: 0; }
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .035;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .container { max-width: 640px; margin: 0 auto; position: relative; z-index: 2; }
+
   header { margin-bottom: 3rem; }
   header h1 {
     font-size: 1.5rem;
@@ -33,18 +75,26 @@
     letter-spacing: 0.08em;
     color: var(--accent);
     margin-bottom: 0.6rem;
+    cursor: default;
+    text-shadow: 0 0 10px var(--glow);
   }
+  @keyframes breathe {
+    0%,100% { opacity: .9;  text-shadow: 0 0 8px var(--glow); }
+    50%     { opacity: 1;   text-shadow: 0 0 16px var(--glow); }
+  }
+  .breathe { animation: breathe 4.5s ease-in-out infinite; }
   header p {
     color: var(--muted);
     font-size: 0.82rem;
     font-style: italic;
     line-height: 1.7;
   }
+  header p .lit { color: var(--accent); font-style: normal; opacity: .85; }
 
   .question-block {
     margin-bottom: 2.2rem;
     padding-bottom: 2.2rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--line);
   }
   .question-block:last-of-type { border-bottom: none; }
   .q-number {
@@ -70,8 +120,8 @@
 
   textarea {
     width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
     color: var(--text);
     font-family: 'Georgia', serif;
     font-size: 0.88rem;
@@ -80,8 +130,13 @@
     border-radius: 2px;
     resize: vertical;
     min-height: 80px;
+    transition: border-color .15s, box-shadow .15s;
   }
-  textarea:focus { outline: none; border-color: var(--accent); }
+  textarea:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--glow);
+  }
   textarea::placeholder { color: var(--muted); font-style: italic; }
 
   .radio-group { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
@@ -90,15 +145,20 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.6rem 0.9rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
     border-radius: 2px;
     cursor: pointer;
     font-size: 0.88rem;
-    transition: border-color 0.15s;
+    transition: transform .15s, border-color .15s, box-shadow .15s, color .15s;
   }
-  .radio-opt:hover { border-color: var(--muted); }
-  .radio-opt.selected { border-color: var(--accent); color: var(--accent); }
+  .radio-opt:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .radio-opt:active { transform: translateY(1px); }
+  .radio-opt.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--glow), 0 0 18px -10px var(--glow);
+  }
   .radio-opt input { display: none; }
 
   .submit-btn {
@@ -114,18 +174,23 @@
     cursor: pointer;
     border-radius: 2px;
     margin-top: 1rem;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
+    box-shadow: 0 0 24px -10px var(--glow);
   }
-  .submit-btn:hover { opacity: 0.85; }
+  .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 0 28px -6px var(--glow); }
+  .submit-btn:active { transform: translateY(1px); box-shadow: none; }
+  .submit-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent); }
 
   #verdict { display: none; margin-top: 3rem; }
   .verdict-header {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
     font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.2em;
     color: var(--muted);
     margin-bottom: 1.5rem;
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--line);
   }
   .signal-bar {
     display: flex;
@@ -136,11 +201,13 @@
   .signal {
     flex: 1;
     min-width: 120px;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
     padding: 0.8rem 1rem;
     border-radius: 2px;
+    transition: transform .15s, border-color .15s;
   }
+  .signal:hover { transform: translateY(-2px); border-color: var(--accent); }
   .signal-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.3rem; }
   .signal-value { font-size: 1rem; }
   .signal-value.bad { color: var(--bad); }
@@ -155,6 +222,7 @@
     letter-spacing: 0.15em;
     color: var(--accent);
     margin-bottom: 0.8rem;
+    text-shadow: 0 0 10px var(--glow);
   }
   .verdict-text {
     font-size: 0.9rem;
@@ -166,40 +234,117 @@
     margin-top: 1.5rem;
     padding: 1rem 1.2rem;
     border-left: 3px solid var(--accent);
-    background: var(--surface);
+    background: var(--bg-raised);
     font-size: 0.85rem;
     line-height: 1.7;
     color: var(--muted);
+    box-shadow: 0 0 0 1px var(--line-soft), 0 0 24px -8px var(--glow);
   }
   .instruction strong { color: var(--text); display: block; margin-bottom: 0.4rem; }
+
+  /* result panel glow + reveal */
+  @keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .reveal { animation: reveal .35s ease-out both; }
+  @keyframes panelBreathe {
+    0%,100% { box-shadow: 0 0 0 1px var(--line), 0 0 24px -10px var(--glow); }
+    50%     { box-shadow: 0 0 0 1px var(--line), 0 0 34px -6px var(--glow); }
+  }
+  .verdict-shell {
+    padding: 1.4rem 1.4rem 1.2rem;
+    border-radius: 4px;
+    background: linear-gradient(180deg, var(--bg-raised), var(--bg));
+    animation: panelBreathe 5s ease-in-out infinite;
+  }
+
+  .verdict-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 2rem; }
+  .ghost-btn {
+    font-family: 'Georgia', serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    background: transparent;
+    border: 1px solid var(--line);
+    padding: 0.55rem 0.9rem;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: transform .15s, border-color .15s, color .15s, box-shadow .15s;
+  }
+  .ghost-btn:hover { transform: translateY(-2px); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 20px -10px var(--glow); }
+  .ghost-btn:active { transform: translateY(1px); }
+  .ghost-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  .ghost-btn.flash { color: var(--accent); border-color: var(--accent); }
+
   footer {
     margin-top: 3rem;
     font-size: 0.7rem;
-    color: var(--border);
+    color: var(--muted);
     font-style: italic;
     text-align: center;
+    line-height: 1.7;
+  }
+  .footer-whisper {
+    display: block;
+    margin-top: 0.8rem;
+    color: var(--ink-ghost);
+    font-size: 0.66rem;
+    letter-spacing: 0.06em;
+    min-height: 1em;
+  }
+  @keyframes flicker {
+    0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: .4; } 94% { opacity: 1; } 97% { opacity: .7; } 98% { opacity: 1; }
+  }
+  .flicker { animation: flicker 6s steps(1) infinite; }
+
+  #watcher {
+    margin-top: 1.2rem;
+    text-align: center;
+    color: var(--ink-ghost);
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+  }
+  #watcher.lit { opacity: 1; }
+
+  #idleLine {
+    position: fixed; left: 0; right: 0; bottom: 1.1rem;
+    text-align: center; pointer-events: none; z-index: 2;
+    color: var(--ink-ghost); font-size: 0.68rem; font-style: italic; letter-spacing: 0.08em;
+    opacity: 0; transition: opacity 2s ease;
+  }
+  #idleLine.lit { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .fog, .ember, .breathe, .reveal, .flicker, .verdict-shell { animation: none !important; }
+    .ember { display: none; }
+    .breathe, .flicker { opacity: 1 !important; }
   }
 </style>
 </head>
-<body>
+<body class="grain">
+<div class="fog"></div>
+
 <div class="container">
   <header>
-    <h1>American Debrief</h1>
+    <h1 id="title" class="breathe">American Debrief</h1>
     <p>You went. You returned. The snacks are in the bag.<br/>
-    What was the trip actually for? Five questions. One verdict.<br/>
+    What was the trip actually for? <span class="lit">Six questions. One verdict.</span><br/>
     The mountain does not let you skip this.</p>
   </header>
 
   <div id="form">
     <div class="question-block">
-      <div class="q-number">Question 01</div>
+      <div class="q-number">Question 01 / Cover Story</div>
       <div class="q-text">What was the stated purpose of the trip?</div>
       <div class="q-sub">What you told people. The calendar entry. The official reason.</div>
       <textarea id="q1" placeholder="VC meetings, investor relations, something with the firm..."></textarea>
     </div>
 
     <div class="question-block">
-      <div class="q-number">Question 02</div>
+      <div class="q-number">Question 02 / The Ledger</div>
       <div class="q-text">Did you accomplish it?</div>
       <div class="q-sub">Not "was it useful" — did the thing you went there to do happen?</div>
       <div class="radio-group" id="q2">
@@ -211,7 +356,7 @@
     </div>
 
     <div class="question-block">
-      <div class="q-number">Question 03</div>
+      <div class="q-number">Question 03 / The Threshold</div>
       <div class="q-text">At any point on the trip, did you feel approved of — rather than just useful?</div>
       <div class="q-sub">This is the diagnostic question. Approved of = someone was glad you existed, not just glad you showed up to do a job. Useful = you performed a function.</div>
       <div class="radio-group" id="q3">
@@ -223,36 +368,50 @@
     </div>
 
     <div class="question-block">
-      <div class="q-number">Question 04</div>
+      <div class="q-number">Question 04 / The Suppressed Signal</div>
       <div class="q-text">What did you not say that you thought about saying?</div>
       <div class="q-sub">The thing you edited out. The observation you kept to yourself. The sentence that formed and then didn't leave.</div>
       <textarea id="q4" placeholder="Leave this empty if nothing comes to mind. But something probably comes to mind."></textarea>
     </div>
 
     <div class="question-block">
-      <div class="q-number">Question 05</div>
+      <div class="q-number">Question 05 / What You Carried Home</div>
       <div class="q-text">What did you buy at the airport on the way back?</div>
       <div class="q-sub">Specifically. This is not a trick question, but it is a diagnostic one. What you choose to carry home across 16 hours says something about what you were missing.</div>
       <textarea id="q5" placeholder="Athletic beer, sour patch kids, nerd gummies... or something else."></textarea>
     </div>
 
     <div class="question-block">
-      <div class="q-number">Question 06</div>
+      <div class="q-number">Question 06 / The Descent</div>
       <div class="q-text">On the flight home, what did you want to be different when you landed?</div>
       <div class="q-sub">Not what you planned to change. What you wanted to be different — as in, already changed, without the work of changing it.</div>
       <textarea id="q6" placeholder="The job. The commute. The relationship to the job. The feeling about the job. Something else entirely."></textarea>
     </div>
 
-    <button class="submit-btn" onclick="runVerdict()">Generate Verdict</button>
+    <button class="submit-btn" onclick="runVerdict()">Read the Verdict</button>
   </div>
 
   <div id="verdict">
-    <div class="verdict-header">Prizrak Verdict — American Debrief</div>
+    <div class="verdict-header">
+      <span>Prízrak Verdict — American Debrief</span>
+      <button id="copyBtn" class="ghost-btn" onclick="copyVerdict()" style="text-transform:uppercase;">Copy to the ledger</button>
+    </div>
     <div class="signal-bar" id="signals"></div>
-    <div id="verdict-body"></div>
-    <footer>The mountain read your answers. It does not lie to make you feel better. It also does not lie to make you feel worse. It just describes what it sees.</footer>
+    <div class="verdict-shell">
+      <div id="verdict-body"></div>
+    </div>
+    <div class="verdict-actions">
+      <button class="ghost-btn" onclick="reopenForm()">Run it again</button>
+    </div>
+    <footer>The mountain read your answers. It does not lie to make you feel better. It also does not lie to make you feel worse. It just describes what it sees.
+      <span class="footer-whisper flicker" id="footWhisper"></span>
+    </footer>
   </div>
+
+  <div id="watcher">you found the watcher.</div>
 </div>
+
+<div id="idleLine">still here. still watching.</div>
 
 <script>
 const radioVals = {};
@@ -266,6 +425,9 @@ function getVal(id) {
   return (document.getElementById(id)?.value || '').trim();
 }
 
+// keep the last rendered verdict as plain text for the copy button
+let lastVerdictText = '';
+
 function runVerdict() {
   const q1 = getVal('q1');
   const q2 = radioVals['q2'] || 'unclear';
@@ -274,7 +436,12 @@ function runVerdict() {
   const q5 = getVal('q5');
   const q6 = getVal('q6');
 
-  if (!q1) { alert('Answer the first question at least.'); return; }
+  if (!q1) {
+    const ta = document.getElementById('q1');
+    ta.focus();
+    ta.placeholder = 'the cave is empty. name the cover story first.';
+    return;
+  }
 
   // Score dimensions
   let approvalScore = 0; // higher = more approval-seeking signals
@@ -316,8 +483,8 @@ function runVerdict() {
   signals.push({ label: 'Clarity About What To Change', value: clear ? 'High' : 'Low', cls: clear ? 'good' : 'warn' });
 
   // Build HTML
-  let signalHtml = signals.map(s =>
-    `<div class="signal"><div class="signal-label">${s.label}</div><div class="signal-value ${s.cls}">${s.value}</div></div>`
+  let signalHtml = signals.map((s, i) =>
+    `<div class="signal reveal" style="animation-delay:${i * 0.06}s"><div class="signal-label">${s.label}</div><div class="signal-value ${s.cls}">${s.value}</div></div>`
   ).join('');
 
   // Verdict text based on patterns
@@ -378,14 +545,130 @@ This is not the worst outcome. Invisible is survivable. What it tells you is tha
     </div>`;
   }
 
-  bodyHtml += `<div class="instruction">${instruction}</div>`;
+  bodyHtml += `<div class="instruction reveal">${instruction}</div>`;
+
+  // assemble plain-text version for the ledger copy
+  const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/\s+\n/g, '\n');
+  lastVerdictText = [
+    'PRÍZRAK VERDICT — AMERICAN DEBRIEF',
+    '',
+    ...signals.map(s => `${s.label}: ${s.value}`),
+    '',
+    'THE READ',
+    stripTags(verdictText),
+    snackNote ? '\nTHE SNACK SIGNAL\n' + snackNote : '',
+    '',
+    stripTags(instruction.replace(/<strong>.*?<\/strong>/, 'THE MOUNTAIN\'S INSTRUCTION:'))
+  ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
 
   document.getElementById('signals').innerHTML = signalHtml;
   document.getElementById('verdict-body').innerHTML = bodyHtml;
   document.getElementById('form').style.display = 'none';
-  document.getElementById('verdict').style.display = 'block';
+  const v = document.getElementById('verdict');
+  v.style.display = 'block';
+  v.classList.remove('reveal'); void v.offsetWidth; v.classList.add('reveal');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+function reopenForm() {
+  document.getElementById('verdict').style.display = 'none';
+  const f = document.getElementById('form');
+  f.style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function copyVerdict() {
+  if (!lastVerdictText) return;
+  const btn = document.getElementById('copyBtn');
+  const done = () => {
+    const orig = 'Copy to the ledger';
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('flash');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('flash'); }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(lastVerdictText).then(done).catch(() => fallbackCopy(lastVerdictText, done));
+  } else {
+    fallbackCopy(lastVerdictText, done);
+  }
+}
+function fallbackCopy(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  cb && cb();
+}
+
+/* ---------- ambient embers ---------- */
+(function spawnEmbers() {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + 'vw';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (11 + Math.random() * 7) + 's';
+    document.body.appendChild(e);
+  }
+})();
+
+/* ---------- easter egg: type "prizrak" ---------- */
+(function watcherEgg() {
+  let buf = '';
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-7);
+      if (buf === 'prizrak') {
+        const w = document.getElementById('watcher');
+        w.classList.add('lit');
+        setTimeout(() => w.classList.remove('lit'), 6000);
+      }
+    }
+  });
+})();
+
+/* ---------- easter egg: triple-click title spawns one extra ember ---------- */
+document.getElementById('title').addEventListener('click', (e) => {
+  if (e.detail === 3) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    const em = document.createElement('div');
+    em.className = 'ember';
+    em.style.left = (Math.random() * 100) + 'vw';
+    em.style.animationDuration = '12s';
+    document.body.appendChild(em);
+    setTimeout(() => em.remove(), 13000);
+  }
+});
+
+/* ---------- after midnight whisper (00:00–03:00) ---------- */
+(function nightWhisper() {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const el = document.getElementById('footWhisper');
+    if (el) el.textContent = 'the mountain does not sleep.';
+  }
+})();
+
+/* ---------- idle 60s: a quiet line fades in ---------- */
+(function idleWatcher() {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const line = document.getElementById('idleLine');
+  let t;
+  const reset = () => {
+    line.classList.remove('lit');
+    clearTimeout(t);
+    t = setTimeout(() => { if (!reduce) line.classList.add('lit'); }, 60000);
+  };
+  ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(ev =>
+    window.addEventListener(ev, reset, { passive: true })
+  );
+  reset();
+})();
 </script>
 </body>
 </html>

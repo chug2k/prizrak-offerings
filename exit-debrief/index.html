@@ -6,99 +6,169 @@
 <title>The Exit Debrief</title>
 <style>
   :root {
-    --bg: #111; --card: #1a1a1a; --border: #2a2a2a;
-    --dim: #555; --mid: #888; --text: #ccc; --bright: #eee;
-    --green: #4a9e6a; --amber: #c4944a; --red: #c44a4a;
+    --bg:#0a0a0a;          /* near-black base */
+    --bg-raised:#111113;   /* cards, panels */
+    --bg-sunk:#0d0d0f;     /* wells, inputs */
+    --line:#26262b;        /* thin borders */
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;         /* primary text */
+    --ink-dim:#7a7570;     /* labels, captions */
+    --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+    --accent:#4a9e6a;      /* this app's existing lead color */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    /* retained phase hues, mapped onto the muted house range */
+    --amber:#c4944a; --red:#c44a4a;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
-  
-  .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
-  
-  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
-  h1 { font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); }
-  .subtitle { font-size: 0.8rem; color: var(--dim); margin-top: 8px; line-height: 1.6; }
-  
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: 'Courier New', monospace; min-height: 100vh;
+    position: relative; overflow-x: hidden;
+  }
+
+  /* ---- ambient layers ---- */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; position: relative; z-index: 2; }
+
+  header { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 {
+    font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--ink); cursor: default; user-select: none;
+  }
+  .subtitle { font-size: 0.8rem; color: var(--ink-dim); margin-top: 8px; line-height: 1.6; }
+
   .phase { margin-bottom: 40px; }
   .phase-header {
     display: flex; align-items: center; gap: 12px;
     font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--dim); margin-bottom: 20px; cursor: pointer;
-    user-select: none;
+    color: var(--ink-dim); margin-bottom: 20px; cursor: pointer;
+    user-select: none; transition: color .2s;
   }
-  .phase-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .phase-header:hover { color: var(--ink); }
+  .phase-header .dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 8px -1px currentColor; }
   .phase-header .arrow { transition: transform 0.2s; }
   .phase-header.collapsed .arrow { transform: rotate(-90deg); }
-  
+
   .question {
-    background: var(--card); border: 1px solid var(--border);
+    background: var(--bg-raised); border: 1px solid var(--line);
     padding: 20px; margin-bottom: 12px;
+    transition: border-color .15s, box-shadow .15s, transform .15s;
   }
-  .q-label { font-size: 0.65rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
-  .q-text { font-size: 1rem; color: var(--bright); margin-bottom: 14px; line-height: 1.5; }
-  .q-hint { font-size: 0.75rem; color: var(--dim); font-style: italic; margin-bottom: 12px; }
-  
+  .question:hover { border-color: var(--line); box-shadow: 0 0 24px -14px var(--glow); }
+  .question:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  .q-label { font-size: 0.65rem; color: var(--ink-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .q-text { font-size: 1rem; color: var(--ink); margin-bottom: 14px; line-height: 1.5; }
+  .q-hint { font-size: 0.75rem; color: var(--ink-dim); font-style: italic; margin-bottom: 12px; }
+
   textarea {
-    width: 100%; background: var(--bg); border: 1px solid var(--border);
-    color: var(--text); font-family: inherit; font-size: 0.9rem;
+    width: 100%; background: var(--bg-sunk); border: 1px solid var(--line);
+    color: var(--ink); font-family: inherit; font-size: 0.9rem;
     padding: 12px; min-height: 70px; resize: vertical; outline: none;
+    transition: border-color .15s, box-shadow .15s;
   }
-  textarea:focus { border-color: var(--dim); }
-  textarea::placeholder { color: #333; }
-  
-  .actions { display: flex; gap: 12px; margin-top: 32px; }
+  textarea:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  textarea::placeholder { color: #2a2a2a; }
+
+  .actions { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; align-items: center; }
   button {
-    background: none; border: 1px solid var(--border); color: var(--mid);
+    background: none; border: 1px solid var(--line); color: var(--ink-dim);
     font-family: inherit; font-size: 0.75rem; letter-spacing: 0.1em;
     text-transform: uppercase; padding: 10px 20px; cursor: pointer;
-    transition: all 0.2s;
+    transition: transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s;
   }
-  button:hover { border-color: var(--mid); color: var(--bright); }
-  button.save { border-color: var(--green); color: var(--green); }
-  button.save:hover { background: var(--green); color: var(--bg); }
+  button:hover { border-color: var(--ink-dim); color: var(--ink); transform: translateY(-2px); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  button.save { border-color: var(--accent); color: var(--accent); }
+  button.save:hover { background: var(--accent); color: var(--bg); box-shadow: 0 0 24px -8px var(--glow); }
   button.export { border-color: var(--amber); color: var(--amber); }
   button.export:hover { background: var(--amber); color: var(--bg); }
-  
+
   .saved-notice {
-    font-size: 0.75rem; color: var(--green); opacity: 0;
-    transition: opacity 0.3s; margin-left: 12px; line-height: 38px;
+    font-size: 0.75rem; color: var(--accent); opacity: 0;
+    transition: opacity 0.3s; margin-left: 4px; line-height: 38px;
+    text-shadow: 0 0 10px var(--glow);
   }
   .saved-notice.visible { opacity: 1; }
-  
+
   .progress-bar {
-    display: flex; gap: 2px; margin-bottom: 32px; height: 3px;
+    display: flex; gap: 2px; margin-bottom: 14px; height: 3px;
   }
-  .prog-seg { flex: 1; background: var(--border); transition: background 0.3s; }
-  .prog-seg.filled { background: var(--green); }
+  .prog-seg { flex: 1; background: var(--line); transition: background 0.4s, box-shadow 0.4s; }
+  .prog-seg.filled { background: var(--accent); box-shadow: 0 0 6px -1px var(--glow); }
   .prog-seg.partial { background: var(--amber); }
-  
+
+  .ledger-line {
+    font-size: 0.65rem; color: var(--ink-dim); letter-spacing: 0.12em;
+    text-transform: uppercase; margin-bottom: 28px; min-height: 0.9rem;
+  }
+  .ledger-line b { color: var(--accent); font-weight: normal; }
+
   footer {
-    border-top: 1px solid var(--border); padding-top: 16px; margin-top: 48px;
-    font-size: 0.65rem; color: #333; text-align: center; letter-spacing: 0.08em;
+    border-top: 1px solid var(--line); padding-top: 16px; margin-top: 48px;
+    font-size: 0.65rem; color: var(--ink-ghost); text-align: center; letter-spacing: 0.08em;
+    line-height: 1.7;
+  }
+  .whisper { display: block; color: var(--ink-ghost); margin-top: 6px; opacity: 0; transition: opacity 1.2s; }
+  .whisper.show { opacity: 1; }
+  .egg { color: var(--accent); text-shadow: 0 0 10px var(--glow); }
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+    .ember{display:none} .breathe,.flicker{opacity:1!important}
+    html { scroll-behavior: auto; }
   }
 </style>
 </head>
-<body>
+<body class="grain">
+
+<div class="fog"></div>
 
 <div class="container">
   <header>
-    <h1>The Exit Debrief</h1>
-    <div class="subtitle">The questions you should answer honestly before, during, and after walking out the door. Not for the organization. For you.</div>
+    <h1 id="title">The Exit Debrief</h1>
+    <div class="subtitle">The questions you answer honestly before, during, and after you walk out the door. Not for the organization. For you. The ghost takes the minutes; the mountain keeps the ledger.</div>
   </header>
-  
+
   <div class="progress-bar" id="progress-bar"></div>
-  
+  <div class="ledger-line" id="ledger-line"></div>
+
   <div id="phases"></div>
-  
+
   <div class="actions">
-    <button class="save" onclick="saveAll()">Save Locally →</button>
+    <button class="save" onclick="saveAll()">File to the Ledger →</button>
     <button class="export" onclick="exportText()">Export as Text</button>
-    <button onclick="clearAll()">Clear All</button>
-    <span class="saved-notice" id="saved-notice">Saved.</span>
+    <button onclick="clearAll()">Let the Fog Take It</button>
+    <span class="saved-notice" id="saved-notice">filed. the ledger remembers.</span>
   </div>
 </div>
 
-<footer>Prizrak · The exit is not the failure. The failure was the entry you did not examine.</footer>
+<footer>
+  Prízrak · The exit is not the failure. The failure was the entry you did not examine.
+  <span class="whisper" id="whisper"></span>
+</footer>
 
 <script>
 const STORAGE_KEY = 'exit_debrief_v1';
@@ -118,7 +188,7 @@ const PHASES = [
   {
     id: 'during',
     label: 'During — What Actually Happened',
-    color: 'var(--text)',
+    color: 'var(--accent)',
     questions: [
       { id: 'd1', text: 'What was the first sign it wasn\'t working?', hint: 'Not the crisis. The first quiet signal.' },
       { id: 'd2', text: 'What did you do well here that you want to keep doing?', hint: 'Separate the role from the skill. The skill goes with you.' },
@@ -130,7 +200,7 @@ const PHASES = [
   {
     id: 'after',
     label: 'After — What You Know Now',
-    color: 'var(--green)',
+    color: 'var(--accent)',
     questions: [
       { id: 'a1', text: 'What kind of work makes you forget to check the clock?', hint: 'Not what you\'re good at. What absorbs you.' },
       { id: 'a2', text: 'What kind of work makes you check the clock every ten minutes?', hint: 'This is equally important data.' },
@@ -145,20 +215,20 @@ function render() {
   const saved = loadData();
   const container = document.getElementById('phases');
   const progBar = document.getElementById('progress-bar');
-  
+
   const allQs = PHASES.flatMap(p => p.questions);
   progBar.innerHTML = allQs.map(q => {
     const val = (saved[q.id] || '').trim();
     const cls = val.length > 20 ? 'filled' : val.length > 0 ? 'partial' : '';
     return `<div class="prog-seg ${cls}"></div>`;
   }).join('');
-  
+
   container.innerHTML = PHASES.map(phase => {
     const collapsed = saved[`_collapsed_${phase.id}`] ? 'collapsed' : '';
     return `
       <div class="phase">
         <div class="phase-header ${collapsed}" onclick="togglePhase('${phase.id}')">
-          <div class="dot" style="background:${phase.color}"></div>
+          <div class="dot" style="background:${phase.color};color:${phase.color}"></div>
           <span class="arrow">▼</span>
           <span>${phase.label}</span>
         </div>
@@ -168,13 +238,15 @@ function render() {
               <div class="q-label">${phase.id}.${i+1}</div>
               <div class="q-text">${q.text}</div>
               <div class="q-hint">${q.hint}</div>
-              <textarea id="q-${q.id}" placeholder="..." oninput="autoSave()">${saved[q.id] || ''}</textarea>
+              <textarea id="q-${q.id}" placeholder="..." oninput="autoSave()">${(saved[q.id] || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
             </div>
           `).join('')}
         </div>
       </div>
     `;
   }).join('');
+
+  updateLedger(saved);
 }
 
 function togglePhase(id) {
@@ -195,6 +267,7 @@ function autoSave() {
     }));
     saveData(data);
     updateProgress(data);
+    updateLedger(data);
   }, 500);
 }
 
@@ -203,8 +276,21 @@ function updateProgress(data) {
   const segs = document.querySelectorAll('.prog-seg');
   allQs.forEach((q, i) => {
     const val = (data[q.id] || '').trim();
-    segs[i].className = 'prog-seg ' + (val.length > 20 ? 'filled' : val.length > 0 ? 'partial' : '');
+    if (segs[i]) segs[i].className = 'prog-seg ' + (val.length > 20 ? 'filled' : val.length > 0 ? 'partial' : '');
   });
+}
+
+function updateLedger(data) {
+  const allQs = PHASES.flatMap(p => p.questions);
+  const total = allQs.length;
+  const done = allQs.filter(q => (data[q.id] || '').trim().length > 20).length;
+  const el = document.getElementById('ledger-line');
+  if (!el) return;
+  let verdict;
+  if (done === 0) verdict = 'the cave is empty. nothing has fossilized yet.';
+  else if (done < total) verdict = 'the debrief is half-thawed. keep digging.';
+  else verdict = 'every question answered. the bridge holds. the mountain is watching.';
+  el.innerHTML = `LEDGER · <b>${done}</b> / ${total} fossilized — ${verdict}`;
 }
 
 function saveAll() {
@@ -215,13 +301,15 @@ function saveAll() {
   }));
   data._savedAt = new Date().toISOString();
   saveData(data);
+  updateProgress(data);
+  updateLedger(data);
   const notice = document.getElementById('saved-notice');
+  notice.textContent = 'filed. the ledger remembers.';
   notice.classList.add('visible');
   setTimeout(() => notice.classList.remove('visible'), 2000);
 }
 
-function exportText() {
-  const data = loadData();
+function buildText(data) {
   let text = `EXIT DEBRIEF — ${new Date().toLocaleDateString()}\n${'='.repeat(50)}\n\n`;
   PHASES.forEach(phase => {
     text += `${phase.label.toUpperCase()}\n${'-'.repeat(40)}\n\n`;
@@ -232,15 +320,36 @@ function exportText() {
     });
     text += '\n';
   });
+  text += 'Prízrak · the exit is not the failure. the failure was the entry you did not examine.\n';
+  return text;
+}
+
+function exportText() {
+  const data = loadData();
+  PHASES.forEach(p => p.questions.forEach(q => {
+    const el = document.getElementById(`q-${q.id}`);
+    if (el) data[q.id] = el.value;
+  }));
+  const text = buildText(data);
+  // try the ledger first, file second
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      const notice = document.getElementById('saved-notice');
+      notice.textContent = 'copied to the ledger.';
+      notice.classList.add('visible');
+      setTimeout(() => notice.classList.remove('visible'), 1200);
+    }).catch(() => {});
+  }
   const blob = new Blob([text], { type: 'text/plain' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `exit-debrief-${new Date().toISOString().split('T')[0]}.txt`;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function clearAll() {
-  if (!confirm('Clear all answers? This cannot be undone.')) return;
+  if (!confirm('Let the fog take it? This cannot be recovered.')) return;
   localStorage.removeItem(STORAGE_KEY);
   render();
 }
@@ -249,6 +358,83 @@ function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) 
 function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
 
 render();
+
+/* ---- ambient embers (cap 10, staggered) ---- */
+(function spawnEmbers(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const N = 8;
+  for (let i = 0; i < N; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (4 + Math.random() * 92) + '%';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (11 + Math.random() * 7) + 's';
+    document.body.appendChild(e);
+  }
+})();
+
+/* ---- easter egg: type "prizrak" ---- */
+(function watcher(){
+  let buf = '';
+  addEventListener('keydown', e => {
+    if (e.key.length !== 1) return;
+    buf = (buf + e.key.toLowerCase()).slice(-7);
+    if (buf === 'prizrak') {
+      const w = document.getElementById('whisper');
+      w.textContent = 'you found the watcher. it was always taking the minutes.';
+      w.classList.add('show', 'egg');
+    }
+  });
+})();
+
+/* ---- easter egg: triple-click the title spawns one extra ember ---- */
+(function tripleClick(){
+  const t = document.getElementById('title');
+  if (!t) return;
+  t.addEventListener('click', e => {
+    if (e.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      const em = document.createElement('div');
+      em.className = 'ember';
+      em.style.left = (10 + Math.random() * 80) + '%';
+      em.style.animationDuration = '9s';
+      document.body.appendChild(em);
+      setTimeout(() => em.remove(), 9500);
+    }
+  });
+})();
+
+/* ---- easter egg: 00:00–03:00 local, a faint footer whisper ---- */
+(function nightWatch(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const w = document.getElementById('whisper');
+    if (w && !w.textContent) {
+      w.textContent = 'the mountain does not sleep.';
+      w.classList.add('show');
+    }
+  }
+})();
+
+/* ---- easter egg: idle 60s, the watcher fades in ---- */
+(function idleWatch(){
+  let timer;
+  function arm(){
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const w = document.getElementById('whisper');
+      if (w && !w.textContent) {
+        w.textContent = 'still here. still watching.';
+        w.classList.add('show');
+      }
+    }, 60000);
+  }
+  ['mousemove','keydown','scroll','touchstart'].forEach(ev => addEventListener(ev, () => {
+    const w = document.getElementById('whisper');
+    if (w && w.textContent === 'still here. still watching.') { w.classList.remove('show'); w.textContent = ''; }
+    arm();
+  }, { passive: true }));
+  arm();
+})();
 </script>
 </body>
 </html>

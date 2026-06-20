@@ -5,60 +5,152 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Fog Walker</title>
     <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#8ca0dc;          /* the lantern-blue this app already walked by */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0c12; overflow: hidden; font-family: 'Courier New', monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
-        canvas { display: block; position: fixed; top: 0; left: 0; }
-        
+        body {
+            background: var(--bg); overflow: hidden;
+            font-family: 'Courier New', monospace; touch-action: none;
+            user-select: none; -webkit-user-select: none;
+        }
+        canvas { display: block; position: fixed; top: 0; left: 0; z-index: 0; }
+
+        /* drifting fog wash behind everything */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{
+            position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate;
+        }
+        /* floating embers / drifting motes */
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.45}100%{transform:translateY(-92vh);opacity:0}}
+        .ember{
+            position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);
+            pointer-events:none;z-index:1;animation:ember 16s linear infinite;
+        }
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 7s steps(1) infinite}
+
+        /* faint film grain over the whole thing */
+        body::after{
+            content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.04;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
         #hud {
             position: fixed; top: 0; left: 0; width: 100%; z-index: 10;
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 16px; pointer-events: none;
+            padding: 14px 18px; pointer-events: none;
         }
-        #hud-level { color: rgba(180,200,220,0.6); font-size: 14px; }
-        #hud-moves { color: rgba(180,200,220,0.4); font-size: 12px; }
-        
+        #hud-level {
+            color: var(--ink-dim); font-size: 12px;
+            letter-spacing: 3px; text-transform: uppercase;
+        }
+        #hud-moves { color: var(--ink-ghost); font-size: 11px; letter-spacing: 1px; }
+
         .overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(8,10,16,0.94); color: rgba(180,200,220,0.8);
-            backdrop-filter: blur(10px);
+            background: rgba(10,10,10,0.93); color: var(--ink);
+            backdrop-filter: blur(11px); padding: 24px; text-align: center;
         }
         .overlay.hidden { display: none; }
-        .ov-title { font-size: 26px; letter-spacing: 3px; margin-bottom: 6px; }
-        .ov-emoji { font-size: 56px; margin-bottom: 12px; }
-        .ov-sub { font-size: 12px; color: rgba(180,200,220,0.4); margin-bottom: 24px; max-width: 300px; text-align: center; line-height: 1.6; }
-        .ov-score { font-size: 42px; color: rgba(140,160,220,0.8); margin-bottom: 4px; }
-        .ov-label { font-size: 11px; color: rgba(180,200,220,0.3); margin-bottom: 24px; }
-        .btn {
-            padding: 14px 40px; border: 1px solid rgba(120,140,200,0.3); border-radius: 8px;
-            background: rgba(60,70,120,0.2); color: rgba(180,200,220,0.8); font-family: inherit;
-            font-size: 14px; cursor: pointer; pointer-events: auto; letter-spacing: 1px;
+        .ov-glyph {
+            font-size: 46px; margin-bottom: 14px; color: var(--accent);
+            line-height: 1; letter-spacing: 4px;
         }
-        .btn:active { background: rgba(80,90,150,0.4); }
-        
+        .ov-title {
+            font-size: 24px; letter-spacing: 6px; margin-bottom: 8px;
+            color: var(--ink); text-shadow: 0 0 14px var(--glow);
+        }
+        .ov-sub {
+            font-size: 12px; color: var(--ink-dim); margin-bottom: 26px;
+            max-width: 320px; line-height: 1.7;
+        }
+        .ov-score {
+            font-size: 48px; color: var(--accent); margin-bottom: 2px;
+            text-shadow: 0 0 18px var(--glow);
+        }
+        .ov-label {
+            font-size: 10px; color: var(--ink-dim); margin-bottom: 6px;
+            letter-spacing: 3px; text-transform: uppercase;
+        }
+        .ov-best {
+            font-size: 10px; color: var(--ink-ghost); margin-bottom: 22px;
+            letter-spacing: 2px; text-transform: uppercase;
+        }
+        .ov-quote {
+            font-size: 12px; color: var(--ink-dim); margin-bottom: 26px;
+            max-width: 320px; line-height: 1.7; font-style: italic;
+            min-height: 1.4em;
+        }
+        .btn {
+            padding: 14px 38px; border: 1px solid var(--line);
+            border-radius: 8px; background: var(--bg-raised); color: var(--ink);
+            font-family: inherit; font-size: 13px; cursor: pointer;
+            pointer-events: auto; letter-spacing: 2px; text-transform: uppercase;
+            transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
+        }
+        .btn:hover { transform: translateY(-2px); border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--line), 0 0 24px -8px var(--glow); }
+        .btn:focus-visible { outline: none; border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--glow); }
+        .btn:active { transform: translateY(1px); background: var(--bg-sunk); }
+
+        .ov-foot {
+            position: absolute; bottom: 16px; left: 0; width: 100%;
+            text-align: center; font-size: 9px; letter-spacing: 3px;
+            text-transform: uppercase; color: var(--ink-ghost);
+        }
+        #night-whisper { display:none; color: var(--ink-ghost); }
+
         #d-pad {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 15; display: grid; grid-template-columns: 60px 60px 60px;
-            grid-template-rows: 60px 60px 60px; gap: 4px; opacity: 0.5;
+            z-index: 15; display: grid; grid-template-columns: 58px 58px 58px;
+            grid-template-rows: 58px 58px 58px; gap: 5px; opacity: 0.55;
         }
         .d-btn {
-            width: 60px; height: 60px; border: 1px solid rgba(120,140,200,0.2);
-            border-radius: 10px; background: rgba(40,50,80,0.3); color: rgba(180,200,220,0.5);
-            font-size: 22px; display: flex; align-items: center; justify-content: center;
+            width: 58px; height: 58px; border: 1px solid var(--line);
+            border-radius: 10px; background: var(--bg-raised); color: var(--ink-dim);
+            font-size: 21px; display: flex; align-items: center; justify-content: center;
             cursor: pointer; -webkit-tap-highlight-color: transparent;
+            transition: background .12s, border-color .12s, color .12s;
         }
-        .d-btn:active { background: rgba(80,90,140,0.5); }
+        .d-btn:active { background: var(--bg-sunk); border-color: var(--accent);
+            color: var(--accent); }
         .d-empty { border: none; background: none; }
+
+        @media (prefers-reduced-motion: reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body>
+<body class="grain">
+    <div class="fog" aria-hidden="true"></div>
     <canvas id="c"></canvas>
-    
+
     <div id="hud">
         <div id="hud-level">LEVEL 1</div>
         <div id="hud-moves"></div>
     </div>
-    
+
     <div id="d-pad" style="display:none;">
         <div class="d-btn d-empty"></div>
         <div class="d-btn" ontouchstart="move(0,-1)" onmousedown="move(0,-1)">↑</div>
@@ -70,34 +162,43 @@
         <div class="d-btn" ontouchstart="move(0,1)" onmousedown="move(0,1)">↓</div>
         <div class="d-btn d-empty"></div>
     </div>
-    
+
     <div class="overlay" id="start-screen">
-        <div class="ov-emoji">🌫️</div>
-        <div class="ov-title">FOG WALKER</div>
-        <div class="ov-sub">The path reveals itself briefly, then the fog rolls in. Navigate by memory from start to exit. Step off the path and the mountain claims you. Swipe or use the d-pad to move.</div>
+        <div class="ov-glyph breathe">≈</div>
+        <div class="ov-title" id="start-title">FOG WALKER</div>
+        <div class="ov-sub">The path shows itself for a breath, then the fog claims it. Walk from start to exit on memory alone. Step where the path is not, and the mountain keeps you. Swipe, arrow keys, or the d-pad.</div>
         <button class="btn" onclick="startGame()">ENTER THE FOG</button>
+        <div class="ov-best" id="start-best"></div>
+        <div class="ov-foot flicker">the mountain remembers every wrong step</div>
     </div>
-    
+
     <div class="overlay hidden" id="death-screen">
-        <div class="ov-emoji">💀</div>
-        <div class="ov-title">LOST IN FOG</div>
+        <div class="ov-glyph">✕</div>
+        <div class="ov-title">LOST TO FOG</div>
         <div class="ov-score" id="final-level">1</div>
-        <div class="ov-label">levels survived</div>
-        <div class="ov-sub" id="death-quote"></div>
-        <button class="btn" onclick="startGame()">TRY AGAIN</button>
+        <div class="ov-label">levels crossed</div>
+        <div class="ov-best" id="death-best"></div>
+        <div class="ov-quote" id="death-quote"></div>
+        <button class="btn" onclick="startGame()">WALK AGAIN</button>
+        <div class="ov-foot" id="night-whisper">the mountain does not sleep</div>
     </div>
-    
+
     <div class="overlay hidden" id="level-screen">
+        <div class="ov-glyph breathe">↟</div>
         <div class="ov-title" id="level-title">LEVEL 2</div>
-        <div class="ov-sub">The path grows longer. The fog grows thicker.</div>
-        <button class="btn" onclick="nextLevel()">CONTINUE</button>
+        <div class="ov-sub" id="level-sub">The path grows longer. The fog grows hungrier.</div>
+        <button class="btn" onclick="nextLevel()">PRESS ON</button>
     </div>
 
     <script>
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
     let W, H;
-    
+
+    const BEST_KEY = 'fogWalkerBest';
+    function getBest(){ const v = parseInt(localStorage.getItem(BEST_KEY) || '0', 10); return isNaN(v) ? 0 : v; }
+    function setBest(v){ try { localStorage.setItem(BEST_KEY, String(v)); } catch(e){} }
+
     const DEATH_QUOTES = [
         "The fog does not forgive. It only forgets.",
         "You stepped where the mountain said not to step.",
@@ -105,17 +206,29 @@
         "The path was always there. You were not.",
         "Even the wind remembers the way. You did not.",
         "The mountain swallowed you. It was not personal.",
+        "The bludička carried a lamp. You carried a guess.",
+        "Karst takes the careless. It is patient and it is wide.",
+        "Snow fills a footprint in an hour. It filled yours.",
     ];
-    
+
+    const LEVEL_SUBS = [
+        "The path grows longer. The fog grows hungrier.",
+        "Deeper now. The Tatras keep their cold counsel.",
+        "The decoys multiply. Trust nothing that glows.",
+        "Further from the valley than anyone should go.",
+        "The ghost is watching how far you carry the lamp.",
+    ];
+
     // Game state
     let game = null;
     let running = false;
     let phase = 'idle'; // 'reveal', 'memorize', 'play', 'dead', 'won'
-    
+
     const GRID = 9;
     let cellSize;
     let gridOffX, gridOffY;
-    
+    let extraEmbers = 0; // easter egg: triple-click title spawns an extra mote
+
     function resize() {
         W = canvas.width = window.innerWidth;
         H = canvas.height = window.innerHeight;
@@ -123,22 +236,22 @@
         gridOffX = (W - GRID * cellSize) / 2;
         gridOffY = (H - GRID * cellSize) / 2 - 10;
     }
-    
+
     function generatePath(level) {
         const gridMap = Array.from({ length: GRID }, () => Array(GRID).fill(0));
         // 0 = void, 1 = path, 2 = start, 3 = exit
-        
+
         // Start at bottom-center
         let sx = Math.floor(GRID / 2);
         let sy = GRID - 1;
-        
+
         // Random walk upward with bias
         const path = [{ x: sx, y: sy }];
         gridMap[sy][sx] = 2;
-        
+
         let cx = sx, cy = sy;
         const pathLen = 8 + level * 3;
-        
+
         for (let i = 0; i < pathLen; i++) {
             const dirs = [];
             // Prefer going up
@@ -146,15 +259,15 @@
             if (cx > 0 && cy > 0) dirs.push({ dx: -1, dy: 0, w: 1 });
             if (cx < GRID - 1 && cy > 0) dirs.push({ dx: 1, dy: 0, w: 1 });
             if (cy > 1) dirs.push({ dx: 0, dy: -1, w: 2 }); // double weight up
-            
+
             // Filter to unvisited
             const valid = dirs.filter(d => {
                 const nx = cx + d.dx, ny = cy + d.dy;
                 return nx >= 0 && nx < GRID && ny >= 0 && ny < GRID && gridMap[ny][nx] === 0;
             });
-            
+
             if (valid.length === 0) break;
-            
+
             // Weighted random pick
             const totalW = valid.reduce((s, d) => s + d.w, 0);
             let r = Math.random() * totalW;
@@ -163,16 +276,16 @@
                 r -= d.w;
                 if (r <= 0) { chosen = d; break; }
             }
-            
+
             cx += chosen.dx;
             cy += chosen.dy;
             gridMap[cy][cx] = 1;
             path.push({ x: cx, y: cy });
         }
-        
+
         // Mark exit
         gridMap[cy][cx] = 3;
-        
+
         // Add a few decoy safe-looking cells (traps)
         const traps = Math.min(level, 5);
         for (let i = 0; i < traps; i++) {
@@ -180,13 +293,13 @@
             const ty = Math.floor(Math.random() * GRID);
             if (gridMap[ty][tx] === 0) gridMap[ty][tx] = 4; // trap (looks like path briefly but isn't)
         }
-        
+
         return { gridMap, path, start: { x: sx, y: sy }, exit: { x: cx, y: cy } };
     }
-    
+
     function initLevel(level) {
         const { gridMap, path, start, exit } = generatePath(level);
-        
+
         game = {
             level,
             gridMap,
@@ -203,10 +316,10 @@
             won: false,
             footprints: [{ x: start.x, y: start.y }],
         };
-        
+
         phase = 'reveal';
     }
-    
+
     function startGame() {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('death-screen').classList.add('hidden');
@@ -215,27 +328,27 @@
         initLevel(1);
         running = true;
     }
-    
+
     window.nextLevel = function() {
         document.getElementById('level-screen').classList.add('hidden');
         initLevel(game.level + 1);
     };
-    
+
     window.move = function(dx, dy) {
         if (!running || !game || phase !== 'play' || game.dead || game.won) return;
-        
+
         const nx = game.player.x + dx;
         const ny = game.player.y + dy;
-        
+
         if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID) return;
-        
+
         game.player.x = nx;
         game.player.y = ny;
         game.moves++;
         game.footprints.push({ x: nx, y: ny });
-        
+
         const cell = game.gridMap[ny][nx];
-        
+
         if (cell === 0 || cell === 4) {
             // Fell off path!
             game.dead = true;
@@ -251,11 +364,16 @@
                     color: '180,60,60',
                 });
             }
+            const crossed = game.level - 1;
+            if (crossed > getBest()) setBest(crossed);
             setTimeout(() => {
-                document.getElementById('final-level').textContent = game.level - 1;
+                document.getElementById('final-level').textContent = crossed;
                 document.getElementById('death-quote').textContent = DEATH_QUOTES[Math.floor(Math.random() * DEATH_QUOTES.length)];
+                const best = getBest();
+                document.getElementById('death-best').textContent = best > 0 ? `deepest crossing · ${best}` : '';
                 document.getElementById('death-screen').classList.remove('hidden');
                 document.getElementById('d-pad').style.display = 'none';
+                updateNightWhisper();
             }, 800);
         } else if (cell === 3) {
             // Reached exit!
@@ -268,21 +386,23 @@
                     vx: (Math.random() - 0.5) * 4,
                     vy: -Math.random() * 4 - 1,
                     life: 1,
-                    color: '100,200,255',
+                    color: '140,160,220',
                 });
             }
+            if (game.level > getBest()) setBest(game.level);
             setTimeout(() => {
                 document.getElementById('level-title').textContent = `LEVEL ${game.level + 1}`;
+                document.getElementById('level-sub').textContent = LEVEL_SUBS[Math.min(game.level - 1, LEVEL_SUBS.length - 1)];
                 document.getElementById('level-screen').classList.remove('hidden');
             }, 600);
         }
     };
-    
+
     function update(dt) {
         if (!game || !running) return;
-        
+
         game.timer += dt;
-        
+
         if (phase === 'reveal') {
             game.fogAlpha = 0;
             if (game.timer > game.revealTime) {
@@ -296,7 +416,7 @@
                 phase = 'play';
             }
         }
-        
+
         // Particles
         game.particles.forEach(p => {
             p.x += p.vx;
@@ -305,33 +425,35 @@
         });
         game.particles = game.particles.filter(p => p.life > 0);
     }
-    
+
     function render() {
         ctx.clearRect(0, 0, W, H);
-        
+
         // Background
-        ctx.fillStyle = '#0a0c12';
+        ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, W, H);
-        
+
         if (!game) { requestAnimationFrame(mainLoop); return; }
-        
+
+        const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.0024); // shared breathing pulse
+
         // Draw grid
         for (let y = 0; y < GRID; y++) {
             for (let x = 0; x < GRID; x++) {
                 const px = gridOffX + x * cellSize;
                 const py = gridOffY + y * cellSize;
                 const cell = game.gridMap[y][x];
-                
+
                 // Base tile (void)
-                ctx.fillStyle = 'rgba(15,18,28,0.8)';
+                ctx.fillStyle = 'rgba(17,17,19,0.85)';
                 ctx.beginPath();
                 ctx.roundRect(px + 1, py + 1, cellSize - 2, cellSize - 2, 3);
                 ctx.fill();
-                
+
                 // Path tiles (visible during reveal, hidden during play)
                 const isPath = cell === 1 || cell === 2 || cell === 3;
                 const isTrap = cell === 4;
-                
+
                 if (isPath || isTrap) {
                     let alpha;
                     if (phase === 'reveal') {
@@ -341,24 +463,23 @@
                     } else {
                         alpha = 0;
                     }
-                    
+
                     // During reveal, show traps as path to confuse
                     if (alpha > 0.01 && (isPath || (isTrap && alpha > 0.5))) {
                         let color;
                         if (cell === 2) color = `rgba(80,180,120,${alpha * 0.6})`; // start = green
-                        else if (cell === 3) color = `rgba(80,140,220,${alpha * 0.6})`; // exit = blue
-                        else color = `rgba(60,65,85,${alpha * 0.5})`; // path = subtle
-                        
+                        else if (cell === 3) color = `rgba(140,160,220,${alpha * 0.6})`; // exit = accent blue
+                        else color = `rgba(62,66,84,${alpha * 0.5})`; // path = subtle
                         ctx.fillStyle = color;
                         ctx.beginPath();
                         ctx.roundRect(px + 1, py + 1, cellSize - 2, cellSize - 2, 3);
                         ctx.fill();
                     }
                 }
-                
+
                 // Always show start and exit markers
                 if (cell === 2) {
-                    ctx.fillStyle = 'rgba(80,180,120,0.4)';
+                    ctx.fillStyle = 'rgba(80,180,120,0.38)';
                     ctx.beginPath();
                     ctx.roundRect(px + 1, py + 1, cellSize - 2, cellSize - 2, 3);
                     ctx.fill();
@@ -369,54 +490,59 @@
                     ctx.fillText('S', px + cellSize/2, py + cellSize/2);
                 }
                 if (cell === 3) {
-                    ctx.fillStyle = 'rgba(80,140,220,0.3)';
+                    // exit breathes a faint lantern glow even in fog
+                    const eGlow = phase === 'play' ? 0.12 + 0.12 * pulse : 0.3;
+                    ctx.fillStyle = `rgba(140,160,220,${eGlow})`;
                     ctx.beginPath();
                     ctx.roundRect(px + 1, py + 1, cellSize - 2, cellSize - 2, 3);
                     ctx.fill();
                     ctx.font = `${cellSize * 0.4}px "Courier New"`;
-                    ctx.fillStyle = 'rgba(100,160,240,0.6)';
+                    ctx.fillStyle = `rgba(150,170,235,${0.45 + 0.25 * pulse})`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('E', px + cellSize/2, py + cellSize/2);
                 }
             }
         }
-        
-        // Footprints
+
+        // Footprints (a fading trail of ink)
+        const fpCount = game.footprints.length;
         game.footprints.forEach((fp, i) => {
-            if (i === game.footprints.length - 1) return; // current position
+            if (i === fpCount - 1) return; // current position
             const px = gridOffX + fp.x * cellSize + cellSize / 2;
             const py = gridOffY + fp.y * cellSize + cellSize / 2;
+            const fade = 0.08 + 0.14 * (i / Math.max(1, fpCount - 1));
             ctx.beginPath();
             ctx.arc(px, py, 3, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(180,200,220,${0.15})`;
+            ctx.fillStyle = `rgba(140,160,220,${fade})`;
             ctx.fill();
         });
-        
+
         // Player
         if (!game.dead) {
             const ppx = gridOffX + game.player.x * cellSize + cellSize / 2;
             const ppy = gridOffY + game.player.y * cellSize + cellSize / 2;
-            
-            // Glow
-            const glow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, cellSize * 0.8);
-            glow.addColorStop(0, 'rgba(180,200,255,0.15)');
+
+            // Glow (breathes — the lantern is alive)
+            const glowR = cellSize * (0.78 + 0.12 * pulse);
+            const glow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, glowR);
+            glow.addColorStop(0, `rgba(150,170,235,${0.16 + 0.08 * pulse})`);
             glow.addColorStop(1, 'transparent');
             ctx.fillStyle = glow;
             ctx.beginPath();
-            ctx.arc(ppx, ppy, cellSize * 0.8, 0, Math.PI * 2);
+            ctx.arc(ppx, ppy, glowR, 0, Math.PI * 2);
             ctx.fill();
-            
+
             // Body
             ctx.beginPath();
             ctx.arc(ppx, ppy, cellSize * 0.25, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(200,210,240,0.8)';
+            ctx.fillStyle = 'rgba(210,215,240,0.85)';
             ctx.fill();
-            ctx.strokeStyle = 'rgba(140,160,220,0.5)';
+            ctx.strokeStyle = 'rgba(140,160,220,0.55)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
         }
-        
+
         // Fog overlay during play
         if (phase === 'play' || phase === 'memorize') {
             const fogA = game.fogAlpha * 0.65;
@@ -427,7 +553,7 @@
                 const fy = H * 0.4 + Math.cos(t * 0.7 + i * 2.1) * H * 0.2;
                 const fr = 200 + Math.sin(t + i) * 60;
                 const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr);
-                grad.addColorStop(0, `rgba(20,25,40,${fogA * 0.4})`);
+                grad.addColorStop(0, `rgba(22,24,34,${fogA * 0.42})`);
                 grad.addColorStop(1, 'transparent');
                 ctx.fillStyle = grad;
                 ctx.beginPath();
@@ -435,23 +561,28 @@
                 ctx.fill();
             }
         }
-        
+
         // Phase indicator
         if (phase === 'reveal') {
-            ctx.font = '13px "Courier New", monospace';
-            ctx.fillStyle = 'rgba(180,200,220,0.5)';
+            ctx.font = '12px "Courier New", monospace';
+            ctx.fillStyle = 'rgba(122,117,112,0.85)';
             ctx.textAlign = 'center';
-            ctx.fillText('MEMORIZE THE PATH', W / 2, gridOffY - 15);
-            
+            ctx.fillText('M E M O R I Z E   T H E   P A T H', W / 2, gridOffY - 16);
+
             // Timer bar
-            const barW = 120;
+            const barW = 130;
             const progress = game.timer / game.revealTime;
-            ctx.fillStyle = 'rgba(40,50,80,0.4)';
+            ctx.fillStyle = 'rgba(38,38,43,0.7)';
             ctx.fillRect(W/2 - barW/2, gridOffY - 8, barW, 4);
-            ctx.fillStyle = 'rgba(120,160,220,0.6)';
+            ctx.fillStyle = 'rgba(140,160,220,0.7)';
             ctx.fillRect(W/2 - barW/2, gridOffY - 8, barW * (1 - progress), 4);
+        } else if (phase === 'memorize') {
+            ctx.font = '12px "Courier New", monospace';
+            ctx.fillStyle = `rgba(122,117,112,${0.7 * game.fogAlpha})`;
+            ctx.textAlign = 'center';
+            ctx.fillText('T H E   F O G   R O L L S   I N', W / 2, gridOffY - 16);
         }
-        
+
         // Particles
         game.particles.forEach(p => {
             ctx.beginPath();
@@ -459,27 +590,27 @@
             ctx.fillStyle = `rgba(${p.color},${p.life})`;
             ctx.fill();
         });
-        
+
         // HUD
         document.getElementById('hud-level').textContent = `LEVEL ${game.level}`;
-        document.getElementById('hud-moves').textContent = phase === 'play' ? `moves: ${game.moves}` : '';
+        document.getElementById('hud-moves').textContent = phase === 'play' ? `steps · ${game.moves}` : '';
     }
-    
+
     // Swipe detection
     let touchStart = null;
     canvas.addEventListener('touchstart', e => {
         e.preventDefault();
         touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }, { passive: false });
-    
+
     canvas.addEventListener('touchend', e => {
         if (!touchStart) return;
         const dx = e.changedTouches[0].clientX - touchStart.x;
         const dy = e.changedTouches[0].clientY - touchStart.y;
         const adx = Math.abs(dx), ady = Math.abs(dy);
-        
-        if (Math.max(adx, ady) < 20) return; // too small
-        
+
+        if (Math.max(adx, ady) < 20) { touchStart = null; return; } // too small
+
         if (adx > ady) {
             move(dx > 0 ? 1 : -1, 0);
         } else {
@@ -487,7 +618,7 @@
         }
         touchStart = null;
     });
-    
+
     // Keyboard
     window.addEventListener('keydown', e => {
         if (e.key === 'ArrowUp' || e.key === 'w') move(0, -1);
@@ -495,7 +626,60 @@
         if (e.key === 'ArrowLeft' || e.key === 'a') move(-1, 0);
         if (e.key === 'ArrowRight' || e.key === 'd') move(1, 0);
     });
-    
+
+    // ---- Atmosphere: drifting embers (motes in the fog) ----
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function spawnEmbers(n){
+        if (prefersReduced) return;
+        for (let i = 0; i < n; i++){
+            const el = document.createElement('div');
+            el.className = 'ember';
+            el.style.left = Math.random() * 100 + 'vw';
+            el.style.animationDelay = (Math.random() * 16) + 's';
+            el.style.animationDuration = (13 + Math.random() * 7) + 's';
+            document.body.appendChild(el);
+        }
+    }
+    spawnEmbers(7);
+
+    // ---- Easter egg 1: typing "prizrak" lights the watcher ----
+    let typed = '';
+    window.addEventListener('keydown', e => {
+        if (e.key && e.key.length === 1) {
+            typed = (typed + e.key.toLowerCase()).slice(-7);
+            if (typed === 'prizrak') {
+                const foot = document.querySelector('#start-screen .ov-foot');
+                if (foot) { foot.textContent = 'you found the watcher'; foot.style.color = 'var(--accent)'; }
+            }
+        }
+    });
+
+    // ---- Easter egg 2: triple-click the title spawns one extra mote ----
+    const startTitle = document.getElementById('start-title');
+    if (startTitle) {
+        startTitle.addEventListener('click', () => {
+            extraEmbers++;
+            if (extraEmbers >= 3 && extraEmbers <= 6 && !prefersReduced) {
+                spawnEmbers(1); // cap stays well under 10
+            }
+        });
+    }
+
+    // ---- Easter egg 3: 00:00–03:00 local — the mountain does not sleep ----
+    function updateNightWhisper(){
+        const h = new Date().getHours();
+        const w = document.getElementById('night-whisper');
+        if (w) w.style.display = (h >= 0 && h < 3) ? 'block' : 'none';
+    }
+
+    // Show best on the start screen
+    (function showStartBest(){
+        const best = getBest();
+        const el = document.getElementById('start-best');
+        if (el) el.textContent = best > 0 ? `deepest crossing · ${best}` : '';
+        updateNightWhisper();
+    })();
+
     let lastTime = 0;
     function mainLoop(ts) {
         const dt = Math.min(0.1, (ts - lastTime) / 1000);
@@ -504,7 +688,7 @@
         render();
         requestAnimationFrame(mainLoop);
     }
-    
+
     window.addEventListener('resize', resize);
     resize();
     requestAnimationFrame(mainLoop);

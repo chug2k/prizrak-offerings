@@ -6,41 +6,108 @@
   <title>The Conviction Gap | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0f0f11; font-family: 'Courier New', monospace; }
-    .glow-red { text-shadow: 0 0 12px rgba(239,68,68,0.7); }
-    .glow-green { text-shadow: 0 0 12px rgba(34,197,94,0.7); }
-    .glow-amber { text-shadow: 0 0 12px rgba(251,191,36,0.7); }
-    input[type=range] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; outline: none; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #71717a; cursor: pointer; border: 2px solid #3f3f46; }
-    .slide-in { animation: slideIn 0.25s ease-out; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      /* This app's existing lead color is the capture-red of the ledger. */
+      --accent:#ef4444;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{ background: var(--bg); }
+    body { font-family: 'Courier New', monospace; color: var(--ink); }
+
+    /* Per-verdict accents (kept from original logic) */
+    .glow-red   { text-shadow: 0 0 14px rgba(239,68,68,0.7); }
+    .glow-green { text-shadow: 0 0 14px rgba(34,197,94,0.7); }
+    .glow-amber { text-shadow: 0 0 14px rgba(251,191,36,0.7); }
+
+    /* ---- sliders ---- */
+    input[type=range] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; outline: none; background:#26262b; cursor:pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #71717a; cursor: pointer; border: 2px solid #3f3f46; transition: box-shadow .15s, background .15s; }
+    input[type=range]:focus-visible::-webkit-slider-thumb { background: var(--accent); box-shadow: 0 0 0 4px var(--glow); }
+    input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #71717a; cursor: pointer; border: 2px solid #3f3f46; }
+
+    /* ---- motion vocabulary (reduced-motion-safe at bottom) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;box-shadow:0 0 0 1px var(--vline), 0 0 24px -10px var(--vglow)}50%{opacity:1;box-shadow:0 0 0 1px var(--vline), 0 0 34px -6px var(--vglow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
     @keyframes slideIn { from { opacity:0; transform: translateX(-8px); } to { opacity:1; transform: translateX(0); } }
+    .slide-in { animation: slideIn 0.25s ease-out; }
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.65}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* needle that swings between the two readings */
+    @keyframes needleSwing{0%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}100%{transform:rotate(-3deg)}}
+    .needle{animation:needleSwing 6s ease-in-out infinite;transform-origin:bottom center}
+
+    /* interactions */
+    .lift{transition:transform .15s, box-shadow .15s, border-color .15s}
+    .lift:hover{transform:translateY(-2px)}
+    .press:active{transform:translateY(1px)}
+    button:focus-visible, input[type=text]:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    .copybtn.copied{ color: var(--accent); border-color: var(--accent); }
+    #idle-whisper{opacity:0;transition:opacity 1.4s ease}
+    #idle-whisper.show{opacity:1}
+    #egg-line{opacity:0;transition:opacity .9s ease}
+    #egg-line.show{opacity:1}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.slide-in,.needle{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="text-zinc-300 min-h-screen">
-  <div class="max-w-xl mx-auto px-4 py-10">
+<body class="grain text-zinc-300 min-h-screen">
+  <div class="fog"></div>
+
+  <div class="max-w-xl mx-auto px-4 py-10 relative" style="z-index:2">
 
     <header class="mb-8 border-b border-zinc-800 pb-6">
-      <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prízrak / Midday Instrument</p>
-      <h1 class="text-3xl font-black text-white mb-2">THE CONVICTION GAP</h1>
-      <p class="text-sm text-zinc-500">What you think. What you're about to say. The difference is the cost.</p>
+      <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2 flicker">Prízrak / Midday Instrument</p>
+      <h1 id="title" class="text-3xl font-black text-white mb-2 select-none cursor-default">THE CONVICTION GAP</h1>
+      <p class="text-sm text-zinc-500">What you believe. What you're about to say. The poludnica measures the distance — and bills you for it.</p>
     </header>
 
     <!-- Input Form -->
     <div id="form" class="space-y-6">
 
       <div>
-        <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-2">Deal / Decision / Meeting</label>
+        <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-2">Deal / Decision / Threshold</label>
         <input id="dealName" type="text" placeholder="Series A — [Company]. Thursday 3PM."
-          class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-400 placeholder-zinc-700">
+          class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2.5 text-sm text-zinc-200 focus:outline-none placeholder-zinc-700 transition-colors">
       </div>
 
       <div>
         <div class="flex justify-between mb-2">
-          <label class="text-xs uppercase tracking-widest text-zinc-500">Your Actual Conviction</label>
+          <label class="text-xs uppercase tracking-widest text-zinc-500">What You Actually Believe</label>
           <span id="convVal" class="text-sm font-black text-white font-mono">5</span>
         </div>
-        <input id="conv" type="range" min="1" max="10" value="5"
-          class="w-full bg-zinc-800 accent-zinc-400">
+        <input id="conv" type="range" min="1" max="10" value="5" class="w-full">
         <div class="flex justify-between text-[10px] text-zinc-700 mt-1">
           <span>Pass. Hard.</span><span>Neutral</span><span>Back this.</span>
         </div>
@@ -51,10 +118,25 @@
           <label class="text-xs uppercase tracking-widest text-zinc-500">What the Room Expects</label>
           <span id="roomVal" class="text-sm font-black text-white font-mono">5</span>
         </div>
-        <input id="room" type="range" min="1" max="10" value="5"
-          class="w-full bg-zinc-800 accent-zinc-400">
+        <input id="room" type="range" min="1" max="10" value="5" class="w-full">
         <div class="flex justify-between text-[10px] text-zinc-700 mt-1">
           <span>They want a pass</span><span>Unclear</span><span>They want a yes</span>
+        </div>
+      </div>
+
+      <!-- live gauge: two needles, the distance between them is the gap -->
+      <div class="border border-zinc-800 rounded bg-zinc-950/50 px-4 py-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[10px] uppercase tracking-widest text-zinc-600">Live Reading</span>
+          <span id="liveGap" class="text-[10px] font-mono text-zinc-600">distance: 0</span>
+        </div>
+        <div class="relative h-2 rounded bg-zinc-800">
+          <div id="bandFill" class="absolute top-0 bottom-0 rounded bg-zinc-600/40 transition-all duration-200"></div>
+          <div id="markConv" class="absolute -top-1.5 w-1 h-5 rounded bg-white transition-all duration-200" title="you"></div>
+          <div id="markRoom" class="absolute -top-1.5 w-1 h-5 rounded bg-zinc-500 transition-all duration-200" title="room"></div>
+        </div>
+        <div class="flex justify-between text-[9px] text-zinc-700 mt-2">
+          <span>1</span><span class="text-zinc-600">you · room</span><span>10</span>
         </div>
       </div>
 
@@ -63,28 +145,28 @@
         <div class="flex gap-3">
           <label class="flex-1 cursor-pointer">
             <input type="radio" name="own" value="invest" class="sr-only peer">
-            <div class="border border-zinc-700 peer-checked:border-emerald-500 peer-checked:bg-emerald-950/30 peer-checked:text-emerald-300 rounded px-3 py-2 text-xs text-center text-zinc-500 transition-all hover:border-zinc-500">Invest</div>
+            <div class="lift border border-zinc-700 peer-checked:border-emerald-500 peer-checked:bg-emerald-950/30 peer-checked:text-emerald-300 rounded px-3 py-2 text-xs text-center text-zinc-500 hover:border-zinc-500">Invest</div>
           </label>
           <label class="flex-1 cursor-pointer">
             <input type="radio" name="own" value="pass" class="sr-only peer" checked>
-            <div class="border border-zinc-700 peer-checked:border-red-500 peer-checked:bg-red-950/30 peer-checked:text-red-300 rounded px-3 py-2 text-xs text-center text-zinc-500 transition-all hover:border-zinc-500">Pass</div>
+            <div class="lift border border-zinc-700 peer-checked:border-red-500 peer-checked:bg-red-950/30 peer-checked:text-red-300 rounded px-3 py-2 text-xs text-center text-zinc-500 hover:border-zinc-500">Pass</div>
           </label>
           <label class="flex-1 cursor-pointer">
             <input type="radio" name="own" value="wait" class="sr-only peer">
-            <div class="border border-zinc-700 peer-checked:border-amber-500 peer-checked:bg-amber-950/30 peer-checked:text-amber-300 rounded px-3 py-2 text-xs text-center text-zinc-500 transition-all hover:border-zinc-500">Need more time</div>
+            <div class="lift border border-zinc-700 peer-checked:border-amber-500 peer-checked:bg-amber-950/30 peer-checked:text-amber-300 rounded px-3 py-2 text-xs text-center text-zinc-500 hover:border-zinc-500">Need more time</div>
           </label>
         </div>
       </div>
 
       <button onclick="assess()"
-        class="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-400 text-white font-black text-sm uppercase tracking-widest py-3 rounded transition-all">
+        class="lift press w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-400 text-white font-black text-sm uppercase tracking-widest py-3 rounded">
         Measure the Gap →
       </button>
     </div>
 
     <!-- Output -->
-    <div id="output" class="hidden mt-8 slide-in">
-      <div id="verdict-card" class="border rounded p-5 mb-6">
+    <div id="output" class="hidden mt-8 reveal">
+      <div id="verdict-card" class="border rounded p-5 mb-6 relative">
         <div class="flex items-start justify-between mb-3">
           <div>
             <p class="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Verdict</p>
@@ -97,10 +179,14 @@
         </div>
         <p id="verdict-desc" class="text-sm text-zinc-400 leading-relaxed border-t border-zinc-800 pt-3 mt-3"></p>
         <p id="slovak-line" class="text-xs text-zinc-600 italic mt-2"></p>
+        <button id="copyBtn" onclick="copyVerdict()"
+          class="copybtn lift press mt-4 text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-300 border border-zinc-800 rounded px-3 py-1.5 transition-colors">
+          copy to the ledger
+        </button>
       </div>
 
       <button onclick="reset()"
-        class="w-full text-xs text-zinc-600 hover:text-zinc-400 transition-colors py-2 border border-zinc-800 hover:border-zinc-700 rounded mb-6">
+        class="lift w-full text-xs text-zinc-600 hover:text-zinc-400 transition-colors py-2 border border-zinc-800 hover:border-zinc-700 rounded mb-6">
         + Log another
       </button>
     </div>
@@ -108,7 +194,7 @@
     <!-- Log -->
     <div id="log-section" class="hidden">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-xs uppercase tracking-widest text-zinc-600">Today's Log</h3>
+        <h3 class="text-xs uppercase tracking-widest text-zinc-600">Today's Ledger</h3>
         <span id="avg-gap" class="text-xs font-mono text-zinc-500"></span>
       </div>
       <div id="log" class="space-y-2"></div>
@@ -116,6 +202,9 @@
 
     <div class="mt-12 pt-6 border-t border-zinc-900">
       <p class="text-[10px] text-zinc-800 text-center">The mountain does not care what you said in the room. It only records what you believed.</p>
+      <p id="night-whisper" class="hidden text-[10px] text-center mt-2" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+      <p id="idle-whisper" class="text-[10px] text-center mt-2" style="color:var(--ink-ghost)">still here. still watching.</p>
+      <p id="egg-line" class="text-[10px] text-center mt-2" style="color:var(--ink-ghost)">you found the watcher.</p>
     </div>
   </div>
 
@@ -123,21 +212,21 @@
     const LOG_KEY = "conviction_gap_log_v1";
 
     const VERDICTS = {
-      aligned:    { label: "ALIGNED", border: "border-emerald-800", glow: "glow-green", textColor: "text-emerald-400", score_color: "text-emerald-400" },
-      performing: { label: "PERFORMING", border: "border-amber-800", glow: "glow-amber", textColor: "text-amber-400", score_color: "text-amber-400" },
-      captured:   { label: "CAPTURED", border: "border-red-800", glow: "glow-red", textColor: "text-red-400", score_color: "text-red-400" },
+      aligned:    { label: "ALIGNED", border: "border-emerald-800", glow: "glow-green", textColor: "text-emerald-400", score_color: "text-emerald-400", line:"rgba(16,185,129,0.55)", fill:"rgba(16,185,129,0.30)" },
+      performing: { label: "PERFORMING", border: "border-amber-800", glow: "glow-amber", textColor: "text-amber-400", score_color: "text-amber-400", line:"rgba(245,158,11,0.55)", fill:"rgba(245,158,11,0.30)" },
+      captured:   { label: "CAPTURED", border: "border-red-800", glow: "glow-red", textColor: "text-red-400", score_color: "text-red-400", line:"rgba(239,68,68,0.55)", fill:"rgba(239,68,68,0.30)" },
     };
 
     const DESCS = {
-      aligned:    "Your view and the room's expectation match. Rare. Either the room is right, or you've managed to avoid capture. Proceed with clear conscience.",
-      performing: "The gap is non-trivial. You're about to say something in the room that doesn't fully match what you believe. This is the slow bleed. It adds up.",
-      captured:   "You've been captured. What you think and what you're about to say are different animals. You are not a decision-maker in this room. You are a vote being managed.",
+      aligned:    "Your view and the room's expectation match. Rare. Either the room is right, or you've slipped the noon-demon's grip. Walk in with a clear conscience — the bridge holds.",
+      performing: "The gap is non-trivial. You're about to say a thing in the room that does not fully match what you believe. This is the slow bleed. It does not scar. It accrues. The ledger remembers each one.",
+      captured:   "You've been captured. What you think and what you're about to say are different animals now. You are not a decision-maker in this room. You are a vote being managed — and the management is going well.",
     };
 
     const SLOVAK = {
-      aligned:    "Dobrý. The mountain and the map agree. A rare day.",
-      performing: "Hm. Like a potato that knows it is not a truffle but still dresses as one. The fog is rolling in.",
-      captured:   "The committee has eaten you. At least the cabbage is honest about what it is.",
+      aligned:    "Dobrý. The mountain and the map agree. A rare day. Mark it.",
+      performing: "Hm. Like a potato that knows it is not a truffle but still dresses as one. The fog is rolling in off the Tatras.",
+      captured:   "The committee has eaten you. At least the cabbage is honest about what it is. You will smile and say yes.",
     };
 
     function getVerdictKey(gap) {
@@ -155,6 +244,8 @@
       localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(-20)));
     }
 
+    let lastVerdictText = "";
+
     function assess() {
       const deal = document.getElementById("dealName").value.trim() || "Unnamed decision";
       const conv = parseInt(document.getElementById("conv").value);
@@ -164,9 +255,11 @@
       const key = getVerdictKey(gap);
       const v = VERDICTS[key];
 
-      // Render verdict card
+      // Render verdict card with breathing glow tuned to the verdict color
       const card = document.getElementById("verdict-card");
-      card.className = `border rounded p-5 mb-6 ${v.border} bg-zinc-900/60`;
+      card.className = `border rounded p-5 mb-6 relative breathe ${v.border} bg-zinc-900/60`;
+      card.style.setProperty("--vline", v.line);
+      card.style.setProperty("--vglow", v.fill);
       document.getElementById("verdict-label").className = `text-2xl font-black ${v.textColor} ${v.glow}`;
       document.getElementById("verdict-label").textContent = v.label;
       document.getElementById("gap-score").className = `text-3xl font-black font-mono ${v.score_color}`;
@@ -174,15 +267,40 @@
       document.getElementById("verdict-desc").textContent = DESCS[key];
       document.getElementById("slovak-line").textContent = `— Prízrak: "${SLOVAK[key]}"`;
 
+      // build copy text (the ledger line)
+      lastVerdictText = `THE CONVICTION GAP — ${v.label}
+${deal}
+believe: ${conv}/10 · room: ${room}/10 · gap: ${gap} · own money: ${own}
+${DESCS[key]}
+— Prízrak: "${SLOVAK[key]}"`;
+
+      const copyBtn = document.getElementById("copyBtn");
+      copyBtn.classList.remove("copied");
+      copyBtn.textContent = "copy to the ledger";
+
       document.getElementById("output").classList.remove("hidden");
       document.getElementById("form").classList.add("hidden");
 
-      // Log it
+      // Log it (unchanged shape)
       const log = loadLog();
       const entry = { deal, conv, room, gap, key, own, ts: Date.now() };
       log.push(entry);
       saveLog(log);
       renderLog();
+
+      document.getElementById("output").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function copyVerdict() {
+      const btn = document.getElementById("copyBtn");
+      const done = () => {
+        btn.classList.add("copied");
+        btn.textContent = "filed. the ledger remembers";
+        setTimeout(() => { btn.classList.remove("copied"); btn.textContent = "copy to the ledger"; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastVerdictText).then(done).catch(done);
+      } else { done(); }
     }
 
     function reset() {
@@ -193,21 +311,29 @@
       document.getElementById("room").value = 5;
       document.getElementById("convVal").textContent = "5";
       document.getElementById("roomVal").textContent = "5";
+      updateGauge();
+      document.getElementById("form").scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function renderLog() {
       const log = loadLog();
-      if (log.length === 0) return;
+      if (log.length === 0) {
+        const sec = document.getElementById("log-section");
+        sec.classList.remove("hidden");
+        document.getElementById("avg-gap").textContent = "";
+        document.getElementById("log").innerHTML =
+          `<p class="text-[11px] text-zinc-700 italic">the cave is empty. nothing has fossilized yet.</p>`;
+        return;
+      }
       document.getElementById("log-section").classList.remove("hidden");
       const avgGap = (log.reduce((s, e) => s + e.gap, 0) / log.length).toFixed(1);
       document.getElementById("avg-gap").textContent = `avg gap: ${avgGap}`;
-      const today = new Date().toDateString();
       document.getElementById("log").innerHTML = [...log].reverse().slice(0, 8).map(e => {
         const v = VERDICTS[e.key];
         const t = new Date(e.ts);
         const label = e.key === "aligned" ? "✓" : e.key === "performing" ? "~" : "✗";
-        return `<div class="slide-in flex items-center justify-between bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-xs">
-          <span class="text-zinc-400 truncate max-w-[200px]">${e.deal}</span>
+        return `<div class="slide-in lift flex items-center justify-between bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-xs hover:border-zinc-700">
+          <span class="text-zinc-400 truncate max-w-[200px]">${escapeHtml(e.deal)}</span>
           <span class="flex items-center gap-3 ml-2 shrink-0">
             <span class="text-zinc-600 font-mono">${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}</span>
             <span class="font-mono text-zinc-500">gap: <span class="${v.score_color}">${e.gap}</span></span>
@@ -217,15 +343,111 @@
       }).join("");
     }
 
-    // Slider live values
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // ---- live gauge ----
+    function updateGauge() {
+      const conv = parseInt(document.getElementById("conv").value);
+      const room = parseInt(document.getElementById("room").value);
+      const gap = Math.abs(conv - room);
+      const key = getVerdictKey(gap);
+      const v = VERDICTS[key];
+      const pct = n => `${((n - 1) / 9) * 100}%`;
+      document.getElementById("markConv").style.left = pct(conv);
+      document.getElementById("markRoom").style.left = pct(room);
+      const lo = Math.min(conv, room), hi = Math.max(conv, room);
+      const fill = document.getElementById("bandFill");
+      fill.style.left = pct(lo);
+      fill.style.width = `${((hi - lo) / 9) * 100}%`;
+      fill.style.background = v.fill;
+      const live = document.getElementById("liveGap");
+      live.textContent = `distance: ${gap}`;
+      live.className = `text-[10px] font-mono ${gap === 0 ? "text-zinc-600" : v.score_color}`;
+    }
+
+    // Slider live values + gauge
     document.getElementById("conv").addEventListener("input", e => {
       document.getElementById("convVal").textContent = e.target.value;
+      updateGauge();
     });
     document.getElementById("room").addEventListener("input", e => {
       document.getElementById("roomVal").textContent = e.target.value;
+      updateGauge();
     });
 
+    // ---- ambient embers (capped, staggered) ----
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const N = 8;
+      for (let i = 0; i < N; i++) {
+        const e = document.createElement("div");
+        e.className = "ember";
+        e.style.left = (Math.random() * 100) + "%";
+        e.style.animationDelay = (Math.random() * 14) + "s";
+        e.style.animationDuration = (12 + Math.random() * 8) + "s";
+        document.body.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg 1: triple-click the title spawns one extra ember ----
+    document.getElementById("title").addEventListener("click", (function(){
+      let n = 0, t = 0;
+      return function(){
+        const now = Date.now();
+        n = (now - t < 500) ? n + 1 : 1;
+        t = now;
+        if (n >= 3) {
+          n = 0;
+          if (!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) {
+            const e = document.createElement("div");
+            e.className = "ember";
+            e.style.left = (40 + Math.random() * 20) + "%";
+            e.style.animationDuration = "9s";
+            document.body.appendChild(e);
+            setTimeout(() => e.remove(), 9500);
+          }
+        }
+      };
+    })());
+
+    // ---- easter egg 2: type 'prizrak' to light the watcher ----
+    (function(){
+      const target = "prizrak"; let buf = "";
+      window.addEventListener("keydown", e => {
+        if (e.key && e.key.length === 1) {
+          buf = (buf + e.key.toLowerCase()).slice(-target.length);
+          if (buf === target) {
+            document.getElementById("egg-line").classList.add("show");
+            setTimeout(() => document.getElementById("egg-line").classList.remove("show"), 6000);
+          }
+        }
+      });
+    })();
+
+    // ---- night whisper: 00:00–03:00 local ----
+    (function(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) document.getElementById("night-whisper").classList.remove("hidden");
+    })();
+
+    // ---- idle 60s whisper ----
+    (function(){
+      let timer;
+      const whisper = document.getElementById("idle-whisper");
+      function ping(){
+        whisper.classList.remove("show");
+        clearTimeout(timer);
+        timer = setTimeout(() => whisper.classList.add("show"), 60000);
+      }
+      ["mousemove","keydown","click","input","scroll","touchstart"].forEach(ev =>
+        window.addEventListener(ev, ping, { passive: true }));
+      ping();
+    })();
+
     // Init
+    updateGauge();
     renderLog();
   </script>
 </body>

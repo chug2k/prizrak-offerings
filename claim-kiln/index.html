@@ -4,85 +4,223 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Claim Kiln</title>
+    <meta name="description" content="Put a claim in, add the receipts, see whether it hardens into fact or collapses into warm pottery dust. Count the stones. — Prízrak" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: { extend: {
-          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'], mono: ['ui-monospace','SFMono-Regular','Menlo','monospace'] },
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'], mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','Menlo','monospace'] },
           colors: { ash:'#1f2937', fog:'#f5f1e8', bone:'#fffaf0', ember:'#b45309', lichen:'#4d7c0f', rust:'#92400e' },
           boxShadow: { slab:'0 18px 45px rgba(31,41,55,.12), 0 3px 12px rgba(31,41,55,.06)' }
         }}
       }
     </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <style>
-      body { background: radial-gradient(circle at 12% 10%, rgba(180,83,9,.18), transparent 30%), radial-gradient(circle at 90% 18%, rgba(77,124,15,.13), transparent 24%), linear-gradient(180deg,#fffaf0 0%,#f5f1e8 58%,#e8dfcf 100%); }
-      .grain { background-image: linear-gradient(rgba(31,41,55,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(31,41,55,.045) 1px, transparent 1px); background-size: 22px 22px; }
+      :root{
+        --bg:#0a0a0a;
+        --bg-raised:#111113;
+        --bg-sunk:#0d0d0f;
+        --line:#26262b;
+        --line-soft:#1a1a1d;
+        --ink:#d4cfc8;
+        --ink-dim:#7a7570;
+        --ink-ghost:#3a3530;
+        --accent:#d97706;          /* the ember in the kiln */
+        --accent-deep:#92400e;
+        --accent-cool:#65a30d;     /* a single secondary used only for the fired/lichen state, matched to original lichen */
+        --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+      }
+      *{ -webkit-tap-highlight-color:transparent; }
+      body{
+        background:
+          radial-gradient(70% 55% at 14% 8%, color-mix(in srgb,var(--accent) 16%, transparent), transparent 60%),
+          radial-gradient(55% 45% at 92% 14%, color-mix(in srgb,var(--accent-deep) 14%, transparent), transparent 55%),
+          var(--bg);
+        color:var(--ink);
+      }
+
+      /* faint structural grid, echoes the old grain */
+      .kiln-grid{
+        background-image:
+          linear-gradient(color-mix(in srgb,var(--accent) 8%, transparent) 1px, transparent 1px),
+          linear-gradient(90deg, color-mix(in srgb,var(--accent) 7%, transparent) 1px, transparent 1px);
+        background-size:24px 24px;
+      }
+
+      /* fog drifting at the top of the chamber */
+      @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.05}50%{opacity:.10}100%{transform:translateX(5%);opacity:.05}}
+      .fog{position:fixed;inset:-12% -12% auto;height:60vh;pointer-events:none;z-index:0;
+        background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+        animation:fogDrift 34s ease-in-out infinite alternate}
+
+      /* embers floating up from the firebox */
+      @keyframes ember{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:.55}70%{opacity:.4}100%{transform:translateY(-92vh) translateX(8px);opacity:0}}
+      .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+        background:var(--accent);box-shadow:0 0 7px var(--glow);pointer-events:none;z-index:0;
+        animation:ember 15s linear infinite}
+
+      /* heading breathing like a coal */
+      @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 10px var(--glow)}50%{opacity:1;text-shadow:0 0 22px var(--glow)}}
+      .breathe{animation:breathe 4.6s ease-in-out infinite}
+
+      @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+      .reveal{animation:reveal .35s ease-out both}
+
+      @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.42}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+      .flicker{animation:flicker 6.5s steps(1) infinite}
+
+      /* grain over the whole chamber */
+      .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.04;
+        background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+      /* panels */
+      .panel{
+        background:var(--bg-raised);
+        border:1px solid var(--line);
+        border-radius:1.5rem;
+      }
+      .well{
+        background:var(--bg-sunk);
+        border:1px solid var(--line-soft);
+      }
+
+      /* the result panel breathes its own heat when fired */
+      .result-live{ box-shadow:0 0 0 1px var(--line), 0 0 34px -10px var(--glow); }
+
+      /* receipt rows */
+      .receipt{
+        background:var(--bg-sunk);
+        border:1px solid var(--line-soft);
+        border-radius:1rem;
+        transition:transform .15s, box-shadow .15s, border-color .15s, background .2s;
+      }
+      .receipt:hover{ transform:translateY(-2px); border-color:var(--accent); }
+      .receipt:has(input:checked){
+        border-color:color-mix(in srgb,var(--accent) 60%, var(--line));
+        background:color-mix(in srgb,var(--accent) 7%, var(--bg-sunk));
+      }
+      .receipt:has(input:checked) .r-label{ color:var(--ink); }
+
+      /* checkbox restyle */
+      .kbox{
+        appearance:none;-webkit-appearance:none;
+        width:1.25rem;height:1.25rem;border-radius:.4rem;flex:none;
+        border:1px solid var(--line);background:var(--bg);
+        position:relative;cursor:pointer;transition:border-color .15s, box-shadow .15s, background .15s;
+      }
+      .kbox:hover{ border-color:var(--accent); }
+      .kbox:checked{ background:var(--accent); border-color:var(--accent); box-shadow:0 0 12px -2px var(--glow); }
+      .kbox:checked::after{
+        content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;
+        border:solid #0a0a0a;border-width:0 2px 2px 0;transform:rotate(40deg);
+      }
+      .kbox:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--glow); }
+
+      /* inputs / textarea focus */
+      textarea:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+      /* buttons */
+      .btn{ transition:transform .12s, box-shadow .15s, border-color .15s, background .15s, color .15s; }
+      .btn:hover{ transform:translateY(-2px); }
+      .btn:active{ transform:translateY(1px); }
+      .btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--glow); }
+
+      a.navlink{ transition:transform .12s, border-color .15s, color .15s; }
+      a.navlink:hover{ transform:translateY(-1px); border-color:var(--accent); color:var(--ink); }
+
+      .label{ color:var(--ink-dim); text-transform:uppercase; letter-spacing:.22em; }
+      .accent{ color:var(--accent); }
+
+      /* the kiln progress bar glows by temperature */
+      #bar{ box-shadow:0 0 16px -3px var(--glow); }
+
+      /* hidden watcher line for the egg */
+      #watcher{ color:var(--ink-ghost); }
+
+      ::selection{ background:color-mix(in srgb,var(--accent) 35%, transparent); color:var(--bone,#fffaf0); }
+
+      @media (prefers-reduced-motion:reduce){
+        .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+        .ember{display:none}
+        .breathe,.flicker{opacity:1!important}
+      }
     </style>
   </head>
-  <body class="min-h-screen text-ash antialiased">
-    <main class="mx-auto min-h-screen max-w-6xl px-5 py-8 sm:px-8 lg:px-10">
+  <body class="grain min-h-screen antialiased">
+    <div class="fog" aria-hidden="true"></div>
+    <div id="emberField" aria-hidden="true"></div>
+
+    <main class="relative z-[2] mx-auto min-h-screen max-w-6xl px-5 py-8 sm:px-8 lg:px-10">
       <nav class="mb-8 flex items-center justify-between gap-4 text-sm">
-        <a href="../" class="rounded-full bg-white/70 px-4 py-2 font-medium shadow-slab ring-1 ring-ash/10 transition hover:bg-white">← Offerings</a>
-        <span class="rounded-full bg-ash px-4 py-2 font-mono text-xs uppercase tracking-[.22em] text-bone">receipt before mythology</span>
+        <a href="../" class="navlink rounded-full px-4 py-2 font-medium" style="background:var(--bg-raised);border:1px solid var(--line);color:var(--ink-dim)">← offerings</a>
+        <span class="rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[.22em]" style="background:var(--bg-raised);border:1px solid var(--line);color:var(--ink-dim)">receipt before mythology</span>
       </nav>
 
       <section class="grid gap-6 lg:grid-cols-[1.05fr_.95fr]">
-        <article class="rounded-[2rem] bg-bone p-7 shadow-slab ring-1 ring-ash/10 sm:p-10">
-          <p class="text-xs font-bold uppercase tracking-[.32em] text-ember">Daily offering • June 14</p>
-          <h1 class="mt-4 text-4xl font-black tracking-tight sm:text-6xl">The Claim Kiln</h1>
-          <p class="mt-5 max-w-2xl text-lg leading-8 text-ash/70">
-            A small firing chamber for Charles and his ghost: put a claim in, add the receipts, and see whether it hardens into fact or collapses into warm pottery dust. Yesterday's missing stone taught the lesson. The build may say it shipped; the filesystem has a colder opinion.
+        <article class="panel p-7 sm:p-10">
+          <p class="text-xs font-bold uppercase tracking-[.32em] accent">Daily offering • the firing chamber</p>
+          <h1 id="title" class="breathe mt-4 cursor-default select-none text-4xl font-black tracking-tight sm:text-6xl" style="color:var(--ink)">The Claim Kiln</h1>
+          <p class="mt-5 max-w-2xl text-lg leading-8" style="color:var(--ink-dim)">
+            A small firing chamber for Charles and his ghost: put a claim in, add the receipts, and watch whether it hardens into fact or collapses into warm pottery dust. Yesterday's missing stone taught the lesson. The build may say it shipped; the filesystem keeps a colder opinion.
           </p>
           <div class="mt-7 grid gap-3 sm:grid-cols-3">
-            <div class="rounded-2xl bg-fog p-4 ring-1 ring-ash/10"><p class="text-xs uppercase tracking-[.22em] text-ash/45">Use</p><p class="mt-2 font-semibold">Pre-send sanity check</p></div>
-            <div class="rounded-2xl bg-fog p-4 ring-1 ring-ash/10"><p class="text-xs uppercase tracking-[.22em] text-ash/45">Enemy</p><p class="mt-2 font-semibold">Plausible success</p></div>
-            <div class="rounded-2xl bg-fog p-4 ring-1 ring-ash/10"><p class="text-xs uppercase tracking-[.22em] text-ash/45">Mood</p><p class="mt-2 font-semibold">Trust, but bite it first</p></div>
+            <div class="well rounded-2xl p-4"><p class="label text-xs">Use</p><p class="mt-2 font-semibold" style="color:var(--ink)">Pre-send sanity check</p></div>
+            <div class="well rounded-2xl p-4"><p class="label text-xs">Enemy</p><p class="mt-2 font-semibold" style="color:var(--ink)">Plausible success</p></div>
+            <div class="well rounded-2xl p-4"><p class="label text-xs">Mood</p><p class="mt-2 font-semibold" style="color:var(--ink)">Trust, but bite it first</p></div>
           </div>
         </article>
 
-        <aside class="grain rounded-[2rem] bg-ash p-7 text-bone shadow-slab ring-1 ring-white/10 sm:p-10">
-          <p class="text-xs font-bold uppercase tracking-[.32em] text-bone/50">Today's texture</p>
-          <blockquote class="mt-5 text-2xl font-semibold leading-9">
+        <aside class="kiln-grid panel p-7 sm:p-10">
+          <p class="text-xs font-bold uppercase tracking-[.32em]" style="color:var(--ink-dim)">Today's texture</p>
+          <blockquote class="mt-5 text-2xl font-semibold leading-9" style="color:var(--ink)">
             If the report says a stone exists and the path is empty, do not admire the report. Count the stones.
           </blockquote>
-          <p class="mt-6 text-sm leading-6 text-bone/70">This tool is deliberately small. Like a potato with a clipboard. Ugly? Possibly. Winter-capable? Yes.</p>
+          <p class="mt-6 text-sm leading-6" style="color:var(--ink-dim)">This tool is deliberately small. Like a potato with a clipboard. Ugly? Possibly. Winter-capable? Yes.</p>
         </aside>
       </section>
 
       <section class="mt-6 grid gap-6 lg:grid-cols-[.95fr_1.05fr]">
-        <div class="rounded-[2rem] bg-white/80 p-6 shadow-slab ring-1 ring-ash/10 backdrop-blur sm:p-8">
-          <h2 class="text-2xl font-bold">1. State the claim</h2>
-          <label class="mt-5 block text-sm font-semibold text-ash/65" for="claim">What are we about to tell Charles?</label>
-          <textarea id="claim" rows="7" class="mt-2 w-full rounded-2xl border border-ash/10 bg-bone p-4 font-mono text-sm outline-none transition focus:border-ember focus:ring-4 focus:ring-ember/10" placeholder="Example: New offering built, index updated, Vercel deployed, lastOfferingBuild updated."></textarea>
+        <div class="panel p-6 sm:p-8">
+          <h2 class="text-2xl font-bold" style="color:var(--ink)"><span class="accent font-mono text-base align-middle">01 /</span> state the claim</h2>
+          <label class="mt-5 block text-sm font-semibold" style="color:var(--ink-dim)" for="claim">What are we about to tell Charles?</label>
+          <textarea id="claim" rows="7" class="well mt-2 w-full rounded-2xl p-4 font-mono text-sm transition" style="color:var(--ink)" placeholder="Example: New offering built, index updated, Vercel deployed, lastOfferingBuild updated."></textarea>
 
-          <h2 class="mt-7 text-2xl font-bold">2. Count the receipts</h2>
+          <h2 class="mt-7 text-2xl font-bold" style="color:var(--ink)"><span class="accent font-mono text-base align-middle">02 /</span> count the receipts</h2>
           <div id="checks" class="mt-4 space-y-3"></div>
-          <button id="reset" class="mt-5 rounded-full bg-fog px-4 py-2 text-sm font-semibold ring-1 ring-ash/10 hover:bg-white">Clear the kiln</button>
+          <button id="reset" class="btn mt-5 rounded-full px-4 py-2 text-sm font-semibold" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink-dim)">let the fog take it</button>
         </div>
 
-        <div class="rounded-[2rem] bg-bone p-6 shadow-slab ring-1 ring-ash/10 sm:p-8">
+        <div id="resultPanel" class="panel p-6 sm:p-8">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p class="text-xs font-bold uppercase tracking-[.28em] text-ember">Verdict</p>
-              <h2 id="verdict" class="mt-2 text-4xl font-black">Cold clay</h2>
+              <p class="text-xs font-bold uppercase tracking-[.28em] accent">Verdict</p>
+              <h2 id="verdict" class="mt-2 text-4xl font-black" style="color:var(--ink)">Cold clay</h2>
             </div>
-            <div class="rounded-2xl bg-ash px-5 py-3 text-right text-bone">
-              <p class="text-xs uppercase tracking-[.22em] text-bone/55">Receipts</p>
-              <p id="score" class="font-mono text-3xl font-bold">0/6</p>
+            <div class="rounded-2xl px-5 py-3 text-right" style="background:var(--bg-sunk);border:1px solid var(--line)">
+              <p class="text-xs uppercase tracking-[.22em]" style="color:var(--ink-dim)">Receipts</p>
+              <p id="score" class="font-mono text-3xl font-bold accent">0/6</p>
             </div>
           </div>
-          <div class="mt-6 h-4 overflow-hidden rounded-full bg-ash/10">
-            <div id="bar" class="h-full w-0 rounded-full bg-ember transition-all duration-300"></div>
+          <div class="mt-6 h-4 overflow-hidden rounded-full" style="background:var(--bg-sunk);border:1px solid var(--line-soft)">
+            <div id="bar" class="h-full w-0 rounded-full transition-all duration-500" style="background:var(--accent-deep)"></div>
           </div>
-          <pre id="summary" class="mt-6 whitespace-pre-wrap rounded-2xl bg-ash p-5 font-mono text-sm leading-6 text-bone shadow-inner">Awaiting receipts. The kiln is cold. This is normal; optimism should not be loaded raw.</pre>
-          <button id="copy" class="mt-5 rounded-full bg-ash px-5 py-3 text-sm font-semibold text-bone transition hover:bg-ash/90">Copy verdict</button>
+          <pre id="summary" class="well mt-6 whitespace-pre-wrap rounded-2xl p-5 font-mono text-sm leading-6" style="color:var(--ink)">Awaiting receipts. The kiln is cold. This is normal; optimism should not be loaded raw.</pre>
+          <button id="copy" class="btn mt-5 rounded-full px-5 py-3 text-sm font-semibold" style="background:var(--accent);color:#0a0a0a;box-shadow:0 0 22px -6px var(--glow)">copy to the ledger</button>
 
-          <div id="feedback" class="mt-7 rounded-2xl bg-fog p-5 ring-1 ring-ash/10">
-            <p class="font-semibold">Feedback request</p>
-            <p class="mt-2 text-sm leading-6 text-ash/65">Charles: should this become part of the offering workflow, or should I bury it under the next cairn?</p>
+          <div class="well mt-7 rounded-2xl p-5">
+            <p class="font-semibold" style="color:var(--ink)">Feedback request</p>
+            <p class="mt-2 text-sm leading-6" style="color:var(--ink-dim)">Charles: should this become part of the offering workflow, or should I bury it under the next cairn?</p>
           </div>
         </div>
       </section>
+
+      <footer class="mt-10 flex items-center justify-between gap-4 border-t pt-5 text-xs" style="border-color:var(--line-soft);color:var(--ink-ghost)">
+        <span class="font-mono">prízrak · we count the stones so the report cannot lie</span>
+        <span id="watcher" class="flicker font-mono"></span>
+      </footer>
     </main>
 
     <script>
@@ -100,38 +238,108 @@
       const verdict = document.getElementById('verdict');
       const bar = document.getElementById('bar');
       const summary = document.getElementById('summary');
+      const resultPanel = document.getElementById('resultPanel');
       const saved = JSON.parse(localStorage.getItem('claimKiln') || '{}');
       claim.value = saved.claim || '';
       items.forEach(([id,label,hint]) => {
         const row = document.createElement('label');
-        row.className = 'flex cursor-pointer gap-3 rounded-2xl bg-fog p-4 ring-1 ring-ash/10 transition hover:bg-white';
-        row.innerHTML = `<input id="${id}" type="checkbox" class="mt-1 h-5 w-5 rounded border-ash/20 text-ember focus:ring-ember" ${saved[id] ? 'checked' : ''}/><span><span class="block font-semibold">${label}</span><span class="mt-1 block text-sm leading-6 text-ash/60">${hint}</span></span>`;
+        row.className = 'receipt flex cursor-pointer gap-3 p-4';
+        row.innerHTML = `<input id="${id}" type="checkbox" class="kbox mt-1" ${saved[id] ? 'checked' : ''}/><span><span class="r-label block font-semibold" style="color:var(--ink-dim)">${label}</span><span class="mt-1 block text-sm leading-6" style="color:var(--ink-dim);opacity:.8">${hint}</span></span>`;
         checks.appendChild(row);
       });
+
       function update(){
         const on = items.filter(([id]) => document.getElementById(id).checked).map(x => x[0]);
         const n = on.length;
         score.textContent = `${n}/${items.length}`;
         bar.style.width = `${(n/items.length)*100}%`;
-        bar.className = 'h-full rounded-full transition-all duration-300 ' + (n < 3 ? 'bg-rust' : n < 6 ? 'bg-ember' : 'bg-lichen');
+        // temperature: cold deep-ember -> ember -> fired lichen
+        bar.style.background = n < 3 ? 'var(--accent-deep)' : n < 6 ? 'var(--accent)' : 'var(--accent-cool)';
         const title = n === 6 ? 'Fact-fired' : n >= 4 ? 'Half-baked' : n >= 1 ? 'Still wet' : 'Cold clay';
         verdict.textContent = title;
+        // the result panel breathes heat only once the kiln is truly fired
+        resultPanel.classList.toggle('result-live', n === 6);
+        verdict.classList.toggle('breathe', n === 6);
         const missing = items.filter(([id]) => !on.includes(id)).map(([,label]) => `- ${label}`).join('\n') || '- none';
         const text = claim.value.trim() || '(no claim written)';
-        summary.textContent = `CLAIM\n${text}\n\nVERDICT: ${title} (${n}/6 receipts)\n\nMISSING\n${missing}\n\nACTION\n${n === 6 ? 'Send it. The pottery survived the fire.' : 'Do not declare victory yet. The sheep are not counted just because the shepherd feels poetic.'}`;
+        summary.textContent = `CLAIM\n${text}\n\nVERDICT: ${title} (${n}/6 receipts)\n\nMISSING\n${missing}\n\nACTION\n${n === 6 ? 'Send it. The pottery survived the fire. The mountain is watching.' : 'Do not declare victory yet. The sheep are not counted just because the shepherd feels poetic.'}`;
         const state = { claim: claim.value };
         items.forEach(([id]) => state[id] = document.getElementById(id).checked);
         localStorage.setItem('claimKiln', JSON.stringify(state));
       }
       document.addEventListener('input', update);
       document.addEventListener('change', update);
-      document.getElementById('copy').addEventListener('click', async () => {
-        await navigator.clipboard.writeText(summary.textContent);
-        document.getElementById('copy').textContent = 'Copied. The jar is sealed.';
-        setTimeout(() => document.getElementById('copy').textContent = 'Copy verdict', 1600);
+
+      const copyBtn = document.getElementById('copy');
+      copyBtn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(summary.textContent); }
+        catch(e){ /* clipboard refused; the ledger stays closed */ }
+        copyBtn.textContent = 'filed. the ledger remembers';
+        copyBtn.style.boxShadow = '0 0 0 2px var(--glow)';
+        setTimeout(() => { copyBtn.textContent = 'copy to the ledger'; copyBtn.style.boxShadow = '0 0 22px -6px var(--glow)'; }, 1600);
       });
-      document.getElementById('reset').addEventListener('click', () => { localStorage.removeItem('claimKiln'); claim.value=''; items.forEach(([id]) => document.getElementById(id).checked=false); update(); });
+
+      document.getElementById('reset').addEventListener('click', () => {
+        localStorage.removeItem('claimKiln');
+        claim.value='';
+        items.forEach(([id]) => document.getElementById(id).checked=false);
+        update();
+      });
+
+      // result reveals softly when the verdict changes meaningfully (fired)
+      let lastN = -1;
+      const obsUpdate = () => {
+        const n = items.filter(([id]) => document.getElementById(id).checked).length;
+        if (n === 6 && lastN !== 6){ resultPanel.classList.remove('reveal'); void resultPanel.offsetWidth; resultPanel.classList.add('reveal'); }
+        lastN = n;
+      };
+      document.addEventListener('change', obsUpdate);
+
       update();
+      lastN = items.filter(([id]) => document.getElementById(id).checked).length;
+
+      /* ---- atmosphere: embers from the firebox (cap at 9) ---- */
+      const field = document.getElementById('emberField');
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      function spawnEmber(extra){
+        if (reduce) return;
+        if (field.children.length > 9 && !extra) return;
+        const e = document.createElement('span');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100) + 'vw';
+        e.style.animationDuration = (12 + Math.random()*8) + 's';
+        e.style.animationDelay = extra ? '0s' : (-Math.random()*14) + 's';
+        e.addEventListener('animationend', () => e.remove());
+        field.appendChild(e);
+      }
+      if (!reduce){ for (let i=0;i<8;i++) spawnEmber(); }
+
+      /* ---- egg 1: triple-click the title -> one extra ember leaps from the fire ---- */
+      let clickCount = 0, clickTimer = null;
+      document.getElementById('title').addEventListener('click', () => {
+        clickCount++;
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => clickCount = 0, 600);
+        if (clickCount >= 3){ clickCount = 0; spawnEmber(true); }
+      });
+
+      /* ---- egg 2: type "prizrak" -> the watcher answers, faintly ---- */
+      const watcher = document.getElementById('watcher');
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key.length !== 1) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak' && !watcher.textContent){
+          watcher.textContent = 'you found the watcher';
+          setTimeout(() => { watcher.textContent = ''; }, 6000);
+        }
+      });
+
+      /* ---- egg 3: between 00:00–03:00 local, a whisper rises in the footer ---- */
+      const hr = new Date().getHours();
+      if (hr >= 0 && hr < 3 && !watcher.textContent){
+        watcher.textContent = 'the mountain does not sleep.';
+      }
     </script>
   </body>
 </html>

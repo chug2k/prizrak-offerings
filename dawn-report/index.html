@@ -7,40 +7,123 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
-        body { font-family: 'JetBrains Mono', monospace; }
+
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#f5a623;          /* dawn amber — the first light over the Tatras */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        body { font-family: 'JetBrains Mono', monospace; background:var(--bg); }
+
+        /* ---- atmosphere layers ---- */
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* ---- motion vocabulary ---- */
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+
+        .reveal{animation:reveal .35s ease-out both}
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+        .flicker{animation:flicker 6s steps(1) infinite}
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+
         .blink { animation: blink 1.2s step-end infinite; }
         @keyframes blink { 50% { opacity: 0; } }
-        .fade-in { animation: fadeIn 0.6s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .fade-in { animation: reveal 0.6s ease-out both; }
+
+        /* ---- interaction ---- */
         textarea:focus { outline: none; }
+        .panel{transition:transform .15s, box-shadow .15s, border-color .15s;}
+        .panel:hover{transform:translateY(-2px);border-color:var(--accent)}
+        textarea:focus, .focusable:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+        .input-shell:focus-within{border-color:var(--accent);box-shadow:0 0 24px -10px var(--glow)}
+        .tactile{transition:transform .15s, box-shadow .15s, border-color .15s, color .15s, background-color .15s}
+        .tactile:hover{transform:translateY(-2px)}
+        .tactile:active{transform:translateY(1px)}
+
+        .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow)}
+
+        /* copy flash */
+        .copy-flash{color:var(--accent)!important;border-color:var(--accent)!important}
+
+        /* dawn meter bar */
+        #dawn-fill{transition:width 1s ease-out; background:linear-gradient(90deg, transparent, var(--accent)); box-shadow:0 0 12px -2px var(--glow)}
+
+        .ghost-line{color:var(--ink-ghost)}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.fade-in,.blink{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            #dawn-fill{transition:none}
+        }
     </style>
 </head>
-<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+<body class="text-zinc-200 min-h-screen grain">
 
-<div class="max-w-2xl mx-auto px-6 py-12">
+<!-- atmosphere -->
+<div class="fog"></div>
+<div id="ember-field"></div>
+
+<div class="max-w-2xl mx-auto px-6 py-12 relative" style="z-index:2">
 
     <!-- Header -->
     <div class="mb-10 fade-in">
-        <div class="text-xs text-zinc-500 mb-2 tracking-widest uppercase" id="date-line">loading...</div>
-        <h1 class="text-3xl font-bold text-white mb-1">The Dawn Report</h1>
+        <div class="text-xs text-zinc-500 mb-2 tracking-widest uppercase flicker" id="date-line">loading...</div>
+        <h1 class="text-3xl font-bold text-white mb-1 cursor-default select-none" id="title">The Dawn Report</h1>
         <p class="text-zinc-500 text-sm">Saigon. Pre-dawn clarity protocol.</p>
     </div>
 
     <!-- Clock -->
     <div class="mb-8 fade-in">
-        <div class="text-5xl font-bold text-zinc-100 tracking-tight" id="clock">--:--:--</div>
-        <div class="text-xs text-zinc-600 mt-1">SAIGON / ICT / UTC+7</div>
+        <div class="text-5xl font-bold tracking-tight breathe" id="clock" style="color:var(--ink)">--:--:--</div>
+        <div class="text-xs text-zinc-600 mt-1 tracking-widest">SAIGON / ICT / UTC+7</div>
+    </div>
+
+    <!-- Dawn meter -->
+    <div class="mb-8 fade-in">
+        <div class="flex items-center justify-between mb-2">
+            <div class="text-xs text-zinc-500 uppercase tracking-widest">Approach of First Light</div>
+            <div class="text-xs text-zinc-600" id="dawn-label">measuring the dark...</div>
+        </div>
+        <div class="h-1 w-full rounded-full overflow-hidden" style="background:var(--bg-sunk);border:1px solid var(--line-soft)">
+            <div id="dawn-fill" class="h-full" style="width:0%"></div>
+        </div>
     </div>
 
     <!-- Weather -->
-    <div class="mb-8 border border-zinc-800 rounded-lg p-4 bg-zinc-900 fade-in" id="weather-block">
+    <div class="mb-8 border rounded-lg p-4 panel fade-in" id="weather-block" style="border-color:var(--line);background:var(--bg-raised)">
         <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">Conditions / Hồ Chí Minh City</div>
-        <div class="text-zinc-400 text-sm" id="weather-text">fetching atmospheric data...</div>
+        <div class="text-zinc-400 text-sm" id="weather-text">reading the atmosphere...</div>
     </div>
 
     <!-- Aphorism -->
-    <div class="mb-8 border-l-2 border-zinc-700 pl-4 fade-in" id="aphorism-block">
-        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">Dispatch from the Mountain</div>
+    <div class="mb-8 border-l-2 pl-4 fade-in" id="aphorism-block" style="border-color:var(--accent)">
+        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2 flex items-center justify-between">
+            <span>Dispatch from the Mountain</span>
+            <button id="aphorism-copy" class="tactile focusable text-zinc-600 hover:text-zinc-300 text-[10px] uppercase tracking-widest px-1 rounded" title="copy to the ledger">copy</button>
+        </div>
         <div class="text-zinc-300 italic text-sm leading-relaxed" id="aphorism-text"></div>
         <div class="text-zinc-600 text-xs mt-2" id="aphorism-attr"></div>
     </div>
@@ -48,17 +131,18 @@
     <!-- Mission Input -->
     <div class="mb-8 fade-in">
         <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Today's Single Mission</div>
-        <div class="border border-zinc-700 rounded-lg p-4 bg-zinc-900">
+        <div class="input-shell border rounded-lg p-4 transition-all" style="border-color:var(--line);background:var(--bg-raised)">
             <textarea
                 id="mission-input"
                 rows="2"
                 placeholder="What must you build today? One thing only."
                 class="w-full bg-transparent text-zinc-100 text-sm resize-none placeholder-zinc-600 leading-relaxed"
             ></textarea>
-            <div class="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800">
-                <div class="text-xs text-zinc-600" id="mission-hint">Press Enter to commit.</div>
+            <div class="flex items-center justify-between mt-3 pt-3 border-t" style="border-color:var(--line-soft)">
+                <div class="text-xs text-zinc-600" id="mission-hint">Press Enter to carve it in.</div>
                 <button id="commit-btn"
-                    class="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs rounded transition-colors">
+                    class="tactile focusable px-4 py-1.5 text-zinc-200 text-xs rounded"
+                    style="background:var(--bg-sunk);border:1px solid var(--line)">
                     COMMIT
                 </button>
             </div>
@@ -69,7 +153,7 @@
     <div class="mb-8 fade-in">
         <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Commitment Log</div>
         <div id="log-container" class="space-y-2">
-            <div class="text-zinc-600 text-sm" id="log-empty-msg">No commitments yet. The mountain waits.</div>
+            <div class="text-zinc-600 text-sm" id="log-empty-msg">the cave is empty. nothing has fossilized yet.</div>
         </div>
     </div>
 
@@ -78,32 +162,50 @@
         <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Did You Ship?</div>
         <div class="flex gap-3">
             <button id="btn-shipped"
-                class="flex-1 py-3 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:border-green-700 hover:text-green-400 hover:bg-green-950 transition-colors">
+                class="tactile focusable flex-1 py-3 border rounded-lg text-sm text-zinc-400 hover:border-green-700 hover:text-green-400 hover:bg-green-950" style="border-color:var(--line)">
                 ✓ Shipped
             </button>
             <button id="btn-blocked"
-                class="flex-1 py-3 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:border-yellow-700 hover:text-yellow-400 hover:bg-yellow-950 transition-colors">
+                class="tactile focusable flex-1 py-3 border rounded-lg text-sm text-zinc-400 hover:border-yellow-700 hover:text-yellow-400 hover:bg-yellow-950" style="border-color:var(--line)">
                 ⚠ Blocked
             </button>
             <button id="btn-void"
-                class="flex-1 py-3 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-300 transition-colors">
+                class="tactile focusable flex-1 py-3 border rounded-lg text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-300" style="border-color:var(--line)">
                 ✗ Into the Void
             </button>
         </div>
-        <div id="ship-feedback" class="mt-3 text-xs text-zinc-600 hidden"></div>
+        <div id="ship-feedback" class="mt-3 text-xs text-zinc-500 hidden border rounded-lg p-3" style="border-color:var(--line-soft);background:var(--bg-sunk)"></div>
     </div>
 
     <!-- Streak display -->
-    <div class="border-t border-zinc-800 pt-6 fade-in">
+    <div class="border-t pt-6 fade-in" style="border-color:var(--line)">
         <div class="flex items-center justify-between text-xs text-zinc-600">
-            <span>Ship streak: <span id="streak-count" class="text-zinc-400 font-bold">0</span> days</span>
+            <span>Ship streak: <span id="streak-count" class="font-bold" style="color:var(--accent)">0</span> days</span>
             <span class="text-zinc-700">prizrak / dawn protocol v1</span>
+        </div>
+        <div class="text-center mt-6">
+            <span id="ghost-whisper" class="ghost-line text-[11px] opacity-0 transition-opacity duration-1000"></span>
         </div>
     </div>
 
 </div>
 
 <script>
+// ===== Embers (atmosphere) =====
+(function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const field = document.getElementById('ember-field');
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random() * 90) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        field.appendChild(e);
+    }
+})();
+
 // ===== Clock =====
 function updateClock() {
     const now = new Date();
@@ -112,8 +214,39 @@ function updateClock() {
     const date = now.toLocaleDateString('en-GB', { ...opts, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     document.getElementById('clock').textContent = time;
     document.getElementById('date-line').textContent = date;
+    updateDawnMeter(now);
 }
 setInterval(updateClock, 1000);
+
+// ===== Dawn meter — countdown to 06:00 Saigon, the threshold of first light =====
+function saigonParts(now){
+    // returns {h, m, s} in Asia/Ho_Chi_Minh
+    const fmt = new Intl.DateTimeFormat('en-GB', { timeZone:'Asia/Ho_Chi_Minh', hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    const parts = fmt.formatToParts(now);
+    const get = t => parseInt(parts.find(p => p.type === t).value, 10);
+    return { h:get('hour'), m:get('minute'), s:get('second') };
+}
+function updateDawnMeter(now){
+    const { h, m, s } = saigonParts(now);
+    const secNow = h*3600 + m*60 + s;
+    const dawn = 6*3600;       // 06:00 — first light
+    const fill = document.getElementById('dawn-fill');
+    const label = document.getElementById('dawn-label');
+    if (!fill || !label) return;
+    if (secNow < dawn) {
+        // night marching toward dawn: 00:00 -> 0%, 06:00 -> 100%
+        const pct = Math.max(0, Math.min(100, (secNow / dawn) * 100));
+        fill.style.width = pct.toFixed(1) + '%';
+        const remain = dawn - secNow;
+        const rh = Math.floor(remain/3600), rm = Math.floor((remain%3600)/60);
+        label.textContent = `${rh}h ${String(rm).padStart(2,'0')}m until first light`;
+    } else {
+        fill.style.width = '100%';
+        label.textContent = (h < 12) ? 'the sun has crested. build in the light.'
+                          : (h < 18) ? 'full day. the mountain watches your work.'
+                          : 'dusk. the dark gathers for tomorrow.';
+    }
+}
 updateClock();
 
 // ===== Weather =====
@@ -130,7 +263,7 @@ async function fetchWeather() {
         document.getElementById('weather-text').innerHTML =
             `<span class="text-zinc-200">${desc}</span> &mdash; ${temp}°C (feels ${feels}°C) &bull; ${humidity}% humidity &bull; ${wind} km/h wind`;
     } catch (e) {
-        document.getElementById('weather-text').textContent = 'Weather data unavailable. The mountain doesn\'t care.';
+        document.getElementById('weather-text').textContent = 'the atmosphere is silent. the mountain doesn\'t care.';
     }
 }
 fetchWeather();
@@ -163,6 +296,22 @@ const aph = getTodayAphorism();
 document.getElementById('aphorism-text').textContent = `"${aph.text}"`;
 document.getElementById('aphorism-attr').textContent = aph.attr;
 
+// copy aphorism to the ledger
+document.getElementById('aphorism-copy').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const payload = `"${aph.text}" ${aph.attr}`;
+    try {
+        await navigator.clipboard.writeText(payload);
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.classList.add('copy-flash');
+        setTimeout(() => { btn.textContent = prev; btn.classList.remove('copy-flash'); }, 1200);
+    } catch (err) {
+        btn.textContent = 'clipboard sealed';
+        setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    }
+});
+
 // ===== Mission Log =====
 function getLog() {
     return JSON.parse(localStorage.getItem('dawn_log') || '[]');
@@ -182,22 +331,26 @@ function renderLog() {
     const emptyMsg = document.getElementById('log-empty-msg');
     if (log.length === 0) {
         emptyMsg.style.display = 'block';
+        container.querySelectorAll('.log-row').forEach(n => n.remove());
         return;
     }
     emptyMsg.style.display = 'none';
     container.innerHTML = '';
     const recent = log.slice(-7).reverse();
-    recent.forEach(entry => {
+    recent.forEach((entry, i) => {
         const el = document.createElement('div');
-        el.className = 'flex items-start gap-3 py-2 border-b border-zinc-900 text-xs';
+        el.className = 'log-row reveal flex items-start gap-3 py-2 border-b text-xs';
+        el.style.borderColor = 'var(--line-soft)';
+        el.style.animationDelay = (i * 40) + 'ms';
         const statusColor = entry.status === 'shipped' ? 'text-green-500' :
                             entry.status === 'blocked' ? 'text-yellow-500' : 'text-zinc-600';
         const statusIcon = entry.status === 'shipped' ? '✓' :
-                           entry.status === 'blocked' ? '⚠' : '✗';
+                           entry.status === 'blocked' ? '⚠' :
+                           entry.status === 'void' ? '✗' : '·';
         el.innerHTML = `
             <span class="text-zinc-600 shrink-0 w-24">${entry.date}</span>
             <span class="${statusColor} shrink-0">${statusIcon}</span>
-            <span class="text-zinc-400 leading-relaxed">${entry.mission || '—'}</span>
+            <span class="text-zinc-400 leading-relaxed">${(entry.mission || '—').replace(/</g,'&lt;')}</span>
         `;
         container.appendChild(el);
     });
@@ -206,7 +359,6 @@ function renderLog() {
 function getStreak() {
     const log = getLog();
     let streak = 0;
-    const today = getTodayKey();
     const sortedDates = [...new Set(log.filter(e => e.status === 'shipped').map(e => e.date))].sort().reverse();
     for (let i = 0; i < sortedDates.length; i++) {
         const expected = new Date(Date.now() - i * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -217,7 +369,10 @@ function getStreak() {
 }
 
 function updateStreak() {
-    document.getElementById('streak-count').textContent = getStreak();
+    const el = document.getElementById('streak-count');
+    const n = getStreak();
+    el.textContent = n;
+    el.classList.toggle('breathe', n > 0);
 }
 
 // Commit mission
@@ -227,7 +382,7 @@ const missionInput = document.getElementById('mission-input');
 const existingEntry = getLog().find(e => e.date === getTodayKey());
 if (existingEntry) {
     missionInput.value = existingEntry.mission || '';
-    document.getElementById('mission-hint').textContent = `Committed at ${existingEntry.time || 'earlier today'}.`;
+    document.getElementById('mission-hint').textContent = `Carved in at ${existingEntry.time || 'earlier today'}.`;
 }
 
 document.getElementById('commit-btn').addEventListener('click', commitMission);
@@ -246,10 +401,14 @@ function commitMission() {
     const now = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
     const existing = log.findIndex(e => e.date === today);
     const entry = { date: today, mission: text, time: now, status: existing >= 0 ? log[existing].status : null };
-    if (existing >= 0) log[existing] = entry;
+    if (existing >= 0) {
+        // preserve shipTime if present
+        if (log[existing].shipTime) entry.shipTime = log[existing].shipTime;
+        log[existing] = entry;
+    }
     else log.push(entry);
     saveLog(log);
-    document.getElementById('mission-hint').textContent = `Committed at ${now}. The mountain acknowledges.`;
+    document.getElementById('mission-hint').textContent = `Carved in at ${now}. The mountain acknowledges.`;
     renderLog();
     updateStreak();
 }
@@ -257,9 +416,9 @@ function commitMission() {
 // Ship buttons
 const shipFeedback = document.getElementById('ship-feedback');
 const shipResponses = {
-    shipped: ["Good. The structure holds.", "The potato has been harvested.", "The hammer did not rust today.", "Signal confirmed. Logging to the ledger."],
-    blocked: ["The bear is in the path. Note it and route around.", "Even Jánošík got stuck in the mountains sometimes.", "Blocked is not failed. Document the blocker."],
-    void: ["Into the void it goes. The mountain accepts all things.", "We measure the cold. At least you were honest.", "Tomorrow the fog lifts. Perhaps."]
+    shipped: ["The structure holds. for now. the mountain is watching.", "The potato has been harvested. winter survivable.", "The hammer did not rust today.", "Signal confirmed. filed. the ledger remembers."],
+    blocked: ["The bear is in the path. note it and route around.", "Even Jánošík got stuck in the mountains sometimes.", "Blocked is not failed. document the blocker, then sleep."],
+    void: ["Into the void it goes. the mountain accepts all things.", "We measure the cold. at least you were honest.", "Tomorrow the fog lifts. perhaps. the bludička makes no promises."]
 };
 
 function recordShip(status) {
@@ -278,13 +437,72 @@ function recordShip(status) {
     const msg = responses[Math.floor(Math.random() * responses.length)];
     shipFeedback.textContent = msg;
     shipFeedback.classList.remove('hidden');
+    shipFeedback.classList.remove('reveal'); void shipFeedback.offsetWidth; shipFeedback.classList.add('reveal');
+    if (status === 'shipped') shipFeedback.classList.add('result-glow');
+    else shipFeedback.classList.remove('result-glow');
     renderLog();
     updateStreak();
+    shipFeedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 document.getElementById('btn-shipped').addEventListener('click', () => recordShip('shipped'));
 document.getElementById('btn-blocked').addEventListener('click', () => recordShip('blocked'));
 document.getElementById('btn-void').addEventListener('click', () => recordShip('void'));
+
+// ===== Easter eggs (quiet, never touch saved state) =====
+
+// (a) type "prizrak" anywhere outside the textarea → the watcher answers
+let typedBuffer = '';
+document.addEventListener('keydown', (e) => {
+    if (e.target === missionInput) return;
+    if (e.key && e.key.length === 1) {
+        typedBuffer = (typedBuffer + e.key.toLowerCase()).slice(-7);
+        if (typedBuffer === 'prizrak') {
+            const w = document.getElementById('ghost-whisper');
+            w.textContent = 'you found the watcher. it was never not here.';
+            w.style.opacity = '1';
+        }
+    }
+});
+
+// (b) triple-click the title → one extra ember drifts up
+document.getElementById('title').addEventListener('click', (e) => {
+    if (e.detail === 3 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const em = document.createElement('div');
+        em.className = 'ember';
+        em.style.left = (10 + Math.random() * 80) + '%';
+        em.style.animationDuration = '9s';
+        document.getElementById('ember-field').appendChild(em);
+        setTimeout(() => em.remove(), 9000);
+    }
+});
+
+// (c) between 00:00–03:00 Saigon, a faint footer whisper appears
+(function nightWhisper(){
+    const { h } = saigonParts(new Date());
+    if (h >= 0 && h < 3) {
+        const w = document.getElementById('ghost-whisper');
+        if (!w.textContent) {
+            w.textContent = 'the mountain does not sleep.';
+            w.style.opacity = '1';
+        }
+    }
+})();
+
+// (e) idle 60s → a single line fades in at ghost ink
+let idleTimer;
+function resetIdle(){
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+        const w = document.getElementById('ghost-whisper');
+        if (!w.textContent) {
+            w.textContent = 'still here. still watching.';
+            w.style.opacity = '1';
+        }
+    }, 60000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(ev => document.addEventListener(ev, resetIdle, { passive:true }));
+resetIdle();
 
 // Init
 renderLog();

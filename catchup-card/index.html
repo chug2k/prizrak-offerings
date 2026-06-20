@@ -7,28 +7,100 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
-    body { font-family: 'IBM Plex Sans', sans-serif; }
+
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#7fd6e0;          /* frost-cyan — the breath you can see */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'IBM Plex Sans', sans-serif; background:var(--bg); }
     .mono { font-family: 'IBM Plex Mono', monospace; }
     .card-output { display: none; }
     .card-output.visible { display: block; }
+
+    /* ── atmosphere ───────────────────────────────────────────────── */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* content rides above the decorative layers */
+    .stage{position:relative;z-index:2;}
+
+    /* ── inputs / focus ───────────────────────────────────────────── */
+    .field{background:var(--bg-sunk);border:1px solid var(--line);}
+    .field:focus-visible,.field:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);}
+
+    /* hover lift on the primary action + card buttons */
+    .lift{transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s;}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent);}
+    .lift:active{transform:translateY(1px);}
+
+    .title-glyph{cursor:default;user-select:none;}
+
+    .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow);}
+
+    /* idle + night whispers */
+    #idle-whisper,#night-whisper{color:var(--ink-ghost);}
+    .whisper-in{animation:reveal .8s ease-out both;}
+
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
       body { background: white !important; color: black !important; }
-      .card-shell { background: white !important; border-color: #ddd !important; }
+      .card-shell { background: white !important; border-color: #ddd !important; box-shadow:none !important; }
       .card-section { border-color: #ddd !important; }
+      .fog,.ember,.grain::after{display:none !important;}
+    }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.whisper-in{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
     }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-200 min-h-screen p-6 md:p-10">
+<body class="grain text-zinc-200 min-h-screen p-6 md:p-10" style="color:var(--ink)">
 
-  <div class="max-w-2xl mx-auto">
+  <!-- decorative atmosphere -->
+  <div class="fog no-print" aria-hidden="true"></div>
+  <div id="ember-field" class="no-print" aria-hidden="true"></div>
+
+  <div class="stage max-w-2xl mx-auto">
 
     <!-- Header -->
     <div class="mb-8 no-print">
-      <p class="mono text-xs text-zinc-500 mb-1">PRIZRAK / OFFERINGS</p>
-      <h1 class="text-3xl font-semibold text-white">The Catchup Card</h1>
-      <p class="text-zinc-400 text-sm mt-2">A pre-meeting briefing generator for founders who do relationship-first business. Input what you know. Receive structure.</p>
+      <p class="mono text-xs mb-1 flicker" style="color:var(--ink-dim);letter-spacing:.15em">PRÍZRAK / OFFERINGS</p>
+      <h1 class="text-3xl font-semibold text-white">
+        <span id="card-title" class="title-glyph">The Catchup Card</span>
+        <span class="title-glyph breathe" style="color:var(--accent)" title="hold to breathe">❄</span>
+      </h1>
+      <p class="text-sm mt-2" style="color:var(--ink-dim)">Reconnaissance with manners. You bring what you know about them. The ghost hands back structure, questions with teeth, and one thing to watch for.</p>
     </div>
 
     <!-- Input Form -->
@@ -36,26 +108,26 @@
 
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="mono text-xs text-zinc-400 block mb-1">CONTACT NAME</label>
-          <input id="inp-name" type="text" placeholder="Pru" 
-            class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400 transition-colors" />
+          <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">CONTACT NAME</label>
+          <input id="inp-name" type="text" placeholder="Pru"
+            class="field w-full rounded px-3 py-2 text-white text-sm transition-colors" />
         </div>
         <div>
-          <label class="mono text-xs text-zinc-400 block mb-1">COMPANY / ROLE</label>
-          <input id="inp-company" type="text" placeholder="Hannah Life Tech" 
-            class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400 transition-colors" />
+          <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">COMPANY / ROLE</label>
+          <input id="inp-company" type="text" placeholder="Hannah Life Tech"
+            class="field w-full rounded px-3 py-2 text-white text-sm transition-colors" />
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="mono text-xs text-zinc-400 block mb-1">MEETING DATE & TIME</label>
-          <input id="inp-datetime" type="text" placeholder="Mon Mar 9 · 9:30 ICT" 
-            class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400 transition-colors" />
+          <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">MEETING DATE &amp; TIME</label>
+          <input id="inp-datetime" type="text" placeholder="Mon Mar 9 · 9:30 ICT"
+            class="field w-full rounded px-3 py-2 text-white text-sm transition-colors" />
         </div>
         <div>
-          <label class="mono text-xs text-zinc-400 block mb-1">DURATION</label>
-          <select id="inp-duration" class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400">
+          <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">DURATION</label>
+          <select id="inp-duration" class="field w-full rounded px-3 py-2 text-white text-sm transition-colors">
             <option value="30">30 minutes</option>
             <option value="45">45 minutes</option>
             <option value="60">60 minutes</option>
@@ -64,37 +136,37 @@
       </div>
 
       <div>
-        <label class="mono text-xs text-zinc-400 block mb-1">WHAT THEY DO (brief)</label>
-        <input id="inp-context" type="text" placeholder="e.g. health tech platform, SEA focus, Series A stage" 
-          class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400 transition-colors" />
+        <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">WHAT THEY DO (brief)</label>
+        <input id="inp-context" type="text" placeholder="e.g. health tech platform, SEA focus, Series A stage"
+          class="field w-full rounded px-3 py-2 text-white text-sm transition-colors" />
       </div>
 
       <div>
-        <label class="mono text-xs text-zinc-400 block mb-1">WHAT YOU WANT FROM THIS MEETING</label>
-        <input id="inp-goal" type="text" placeholder="e.g. understand their investor pipeline, explore partnership" 
-          class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400 transition-colors" />
+        <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">WHAT YOU WANT FROM THIS MEETING</label>
+        <input id="inp-goal" type="text" placeholder="e.g. understand their investor pipeline, explore partnership"
+          class="field w-full rounded px-3 py-2 text-white text-sm transition-colors" />
       </div>
 
       <div>
-        <label class="mono text-xs text-zinc-400 block mb-1">LAST INTERACTION (optional)</label>
-        <input id="inp-last" type="text" placeholder="e.g. met at Echelon, talked about Series A plans" 
-          class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400 transition-colors" />
+        <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">LAST INTERACTION (optional)</label>
+        <input id="inp-last" type="text" placeholder="e.g. met at Echelon, talked about Series A plans"
+          class="field w-full rounded px-3 py-2 text-white text-sm transition-colors" />
       </div>
 
       <div>
-        <label class="mono text-xs text-zinc-400 block mb-1">ANYTHING TO OFFER THEM (optional)</label>
-        <input id="inp-offer" type="text" placeholder="e.g. intro to Kartick, feedback on their deck" 
-          class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-zinc-400 transition-colors" />
+        <label class="mono text-xs block mb-1" style="color:var(--ink-dim);letter-spacing:.08em">ANYTHING TO OFFER THEM (optional)</label>
+        <input id="inp-offer" type="text" placeholder="e.g. intro to Kartick, feedback on their deck"
+          class="field w-full rounded px-3 py-2 text-white text-sm transition-colors" />
       </div>
 
       <div class="flex gap-3 pt-2">
-        <button onclick="generateCard()" 
-          class="bg-white text-zinc-900 font-medium text-sm px-5 py-2 rounded hover:bg-zinc-200 transition-colors">
-          Generate Card
+        <button onclick="generateCard()"
+          class="lift bg-white text-zinc-900 font-medium text-sm px-5 py-2 rounded">
+          Cut the Card
         </button>
-        <button onclick="clearForm()" 
-          class="border border-zinc-700 text-zinc-400 font-medium text-sm px-5 py-2 rounded hover:border-zinc-500 transition-colors">
-          Clear
+        <button onclick="clearForm()"
+          class="lift border text-sm font-medium px-5 py-2 rounded" style="border-color:var(--line);color:var(--ink-dim)">
+          Let the fog take it
         </button>
       </div>
     </div>
@@ -102,77 +174,103 @@
     <!-- Output Card -->
     <div id="card-output" class="card-output">
 
-      <div class="card-shell border border-zinc-700 rounded-lg overflow-hidden">
+      <div class="card-shell result-glow border rounded-lg overflow-hidden" style="border-color:var(--line);background:var(--bg-raised)">
 
         <!-- Card Header -->
-        <div class="bg-zinc-900 px-6 py-4 border-b border-zinc-700">
+        <div class="px-6 py-4 border-b" style="background:var(--bg-raised);border-color:var(--line)">
           <div class="flex items-start justify-between">
             <div>
-              <p id="out-meta" class="mono text-xs text-zinc-500 mb-1"></p>
-              <h2 id="out-title" class="text-xl font-semibold text-white"></h2>
-              <p id="out-sub" class="text-zinc-400 text-sm mt-0.5"></p>
+              <p id="out-meta" class="mono text-xs mb-1" style="color:var(--ink-dim);letter-spacing:.1em"></p>
+              <h2 id="out-title" class="text-xl font-semibold text-white breathe"></h2>
+              <p id="out-sub" class="text-sm mt-0.5" style="color:var(--ink-dim)"></p>
             </div>
             <div class="text-right">
-              <p id="out-datetime" class="mono text-xs text-zinc-400"></p>
-              <p id="out-duration" class="mono text-xs text-zinc-500 mt-0.5"></p>
+              <p id="out-datetime" class="mono text-xs" style="color:var(--ink)"></p>
+              <p id="out-duration" class="mono text-xs mt-0.5" style="color:var(--ink-dim)"></p>
             </div>
           </div>
         </div>
 
         <!-- Objective -->
-        <div class="card-section bg-zinc-950 px-6 py-4 border-b border-zinc-800">
-          <p class="mono text-xs text-zinc-500 mb-2">MISSION</p>
+        <div class="card-section px-6 py-4 border-b" style="background:var(--bg-sunk);border-color:var(--line-soft)">
+          <p class="mono text-xs mb-2" style="color:var(--ink-dim);letter-spacing:.12em">MISSION</p>
           <p id="out-objective" class="text-white text-sm leading-relaxed"></p>
         </div>
 
         <!-- Agenda -->
-        <div class="card-section bg-zinc-950 px-6 py-4 border-b border-zinc-800">
-          <p class="mono text-xs text-zinc-500 mb-3">AGENDA</p>
+        <div class="card-section px-6 py-4 border-b" style="background:var(--bg-sunk);border-color:var(--line-soft)">
+          <p class="mono text-xs mb-3" style="color:var(--ink-dim);letter-spacing:.12em">AGENDA</p>
           <div id="out-agenda" class="space-y-2"></div>
         </div>
 
         <!-- Questions -->
-        <div class="card-section bg-zinc-950 px-6 py-4 border-b border-zinc-800">
-          <p class="mono text-xs text-zinc-500 mb-3">KEY QUESTIONS</p>
+        <div class="card-section px-6 py-4 border-b" style="background:var(--bg-sunk);border-color:var(--line-soft)">
+          <p class="mono text-xs mb-3" style="color:var(--ink-dim);letter-spacing:.12em">QUESTIONS WITH TEETH</p>
           <div id="out-questions" class="space-y-2"></div>
         </div>
 
         <!-- Offer & Watch -->
-        <div class="grid grid-cols-2 border-b border-zinc-800">
-          <div class="card-section bg-zinc-950 px-6 py-4 border-r border-zinc-800">
-            <p class="mono text-xs text-zinc-500 mb-2">WHAT YOU BRING</p>
-            <p id="out-offer" class="text-zinc-300 text-sm leading-relaxed"></p>
+        <div class="grid grid-cols-2 border-b" style="border-color:var(--line-soft)">
+          <div class="card-section px-6 py-4 border-r" style="background:var(--bg-sunk);border-color:var(--line-soft)">
+            <p class="mono text-xs mb-2" style="color:var(--ink-dim);letter-spacing:.1em">WHAT YOU BRING</p>
+            <p id="out-offer" class="text-sm leading-relaxed" style="color:var(--ink)"></p>
           </div>
-          <div class="card-section bg-zinc-950 px-6 py-4">
-            <p class="mono text-xs text-zinc-500 mb-2">WATCH FOR</p>
-            <p id="out-watch" class="text-zinc-300 text-sm leading-relaxed"></p>
+          <div class="card-section px-6 py-4" style="background:var(--bg-sunk)">
+            <p class="mono text-xs mb-2" style="color:var(--ink-dim);letter-spacing:.1em">WATCH FOR</p>
+            <p id="out-watch" class="text-sm leading-relaxed" style="color:var(--ink)"></p>
           </div>
         </div>
 
         <!-- Prizrak Note -->
-        <div class="card-section bg-zinc-900 px-6 py-3">
-          <p id="out-prizrak" class="mono text-xs text-zinc-500 italic"></p>
+        <div class="card-section px-6 py-3" style="background:var(--bg-raised)">
+          <p id="out-prizrak" class="mono text-xs italic" style="color:var(--ink-dim)"></p>
         </div>
 
       </div>
 
       <!-- Actions -->
       <div class="flex gap-3 mt-4 no-print">
-        <button onclick="window.print()" 
-          class="border border-zinc-700 text-zinc-400 text-sm px-4 py-2 rounded hover:border-zinc-500 transition-colors">
+        <button id="btn-copy" onclick="copyCard()"
+          class="lift border text-sm px-4 py-2 rounded" style="border-color:var(--line);color:var(--ink-dim)">
+          Copy to the ledger
+        </button>
+        <button onclick="window.print()"
+          class="lift border text-sm px-4 py-2 rounded" style="border-color:var(--line);color:var(--ink-dim)">
           Print / Save PDF
         </button>
-        <button onclick="resetCard()" 
-          class="border border-zinc-700 text-zinc-400 text-sm px-4 py-2 rounded hover:border-zinc-500 transition-colors">
+        <button onclick="resetCard()"
+          class="lift border text-sm px-4 py-2 rounded" style="border-color:var(--line);color:var(--ink-dim)">
           ← New Card
         </button>
       </div>
 
     </div>
 
+    <!-- footer whispers -->
+    <p id="idle-whisper" class="mono text-xs mt-10 no-print" style="display:none"></p>
+    <p id="night-whisper" class="mono text-xs mt-2 no-print" style="display:none"></p>
+    <p id="egg-whisper" class="mono text-xs mt-2 no-print" style="display:none;color:var(--ink-ghost)"></p>
+
   </div>
 
+  <script src="/shared/star-widget.js"></script>
   <script>
+  // ── ember field: spawn a quiet handful, staggered ──────────────────────────
+  (function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const field = document.getElementById('ember-field');
+    for (let i = 0; i < 7; i++){
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (6 + Math.random()*88) + 'vw';
+      e.style.animationDelay = (Math.random()*14) + 's';
+      e.style.animationDuration = (12 + Math.random()*8) + 's';
+      field.appendChild(e);
+    }
+  })();
+
+  let lastCard = null; // plaintext snapshot for clipboard
+
   function generateCard() {
     const name     = document.getElementById('inp-name').value.trim() || 'Contact';
     const company  = document.getElementById('inp-company').value.trim() || '';
@@ -188,14 +286,14 @@
     // Header
     document.getElementById('out-meta').textContent = 'CATCHUP BRIEF';
     document.getElementById('out-title').textContent = `${name}${companyStr}`;
-    document.getElementById('out-sub').textContent = context || 'No context provided.';
+    document.getElementById('out-sub').textContent = context || 'no context provided. you walk in cold.';
     document.getElementById('out-datetime').textContent = datetime || 'Time TBD';
     document.getElementById('out-duration').textContent = `${duration} min`;
 
     // Objective
     const objectiveText = goal
-      ? `${goal.charAt(0).toUpperCase() + goal.slice(1)}. Leave with a clear next step.`
-      : `Strengthen the relationship. Understand where ${name} is now. Leave with a clear next step.`;
+      ? `${goal.charAt(0).toUpperCase() + goal.slice(1)}. Leave with a clear next step — or none, honestly.`
+      : `Strengthen the thread. Find out where ${name} actually is now, not where they were. Leave with one concrete next step.`;
     document.getElementById('out-objective').textContent = objectiveText;
 
     // Agenda
@@ -205,8 +303,9 @@
     agenda.forEach(item => {
       const row = document.createElement('div');
       row.className = 'flex gap-3 items-start';
-      row.innerHTML = `<span class="mono text-xs text-zinc-500 w-12 flex-shrink-0 mt-0.5">${item.time}</span>
-                       <span class="text-sm text-zinc-300">${item.action}</span>`;
+      row.innerHTML = `<span class="mono text-xs w-12 flex-shrink-0 mt-0.5" style="color:var(--accent)">${item.time}</span>
+                       <span class="text-sm" style="color:var(--ink)"></span>`;
+      row.lastElementChild.textContent = item.action;
       agendaEl.appendChild(row);
     });
 
@@ -217,45 +316,105 @@
     questions.forEach((q, i) => {
       const row = document.createElement('div');
       row.className = 'flex gap-3 items-start';
-      row.innerHTML = `<span class="mono text-xs text-zinc-600 w-5 flex-shrink-0 mt-0.5">${i+1}.</span>
-                       <span class="text-sm text-zinc-300">${q}</span>`;
+      row.innerHTML = `<span class="mono text-xs w-5 flex-shrink-0 mt-0.5" style="color:var(--ink-dim)">${i+1}.</span>
+                       <span class="text-sm" style="color:var(--ink)"></span>`;
+      row.lastElementChild.textContent = q;
       questionsEl.appendChild(row);
     });
 
     // Offer
-    document.getElementById('out-offer').textContent = offer
+    const offerText = offer
       ? offer.charAt(0).toUpperCase() + offer.slice(1) + '.'
-      : `Perspective from operating in SEA. Genuine interest in their work.`;
+      : `Perspective from operating in SEA. Genuine, unfeigned interest in their work.`;
+    document.getElementById('out-offer').textContent = offerText;
 
     // Watch for
-    document.getElementById('out-watch').textContent =
-      `Energy around what they're building. What they ask you first. What they avoid answering.`;
+    const watchText = `The energy around what they build. What they ask you first. And — the tell — what they quietly avoid answering.`;
+    document.getElementById('out-watch').textContent = watchText;
 
     // Prizrak note
     const notes = [
-      `The potato does not care about the agenda. It just needs to be planted before the frost. Show up, be present, ask the second question.`,
-      `A catchup is not a meeting. It is reconnaissance with manners. The agenda is a map, not a contract.`,
-      `You will know the meeting was successful if ${name} does most of the talking and you leave knowing one thing you did not know before.`,
-      `The question you are afraid to ask is usually the one worth asking. Note which one you skip.`,
-      `Thirty minutes is enough to determine if the relationship deserves thirty more. That is all this is.`,
+      `The potato does not care about your agenda. It needs only to be in the ground before the frost. Show up, be present, ask the second question.`,
+      `A catchup is not a meeting. It is reconnaissance with manners. The agenda is a map, not a contract — and the mountain redraws maps.`,
+      `You will know it worked if ${name} did most of the talking and you walked out carrying one thing you did not know on the way in.`,
+      `The question you are afraid to ask is usually the one worth asking. Note which one you skip. The ghost notes it too.`,
+      `Thirty minutes is enough to learn whether the relationship deserves thirty more. That is the whole of it. No more, no less.`,
+      `Warmth is not strategy, but cold never built a bridge either. Bring both. The Tatras keep the ones who do.`,
     ];
-    const note = notes[Math.abs(name.charCodeAt(0) + (company || '').charCodeAt(0) || 0) % notes.length];
-    document.getElementById('out-prizrak').textContent = `— Prizrak: ${note}`;
+    const seed = Math.abs((name.charCodeAt(0) || 0) + ((company || '').charCodeAt(0) || 0));
+    const note = notes[seed % notes.length];
+    document.getElementById('out-prizrak').textContent = `— Prízrak: ${note}`;
 
-    // Show card
-    document.getElementById('card-output').classList.add('visible');
+    // Build plaintext snapshot for the ledger
+    lastCard = buildPlaintext({ name, companyStr, context, datetime, duration, objectiveText, agenda, questions, offerText, watchText, note });
+
+    // Show card with the reveal animation
+    const out = document.getElementById('card-output');
+    out.classList.add('visible');
+    out.classList.remove('reveal'); void out.offsetWidth; out.classList.add('reveal');
     document.getElementById('form-section').style.opacity = '0.4';
-    document.getElementById('card-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function buildPlaintext(d){
+    const lines = [];
+    lines.push(`CATCHUP BRIEF — ${d.name}${d.companyStr}`);
+    if (d.context) lines.push(d.context);
+    lines.push(`${d.datetime || 'Time TBD'} · ${d.duration} min`);
+    lines.push('');
+    lines.push('MISSION'); lines.push(d.objectiveText); lines.push('');
+    lines.push('AGENDA');
+    d.agenda.forEach(a => lines.push(`  ${a.time}  ${a.action}`));
+    lines.push('');
+    lines.push('QUESTIONS WITH TEETH');
+    d.questions.forEach((q,i) => lines.push(`  ${i+1}. ${q}`));
+    lines.push('');
+    lines.push(`WHAT YOU BRING: ${d.offerText}`);
+    lines.push(`WATCH FOR: ${d.watchText}`);
+    lines.push('');
+    lines.push(`— Prízrak: ${d.note}`);
+    return lines.join('\n');
+  }
+
+  function copyCard(){
+    const btn = document.getElementById('btn-copy');
+    if (!lastCard){ return; }
+    const done = () => {
+      const original = 'Copy to the ledger';
+      btn.textContent = 'copied to the ledger';
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.color = 'var(--accent)';
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.style.borderColor = 'var(--line)';
+        btn.style.color = 'var(--ink-dim)';
+      }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(lastCard).then(done).catch(() => fallbackCopy(lastCard, done));
+    } else {
+      fallbackCopy(lastCard, done);
+    }
+  }
+
+  function fallbackCopy(text, done){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      done();
+    }catch(e){ /* the fog keeps it */ }
   }
 
   function buildAgenda(duration, name, last, goal) {
     if (duration === 30) {
       return [
-        { time: '0:00',  action: `Open — ${last ? `"Good to reconnect since ${last}."` : `Brief context reset: where you both are now.`}` },
-        { time: '0:05',  action: `Their update — what is ${name} working on / excited about right now?` },
+        { time: '0:00',  action: `Open — ${last ? `"Good to reconnect since ${last}."` : `Brief context reset: where you both stand now.`}` },
+        { time: '0:05',  action: `Their update — what is ${name} working on / genuinely excited about right now?` },
         { time: '0:15',  action: `Your update — keep it honest and brief. One thing you are building.` },
         { time: '0:22',  action: goal ? `Drive toward goal: ${goal}.` : `Explore overlap — any shared problems, opportunities, people?` },
-        { time: '0:27',  action: `Close — agree on next step if there is one. No forced follow-up if there is not.` },
+        { time: '0:27',  action: `Close — name the next step if there is one. No forced follow-up if there is not.` },
       ];
     } else if (duration === 45) {
       return [
@@ -264,16 +423,16 @@
         { time: '0:18',  action: `Your world — brief update, honest signal on where things stand.` },
         { time: '0:28',  action: goal ? `Focus: ${goal}.` : `Explore overlap — where do interests / networks intersect?` },
         { time: '0:38',  action: `Concrete exchange — is there anything they need? Anything you can offer?` },
-        { time: '0:43',  action: `Close — next step, even if it is just "let's check in again in 2 months."` },
+        { time: '0:43',  action: `Close — a real next step, even if it is just "let's check in again in 2 months."` },
       ];
     } else {
       return [
         { time: '0:00',  action: `Open — reconnect properly. How are things, not just what are you working on.` },
         { time: '0:10',  action: `Their deep update — company, market, headspace.` },
-        { time: '0:25',  action: `Your update — what you are building and where you need help.` },
+        { time: '0:25',  action: `Your update — what you are building and where you actually need help.` },
         { time: '0:35',  action: goal ? `Structured discussion: ${goal}.` : `Explore collaboration surface — referrals, feedback, partnership.` },
         { time: '0:50',  action: `Concrete asks and offers. What would make the next 90 days easier for each of you?` },
-        { time: '0:57',  action: `Close with a specific next step. No vague "let's stay in touch."` },
+        { time: '0:57',  action: `Close on a specific next step. No vague "let's stay in touch." The fog eats those.` },
       ];
     }
   }
@@ -290,20 +449,20 @@
     } else if (context && (context.toLowerCase().includes('health') || context.toLowerCase().includes('life'))) {
       q.push(`Who is the core user and what does the product actually change for them on a daily basis?`);
     } else if (context) {
-      q.push(`What has changed in the market for ${company || 'them'} in the last 90 days?`);
+      q.push(`What has shifted in the market for ${company || 'them'} in the last 90 days?`);
     } else {
       q.push(`What has been the biggest surprise — good or bad — in the last quarter?`);
     }
 
     // Goal-based
     if (goal && goal.toLowerCase().includes('partner')) {
-      q.push(`What would a meaningful partnership actually look like from ${name}'s side — what would they need to be true?`);
+      q.push(`What would a meaningful partnership look like from ${name}'s side — what would have to be true?`);
     } else if (goal && goal.toLowerCase().includes('invest')) {
-      q.push(`What does ${name} look for in an investor beyond capital — what matters most at their stage?`);
+      q.push(`What does ${name} want from an investor beyond capital — what matters most at their stage?`);
     } else if (goal) {
-      q.push(`What would make this conversation useful for ${name} — what outcome matters to them today?`);
+      q.push(`What would make this conversation worth ${name}'s time — what outcome matters to them today?`);
     } else {
-      q.push(`What is the one problem where an introduction or outside perspective would move things fastest?`);
+      q.push(`Where would one introduction or one outside perspective move things fastest?`);
     }
 
     // Always a relationship quality check
@@ -323,6 +482,7 @@
       document.getElementById(id).value = '';
     });
     document.getElementById('inp-duration').value = '30';
+    lastCard = null;
     resetCard();
   }
 
@@ -332,7 +492,81 @@
     document.getElementById('inp-company').value = 'Hannah Life Tech';
     document.getElementById('inp-datetime').value = 'Mon Mar 9 · 9:30 ICT';
     document.getElementById('inp-duration').value = '30';
+
+    // ── night whisper: 00:00–03:00 local, the ghost keeps odd hours ──────────
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3){
+      const nw = document.getElementById('night-whisper');
+      nw.textContent = 'the mountain does not sleep. neither, apparently, do you.';
+      nw.style.display = 'block';
+      nw.classList.add('whisper-in');
+    }
   });
+
+  // ── easter egg 1: type "prizrak" → the watcher answers ──────────────────────
+  (function(){
+    let buf = '';
+    window.addEventListener('keydown', (e) => {
+      if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+      if (e.key.length !== 1) return;
+      buf = (buf + e.key.toLowerCase()).slice(-7);
+      if (buf === 'prizrak'){
+        const w = document.getElementById('egg-whisper');
+        w.textContent = 'you found the watcher. it was already watching you.';
+        w.style.display = 'block';
+        w.classList.remove('whisper-in'); void w.offsetWidth; w.classList.add('whisper-in');
+      }
+    });
+  })();
+
+  // ── easter egg 2: triple-click the title → one extra ember drifts up ─────────
+  (function(){
+    const t = document.getElementById('card-title');
+    if (!t) return;
+    t.addEventListener('click', (e) => {
+      if (e.detail === 3){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const field = document.getElementById('ember-field');
+        const em = document.createElement('div');
+        em.className = 'ember';
+        em.style.left = (40 + Math.random()*20) + 'vw';
+        em.style.animationDuration = '12s';
+        field.appendChild(em);
+        setTimeout(() => em.remove(), 13000);
+      }
+    });
+  })();
+
+  // ── easter egg 3: hold the ❄ glyph → it breathes faster for 3s ───────────────
+  (function(){
+    const glyph = document.querySelector('h1 .breathe');
+    if (!glyph) return;
+    const fast = () => {
+      glyph.style.animationDuration = '1.1s';
+      setTimeout(() => { glyph.style.animationDuration = ''; }, 3000);
+    };
+    glyph.addEventListener('mousedown', fast);
+    glyph.addEventListener('touchstart', (e) => { fast(); }, { passive: true });
+  })();
+
+  // ── idle 60s → a single line fades in, then keeps its silence ────────────────
+  (function(){
+    let timer = null;
+    const w = document.getElementById('idle-whisper');
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (w.dataset.shown) return;
+        w.dataset.shown = '1';
+        w.textContent = 'still here. still watching.';
+        w.style.display = 'block';
+        w.classList.add('whisper-in');
+      }, 60000);
+    };
+    ['mousemove','keydown','scroll','touchstart','click'].forEach(ev =>
+      window.addEventListener(ev, () => { if (!w.dataset.shown) arm(); }, { passive: true }));
+    arm();
+  })();
   </script>
 
 </body>

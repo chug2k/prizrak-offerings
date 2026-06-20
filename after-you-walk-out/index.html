@@ -6,99 +6,201 @@
   <title>After You Walk Out | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0f0f12; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#34d399;            /* emerald — this app's existing lead color */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background: var(--bg); }
+    body{ color: var(--ink); }
+
     textarea:focus, input:focus { outline: none; }
-    .fade-in { animation: fadeIn 0.5s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ---- motion vocabulary (CSS-only, reduced-motion-safe) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+    .fade-in { animation: reveal 0.45s ease-out both; }
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* content sits above decorative layers */
+    .stage{position:relative;z-index:2}
+
+    /* tactile inputs */
+    .field{ transition:border-color .15s, box-shadow .15s, background .15s; }
+    .field:focus-visible{ border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    .field:focus{ border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* result panel breathing glow */
+    .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+    /* hover-lift cards */
+    .lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+    .lift:hover{ transform:translateY(-2px); }
+
+    /* primary button press */
+    .btn-press{ transition:transform .12s, background .15s, box-shadow .15s; }
+    .btn-press:active{ transform:translateY(1px); }
+
+    .title-glow{ text-shadow:0 0 12px var(--glow); }
+
+    /* idle / egg whisper */
+    #idleWhisper, #eggLine{ color:var(--ink-ghost); transition:opacity .8s ease; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.fade-in,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="text-zinc-300 min-h-screen font-mono">
+<body class="text-zinc-300 min-h-screen font-mono grain">
+
+  <!-- atmosphere -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
 
   <!-- PHASE 1: INPUT -->
-  <div id="phase1" class="max-w-2xl mx-auto px-4 py-12">
+  <div id="phase1" class="stage max-w-2xl mx-auto px-4 py-12">
     <div class="mb-8">
-      <p class="text-zinc-600 text-xs mb-1">PRIZRAK / TOOLS</p>
-      <h1 class="text-2xl font-bold text-white mb-2">After You Walk Out</h1>
-      <p class="text-zinc-500 text-sm">You just had an important conversation. Before the clarity fades — capture it. Takes 5 minutes. The things that hit hardest tend to evaporate fastest.</p>
+      <p class="text-zinc-600 text-xs mb-1 tracking-widest flicker">PRÍZRAK / THRESHOLD 07 / EXITS</p>
+      <h1 id="appTitle" class="text-2xl font-bold text-white mb-2 title-glow cursor-default select-none">After You Walk Out</h1>
+      <p class="text-zinc-500 text-sm">The door closes behind you and the clarity starts to cool. Capture it before the cave swallows it. Five minutes. The things that hit hardest evaporate fastest — the ghost has watched them go.</p>
     </div>
 
     <div class="space-y-5">
       <div>
         <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">What surprised you?</label>
-        <textarea id="q1" rows="3" placeholder="The thing you didn't expect to hear, or didn't expect to feel." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none focus:border-emerald-600 transition-colors"></textarea>
+        <textarea id="q1" rows="3" placeholder="The thing you didn't expect to hear, or didn't expect to feel." class="field w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none"></textarea>
       </div>
       <div>
         <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">What shifted?</label>
-        <textarea id="q2" rows="3" placeholder="Something you understood differently coming out than going in." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none focus:border-emerald-600 transition-colors"></textarea>
+        <textarea id="q2" rows="3" placeholder="Something you understood differently coming out than going in." class="field w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none"></textarea>
       </div>
       <div>
         <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">What are you going to do?</label>
-        <textarea id="q3" rows="3" placeholder="One specific thing. Not a vague intention — an action." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none focus:border-emerald-600 transition-colors"></textarea>
+        <textarea id="q3" rows="3" placeholder="One specific thing. Not a vague intention — an action." class="field w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none"></textarea>
       </div>
       <div>
         <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">What are you still carrying?</label>
-        <textarea id="q4" rows="2" placeholder="The unresolved thing. The open loop." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none focus:border-emerald-600 transition-colors"></textarea>
+        <textarea id="q4" rows="2" placeholder="The unresolved thing. The open loop." class="field w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 resize-none"></textarea>
       </div>
       <div>
         <label class="block text-xs text-zinc-500 mb-2 uppercase tracking-widest">Meeting (optional)</label>
-        <input id="name" type="text" placeholder="e.g. Tara / coaching session" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 focus:border-emerald-600 transition-colors">
+        <input id="name" type="text" placeholder="e.g. Tara / coaching session" class="field w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600">
       </div>
-      <button onclick="distill()" class="w-full py-3 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-bold transition-colors">
+      <button onclick="distill()" class="btn-press w-full py-3 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-bold">
         Land it →
       </button>
     </div>
+
+    <p id="eggLine" class="mt-8 text-xs text-center opacity-0 select-none" aria-hidden="true">you found the watcher. it was always at the threshold.</p>
+    <p id="footerWhisper" class="mt-6 text-[11px] text-center text-zinc-700 tracking-wide"></p>
   </div>
 
   <!-- PHASE 2: LOADING -->
-  <div id="phase2" class="hidden max-w-2xl mx-auto px-4 py-12 text-center">
-    <div class="inline-block w-2 h-2 bg-emerald-400 rounded-full mb-4 animate-pulse"></div>
-    <p class="text-zinc-500 text-sm">Distilling...</p>
+  <div id="phase2" class="stage hidden max-w-2xl mx-auto px-4 py-12 text-center">
+    <div class="inline-block w-2 h-2 bg-emerald-400 rounded-full mb-4 animate-pulse" style="box-shadow:0 0 10px var(--glow)"></div>
+    <p id="loadLine" class="text-zinc-500 text-sm breathe">letting the sediment settle…</p>
   </div>
 
   <!-- PHASE 3: LANDING -->
-  <div id="phase3" class="hidden max-w-2xl mx-auto px-4 py-12 fade-in">
+  <div id="phase3" class="stage hidden max-w-2xl mx-auto px-4 py-12 fade-in">
     <div class="mb-6">
-      <p class="text-zinc-600 text-xs mb-1">POST-CONVERSATION LANDING</p>
-      <h2 id="title" class="text-xl font-bold text-white"></h2>
+      <p class="text-zinc-600 text-xs mb-1 tracking-widest">POST-CONVERSATION LANDING</p>
+      <h2 id="title" class="text-xl font-bold text-white title-glow"></h2>
       <p id="timestamp" class="text-xs text-zinc-600 mt-1"></p>
     </div>
 
     <div class="space-y-4 mb-8">
-      <div class="bg-zinc-900 border border-emerald-800/50 rounded-xl p-5">
+      <div class="lift bg-zinc-900 border border-emerald-800/50 rounded-xl p-5 hover:border-emerald-500">
         <p class="text-xs text-emerald-400 uppercase tracking-widest mb-2">What Surprised You</p>
         <p id="out1" class="text-zinc-200 text-sm leading-relaxed"></p>
       </div>
-      <div class="bg-zinc-900 border border-violet-800/50 rounded-xl p-5">
+      <div class="lift bg-zinc-900 border border-violet-800/50 rounded-xl p-5 hover:border-violet-500">
         <p class="text-xs text-violet-400 uppercase tracking-widest mb-2">What Shifted</p>
         <p id="out2" class="text-zinc-200 text-sm leading-relaxed"></p>
       </div>
-      <div class="bg-zinc-900 border border-amber-800/50 rounded-xl p-5">
+      <div class="lift bg-zinc-900 border border-amber-800/50 rounded-xl p-5 hover:border-amber-500">
         <p class="text-xs text-amber-400 uppercase tracking-widest mb-2">What You're Going To Do</p>
         <p id="out3" class="text-zinc-200 text-sm leading-relaxed"></p>
       </div>
-      <div id="carryBlock" class="bg-zinc-900 border border-zinc-700 rounded-xl p-5 hidden">
+      <div id="carryBlock" class="lift bg-zinc-900 border border-zinc-700 rounded-xl p-5 hidden hover:border-zinc-500">
         <p class="text-xs text-zinc-500 uppercase tracking-widest mb-2">Still Carrying</p>
         <p id="out4" class="text-zinc-400 text-sm leading-relaxed"></p>
       </div>
-      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-        <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prízrak Note</p>
-        <p id="verdict" class="text-zinc-500 text-sm leading-relaxed italic"></p>
+      <div class="result-glow bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+        <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2 breathe">Prízrak Note</p>
+        <p id="verdict" class="text-zinc-400 text-sm leading-relaxed italic"></p>
       </div>
     </div>
 
     <div class="flex gap-3">
-      <button onclick="copyLanding()" class="flex-1 py-2.5 rounded-lg border border-zinc-700 text-zinc-400 text-sm hover:border-zinc-500 hover:text-zinc-200 transition-colors">Copy</button>
-      <button onclick="reset()" class="flex-1 py-2.5 rounded-lg bg-zinc-800 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors">New Conversation</button>
+      <button onclick="copyLanding()" class="btn-press flex-1 py-2.5 rounded-lg border border-zinc-700 text-zinc-400 text-sm hover:border-emerald-500 hover:text-zinc-200 transition-colors">Copy to the ledger</button>
+      <button onclick="reset()" class="btn-press flex-1 py-2.5 rounded-lg bg-zinc-800 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors">New conversation</button>
     </div>
 
     <div id="histSec" class="mt-8 hidden">
-      <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Past Landings</p>
+      <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Past Landings · the ledger</p>
       <div id="histList" class="space-y-2"></div>
     </div>
   </div>
 
+  <p id="idleWhisper" class="stage fixed bottom-4 left-0 right-0 text-center text-[11px] opacity-0 pointer-events-none select-none">still here. still watching.</p>
+
   <script>
     const STORE = 'prizrak_landing_v1';
+
+    /* ---------------- atmosphere: embers ---------------- */
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const field = document.getElementById('emberField');
+      const COUNT = 7;
+      for (let i=0;i<COUNT;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100).toFixed(2) + '%';
+        e.style.animationDelay = (Math.random()*14).toFixed(2) + 's';
+        e.style.animationDuration = (12 + Math.random()*6).toFixed(2) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    function spawnOneEmber(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const field = document.getElementById('emberField');
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (Math.random()*100).toFixed(2) + '%';
+      e.style.animationDuration = '12s';
+      field.appendChild(e);
+      setTimeout(() => e.remove(), 12500);
+    }
 
     function distill() {
       const q1 = document.getElementById('q1').value.trim();
@@ -106,7 +208,7 @@
       const q3 = document.getElementById('q3').value.trim();
       const q4 = document.getElementById('q4').value.trim();
       const name = document.getElementById('name').value.trim();
-      if (!q1 && !q2 && !q3) { alert('Answer at least one question.'); return; }
+      if (!q1 && !q2 && !q3) { alert('the cave is empty. name at least one thing before the fog takes it.'); return; }
       document.getElementById('phase1').classList.add('hidden');
       document.getElementById('phase2').classList.remove('hidden');
       setTimeout(() => {
@@ -115,6 +217,7 @@
         save({ q1, q2, q3, q4, name, verdict: v });
         document.getElementById('phase2').classList.add('hidden');
         document.getElementById('phase3').classList.remove('hidden');
+        document.getElementById('phase3').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 1400);
     }
 
@@ -125,15 +228,15 @@
       const hasSurprise = q1 && q1.length > 15;
 
       if (hasAction && hasShift && !hasCarry) {
-        return 'You left with something and you know what you are going to do with it. The open loop is closed for now. This is a complete landing. The potato is in the cellar.';
+        return 'You left with something and you know what you will do with it. The open loop is closed for now. This is a complete landing — the potato is in the cellar, the cave sealed against the thaw. The bridge holds. For now. The mountain is watching.';
       } else if (hasAction && hasCarry) {
-        return 'You have an action but an open loop. The open loop is not a problem unless it eats the action. Write the action somewhere external before the carry takes over. The carry will still be there tomorrow. The action window may not be.';
+        return 'An action and an open loop, walking out together. The loop is not a problem unless it eats the action. File the action somewhere external before the carry takes the room. The carry will still be there at dawn. The action window will not.';
       } else if (!hasAction && hasShift) {
-        return 'Something shifted but you have not named what you will do differently. A shift without an action is a feeling. Feelings decay faster than commitments. Name one thing — one sentence, one step — before you open the next thing.';
+        return 'Something shifted but you have not named what you will do differently. A shift without an action is only a feeling, and feelings decay faster than commitments in this cold. Name one thing — one sentence, one step — before you open the next door.';
       } else if (!hasAction && !hasShift && hasSurprise) {
-        return 'You noticed something but have not yet decided what to do with it. That is fine — not every observation requires immediate action. But write it down somewhere before the Saigon afternoon dissolves it.';
+        return 'You noticed something and have not yet decided what to do with it. That is fine — not every observation demands an action. But fossilize it here before the long afternoon dissolves the edges. The ghost does not trust memory either.';
       } else {
-        return 'The conversation happened. You stopped to log it. That alone puts it in the record. The bones do not consolidate by themselves — but they are preserved. The archaeologist can work with this.';
+        return 'The conversation happened. You stopped at the threshold and logged it. That alone puts it in the record. The bones do not consolidate themselves — but they are preserved now, in the cold, in the dark. The archaeologist can work with this.';
       }
     }
 
@@ -144,9 +247,12 @@
       document.getElementById('out2').textContent = d.q2 || '(not noted)';
       document.getElementById('out3').textContent = d.q3 || '(not named yet)';
       document.getElementById('verdict').textContent = d.verdict;
+      const carry = document.getElementById('carryBlock');
       if (d.q4) {
         document.getElementById('out4').textContent = d.q4;
-        document.getElementById('carryBlock').classList.remove('hidden');
+        carry.classList.remove('hidden');
+      } else {
+        carry.classList.add('hidden');
       }
     }
 
@@ -163,18 +269,23 @@
       if (h.length <= 1) return;
       document.getElementById('histSec').classList.remove('hidden');
       document.getElementById('histList').innerHTML = h.slice(1).map((e, i) => `
-        <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 cursor-pointer hover:border-zinc-600 transition-colors" onclick="loadHist(${i+1})">
+        <div class="lift bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 cursor-pointer hover:border-emerald-600 transition-colors" onclick="loadHist(${i+1})">
           <div class="flex justify-between items-center">
-            <span class="text-sm text-zinc-300">${e.name || 'Unnamed'}</span>
-            <span class="text-xs text-zinc-600">${e.date} ${e.time}</span>
+            <span class="text-sm text-zinc-300">${esc(e.name) || 'Unnamed'}</span>
+            <span class="text-xs text-zinc-600">${esc(e.date)} ${esc(e.time)}</span>
           </div>
-          ${e.q3 ? `<p class="text-xs text-zinc-600 mt-1 truncate">${e.q3.substring(0,60)}${e.q3.length>60?'...':''}</p>` : ''}
+          ${e.q3 ? `<p class="text-xs text-zinc-600 mt-1 truncate">${esc(e.q3.substring(0,60))}${e.q3.length>60?'…':''}</p>` : ''}
         </div>`).join('');
     }
 
+    function esc(s){ return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function loadHist(i) {
       const h = JSON.parse(localStorage.getItem(STORE) || '[]');
-      if (h[i]) render(h[i]);
+      if (h[i]) {
+        render(h[i]);
+        document.getElementById('phase3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
 
     function copyLanding() {
@@ -186,12 +297,18 @@
         'WHAT SHIFTED:', document.getElementById('out2').textContent, '',
         'WHAT YOU\'RE GOING TO DO:', document.getElementById('out3').textContent, '',
       ];
+      const carry = document.getElementById('carryBlock');
       const c4 = document.getElementById('out4').textContent;
-      if (c4) lines.push('STILL CARRYING:', c4, '');
+      if (c4 && !carry.classList.contains('hidden')) lines.push('STILL CARRYING:', c4, '');
       lines.push('PRÍZRAK NOTE:', document.getElementById('verdict').textContent);
+      const btn = event && event.target;
       navigator.clipboard.writeText(lines.join('\n')).then(() => {
-        const b = event.target; b.textContent = 'Copied ✓';
-        setTimeout(() => b.textContent = 'Copy', 1500);
+        if (!btn) return;
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        setTimeout(() => { btn.textContent = prev; btn.style.borderColor = ''; btn.style.color = ''; }, 1200);
       });
     }
 
@@ -205,6 +322,51 @@
       document.getElementById('phase1').classList.remove('hidden');
       renderHist();
     }
+
+    /* ---------------- easter eggs (non-blocking, never touch saved state) ---------------- */
+
+    // (a) type "prizrak" -> light the hidden watcher line
+    (function watcher(){
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+          buf = (buf + ev.key.toLowerCase()).slice(-7);
+          if (buf === 'prizrak') {
+            const line = document.getElementById('eggLine');
+            if (line) { line.classList.add('flicker'); line.style.opacity = '1'; }
+          }
+        }
+      });
+    })();
+
+    // (b) triple-click the title -> one extra ember
+    (function tripleTitle(){
+      const t = document.getElementById('appTitle');
+      if (!t) return;
+      t.addEventListener('click', (ev) => { if (ev.detail === 3) spawnOneEmber(); });
+    })();
+
+    // (c) 00:00–03:00 local -> faint footer whisper
+    (function nightWhisper(){
+      const hr = new Date().getHours();
+      if (hr >= 0 && hr < 3) {
+        const f = document.getElementById('footerWhisper');
+        if (f) f.textContent = 'the mountain does not sleep.';
+      }
+    })();
+
+    // (e) idle 60s -> single fading line
+    (function idleWatch(){
+      let timer;
+      const w = document.getElementById('idleWhisper');
+      function reset(){
+        if (w) w.style.opacity = '0';
+        clearTimeout(timer);
+        timer = setTimeout(() => { if (w) w.style.opacity = '1'; }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(e => window.addEventListener(e, reset, {passive:true}));
+      reset();
+    })();
 
     renderHist();
   </script>

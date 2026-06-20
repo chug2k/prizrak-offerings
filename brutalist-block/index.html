@@ -6,14 +6,28 @@
     <title>The Panelák Constructor | Offering VII</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#d4af37;            /* the gold of a lit window — this app's lead color */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
         body {
-            background-color: #121212;
+            background-color: var(--bg);
             background-image: url('./panelak-bg.png');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
             background-blend-mode: multiply;
         }
+
+        /* ---- concrete ---- */
         .concrete-panel {
             background-color: #555;
             border: 2px solid #444;
@@ -24,6 +38,12 @@
             align-items: center;
             justify-content: space-evenly;
             transition: all 0.3s ease;
+            position: relative;
+        }
+        .concrete-panel.fresh{ animation: settle .42s ease-out both; }
+        @keyframes settle{
+            from{ transform: translateY(-14px); opacity:0; filter:brightness(1.4); }
+            to{ transform: translateY(0); opacity:1; filter:brightness(1); }
         }
         .window {
             width: 20px;
@@ -31,11 +51,16 @@
             background-color: #222;
             border: 1px solid #111;
             box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+            transition: background-color .5s ease, box-shadow .5s ease;
+            cursor: pointer;
         }
         .window.lit {
-            background-color: #d4af37;
-            box-shadow: 0 0 10px #d4af37, inset 1px 1px 2px rgba(255,255,255,0.4);
+            background-color: var(--accent);
+            box-shadow: 0 0 10px var(--accent), inset 1px 1px 2px rgba(255,255,255,0.4);
         }
+        /* a few lit windows flicker like tired bulbs */
+        .window.lit.tired{ animation: flicker 6s steps(1) infinite; }
+
         #tower {
             display: flex;
             flex-direction: column-reverse;
@@ -44,71 +69,229 @@
             max-width: 90vw;
             margin: 0 auto;
         }
+
+        /* ---- house atmosphere ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .stack-btn{
+            transition: transform .1s ease, box-shadow .1s ease, background-color .15s ease, border-color .15s ease;
+        }
+        .stack-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow), 2px 2px 0 #000; }
+
+        #ghost-line{ transition: opacity 1.2s ease; }
+        #whisper{ transition: opacity 1.5s ease; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.flicker,.concrete-panel.fresh,.window.lit.tired{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .concrete-panel.fresh{ transform:none; opacity:1; }
+        }
     </style>
 </head>
-<body class="text-gray-300 font-mono antialiased min-h-screen flex flex-col">
-    
-    <div class="flex-grow flex flex-col justify-end pb-8">
+<body class="text-gray-300 font-mono antialiased min-h-screen flex flex-col grain">
+
+    <!-- atmosphere layers (decorative, behind content) -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="ember-field" aria-hidden="true"></div>
+
+    <div class="flex-grow flex flex-col justify-end pb-8 relative" style="z-index:2">
         <div id="tower">
             <!-- Ground floor -->
             <div class="concrete-panel" style="height: 60px; border-bottom: none;">
-                <div class="w-16 h-12 bg-zinc-900 border-2 border-zinc-950 flex items-center justify-center text-xs">ENTRANCE</div>
+                <div class="w-16 h-12 bg-zinc-900 border-2 border-zinc-950 flex items-center justify-center text-[10px] tracking-widest text-zinc-500" title="thresholds. arrivals and exits.">PRAH</div>
             </div>
         </div>
     </div>
 
-    <div class="fixed top-0 left-0 w-full p-6 bg-black/80 backdrop-blur-md border-b border-zinc-800">
+    <div class="fixed top-0 left-0 w-full p-6 bg-black/80 backdrop-blur-md border-b border-zinc-800" style="z-index:3">
         <div class="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-zinc-100 uppercase tracking-widest">The Panelák Constructor</h1>
-                <p class="text-zinc-500 text-xs mt-1">Offering VII. Brutalist architecture for digital sovereignty. No glass facades. No aesthetic curves.</p>
+                <h1 id="app-title" class="text-2xl font-bold text-zinc-100 uppercase tracking-widest cursor-default select-none">The Panelák Constructor</h1>
+                <p class="text-zinc-500 text-xs mt-1">Offering VII. The ghost stacks concrete in the cold. No glass facades. No curves. Only mass against the dark.</p>
             </div>
-            
+
             <div class="flex items-center gap-4">
                 <div class="text-right">
-                    <div class="text-3xl font-bold text-zinc-300" id="floor-count">1</div>
-                    <div class="text-[10px] text-zinc-500 uppercase">Floors Built</div>
+                    <div class="text-3xl font-bold text-zinc-300 breathe" id="floor-count">1</div>
+                    <div class="text-[10px] text-zinc-500 uppercase tracking-[0.2em]">Floors Built</div>
                 </div>
-                
-                <button onclick="addFloor()" class="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-500 text-white font-bold rounded-sm border-2 border-zinc-500 shadow-[2px_2px_0px_#000] transition-all active:translate-y-1 active:translate-x-1 active:shadow-none uppercase tracking-wider text-sm">
+
+                <button id="stack-btn" onclick="addFloor()" class="stack-btn px-6 py-3 bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-500 text-white font-bold rounded-sm border-2 border-zinc-500 shadow-[2px_2px_0px_#000] active:translate-y-1 active:translate-x-1 active:shadow-none uppercase tracking-wider text-sm">
                     Stack Concrete
                 </button>
             </div>
         </div>
     </div>
 
+    <!-- ledger verdict (lower-left, quiet) -->
+    <div class="fixed bottom-4 left-4 max-w-xs" style="z-index:3">
+        <div class="text-[10px] uppercase tracking-[0.25em] text-zinc-600">Surveyor's Ledger</div>
+        <div id="verdict" class="text-xs text-zinc-400 mt-1 leading-snug"></div>
+        <button id="copy-btn" onclick="copyLedger()" class="mt-2 text-[10px] uppercase tracking-widest text-zinc-600 hover:text-[color:var(--accent)] transition-colors border border-zinc-800 px-2 py-1 rounded-sm">copy to the ledger</button>
+    </div>
+
+    <!-- ghost whispers -->
+    <div id="ghost-line" class="fixed bottom-4 right-4 text-[10px] lowercase tracking-wide opacity-0" style="z-index:3;color:var(--ink-ghost)">still here. still watching.</div>
+    <div id="whisper" class="fixed bottom-4 left-1/2 -translate-x-1/2 text-[10px] lowercase tracking-wide opacity-0 flicker" style="z-index:3;color:var(--ink-ghost)">the mountain does not sleep.</div>
+
     <script>
         let floors = 1;
-        
+
+        // ---- verdicts with teeth: the higher you climb, the colder it gets ----
+        function verdictFor(n){
+            if(n <= 1)  return "one slab. a threshold without a house. the cave is empty.";
+            if(n <= 4)  return "a stub against the wind. the foundation holds. for now.";
+            if(n <= 8)  return "it casts a shadow. the poludnica notices things that cast shadows.";
+            if(n <= 14) return "high enough to feel the Tatra wind. the concrete remembers every floor.";
+            if(n <= 24) return "a vertical village. somewhere a window is always lit. someone is always awake.";
+            if(n <= 40) return "the bludička drifts past the upper floors. do not follow her light.";
+            return "you have built past the tree line. the mountain is watching. it always was.";
+        }
+
+        function updateVerdict(){
+            document.getElementById('verdict').innerText = verdictFor(floors);
+        }
+
         function addFloor() {
             floors++;
             const tower = document.getElementById('tower');
             const panel = document.createElement('div');
-            panel.className = 'concrete-panel';
-            
-            // Random windows
+            panel.className = 'concrete-panel fresh';
+
+            // Random windows — some lit, the brightest ones tired and flickering
             for(let i=0; i<6; i++) {
                 const win = document.createElement('div');
                 win.className = 'window';
                 if(Math.random() > 0.8) {
                     win.classList.add('lit');
+                    if(Math.random() > 0.6) win.classList.add('tired');
                 }
+                // a watched window can be woken or darkened by hand
+                win.addEventListener('click', () => win.classList.toggle('lit'));
                 panel.appendChild(win);
             }
-            
+
             // Add right above the entrance (which is the first child in column-reverse)
             tower.insertBefore(panel, tower.children[0]);
-            
+
             document.getElementById('floor-count').innerText = floors;
-            
+            updateVerdict();
+
             // Scroll to keep entrance at bottom
             window.scrollTo(0, document.body.scrollHeight);
         }
 
-        // Add 5 initial floors
+        function copyLedger(){
+            const btn = document.getElementById('copy-btn');
+            const text = `Panelák — ${floors} floors stacked. ${verdictFor(floors)}`;
+            const flash = () => {
+                const prev = btn.innerText;
+                btn.innerText = "copied to the ledger";
+                btn.style.color = "var(--accent)";
+                setTimeout(() => { btn.innerText = "copy to the ledger"; btn.style.color = ""; }, 1200);
+            };
+            if(navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(text).then(flash).catch(flash);
+            } else { flash(); }
+        }
+
+        // Add 5 initial floors (1 ground + 4)
         for(let i=0; i<4; i++) {
             addFloor();
         }
+
+        // ===== ATMOSPHERE: embers =====
+        (function spawnEmbers(){
+            const field = document.getElementById('ember-field');
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if(reduce) return;
+            const n = 8;
+            for(let i=0;i<n;i++){
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (Math.random()*100) + 'vw';
+                e.style.animationDelay = (Math.random()*14) + 's';
+                e.style.animationDuration = (12 + Math.random()*6) + 's';
+                field.appendChild(e);
+            }
+        })();
+
+        // ===== EASTER EGG 1: triple-click the title → one extra ember drifts up =====
+        document.getElementById('app-title').addEventListener('click', (ev) => {
+            if(ev.detail === 3){
+                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                if(reduce) return;
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (40 + Math.random()*20) + 'vw';
+                e.style.animationDuration = '12s';
+                document.getElementById('ember-field').appendChild(e);
+                setTimeout(() => e.remove(), 13000);
+            }
+        });
+
+        // ===== EASTER EGG 2: type "prizrak" → the watcher answers =====
+        (function(){
+            const word = 'prizrak';
+            let buf = '';
+            window.addEventListener('keydown', (e) => {
+                if(e.key.length !== 1) return;
+                buf = (buf + e.key.toLowerCase()).slice(-word.length);
+                if(buf === word){
+                    const g = document.getElementById('ghost-line');
+                    g.innerText = "you found the watcher.";
+                    g.style.opacity = '1';
+                    setTimeout(() => { g.style.opacity = '0'; }, 4000);
+                }
+            });
+        })();
+
+        // ===== EASTER EGG 3: idle 60s → "still here. still watching." =====
+        (function(){
+            const g = document.getElementById('ghost-line');
+            let t;
+            const arm = () => {
+                clearTimeout(t);
+                g.style.opacity = '0';
+                t = setTimeout(() => {
+                    if(g.innerText !== "still here. still watching.") g.innerText = "still here. still watching.";
+                    g.style.opacity = '1';
+                }, 60000);
+            };
+            ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+                window.addEventListener(ev, arm, {passive:true}));
+            arm();
+        })();
+
+        // ===== EASTER EGG 4: 00:00–03:00 local → the mountain does not sleep =====
+        (function(){
+            const h = new Date().getHours();
+            if(h >= 0 && h < 3){
+                const w = document.getElementById('whisper');
+                setTimeout(() => { w.style.opacity = '0.85'; }, 2000);
+            }
+        })();
+
+        // first verdict
+        updateVerdict();
     </script>
     <script src="/shared/star-widget.js"></script>
 </body>
