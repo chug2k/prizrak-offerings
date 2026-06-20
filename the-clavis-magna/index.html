@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Clavis Magna</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f0f12; }
+    .dim-row { transition: all 0.15s; }
+    .weight-bar { transition: width 0.2s; }
+    .score-ring { stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset 0.6s ease; }
+    input[type=range] { accent-color: #7c3aed; }
+    .verdict-box { border-left: 3px solid #7c3aed; background: rgba(124,58,237,0.06); }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    .tab-active { border-bottom: 2px solid #7c3aed; color: #c4b5fd; }
+    .tab-inactive { border-bottom: 2px solid transparent; color: #52525b; }
+  </style>
+</head>
+<body class="text-zinc-300 min-h-screen font-sans antialiased">
+<div class="max-w-2xl mx-auto px-4 py-8">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-white mb-1">The Clavis Magna</h1>
+    <p class="text-zinc-500 text-sm">The key Bruno never wrote. Define your personal scoring function — then run decisions through it.<br>What you value, made explicit, before you need it.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-6 mb-6 border-b border-zinc-800">
+    <button onclick="showTab('build')" id="tab-build" class="tab-active pb-2 text-sm font-mono">Build Key</button>
+    <button onclick="showTab('run')" id="tab-run" class="tab-inactive pb-2 text-sm font-mono">Run Decision</button>
+    <button onclick="showTab('history')" id="tab-history" class="tab-inactive pb-2 text-sm font-mono">History</button>
+  </div>
+
+  <!-- TAB: Build Key -->
+  <div id="pane-build">
+    <div class="mb-4 text-xs font-mono text-zinc-600 uppercase tracking-wider">Your Five Dimensions</div>
+    <p class="text-xs text-zinc-600 mb-5">Name each dimension. Set its weight (1–10). The five together become your scoring function — your declared values for evaluating decisions in this domain.</p>
+
+    <div class="mb-4">
+      <label class="block text-xs font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">Domain (what is this key for?)</label>
+      <input id="domain" type="text" placeholder="e.g. career moves, project selection, relationships, where to spend time…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600">
+    </div>
+
+    <div id="dimensions" class="space-y-4 mb-6"></div>
+
+    <button onclick="addDimension()" class="text-xs font-mono text-zinc-600 hover:text-zinc-400 mb-6 block">+ add dimension (max 5)</button>
+
+    <div class="mb-6">
+      <label class="block text-xs font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">What does a perfect 10 look like?</label>
+      <textarea id="idealDesc" rows="2" placeholder="Describe the decision that would score maximally on your key…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 resize-none"></textarea>
+    </div>
+
+    <div class="flex gap-3">
+      <button onclick="saveKey()" class="flex-1 py-2.5 bg-violet-800 hover:bg-violet-700 text-violet-100 rounded-xl text-sm font-mono transition-colors">Save Key</button>
+      <button onclick="loadPreset()" class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono transition-colors">Preset</button>
+    </div>
+
+    <!-- Saved key preview -->
+    <div id="keyPreview" class="hidden mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+      <div class="text-xs font-mono text-zinc-600 mb-3 uppercase tracking-wider">Active Key — <span id="keyDomain" class="text-violet-400"></span></div>
+      <div id="keyBars" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- TAB: Run Decision -->
+  <div id="pane-run" class="hidden">
+    <div id="noKeyMsg" class="hidden text-center py-12 text-zinc-600 text-sm">No key saved yet. Build your key first.</div>
+
+    <div id="runContent">
+      <div class="mb-5 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+        <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">Active Key — <span id="runKeyDomain" class="text-violet-400"></span></div>
+        <div id="runKeyBars" class="space-y-1.5"></div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-xs font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">Decision to evaluate</label>
+        <input id="decisionName" type="text" placeholder="Name this option or choice…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 mb-2">
+        <textarea id="decisionDesc" rows="2" placeholder="Brief description (optional)…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 resize-none"></textarea>
+      </div>
+
+      <div class="text-xs font-mono text-zinc-600 mb-3 uppercase tracking-wider">Score each dimension (0–10)</div>
+      <div id="scoreSliders" class="space-y-4 mb-6"></div>
+
+      <button onclick="calculateScore()" class="w-full py-3 bg-violet-800 hover:bg-violet-700 text-violet-100 rounded-xl text-sm font-mono transition-colors mb-6">Calculate Score</button>
+
+      <!-- Score output -->
+      <div id="scoreOutput" class="hidden fade-in">
+        <div class="flex items-center gap-6 mb-5">
+          <div class="relative w-24 h-24 shrink-0">
+            <svg viewBox="0 0 100 100" class="w-24 h-24 -rotate-90">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="#27272a" stroke-width="8"/>
+              <circle id="scoreRing" cx="50" cy="50" r="45" fill="none" stroke="#7c3aed" stroke-width="8" class="score-ring"/>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span id="scoreNum" class="text-2xl font-bold text-white font-mono"></span>
+            </div>
+          </div>
+          <div>
+            <div id="scoreVerdict" class="text-lg font-semibold text-white mb-1"></div>
+            <div id="scoreDomain" class="text-xs text-zinc-500 font-mono"></div>
+          </div>
+        </div>
+
+        <div id="scoreBars" class="space-y-2 mb-5"></div>
+
+        <div class="verdict-box rounded-xl p-4 mb-4">
+          <div class="text-xs font-mono text-violet-400 mb-2 uppercase tracking-wider">Prízrak</div>
+          <div id="prVertdict" class="text-sm text-zinc-300 leading-relaxed"></div>
+        </div>
+
+        <button onclick="saveResult()" class="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono transition-colors">Save to History</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: History -->
+  <div id="pane-history" class="hidden">
+    <div id="histEmpty" class="text-center py-12 text-zinc-600 text-sm">No saved results yet.</div>
+    <div id="histList" class="space-y-4"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="mt-12 pt-6 border-t border-zinc-800 text-center">
+    <p class="text-xs text-zinc-600">Bruno burned before the key was written. Yours is a draft. Keep revising it.</p>
+    <p class="text-[10px] text-zinc-700 mt-1">De Umbris Idearum · Clavis Magna (unfinished) · 1582–1600</p>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "clavis_magna_v1";
+let state = { key: null, history: [] };
+
+// --- Preset dimensions for common use cases ---
+const PRESETS = {
+  career: [
+    { name: "Agency", desc: "Do I have real autonomy here?", weight: 9 },
+    { name: "Build", desc: "Am I creating something permanent?", weight: 8 },
+    { name: "Conviction", desc: "Do I believe in the mission?", weight: 8 },
+    { name: "Learning", desc: "Does this compound my capabilities?", weight: 6 },
+    { name: "Sustainability", desc: "Can I maintain this for 2 years?", weight: 5 }
+  ]
+};
+
+let dimCount = 0;
+let rawScores = {};
+
+function init() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) { try { state = JSON.parse(saved); } catch(e) {} }
+  if (!state.history) state.history = [];
+
+  // Populate build pane with existing or empty dims
+  if (state.key) {
+    if (state.key.domain) document.getElementById('domain').value = state.key.domain;
+    if (state.key.ideal) document.getElementById('idealDesc').value = state.key.ideal;
+    state.key.dimensions.forEach(d => addDimension(d));
+    renderKeyPreview();
+  } else {
+    // Start with 5 empty dims
+    for (let i = 0; i < 5; i++) addDimension();
+  }
+  renderHistory();
+  updateRunPane();
+}
+
+function addDimension(data) {
+  if (dimCount >= 5) return;
+  const id = dimCount++;
+  const container = document.getElementById('dimensions');
+  const div = document.createElement('div');
+  div.id = `dim-${id}`;
+  div.className = 'dim-row bg-zinc-900 border border-zinc-800 rounded-xl p-4';
+  div.innerHTML = `
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-xs font-mono text-zinc-600 w-4">${id+1}.</span>
+      <input type="text" id="dim-name-${id}" value="${data?.name||''}" placeholder="Dimension name (e.g. Agency, Build, Conviction…)"
+        class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600">
+      ${id >= 1 ? `<button onclick="removeDim(${id})" class="text-zinc-700 hover:text-zinc-500 text-xs px-2">✕</button>` : ''}
+    </div>
+    <input type="text" id="dim-desc-${id}" value="${data?.desc||''}" placeholder="What does this dimension measure?" 
+      class="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-1.5 text-xs text-zinc-400 focus:outline-none focus:border-violet-600 placeholder-zinc-600 mb-3">
+    <div class="flex items-center gap-3">
+      <span class="text-xs font-mono text-zinc-600 w-12">Weight</span>
+      <input type="range" id="dim-weight-${id}" min="1" max="10" value="${data?.weight||5}" class="flex-1">
+      <span id="dim-wval-${id}" class="text-sm font-mono text-violet-300 w-4">${data?.weight||5}</span>
+    </div>`;
+  container.appendChild(div);
+  document.getElementById(`dim-weight-${id}`).addEventListener('input', e => {
+    document.getElementById(`dim-wval-${id}`).textContent = e.target.value;
+  });
+}
+
+function removeDim(id) {
+  const el = document.getElementById(`dim-${id}`);
+  if (el) { el.remove(); dimCount = Math.max(0, dimCount-1); }
+}
+
+function readDimensions() {
+  const dims = [];
+  for (let i = 0; i < 5; i++) {
+    const nameEl = document.getElementById(`dim-name-${i}`);
+    if (!nameEl) continue;
+    const name = nameEl.value.trim();
+    if (!name) continue;
+    dims.push({
+      name,
+      desc: document.getElementById(`dim-desc-${i}`)?.value.trim() || '',
+      weight: parseInt(document.getElementById(`dim-weight-${i}`)?.value || '5')
+    });
+  }
+  return dims;
+}
+
+function saveKey() {
+  const domain = document.getElementById('domain').value.trim();
+  const ideal = document.getElementById('idealDesc').value.trim();
+  const dims = readDimensions();
+  if (!domain || dims.length < 2) {
+    alert('Name the domain and add at least 2 dimensions.');
+    return;
+  }
+  state.key = { domain, ideal, dimensions: dims, savedAt: new Date().toISOString() };
+  save();
+  renderKeyPreview();
+  updateRunPane();
+  // Flash feedback
+  const btn = event.target;
+  btn.textContent = 'Key Saved ✓';
+  setTimeout(() => btn.textContent = 'Save Key', 1500);
+}
+
+function loadPreset() {
+  const preset = PRESETS.career;
+  document.getElementById('domain').value = 'career moves';
+  document.getElementById('idealDesc').value = 'High agency, building something real I believe in, compounding fast, sustainable for 2+ years.';
+  document.getElementById('dimensions').innerHTML = '';
+  dimCount = 0;
+  preset.forEach(d => addDimension(d));
+}
+
+function renderKeyPreview() {
+  if (!state.key) return;
+  document.getElementById('keyPreview').classList.remove('hidden');
+  document.getElementById('keyDomain').textContent = state.key.domain;
+  const total = state.key.dimensions.reduce((s,d) => s+d.weight, 0);
+  document.getElementById('keyBars').innerHTML = state.key.dimensions.map(d => `
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-mono text-zinc-400 w-28 truncate">${d.name}</span>
+      <div class="flex-1 bg-zinc-800 rounded-full h-1.5">
+        <div class="weight-bar bg-violet-600 h-1.5 rounded-full" style="width:${Math.round(d.weight/total*100)}%"></div>
+      </div>
+      <span class="text-xs font-mono text-zinc-600 w-6">${d.weight}</span>
+    </div>`).join('');
+}
+
+function updateRunPane() {
+  if (!state.key) {
+    document.getElementById('noKeyMsg')?.classList.remove('hidden');
+    document.getElementById('runContent')?.classList.add('hidden');
+    return;
+  }
+  document.getElementById('noKeyMsg')?.classList.add('hidden');
+  document.getElementById('runContent')?.classList.remove('hidden');
+  document.getElementById('runKeyDomain').textContent = state.key.domain;
+
+  const total = state.key.dimensions.reduce((s,d) => s+d.weight, 0);
+  document.getElementById('runKeyBars').innerHTML = state.key.dimensions.map(d => `
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-mono text-zinc-500 w-24 truncate">${d.name}</span>
+      <div class="flex-1 bg-zinc-800 rounded-full h-1">
+        <div class="weight-bar bg-violet-700/60 h-1 rounded-full" style="width:${Math.round(d.weight/total*100)}%"></div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('scoreSliders').innerHTML = state.key.dimensions.map((d,i) => `
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <div>
+          <span class="text-sm text-zinc-300">${d.name}</span>
+          ${d.desc ? `<span class="text-xs text-zinc-600 ml-2">${d.desc}</span>` : ''}
+        </div>
+        <span id="sv-${i}" class="text-sm font-mono text-violet-300">5</span>
+      </div>
+      <input type="range" min="0" max="10" value="5" id="sl-${i}"
+        class="w-full" oninput="document.getElementById('sv-${i}').textContent=this.value">
+    </div>`).join('');
+}
+
+function calculateScore() {
+  if (!state.key) return;
+  const name = document.getElementById('decisionName').value.trim() || 'Unnamed decision';
+  const dims = state.key.dimensions;
+  const totalWeight = dims.reduce((s,d) => s+d.weight, 0);
+
+  rawScores = {};
+  let weightedSum = 0;
+  dims.forEach((d,i) => {
+    const score = parseInt(document.getElementById(`sl-${i}`).value);
+    rawScores[d.name] = score;
+    weightedSum += score * d.weight;
+  });
+
+  const maxPossible = totalWeight * 10;
+  const pct = Math.round((weightedSum / maxPossible) * 100);
+  const raw = (weightedSum / totalWeight).toFixed(1);
+
+  // Animate ring
+  const ring = document.getElementById('scoreRing');
+  const offset = 283 * (1 - pct/100);
+  setTimeout(() => ring.style.strokeDashoffset = offset, 50);
+  document.getElementById('scoreNum').textContent = pct;
+
+  // Verdict text
+  const verdicts = [
+    { min: 85, text: "Strong signal.", label: "Aligned" },
+    { min: 70, text: "Worth pursuing with eyes open.", label: "Viable" },
+    { min: 55, text: "Mixed. The low scores are telling you something.", label: "Contested" },
+    { min: 40, text: "The key says no. Check which dimension is the real veto.", label: "Weak" },
+    { min: 0,  text: "The potato does not lie. This scores against what you said you value.", label: "Misaligned" }
+  ];
+  const v = verdicts.find(x => pct >= x.min);
+  document.getElementById('scoreVerdict').textContent = v.label;
+  document.getElementById('scoreDomain').textContent = `${state.key.domain} · ${raw}/10 weighted · ${pct}%`;
+
+  // Breakdown bars
+  document.getElementById('scoreBars').innerHTML = dims.map((d,i) => {
+    const score = rawScores[d.name];
+    const pctD = score * 10;
+    const color = score >= 7 ? 'bg-emerald-600' : score >= 5 ? 'bg-amber-600' : 'bg-red-700';
+    return `<div class="flex items-center gap-2">
+      <span class="text-xs font-mono text-zinc-400 w-28 truncate">${d.name}</span>
+      <div class="flex-1 bg-zinc-800 rounded-full h-2">
+        <div class="${color} h-2 rounded-full transition-all" style="width:${pctD}%"></div>
+      </div>
+      <span class="text-xs font-mono text-zinc-500 w-6">${score}</span>
+    </div>`;
+  }).join('');
+
+  // Prizrak verdict
+  const lowestDim = dims.reduce((a,b) => rawScores[a.name] < rawScores[b.name] ? a : b);
+  const highestDim = dims.reduce((a,b) => rawScores[a.name] > rawScores[b.name] ? a : b);
+  const prizraks = [
+    `${name} scores ${pct}% against your declared key. The weak point is ${lowestDim.name} (${rawScores[lowestDim.name]}/10). If that dimension is not actually important to you, update the key — do not override the score. ${v.text}`,
+    `Your key says ${lowestDim.name} matters. This option scores it ${rawScores[lowestDim.name]}/10. Either the option is weak on what you value, or you have been wrong about what you value. Both are worth knowing. ${v.text}`,
+    `${highestDim.name} is carrying this evaluation (${rawScores[highestDim.name]}/10). Check whether you are optimizing for the dimension that is easy to score rather than the one that is hard. The key is only as honest as the person who built it. ${v.text}`
+  ];
+  document.getElementById('prVertdict').textContent = prizraks[Math.floor(Math.random()*prizraks.length)];
+
+  document.getElementById('scoreOutput').classList.remove('hidden');
+  document.getElementById('scoreOutput').classList.add('fade-in');
+
+  // Store for saving
+  window._lastResult = { name, date: new Date().toISOString().split('T')[0], pct, raw, scores: {...rawScores}, verdict: v.label, domain: state.key.domain };
+}
+
+function saveResult() {
+  if (!window._lastResult) return;
+  state.history.unshift(window._lastResult);
+  if (state.history.length > 30) state.history = state.history.slice(0,30);
+  save();
+  renderHistory();
+  const btn = event.target;
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => btn.textContent = 'Save to History', 1500);
+}
+
+function renderHistory() {
+  const list = document.getElementById('histList');
+  const empty = document.getElementById('histEmpty');
+  if (!state.history || state.history.length === 0) {
+    empty?.classList.remove('hidden'); list.innerHTML = ''; return;
+  }
+  empty?.classList.add('hidden');
+  list.innerHTML = state.history.map((r,i) => {
+    const color = r.pct >= 85 ? 'text-emerald-400' : r.pct >= 55 ? 'text-amber-400' : 'text-red-400';
+    return `<div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-medium text-zinc-200">${r.name}</span>
+        <span class="font-mono font-bold ${color}">${r.pct}%</span>
+      </div>
+      <div class="text-xs font-mono text-zinc-600 mb-2">${r.date} · ${r.domain} · ${r.verdict}</div>
+      <div class="flex flex-wrap gap-1">
+        ${Object.entries(r.scores).map(([k,v]) => `<span class="text-[10px] font-mono px-1.5 py-0.5 bg-zinc-800 text-zinc-500 rounded">${k}: ${v}</span>`).join('')}
+      </div>
+      <button onclick="deleteHist(${i})" class="text-[10px] text-zinc-700 hover:text-zinc-500 font-mono mt-2 block">delete</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteHist(i) {
+  state.history.splice(i,1); save(); renderHistory();
+}
+
+function showTab(name) {
+  ['build','run','history'].forEach(t => {
+    document.getElementById(`pane-${t}`).classList.toggle('hidden', t !== name);
+    document.getElementById(`tab-${t}`).className = `pb-2 text-sm font-mono ${t===name ? 'tab-active' : 'tab-inactive'}`;
+  });
+  if (name === 'run') updateRunPane();
+  if (name === 'history') renderHistory();
+}
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>

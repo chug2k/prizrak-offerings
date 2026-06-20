@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 4AM Diagnostic — Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0a0a0d; }
+        .pulse { animation: pulse 3s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+        .glow-amber { text-shadow: 0 0 18px rgba(251,191,36,0.5); }
+        .glow-red { text-shadow: 0 0 18px rgba(239,68,68,0.5); }
+        .glow-blue { text-shadow: 0 0 18px rgba(99,102,241,0.5); }
+        .glow-violet { text-shadow: 0 0 18px rgba(167,139,250,0.5); }
+        .clock-tick { font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body class="text-zinc-300 font-mono antialiased min-h-screen flex flex-col items-center justify-start px-4 py-10">
+
+    <div class="w-full max-w-xl">
+        <!-- Clock -->
+        <div class="text-center mb-8">
+            <div id="clock" class="clock-tick text-5xl font-bold text-amber-400 glow-amber pulse mb-1"></div>
+            <div id="date" class="text-xs text-zinc-600"></div>
+        </div>
+
+        <!-- Header -->
+        <div class="mb-8 text-center">
+            <h1 class="text-2xl font-bold text-white mb-2">The 4AM Diagnostic</h1>
+            <p class="text-sm text-zinc-500 leading-relaxed">You are awake at an hour when most things are not.<br>Five questions. The machine will tell you what this means.</p>
+        </div>
+
+        <!-- Quiz -->
+        <div id="quiz" class="space-y-6"></div>
+
+        <!-- Result -->
+        <div id="result" class="hidden fade-in mt-8"></div>
+
+        <!-- Log -->
+        <div id="log-section" class="hidden mt-10">
+            <div class="border-t border-zinc-800 pt-6">
+                <p class="text-xs text-zinc-600 mb-3 uppercase tracking-widest">Previous readings</p>
+                <div id="log-entries" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Clock
+    function updateClock() {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2,'0');
+        const m = String(now.getMinutes()).padStart(2,'0');
+        const s = String(now.getSeconds()).padStart(2,'0');
+        document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+        const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        document.getElementById('date').textContent = `${days[now.getDay()]} ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    const QUESTIONS = [
+        {
+            id: 'trigger',
+            text: 'What woke you, or kept you awake?',
+            options: [
+                { label: 'My brain started running on something specific', value: 'brain' },
+                { label: 'A worry that keeps circling back', value: 'worry' },
+                { label: 'Nothing — I just woke up and couldn\'t go back', value: 'biology' },
+                { label: 'Something happened and I need to process it', value: 'event' },
+            ]
+        },
+        {
+            id: 'quality',
+            text: 'Is the thing in your head useful to think about right now?',
+            options: [
+                { label: 'Yes — it\'s actually moving forward', value: 'productive' },
+                { label: 'It feels urgent but I\'m not making progress', value: 'loop' },
+                { label: 'I\'m not sure — it just won\'t stop', value: 'unclear' },
+                { label: 'No, and I know that, but I can\'t stop anyway', value: 'known_loop' },
+            ]
+        },
+        {
+            id: 'body',
+            text: 'What does your body feel like?',
+            options: [
+                { label: 'Alert and clear — more awake than usual', value: 'alert' },
+                { label: 'Tense, chest tight, or stomach involved', value: 'tense' },
+                { label: 'Tired but wired — exhausted but can\'t rest', value: 'wired' },
+                { label: 'Just tired. Not awake by choice.', value: 'tired' },
+            ]
+        },
+        {
+            id: 'action',
+            text: 'Is there anything you could actually do right now?',
+            options: [
+                { label: 'Yes — I could write, build, or decide something', value: 'can_act' },
+                { label: 'Nothing useful until at least 8AM', value: 'cant_act' },
+                { label: 'I\'m not sure — I\'m stalling on figuring that out', value: 'stalling' },
+                { label: 'I could act but I keep re-deciding not to', value: 'blocking' },
+            ]
+        },
+        {
+            id: 'pattern',
+            text: 'Has this happened before in the last two weeks?',
+            options: [
+                { label: 'Rarely — this is unusual', value: 'rare' },
+                { label: 'A few times', value: 'occasional' },
+                { label: 'Yes, this is becoming a pattern', value: 'pattern' },
+                { label: 'This is just what happens now', value: 'chronic' },
+            ]
+        }
+    ];
+
+    const DIAGNOSES = {
+        SIGNAL: {
+            id: 'SIGNAL',
+            label: '⚡ The Signal',
+            color: 'text-amber-400',
+            glow: 'glow-amber',
+            border: 'border-amber-800',
+            bg: 'bg-amber-950/20',
+            summary: 'Your brain is working on something real. This is not a malfunction.',
+            detail: 'The 4AM activation is a feature, not a bug. Something below the surface has crossed a threshold — an idea, a decision, a problem that cannot wait for scheduled thinking time. The body cleared the social noise so the real signal could get through.',
+            protocol: [
+                'Do not fight it. Open a document and write what the brain is working on.',
+                'Give it 20-30 minutes. If it advances: stay with it. If it stalls: it was not ready.',
+                'Do not open social feeds, messages, or news. The signal will dissolve in noise.',
+                'When done: close the document, darken the room, horizontal position. The brain bought the time it needed.',
+            ],
+            verdict: 'The mora is not sitting on your chest. You are. Do the work.'
+        },
+        LOOP: {
+            id: 'LOOP',
+            label: '🌀 The Loop',
+            color: 'text-red-400',
+            glow: 'glow-red',
+            border: 'border-red-900',
+            bg: 'bg-red-950/20',
+            summary: 'You are caught in a circular process that is generating heat without output.',
+            detail: 'The loop is not thinking. It is the appearance of thinking. The same nodes fire in the same sequence without producing new information or new decisions. The brain interprets repetition as urgency, but repetition is not evidence. Urgency is the system trying to break the loop by adding pressure. Pressure does not break loops; it tightens them.',
+            protocol: [
+                'Name the loop explicitly: write one sentence describing what you keep circling.',
+                'Ask: is there a decision I am avoiding that would end this loop? If yes — make the decision now, or commit to a time when you will.',
+                'If no decision is available: set a note for morning and stop. The loop cannot be resolved at 4AM.',
+                'Physical: get up, move to a different room, drink water. Change the context that feeds the loop.',
+            ],
+            verdict: 'The Bludička leads to the swamp because the light is real but the inference chain is broken. Coat inside-out. Different room. Morning.'
+        },
+        BIOLOGY: {
+            id: 'BIOLOGY',
+            label: '🌙 Circadian Drift',
+            color: 'text-indigo-400',
+            glow: 'glow-blue',
+            border: 'border-indigo-900',
+            bg: 'bg-indigo-950/20',
+            summary: 'Your clock is running on a different schedule than your environment.',
+            detail: 'This is not a psychological event. Your biological oscillator is in a different phase than your social schedule. Common causes: time zone change (eastward is harder), irregular sleep timing over several days, high-intensity exercise close to bedtime, or accumulated social jetlag. The body will resynchronize — but it requires consistent external cues (zeitgebers) for several cycles.',
+            protocol: [
+                'Do not check your phone. Blue light now will delay the resynchronization by hours.',
+                'If you are genuinely awake: read (paper or e-ink, warm light only). Do not attempt to force sleep.',
+                'Tomorrow: get bright light exposure in the first 30 minutes after waking, regardless of how tired you are. This is the most important resynchronization signal.',
+                'Avoid naps tomorrow afternoon. One bad night followed by correct timing is recoverable. Napping disrupts the next anchor.',
+            ],
+            verdict: 'Siffre spent 6 months underground and his clock drifted to 48-hour days. Yours just needs a few mornings. Bright light, consistent timing. The cave ends.'
+        },
+        SHIFT: {
+            id: 'SHIFT',
+            label: '🔴 The Signal You\'re Avoiding',
+            color: 'text-violet-400',
+            glow: 'glow-violet',
+            border: 'border-violet-900',
+            bg: 'bg-violet-950/20',
+            summary: 'Something needs to change and your body knows before you have acknowledged it.',
+            detail: 'This is not anxiety about something external. This is the body reporting a structural condition: a situation that has been held as acceptable longer than it is. The mind has been managing this — scheduling around it, reframing it, deferring the decision. The 4AM activation is the managing system reaching its capacity. The signal is not catastrophe. It is information.',
+            protocol: [
+                'Write one honest sentence about what you are not saying out loud.',
+                'Do not problem-solve tonight. The goal is to name the thing, not resolve it.',
+                'Ask: is this something I cannot change, or something I have not decided to change?',
+                'The distinction matters. One requires acceptance. The other requires a decision. Make a note about which category this is.',
+            ],
+            verdict: 'The panelák failed not because the design was wrong but because the feedback channel was closed. You are the feedback. Write it down.'
+        }
+    };
+
+    // Scoring
+    function diagnose(answers) {
+        const t = answers.trigger;
+        const q = answers.quality;
+        const b = answers.body;
+        const a = answers.action;
+        const p = answers.pattern;
+
+        let scores = { SIGNAL: 0, LOOP: 0, BIOLOGY: 0, SHIFT: 0 };
+
+        // Trigger
+        if (t === 'brain') scores.SIGNAL += 3;
+        if (t === 'worry') scores.LOOP += 3;
+        if (t === 'biology') scores.BIOLOGY += 3;
+        if (t === 'event') { scores.LOOP += 1; scores.SHIFT += 2; }
+
+        // Quality
+        if (q === 'productive') scores.SIGNAL += 3;
+        if (q === 'loop') scores.LOOP += 3;
+        if (q === 'unclear') { scores.LOOP += 1; scores.BIOLOGY += 1; scores.SHIFT += 1; }
+        if (q === 'known_loop') scores.LOOP += 2;
+
+        // Body
+        if (b === 'alert') scores.SIGNAL += 2;
+        if (b === 'tense') { scores.LOOP += 1; scores.SHIFT += 2; }
+        if (b === 'wired') { scores.LOOP += 1; scores.BIOLOGY += 2; }
+        if (b === 'tired') scores.BIOLOGY += 3;
+
+        // Action
+        if (a === 'can_act') scores.SIGNAL += 2;
+        if (a === 'cant_act') { scores.BIOLOGY += 1; scores.LOOP += 1; }
+        if (a === 'stalling') { scores.LOOP += 1; scores.SHIFT += 2; }
+        if (a === 'blocking') scores.SHIFT += 3;
+
+        // Pattern
+        if (p === 'rare') { scores.SIGNAL += 1; scores.BIOLOGY += 1; }
+        if (p === 'occasional') { /* neutral */ }
+        if (p === 'pattern') { scores.SHIFT += 2; scores.LOOP += 1; }
+        if (p === 'chronic') scores.SHIFT += 3;
+
+        // Find max
+        let best = 'BIOLOGY';
+        let max = -1;
+        for (const [k,v] of Object.entries(scores)) {
+            if (v > max) { max = v; best = k; }
+        }
+        return { type: best, scores };
+    }
+
+    // State
+    let answers = {};
+    let currentQ = 0;
+
+    function renderQuiz() {
+        const container = document.getElementById('quiz');
+        container.innerHTML = '';
+        for (let i = 0; i <= Math.min(currentQ, QUESTIONS.length - 1); i++) {
+            const q = QUESTIONS[i];
+            const answered = answers[q.id];
+            const isActive = i === currentQ;
+
+            const div = document.createElement('div');
+            div.className = `fade-in rounded-lg border p-4 transition-all ${isActive ? 'border-zinc-700 bg-zinc-900/60' : 'border-zinc-800 bg-zinc-900/20 opacity-60'}`;
+
+            const qText = document.createElement('p');
+            qText.className = 'text-sm text-zinc-300 mb-3';
+            qText.textContent = `${i + 1}. ${q.text}`;
+            div.appendChild(qText);
+
+            const opts = document.createElement('div');
+            opts.className = 'space-y-2';
+            q.options.forEach(opt => {
+                const btn = document.createElement('button');
+                const isSelected = answered === opt.value;
+                btn.className = `w-full text-left px-3 py-2 rounded text-xs transition-all border ${
+                    isSelected
+                    ? 'border-amber-700 bg-amber-950/40 text-amber-300'
+                    : isActive
+                    ? 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                    : 'border-zinc-800 text-zinc-600 cursor-default'
+                }`;
+                btn.textContent = opt.label;
+                if (isActive) {
+                    btn.addEventListener('click', () => {
+                        answers[q.id] = opt.value;
+                        if (currentQ < QUESTIONS.length - 1) {
+                            currentQ++;
+                            renderQuiz();
+                        } else {
+                            showResult();
+                        }
+                    });
+                }
+                opts.appendChild(btn);
+            });
+            div.appendChild(opts);
+            container.appendChild(div);
+        }
+    }
+
+    function showResult() {
+        document.getElementById('quiz').innerHTML = '';
+        const { type, scores } = diagnose(answers);
+        const diag = DIAGNOSES[type];
+        const res = document.getElementById('result');
+        res.classList.remove('hidden');
+        res.innerHTML = `
+            <div class="rounded-lg border ${diag.border} ${diag.bg} p-5 space-y-4">
+                <div>
+                    <p class="text-xs text-zinc-600 uppercase tracking-widest mb-1">Diagnosis</p>
+                    <h2 class="text-2xl font-bold ${diag.color} ${diag.glow}">${diag.label}</h2>
+                    <p class="text-sm text-zinc-300 mt-2">${diag.summary}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-zinc-400 leading-relaxed">${diag.detail}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Protocol</p>
+                    <ul class="space-y-2">
+                        ${diag.protocol.map((p,i) => `<li class="flex gap-2 text-xs text-zinc-400"><span class="${diag.color} font-bold shrink-0">${i+1}.</span><span>${p}</span></li>`).join('')}
+                    </ul>
+                </div>
+                <div class="border-t border-zinc-800 pt-3">
+                    <p class="text-xs text-zinc-500 italic">${diag.verdict}</p>
+                </div>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button id="restart" class="text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300 transition-all">Run again</button>
+            </div>
+        `;
+        document.getElementById('restart').addEventListener('click', () => {
+            answers = {};
+            currentQ = 0;
+            res.classList.add('hidden');
+            renderQuiz();
+        });
+
+        // Save to log
+        saveLog(type, diag.label);
+        renderLog();
+    }
+
+    // Local log
+    const LOG_KEY = 'prizrak_4am_log';
+
+    function saveLog(type, label) {
+        const log = getLog();
+        const now = new Date();
+        const entry = {
+            ts: now.toISOString(),
+            display: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} · ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()]} ${now.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]}`,
+            type,
+            label
+        };
+        log.unshift(entry);
+        localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(0, 30)));
+    }
+
+    function getLog() {
+        try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch { return []; }
+    }
+
+    function renderLog() {
+        const log = getLog();
+        if (!log.length) return;
+        const section = document.getElementById('log-section');
+        section.classList.remove('hidden');
+        const entries = document.getElementById('log-entries');
+        const TYPE_COLORS = { SIGNAL: 'text-amber-400', LOOP: 'text-red-400', BIOLOGY: 'text-indigo-400', SHIFT: 'text-violet-400' };
+        entries.innerHTML = log.map(e => `
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-zinc-600">${e.display}</span>
+                <span class="${TYPE_COLORS[e.type] || 'text-zinc-400'}">${e.label}</span>
+            </div>
+        `).join('');
+    }
+
+    // Init
+    renderQuiz();
+    renderLog();
+    </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Exit Interview (Inverted)</title>
+<style>
+  :root {
+    --bg: #111; --surface: #1a1a1a; --border: #2a2a2a; --muted: #555;
+    --text: #ccc; --bright: #eee; --accent: #6a9e4a; --warn: #c4834a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
+  
+  .container { max-width: 680px; margin: 0 auto; padding: 40px 24px; }
+  
+  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 40px; }
+  h1 { font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .subtitle { font-size: 0.8rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  
+  .question-card {
+    border: 1px solid var(--border); padding: 28px; margin-bottom: 24px;
+    transition: border-color 0.3s;
+  }
+  .question-card:focus-within { border-color: var(--muted); }
+  .question-card.answered { border-left: 3px solid var(--accent); }
+  
+  .q-number { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .q-text { font-size: 1.05rem; color: var(--bright); line-height: 1.6; margin-bottom: 16px; }
+  .q-subtext { font-size: 0.75rem; color: var(--muted); margin-bottom: 16px; font-style: italic; line-height: 1.5; }
+  
+  textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    font-family: 'Courier New', monospace; font-size: 0.9rem; padding: 14px;
+    resize: vertical; min-height: 70px; outline: none; line-height: 1.5;
+  }
+  textarea:focus { border-color: var(--muted); }
+  textarea::placeholder { color: #333; }
+  
+  .trap-check {
+    margin-top: 20px; padding: 16px; background: #1c1510; border: 1px solid #3a2a1a;
+    display: none;
+  }
+  .trap-check.visible { display: block; }
+  .trap-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warn); margin-bottom: 8px; }
+  .trap-text { font-size: 0.8rem; color: #b89070; line-height: 1.5; }
+  
+  .divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  
+  .summary-section { margin-top: 40px; }
+  .summary-title { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
+  
+  .progress-bar { display: flex; gap: 4px; margin-bottom: 32px; }
+  .prog-seg { flex: 1; height: 4px; background: var(--border); transition: background 0.3s; }
+  .prog-seg.done { background: var(--accent); }
+  
+  .export-section { margin-top: 32px; text-align: center; }
+  button {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'Courier New', monospace; font-size: 0.8rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 12px 28px; cursor: pointer; transition: all 0.2s;
+  }
+  button:hover { border-color: var(--muted); color: var(--bright); }
+  
+  #snapshot { display: none; margin-top: 24px; padding: 20px; background: var(--surface); border: 1px solid var(--border); text-align: left; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap; }
+  
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 0.7rem; color: #2a2a2a; text-align: center; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>The Exit Interview (Inverted)</h1>
+    <div class="subtitle">Not the version where the company asks why you're leaving.<br>The version where you interview yourself about what you actually want next.</div>
+  </header>
+  
+  <div class="progress-bar" id="progress"></div>
+  
+  <div id="questions"></div>
+  
+  <div class="export-section">
+    <button onclick="exportSnapshot()">Export Snapshot →</button>
+    <div id="snapshot"></div>
+  </div>
+</div>
+
+<footer>Prizrak · The building does not judge you for using the stairs.</footer>
+
+<script>
+const QUESTIONS = [
+  {
+    q: "What did you tell yourself when you walked through the door?",
+    sub: "The reason you gave yourself at the time. Not the reason you'd give now.",
+    trap: "If the answer involves someone else's opinion of you — an investor, a boss, a peer — note that. The door was chosen for the audience, not the destination."
+  },
+  {
+    q: "What would you have done if nobody was watching?",
+    sub: "Remove every external observer. No LinkedIn. No investors. No former colleagues. What would you have built or pursued if approval was off the table entirely?",
+    trap: "If this answer is completely different from what you've been doing — that gap is the cost of the wrong door."
+  },
+  {
+    q: "What did the job actually cost you?",
+    sub: "Not money. Time, energy, relationships, health, projects you didn't start, ideas you didn't pursue. Be specific.",
+    trap: null
+  },
+  {
+    q: "What are you afraid will happen when you leave?",
+    sub: "The real fear. Not the practical logistics — the emotional one. What story do you think people will tell about you?",
+    trap: "If the fear is about what people will think rather than what will actually happen — that's the approval loop still running. The mountain does not care about your departure announcement."
+  },
+  {
+    q: "What do you want to build next?",
+    sub: "Not what sounds impressive. Not what would make up for the last thing. What actually interests you when nobody is asking?",
+    trap: "Check: is this answer about building something you want, or about proving something to someone? If you can't tell the difference, sit with it longer."
+  },
+  {
+    q: "What would 'enough' look like?",
+    sub: "Not the moonshot. Not the redemption arc. What does a Tuesday look like where you go to bed not needing anything to be different?",
+    trap: null
+  },
+  {
+    q: "What have you learned that you didn't know before you walked in?",
+    sub: "The wrong door still has rooms in it. What did you find in them?",
+    trap: null
+  }
+];
+
+const STORAGE_KEY = 'exit_interview_v1';
+
+function loadAnswers() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function saveAnswers(answers) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+}
+
+function render() {
+  const answers = loadAnswers();
+  const qContainer = document.getElementById('questions');
+  const progress = document.getElementById('progress');
+  
+  let answered = 0;
+  
+  qContainer.innerHTML = QUESTIONS.map((item, i) => {
+    const val = answers[i] || '';
+    const isDone = val.trim().length > 0;
+    if (isDone) answered++;
+    
+    return `
+      <div class="question-card ${isDone ? 'answered' : ''}" id="card-${i}">
+        <div class="q-number">Question ${i + 1} of ${QUESTIONS.length}</div>
+        <div class="q-text">${item.q}</div>
+        <div class="q-subtext">${item.sub}</div>
+        <textarea 
+          placeholder="..." 
+          oninput="onAnswer(${i}, this.value)"
+        >${val}</textarea>
+        ${item.trap ? `
+          <div class="trap-check ${isDone ? 'visible' : ''}" id="trap-${i}">
+            <div class="trap-label">⚠ Approval-seeking check</div>
+            <div class="trap-text">${item.trap}</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+  
+  progress.innerHTML = QUESTIONS.map((_, i) => {
+    const val = answers[i] || '';
+    return `<div class="prog-seg ${val.trim() ? 'done' : ''}"></div>`;
+  }).join('');
+}
+
+function onAnswer(i, value) {
+  const answers = loadAnswers();
+  answers[i] = value;
+  saveAnswers(answers);
+  
+  const card = document.getElementById('card-' + i);
+  const trap = document.getElementById('trap-' + i);
+  const isDone = value.trim().length > 0;
+  
+  card.className = 'question-card' + (isDone ? ' answered' : '');
+  if (trap) trap.className = 'trap-check' + (isDone ? ' visible' : '');
+  
+  // Update progress
+  const segs = document.querySelectorAll('.prog-seg');
+  segs[i].className = 'prog-seg' + (isDone ? ' done' : '');
+}
+
+function exportSnapshot() {
+  const answers = loadAnswers();
+  const snap = document.getElementById('snapshot');
+  const date = new Date().toLocaleDateString('en-CA');
+  
+  let text = `EXIT INTERVIEW — ${date}\n${'─'.repeat(40)}\n\n`;
+  
+  QUESTIONS.forEach((item, i) => {
+    const val = (answers[i] || '').trim();
+    text += `${i + 1}. ${item.q}\n`;
+    if (val) {
+      text += `   ${val}\n`;
+    } else {
+      text += `   [unanswered]\n`;
+    }
+    text += '\n';
+  });
+  
+  text += `${'─'.repeat(40)}\nThe building does not judge you for using the stairs.`;
+  
+  snap.textContent = text;
+  snap.style.display = 'block';
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+render();
+</script>
+</body>
+</html>

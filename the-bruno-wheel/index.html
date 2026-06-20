@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Bruno Wheel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f0f12; }
+    .ring-label { font-family: monospace; }
+    .slot { transition: all 0.2s; cursor: pointer; }
+    .slot:hover { background: rgba(139,92,246,0.15); }
+    .slot.locked { background: rgba(139,92,246,0.25); border-color: #7c3aed !important; color: #c4b5fd; }
+    .spin-btn { transition: all 0.15s; }
+    .spin-btn:hover { transform: rotate(15deg); }
+    @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .flashing { animation: flash 0.4s ease; }
+    .wheel-svg text { font-family: monospace; font-size: 9px; }
+    .verdict { border-left: 3px solid #7c3aed; background: rgba(124,58,237,0.08); }
+    .history-item { border-left: 2px solid #3f3f46; }
+  </style>
+</head>
+<body class="text-zinc-300 min-h-screen font-sans antialiased">
+  <div class="max-w-3xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-white mb-1">The Bruno Wheel</h1>
+      <p class="text-zinc-500 text-sm">Five rings. 3,750 cells. Spin to generate a framing for your stuck problem.<br>Based on Giordano Bruno's <em>De Umbris Idearum</em> (1582) — the first search index without a ranking algorithm.</p>
+    </div>
+
+    <!-- Problem input -->
+    <div class="mb-6">
+      <label class="block text-xs font-mono text-zinc-500 mb-2 uppercase tracking-wider">Your Stuck Problem</label>
+      <textarea id="problem" rows="2" placeholder="What are you trying to figure out? (optional — the wheel works without it)" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 resize-none"></textarea>
+    </div>
+
+    <!-- The Wheel Display -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <span class="text-xs font-mono text-zinc-500 uppercase tracking-wider">Current Alignment</span>
+        <div class="flex gap-2">
+          <button onclick="spinAll()" class="spin-btn px-4 py-1.5 bg-violet-800 hover:bg-violet-700 text-violet-100 text-sm rounded-lg font-mono">⟳ Spin All</button>
+          <button onclick="clearLocks()" class="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm rounded-lg font-mono">Clear Locks</button>
+        </div>
+      </div>
+
+      <!-- Five rings -->
+      <div id="rings" class="space-y-3"></div>
+
+      <!-- Address -->
+      <div class="mt-4 pt-4 border-t border-zinc-800 flex items-center justify-between">
+        <span class="text-xs font-mono text-zinc-600">Address: <span id="address" class="text-zinc-500">—</span></span>
+        <span class="text-xs font-mono text-zinc-600">Cell <span id="cellnum" class="text-zinc-400">—</span> of 3,750</span>
+      </div>
+    </div>
+
+    <!-- Generate Brief -->
+    <div class="mb-6">
+      <button onclick="generateBrief()" id="briefBtn" class="w-full py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-violet-700 text-zinc-200 rounded-xl font-mono text-sm transition-all">
+        Generate Brief from Locked Rings
+      </button>
+    </div>
+
+    <!-- Brief output -->
+    <div id="brief" class="hidden mb-6 verdict rounded-xl p-5">
+      <div class="text-xs font-mono text-violet-400 mb-3 uppercase tracking-wider">Prízrak Reads the Alignment</div>
+      <div id="briefText" class="text-sm text-zinc-300 leading-relaxed"></div>
+      <div class="mt-4 flex gap-2">
+        <button onclick="saveBrief()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-mono rounded-lg">Save to Log</button>
+        <button onclick="copyBrief()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-mono rounded-lg">Copy</button>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div id="historySection" class="hidden">
+      <div class="text-xs font-mono text-zinc-600 uppercase tracking-wider mb-3">Saved Alignments</div>
+      <div id="history" class="space-y-3"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-10 pt-6 border-t border-zinc-800 text-center">
+      <p class="text-xs text-zinc-600">Bruno's Clavis Magna was never finished. The scoring function is yours.</p>
+      <p class="text-[10px] text-zinc-700 mt-1">De Umbris Idearum · 1582 · Paris</p>
+    </div>
+  </div>
+
+<script>
+// The five rings of Bruno's wheel
+// Ring 1 (outermost): Agent — who or what is acting
+// Ring 2: Action — what is being done  
+// Ring 3: Emblem — the symbol/image that makes it vivid
+// Ring 4: Attribute — the quality or condition
+// Ring 5 (innermost): Circumstance — context, when/where/why
+
+const RINGS = [
+  {
+    id: "agent",
+    label: "Ring I — Agent",
+    sublabel: "who or what is acting",
+    color: "border-amber-600/50 text-amber-300",
+    dotColor: "bg-amber-500",
+    values: [
+      "the founder", "the institution", "the body", "the system", "the past self",
+      "the observer", "the market", "the team", "time itself", "the critic",
+      "the first soul", "the second soul", "the builder", "the inheritor", "the stranger",
+      "the village", "the mountain", "the well", "the archive", "the machine"
+    ]
+  },
+  {
+    id: "action",
+    label: "Ring II — Action",
+    sublabel: "what is being done",
+    color: "border-violet-600/50 text-violet-300",
+    dotColor: "bg-violet-500",
+    values: [
+      "is generating", "is filtering", "is preserving", "is dissolving", "is waiting",
+      "is building", "is performing", "is inheriting", "is consuming", "is emitting",
+      "is routing around", "is calibrating", "is abandoning", "is crystallizing", "is descending",
+      "is naming", "is suppressing", "is encoding", "is drifting", "is choosing"
+    ]
+  },
+  {
+    id: "emblem",
+    label: "Ring III — Emblem",
+    sublabel: "the image that makes it stick",
+    color: "border-emerald-600/50 text-emerald-300",
+    dotColor: "bg-emerald-500",
+    values: [
+      "a jar of brine", "a rotating wheel", "the cave bear's skull", "a cave pearl", "foxfire at 3 AM",
+      "the parchment and the LaserDisc", "the snake in the mountain", "the potato", "the absent Clavis Magna", "the midsleep of free days",
+      "Bruno's burning", "the tank through the gate", "the well at Zakopane", "the cobalt glass mosaic", "the Niphargus in the bucket",
+      "the flying saucer on the peak", "the seven abandoned galleries", "the frozen FRQ protein", "the dance at noon", "the ant's death grip"
+    ]
+  },
+  {
+    id: "attribute",
+    label: "Ring IV — Attribute",
+    sublabel: "quality or condition",
+    color: "border-cyan-600/50 text-cyan-300",
+    dotColor: "bg-cyan-500",
+    values: [
+      "legible", "invisible", "too heavy to rotate", "still being tumbled", "temperature-compensated",
+      "abandoned but intact", "encoded in the foundation date", "value-laden", "borrowed", "cryptobiotic",
+      "without a scoring function", "porous", "load-bearing", "sealed at the wrong opening", "entrained",
+      "free-running", "borrowed from the corpus", "inside the wall", "irreversible", "permanent"
+    ]
+  },
+  {
+    id: "circumstance",
+    label: "Ring V — Circumstance",
+    sublabel: "context, when / where / why",
+    color: "border-rose-600/50 text-rose-300",
+    dotColor: "bg-rose-500",
+    values: [
+      "at 3 AM in the dark", "on the day of the original reading", "when the zeitgeber disappears", "while the roof is still standing",
+      "after the party falls", "six months underground", "before the Clavis Magna is written", "in the limestone chamber",
+      "at the moment of the spin", "when the well is punctured", "when the forest floor is under threat",
+      "at the moment the pearl stops rotating", "during the free-run period", "when the first soul is sleeping",
+      "in the 12 minutes before the answer fades", "when the glacier feeds the ponory", "at the altitude of the correct humidity",
+      "the week after the company fails", "while the tank is still approaching the gate", "when the surface river has gone underground"
+    ]
+  }
+];
+
+const STORAGE_KEY = "bruno_wheel_v1";
+let state = { rings: {}, locked: {}, history: [] };
+
+function init() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try { state = JSON.parse(saved); } catch(e) {}
+  }
+  // Ensure all rings have values
+  RINGS.forEach(r => {
+    if (!state.rings[r.id]) state.rings[r.id] = rand(r.values);
+    if (state.locked[r.id] === undefined) state.locked[r.id] = false;
+  });
+  if (!state.history) state.history = [];
+  render();
+}
+
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function spinAll() {
+  RINGS.forEach(r => {
+    if (!state.locked[r.id]) {
+      state.rings[r.id] = rand(r.values);
+    }
+  });
+  save();
+  render();
+  updateAddress();
+}
+
+function spinOne(id) {
+  const ring = RINGS.find(r => r.id === id);
+  state.rings[id] = rand(ring.values);
+  state.locked[id] = false;
+  save();
+  render();
+}
+
+function toggleLock(id) {
+  state.locked[id] = !state.locked[id];
+  save();
+  render();
+}
+
+function clearLocks() {
+  RINGS.forEach(r => state.locked[r.id] = false);
+  document.getElementById('brief').classList.add('hidden');
+  save();
+  render();
+}
+
+function render() {
+  const container = document.getElementById('rings');
+  container.innerHTML = RINGS.map(r => {
+    const val = state.rings[r.id] || rand(r.values);
+    const locked = state.locked[r.id];
+    return `
+    <div class="flex items-center gap-3">
+      <div class="w-32 shrink-0">
+        <div class="text-[10px] font-mono text-zinc-600 leading-tight">${r.label}</div>
+        <div class="text-[9px] text-zinc-700 italic">${r.sublabel}</div>
+      </div>
+      <div class="flex-1 flex items-center gap-2 bg-zinc-800/50 border ${locked ? 'border-violet-700' : 'border-zinc-700/50'} rounded-lg px-3 py-2 ${locked ? 'bg-violet-900/10' : ''}">
+        <div class="w-1.5 h-1.5 rounded-full shrink-0 ${locked ? 'bg-violet-400' : r.dotColor.replace('bg-','bg-') + '/60'}"></div>
+        <span class="flex-1 text-sm ${locked ? 'text-violet-200' : r.color.split(' ')[1]}">${val}</span>
+        <div class="flex gap-1.5 shrink-0">
+          <button onclick="spinOne('${r.id}')" class="text-zinc-600 hover:text-zinc-400 text-xs px-1.5 py-0.5 rounded hover:bg-zinc-700/50 transition-colors font-mono" title="Spin this ring">⟳</button>
+          <button onclick="toggleLock('${r.id}')" class="text-xs px-1.5 py-0.5 rounded transition-colors font-mono ${locked ? 'text-violet-400 bg-violet-900/30 hover:bg-violet-900/50' : 'text-zinc-600 hover:text-zinc-400 hover:bg-zinc-700/50'}" title="${locked ? 'Unlock' : 'Lock this value'}">${locked ? '🔒' : '○'}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  updateAddress();
+}
+
+function updateAddress() {
+  const indices = RINGS.map(r => {
+    const vals = r.values;
+    const current = state.rings[r.id];
+    const idx = vals.indexOf(current);
+    return idx >= 0 ? idx : 0;
+  });
+  // Address as base-20 coordinate
+  const addr = indices.map((i,j) => `${String.fromCharCode(65+j)}${String(i+1).padStart(2,'0')}`).join('·');
+  const cellNum = indices[0]*20*20*20*20 + indices[1]*20*20*20 + indices[2]*20*20 + indices[3]*20 + indices[4] + 1;
+  document.getElementById('address').textContent = addr;
+  document.getElementById('cellnum').textContent = Math.min(cellNum, 3750);
+}
+
+function generateBrief() {
+  const lockedCount = RINGS.filter(r => state.locked[r.id]).length;
+  
+  const vals = {};
+  RINGS.forEach(r => vals[r.id] = state.rings[r.id]);
+  
+  const problem = document.getElementById('problem').value.trim();
+  
+  // Generate a Prizrak-style brief from the alignment
+  const briefs = [
+    `${vals.agent} ${vals.action} something ${vals.attribute}.\n\nThe emblem: ${vals.emblem}.\n\nCircumstance: ${vals.circumstance}.\n\n${problem ? `Your problem — "${problem}" — seen through this window: the ${vals.attribute.replace(/^(a |an |the )/,'')} state is not the obstacle. It is the condition that makes the next step visible.` : `The wheel has aligned. The combination is not the answer. It is the question the answer is inside.`}\n\nThe Clavis Magna is still missing. What does this framing unlock that your previous framing didn't?` ,
+    
+    `The alignment: ${vals.agent} / ${vals.action} / ${vals.attribute}.\n\nThe image to hold: ${vals.emblem}.\n\nContext: ${vals.circumstance}.\n\n${problem ? `"${problem}" — the frame this alignment offers: who is the actual agent? Not who you assumed. The emblem makes it concrete. Place that image in the cell and walk past it.` : `Bruno loaded images into cells to make combinations retrievable. The combination isn't stored until you name what it is for. What does this combination retrieve?`}\n\nSpin again or lock what fits. The key is yours to write.`,
+    
+    `A cell in the 3,750: ${vals.agent} is ${vals.action.replace('is ','')} something ${vals.attribute}, ${vals.circumstance}.\n\nThe symbolic anchor: ${vals.emblem}.\n\n${problem ? `Held against "${problem}": the emblem is doing the work the explanation cannot. What does ${vals.emblem} tell you about this situation that your own framing didn't?` : `The wheel produces the address. The address points to an image. The image retrieves the thought. This is the sequence Bruno built. The missing step — the Great Key — is the judgment about whether this thought is worth retrieving.`}\n\nIs this combination signal or noise? Only you can answer. That was always the point.`
+  ];
+  
+  const brief = briefs[Math.floor(Math.random() * briefs.length)];
+  
+  document.getElementById('briefText').innerHTML = brief.replace(/\n/g, '<br>');
+  document.getElementById('brief').classList.remove('hidden');
+}
+
+function saveBrief() {
+  const brief = document.getElementById('briefText').innerHTML.replace(/<br>/g,'\n');
+  const problem = document.getElementById('problem').value.trim();
+  const alignment = {};
+  RINGS.forEach(r => alignment[r.label.split('—')[1].trim().toLowerCase()] = state.rings[r.id]);
+  
+  const entry = {
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}),
+    problem: problem || '(no problem stated)',
+    alignment,
+    brief
+  };
+  state.history.unshift(entry);
+  if (state.history.length > 20) state.history = state.history.slice(0,20);
+  save();
+  renderHistory();
+}
+
+function copyBrief() {
+  const text = document.getElementById('briefText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function renderHistory() {
+  const section = document.getElementById('historySection');
+  const container = document.getElementById('history');
+  if (!state.history || state.history.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+  container.innerHTML = state.history.map((e,i) => `
+    <div class="history-item pl-4 py-3 bg-zinc-900/50 rounded-r-lg">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="text-xs font-mono text-zinc-600">${e.date} ${e.time}</span>
+        ${e.problem !== '(no problem stated)' ? `<span class="text-xs text-zinc-500 italic truncate max-w-xs">"${e.problem}"</span>` : ''}
+      </div>
+      <div class="flex flex-wrap gap-1 mb-2">
+        ${Object.entries(e.alignment).map(([k,v]) => `<span class="text-[10px] font-mono px-1.5 py-0.5 bg-zinc-800 text-zinc-500 rounded">${v}</span>`).join('')}
+      </div>
+      <button onclick="deleteHistory(${i})" class="text-[10px] text-zinc-700 hover:text-zinc-500 font-mono">delete</button>
+    </div>
+  `).join('');
+}
+
+function deleteHistory(i) {
+  state.history.splice(i, 1);
+  save();
+  renderHistory();
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+window.addEventListener('load', () => {
+  init();
+  renderHistory();
+});
+</script>
+</body>
+</html>

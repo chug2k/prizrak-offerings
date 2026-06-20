@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Karst Crossing</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+  body { background: #0a0e14; font-family: 'Share Tech Mono', monospace; }
+  .river { animation: flow 8s linear infinite; }
+  @keyframes flow { from { background-position: 0 0; } to { background-position: 0 200px; } }
+  .drip { animation: drip 3s ease-in infinite; }
+  @keyframes drip { 0%,80% { opacity: 0.15; } 90% { opacity: 0.6; } 100% { opacity: 0.15; } }
+  textarea:focus { outline: none; }
+  .fade-in { animation: fadeIn 0.6s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .crossing-flash { animation: flash 1.2s ease-out forwards; }
+  @keyframes flash { 0% { background: #0a0e14; } 30% { background: #0d2433; } 100% { background: #0a0e14; } }
+</style>
+</head>
+<body class="text-slate-300 min-h-screen">
+
+<!-- ASCII river background (decorative) -->
+<div class="fixed inset-0 pointer-events-none overflow-hidden opacity-5 select-none">
+  <pre class="text-blue-400 text-xs leading-4 absolute top-0 left-0 w-full h-full overflow-hidden">
+~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~
+  ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~
+~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~
+  ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~
+~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~
+  ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~
+</pre>
+</div>
+
+<div class="max-w-xl mx-auto px-4 py-10 relative">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between mb-1">
+      <span class="text-blue-500 text-xs tracking-widest uppercase">KARST CROSSING PROTOCOL</span>
+      <span id="clock" class="text-slate-600 text-xs font-mono"></span>
+    </div>
+    <h1 class="text-2xl font-bold text-white tracking-tight">The Karst Crossing</h1>
+    <p class="text-slate-600 text-xs mt-1 leading-relaxed">The river that crosses borders does not know it crosses borders.<br>Surface what moved underground today. Cross. Leave what belongs in the cave.</p>
+  </div>
+
+  <!-- App container -->
+  <div id="app"></div>
+
+  <!-- Log -->
+  <div id="log-section" class="mt-10 hidden">
+    <div class="border-t border-slate-800 pt-6">
+      <h2 class="text-xs text-slate-600 uppercase tracking-widest mb-3">Past Crossings</h2>
+      <div id="log-entries" class="space-y-3"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const STORE_KEY = "karst_crossings_v1";
+const PROMPTS = [
+  {
+    id: "underground",
+    label: "I. UNDERGROUND SIGNAL",
+    question: "What moved through you today that the room never saw?",
+    hint: "Real conviction. A doubt you didn't voice. A pattern you noticed but didn't name.",
+    color: "text-blue-400",
+    border: "border-blue-900"
+  },
+  {
+    id: "carrying",
+    label: "II. CROSSING CARGO",
+    question: "What are you carrying across the border into tonight?",
+    hint: "What follows you home from the VC machine. Name it or it travels unnamed.",
+    color: "text-amber-400",
+    border: "border-amber-900"
+  },
+  {
+    id: "cave",
+    label: "III. WHAT STAYS IN THE CAVE",
+    question: "What do you leave in the dark?",
+    hint: "The approval loop. The unfinished performance. The thing that was never yours.",
+    color: "text-slate-400",
+    border: "border-slate-700"
+  }
+];
+
+let state = { step: 0, answers: {}, done: false };
+
+function save(entry) {
+  const log = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+  log.unshift(entry);
+  localStorage.setItem(STORE_KEY, JSON.stringify(log.slice(0, 20)));
+}
+
+function getLog() {
+  return JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+}
+
+function renderClock() {
+  const now = new Date();
+  document.getElementById("clock").textContent =
+    now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function verdict(answers) {
+  const cave = (answers.cave || "").toLowerCase();
+  const carrying = (answers.carrying || "").toLowerCase();
+  if (!answers.underground || !answers.carrying || !answers.cave) return "CROSSING INCOMPLETE.";
+  const keywords = ["approval", "perform", "impress", "meeting", "firm", "vc", "boss"];
+  const caveClean = keywords.some(k => cave.includes(k));
+  const carryClean = !keywords.some(k => carrying.includes(k));
+  if (caveClean && carryClean) return "CLEAN CROSSING. The river knows its own banks.";
+  if (caveClean) return "CAVE PACKED. Watch what you're still carrying.";
+  if (carryClean) return "CARGO LIGHT. But the cave is not yet sealed.";
+  return "PARTIAL CROSSING. The machine followed you through the limestone.";
+}
+
+function renderStep() {
+  const app = document.getElementById("app");
+  if (state.step < PROMPTS.length) {
+    const p = PROMPTS[state.step];
+    app.innerHTML = `
+    <div class="fade-in bg-slate-900 border ${p.border} border-l-4 rounded p-5">
+      <div class="${p.color} text-xs tracking-widest uppercase mb-3">${p.label}</div>
+      <div class="text-white text-base mb-1 leading-snug">${p.question}</div>
+      <div class="text-slate-600 text-xs mb-4">${p.hint}</div>
+      <textarea id="answer" rows="3" placeholder="..."
+        class="w-full bg-black border border-slate-700 focus:border-slate-500 rounded px-3 py-2 text-sm text-slate-200 placeholder-slate-700 resize-none transition-colors"></textarea>
+      <div class="mt-3 flex justify-between items-center">
+        <span class="text-slate-700 text-xs">${state.step + 1} / ${PROMPTS.length}</span>
+        <button id="next-btn" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-slate-400 text-xs text-white rounded transition-colors">
+          ${state.step < PROMPTS.length - 1 ? 'CONTINUE →' : 'CROSS →'}
+        </button>
+      </div>
+    </div>`;
+    document.getElementById("answer").focus();
+    document.getElementById("next-btn").addEventListener("click", () => {
+      const val = document.getElementById("answer").value.trim();
+      if (!val) return;
+      state.answers[PROMPTS[state.step].id] = val;
+      state.step++;
+      if (state.step >= PROMPTS.length) {
+        renderCrossing();
+      } else {
+        renderStep();
+      }
+    });
+  }
+}
+
+function renderCrossing() {
+  const app = document.getElementById("app");
+  const v = verdict(state.answers);
+  const entry = {
+    date: new Date().toISOString(),
+    answers: { ...state.answers },
+    verdict: v
+  };
+  save(entry);
+  document.body.className += " crossing-flash";
+
+  app.innerHTML = `
+  <div class="fade-in text-center py-6">
+    <div class="text-blue-500 text-3xl mb-4">≋</div>
+    <div class="text-white font-bold text-sm tracking-widest uppercase mb-1">CROSSING COMPLETE</div>
+    <div class="text-slate-500 text-xs mb-6">${new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit",hour12:false})} — ${new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</div>
+    <div class="bg-slate-900 border border-slate-700 rounded p-4 mb-6 text-left space-y-3">
+      ${PROMPTS.map(p => `
+        <div>
+          <div class="${p.color} text-xs uppercase tracking-wider mb-0.5">${p.label}</div>
+          <div class="text-slate-300 text-sm">${state.answers[p.id]}</div>
+        </div>`).join('<div class="border-t border-slate-800 my-2"></div>')}
+    </div>
+    <div class="border border-slate-700 bg-black rounded px-4 py-3 mb-6">
+      <div class="text-slate-500 text-xs uppercase tracking-widest mb-1">Verdict</div>
+      <div class="text-white text-sm font-bold">${v}</div>
+    </div>
+    <button id="new-btn" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 rounded transition-colors">NEW CROSSING</button>
+  </div>`;
+
+  renderLogSection();
+  document.getElementById("new-btn").addEventListener("click", () => {
+    state = { step: 0, answers: {}, done: false };
+    renderStep();
+  });
+}
+
+function renderLogSection() {
+  const log = getLog();
+  if (log.length === 0) return;
+  document.getElementById("log-section").classList.remove("hidden");
+  const container = document.getElementById("log-entries");
+  container.innerHTML = log.map((e, i) => {
+    const d = new Date(e.date);
+    const label = d.toLocaleDateString("en-US", {month:"short",day:"numeric"}) + " " +
+                  d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",hour12:false});
+    return `
+    <details class="bg-slate-900/60 border border-slate-800 rounded ${i === 0 ? 'open' : ''}">
+      <summary class="px-3 py-2 text-xs text-slate-500 cursor-pointer hover:text-slate-300 flex justify-between">
+        <span>${label}</span>
+        <span class="text-slate-700">${e.verdict.slice(0, 28)}…</span>
+      </summary>
+      <div class="px-3 pb-3 pt-1 space-y-2 text-xs">
+        ${PROMPTS.map(p => `<div><span class="text-slate-600 uppercase">${p.id}: </span><span class="text-slate-400">${e.answers[p.id] || '—'}</span></div>`).join("")}
+        <div class="text-white border-t border-slate-800 pt-2 mt-2">${e.verdict}</div>
+      </div>
+    </details>`;
+  }).join("");
+}
+
+// Init
+renderStep();
+renderLogSection();
+setInterval(renderClock, 1000);
+renderClock();
+</script>
+</body>
+</html>

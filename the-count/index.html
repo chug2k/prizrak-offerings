@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Count</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0b0c0b;
+      --surface: #111210;
+      --border: #1e1f1d;
+      --text: #bdbfba;
+      --muted: #52554f;
+      --white: #e4e6e0;
+      --debit: #7c3a3a;
+      --debit-light: #c47070;
+      --credit: #3a6b4a;
+      --credit-light: #6ba87a;
+      --neutral: #4a5060;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 20px 80px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .title-label {
+      font-size: 10px;
+      letter-spacing: 4px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: normal;
+      color: var(--white);
+      margin-bottom: 6px;
+    }
+    .date-line {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .ledger {
+      width: 100%;
+      max-width: 700px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+    .col-header {
+      padding: 14px 20px;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .col-debit  { color: var(--debit-light);  border-right: 1px solid var(--border); }
+    .col-credit { color: var(--credit-light); }
+    .col-debit .col-sub, .col-credit .col-sub {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-style: italic;
+      text-transform: none;
+      margin-top: 2px;
+    }
+    .entries-col {
+      padding: 12px;
+      min-height: 280px;
+      vertical-align: top;
+    }
+    .entries-col.debit-col  { border-right: 1px solid var(--border); }
+    .entry-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .entry-tag {
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 1px;
+      white-space: nowrap;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .tag-time    { background: rgba(124,58,58,0.25);  color: var(--debit-light);  border: 1px solid var(--debit); }
+    .tag-energy  { background: rgba(124,58,58,0.15);  color: #b06060;             border: 1px solid #5a2a2a; }
+    .tag-attn    { background: rgba(90,70,30,0.25);   color: #b89050;             border: 1px solid #5a4010; }
+    .tag-made    { background: rgba(58,107,74,0.25);  color: var(--credit-light); border: 1px solid var(--credit); }
+    .tag-moved   { background: rgba(40,80,60,0.15);   color: #509070;             border: 1px solid #204030; }
+    .tag-learned { background: rgba(50,60,90,0.25);   color: #7090c0;             border: 1px solid #203060; }
+    .entry-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      padding: 4px 0;
+      outline: none;
+      transition: border-color 0.15s;
+      line-height: 1.4;
+    }
+    .entry-input:focus { border-bottom-color: var(--border); }
+    .entry-input::placeholder { color: var(--muted); font-style: italic; }
+    .remove-btn {
+      background: none; border: none; color: var(--border);
+      cursor: pointer; font-size: 14px; padding: 2px 4px; margin-top: 2px;
+      transition: color 0.15s; flex-shrink: 0;
+    }
+    .remove-btn:hover { color: var(--debit-light); }
+    .add-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .add-btn {
+      background: none;
+      border: 1px dashed var(--border);
+      color: var(--muted);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 4px 10px;
+      border-radius: 1px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .add-btn:hover { color: var(--text); border-color: var(--muted); }
+    .balance-section {
+      width: 100%;
+      max-width: 700px;
+      border: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+    .balance-header {
+      padding: 12px 20px;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .balance-body {
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+    .balance-cell { text-align: center; }
+    .balance-num {
+      font-size: 32px;
+      font-weight: normal;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .balance-label { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+    .num-debit  { color: var(--debit-light); }
+    .num-credit { color: var(--credit-light); }
+    .num-delta-pos { color: var(--credit-light); }
+    .num-delta-neg { color: var(--debit-light); }
+    .num-delta-zero { color: var(--muted); }
+    .note-section {
+      width: 100%;
+      max-width: 700px;
+      margin-bottom: 32px;
+    }
+    .note-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    textarea.note-area {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 14px;
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+      transition: border-color 0.15s;
+      border-radius: 0;
+    }
+    textarea.note-area:focus { border-color: var(--muted); }
+    textarea.note-area::placeholder { color: var(--muted); font-style: italic; }
+    .actions {
+      width: 100%;
+      max-width: 700px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .save-btn {
+      background: rgba(58,107,74,0.2);
+      border: 1px solid var(--credit);
+      color: var(--credit-light);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .save-btn:hover { background: rgba(58,107,74,0.35); }
+    .status { font-size: 11px; color: var(--muted); font-style: italic; }
+    .history-section {
+      width: 100%;
+      max-width: 700px;
+      margin-top: 40px;
+    }
+    .history-header {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 10px; letter-spacing: 3px; color: var(--muted);
+      text-transform: uppercase; margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .clear-hist { background: none; border: none; color: var(--muted);
+      font-family: 'Courier New'; font-size: 10px; cursor: pointer; letter-spacing: 1px; }
+    .clear-hist:hover { color: var(--debit-light); }
+    .hist-entry { border-bottom: 1px solid var(--border); padding: 12px 0; }
+    .hist-date { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+    .hist-counts { display: flex; gap: 16px; font-size: 11px; margin-bottom: 4px; }
+    .hist-note { font-size: 12px; color: var(--muted); font-style: italic; line-height: 1.4; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title-label">Evening Discipline</div>
+  <h1>The Count</h1>
+  <div class="date-line" id="date-line">--</div>
+</div>
+
+<div class="ledger">
+  <div class="col-header col-debit">
+    Debits — What You Gave
+    <div class="col-sub">time · energy · attention</div>
+  </div>
+  <div class="col-header col-credit">
+    Credits — What Got Made
+    <div class="col-sub">made · moved · learned</div>
+  </div>
+  <div class="entries-col debit-col" id="debit-entries"></div>
+  <div class="entries-col credit-col" id="credit-entries"></div>
+</div>
+
+<div class="balance-section">
+  <div class="balance-header">Balance</div>
+  <div class="balance-body">
+    <div class="balance-cell">
+      <div class="balance-num num-debit" id="bal-debits">0</div>
+      <div class="balance-label">Debits</div>
+    </div>
+    <div class="balance-cell">
+      <div class="balance-num num-credit" id="bal-credits">0</div>
+      <div class="balance-label">Credits</div>
+    </div>
+    <div class="balance-cell">
+      <div class="balance-num num-delta-zero" id="bal-delta">±0</div>
+      <div class="balance-label">Gap</div>
+    </div>
+  </div>
+</div>
+
+<div class="note-section">
+  <div class="note-label">Closing Note</div>
+  <textarea class="note-area" id="closing-note" placeholder="One honest sentence about today. Not good or bad. Just true."></textarea>
+</div>
+
+<div class="actions">
+  <div class="status" id="status">unsaved</div>
+  <button class="save-btn" onclick="saveEntry()">Close the Books</button>
+</div>
+
+<div class="history-section" id="history-section" style="display:none">
+  <div class="history-header">
+    <span>Previous Counts</span>
+    <button class="clear-hist" onclick="clearHistory()">clear</button>
+  </div>
+  <div id="history-list"></div>
+</div>
+
+<script>
+const DEBIT_TAGS  = ['time','energy','attention'];
+const CREDIT_TAGS = ['made','moved','learned'];
+const TAG_LABELS  = { time:'time', energy:'energy', attention:'attn', made:'made', moved:'moved', learned:'learned' };
+const TAG_CLASSES = { time:'tag-time', energy:'tag-energy', attention:'tag-attn', made:'tag-made', moved:'tag-moved', learned:'tag-learned' };
+
+let debits = [], credits = [];
+
+function makeEntry(side, tag, value='') {
+  const list = side === 'debit' ? debits : credits;
+  const id = Date.now() + Math.random();
+  list.push({ id, tag, value });
+  renderAll();
+  autoSave();
+  // Focus new input
+  setTimeout(() => {
+    const el = document.querySelector(`[data-id="${id}"]`);
+    if (el) el.focus();
+  }, 30);
+}
+
+function removeEntry(side, id) {
+  if (side === 'debit')  debits  = debits.filter(e => e.id !== id);
+  else                   credits = credits.filter(e => e.id !== id);
+  renderAll();
+  autoSave();
+}
+
+function updateEntry(side, id, value) {
+  const list = side === 'debit' ? debits : credits;
+  const e = list.find(x => x.id === id);
+  if (e) e.value = value;
+  updateBalance();
+  autoSave();
+}
+
+function renderEntries(containerId, list, side) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = list.map(e => `
+    <div class="entry-row">
+      <span class="entry-tag ${TAG_CLASSES[e.tag]}">${TAG_LABELS[e.tag]}</span>
+      <input type="text" class="entry-input" data-id="${e.id}"
+        value="${escHtml(e.value)}"
+        placeholder="..."
+        oninput="updateEntry('${side}', ${e.id}, this.value)"
+        onblur="autoSave()" />
+      <button class="remove-btn" onclick="removeEntry('${side}', ${e.id})">×</button>
+    </div>
+  `).join('') + `
+    <div class="add-row">
+      ${(side === 'debit' ? DEBIT_TAGS : CREDIT_TAGS).map(t =>
+        `<button class="add-btn" onclick="makeEntry('${side}', '${t}')">+ ${t}</button>`
+      ).join('')}
+    </div>
+  `;
+}
+
+function renderAll() {
+  renderEntries('debit-entries',  debits,  'debit');
+  renderEntries('credit-entries', credits, 'credit');
+  updateBalance();
+}
+
+function updateBalance() {
+  const d = debits.filter(e => e.value.trim()).length;
+  const c = credits.filter(e => e.value.trim()).length;
+  const delta = c - d;
+  document.getElementById('bal-debits').textContent = d;
+  document.getElementById('bal-credits').textContent = c;
+  const deltaEl = document.getElementById('bal-delta');
+  deltaEl.textContent = delta > 0 ? '+' + delta : delta === 0 ? '±0' : String(delta);
+  deltaEl.className = 'balance-num ' + (delta > 0 ? 'num-delta-pos' : delta < 0 ? 'num-delta-neg' : 'num-delta-zero');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const KEY = 'the_count_state';
+const HIST_KEY = 'the_count_history';
+
+function autoSave() {
+  const state = {
+    debits: debits.map(e => ({...e})),
+    credits: credits.map(e => ({...e})),
+    note: document.getElementById('closing-note').value,
+    ts: new Date().toISOString()
+  };
+  localStorage.setItem(KEY, JSON.stringify(state));
+  document.getElementById('status').textContent = 'draft saved';
+}
+
+function saveEntry() {
+  const note = document.getElementById('closing-note').value.trim();
+  const d = debits.filter(e => e.value.trim());
+  const c = credits.filter(e => e.value.trim());
+  if (!d.length && !c.length && !note) {
+    document.getElementById('status').textContent = 'nothing to close';
+    return;
+  }
+  const hist = loadHistory();
+  hist.unshift({
+    ts: new Date().toISOString(),
+    debits: d,
+    credits: c,
+    note,
+    delta: c.length - d.length
+  });
+  if (hist.length > 60) hist.pop();
+  localStorage.setItem(HIST_KEY, JSON.stringify(hist));
+
+  // Clear today
+  debits = []; credits = [];
+  document.getElementById('closing-note').value = '';
+  localStorage.removeItem(KEY);
+  renderAll();
+  renderHistory(hist);
+  document.getElementById('status').textContent = 'closed ' + new Date().toLocaleTimeString();
+}
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(e) { return []; }
+}
+
+function clearHistory() {
+  if (confirm('Clear all saved counts?')) {
+    localStorage.removeItem(HIST_KEY);
+    renderHistory([]);
+  }
+}
+
+function renderHistory(hist) {
+  const sec = document.getElementById('history-section');
+  const list = document.getElementById('history-list');
+  if (!hist.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = hist.map(h => {
+    const d = new Date(h.ts);
+    const ds = d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    const deltaStr = h.delta > 0 ? `<span style="color:var(--credit-light)">+${h.delta}</span>` : h.delta < 0 ? `<span style="color:var(--debit-light)">${h.delta}</span>` : '<span style="color:var(--muted)">±0</span>';
+    return `<div class="hist-entry">
+      <div class="hist-date">${ds}</div>
+      <div class="hist-counts">
+        <span style="color:var(--debit-light)">${h.debits.length} debits</span>
+        <span style="color:var(--credit-light)">${h.credits.length} credits</span>
+        <span>gap: ${deltaStr}</span>
+      </div>
+      ${h.note ? `<div class="hist-note">"${escHtml(h.note)}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Init date
+function setDate() {
+  const d = new Date();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('date-line').textContent =
+    days[d.getDay()] + ' · ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
+setDate();
+
+// Wire note autosave
+document.getElementById('closing-note').addEventListener('input', autoSave);
+
+// Load draft
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.debits)  debits  = s.debits;
+    if (s.credits) credits = s.credits;
+    if (s.note) document.getElementById('closing-note').value = s.note;
+    document.getElementById('status').textContent = 'draft from ' + new Date(s.ts).toLocaleTimeString();
+  } catch(e) {}
+}
+
+loadDraft();
+renderAll();
+renderHistory(loadHistory());
+
+// Seed empty rows if blank
+if (debits.length === 0 && credits.length === 0) {
+  ['time','energy'].forEach(t => debits.push({id: Date.now()+Math.random(), tag:t, value:''}));
+  ['made','learned'].forEach(t => credits.push({id: Date.now()+Math.random(), tag:t, value:''}));
+  renderAll();
+}
+</script>
+</body>
+</html>

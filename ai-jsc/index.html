@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI JSC — Your Job Search Council</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg: #0d0f12;
+    --surface: #161a1f;
+    --border: #2a2f38;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; margin: 0; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  textarea:focus, input:focus, select:focus { outline: 2px solid #4ade80; outline-offset: 1px; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .loading-dot { animation: pulse 1.2s infinite; }
+  .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+  .member-card { transition: all 0.15s; cursor: pointer; }
+  .member-card:hover { transform: translateY(-1px); }
+  .member-card.selected { box-shadow: 0 0 0 2px var(--member-color, #4ade80); }
+  .commitment-item { border-left: 3px solid #4ade80; }
+  .commitment-item.done { border-left-color: var(--muted); opacity: 0.55; }
+  .view { display: none; }
+  .view.active { display: flex; }
+  .phase-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 3px;
+  }
+</style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+<!-- ══════════════════ HEADER ══════════════════ -->
+<header class="border-b flex items-center justify-between px-5 py-3 flex-shrink-0" style="border-color:var(--border);background:var(--surface);">
+  <div class="flex items-center gap-3">
+    <span class="mono text-xs" style="color:#4ade80;">▶ AI·JSC</span>
+    <div>
+      <div class="font-semibold text-sm">Job Search Council</div>
+      <div class="text-xs" style="color:var(--muted);">Never Search Alone · AI edition</div>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="hdr-status" class="mono text-xs" style="color:var(--muted);">configure council</span>
+    <button onclick="goView('council')" class="text-xs px-3 py-1.5 rounded" style="color:var(--muted);">My Council</button>
+    <button onclick="tryStartSession()" id="start-btn" class="text-xs font-medium px-4 py-1.5 rounded" style="background:#4ade80;color:#000;">Start Session →</button>
+    <button onclick="goView('settings')" class="text-xs px-2 py-1.5 rounded" title="Settings" style="border:1px solid var(--border);">⚙</button>
+  </div>
+</header>
+
+<!-- ══════════════════ VIEWS ══════════════════ -->
+
+<!-- VIEW: COUNCIL BUILDER -->
+<div id="view-council" class="view active flex-1 overflow-y-auto p-6 flex-col">
+  <div class="max-w-2xl mx-auto w-full">
+
+    <!-- SELECTED COUNCIL (always visible, prominent) -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Your Council</h2>
+        <button onclick="goView('learn')" class="text-xs" style="color:var(--muted);">How does JSC work? →</button>
+      </div>
+      <div id="selected-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4"></div>
+      <button onclick="tryStartSession()" class="w-full py-3 rounded-xl font-semibold text-sm" style="background:#4ade80;color:#000;">
+        Start Council Session →
+      </button>
+      <p class="text-center text-xs mt-2" style="color:var(--muted);">Weekly meeting · ~30 min · 7-phase agenda</p>
+    </div>
+
+    <!-- CUSTOMIZE TOGGLE -->
+    <div class="mb-3">
+      <button onclick="toggleCustomize()" id="customize-toggle" class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm" style="background:var(--surface);border:1px solid var(--border);">
+        <span style="color:var(--muted);">Customize council (add / swap members)</span>
+        <span id="customize-arrow" style="color:var(--muted);">▼</span>
+      </button>
+    </div>
+
+    <!-- FULL ROSTER (collapsed by default) -->
+    <div id="customize-panel" class="hidden">
+      <p class="text-xs mb-4" style="color:var(--muted);">Pick up to 5. Click to add or remove. Real people and historical figures simulate their documented voice.</p>
+      <div id="roster-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6"></div>
+
+      <div class="rounded-xl p-4 mb-4" style="background:var(--surface);border:1px solid var(--border);">
+        <div class="mono text-xs mb-2" style="color:#4ade80;">+ ADD ANYONE</div>
+        <div class="text-xs mb-3" style="color:var(--muted);">Real person, historical figure, mentor, fictional character — anyone whose lens sharpens your thinking.</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          <input id="custom-name" placeholder="Name (e.g. Jeff Bezos, your old boss)" class="rounded px-3 py-2 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+          <input id="custom-role" placeholder="Role (e.g. Amazon founder)" class="rounded px-3 py-2 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          <input id="custom-voice" placeholder="Voice (e.g. blunt, visionary)" class="rounded px-3 py-2 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+          <input id="custom-challenge" placeholder="What they push on" class="rounded px-3 py-2 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+        </div>
+        <button onclick="addCustomMember()" class="text-xs px-3 py-1.5 rounded" style="background:#1e293b;border:1px solid var(--border);">Add to Roster</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- VIEW: SESSION -->
+<div id="view-session" class="view flex-1 overflow-hidden">
+  <div class="flex h-full">
+
+    <!-- Sidebar -->
+    <aside class="w-56 flex-shrink-0 flex flex-col border-r overflow-y-auto" style="border-color:var(--border);background:var(--surface);">
+      <div class="p-3 border-b" style="border-color:var(--border);">
+        <div class="mono text-xs mb-2" style="color:var(--muted);">COUNCIL</div>
+        <div id="session-council-list" class="space-y-1.5"></div>
+      </div>
+      <div class="p-3 border-b" style="border-color:var(--border);">
+        <div class="flex items-center justify-between mb-2">
+          <div class="mono text-xs" style="color:var(--muted);">COMMITMENTS</div>
+          <div id="commitment-counts" class="mono text-xs" style="color:var(--muted);"></div>
+        </div>
+        <div id="commitments-list" class="space-y-1.5">
+          <div class="text-xs" style="color:var(--muted);font-style:italic;">None yet.</div>
+        </div>
+        <button onclick="addCommitment()" class="mt-2 text-xs w-full text-left px-2 py-1 rounded" style="border:1px dashed var(--border);color:var(--muted);">+ add manual</button>
+      </div>
+      <div class="p-3">
+        <div class="mono text-xs mb-2" style="color:var(--muted);">PAST SESSIONS</div>
+        <div id="sessions-list" class="space-y-1"></div>
+      </div>
+    </aside>
+
+    <!-- Chat -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <div id="chat-container" class="flex-1 overflow-y-auto p-5 space-y-4" style="scroll-behavior:smooth;"></div>
+      <div class="border-t p-3 flex-shrink-0" style="border-color:var(--border);background:var(--surface);">
+        <!-- Phase bar -->
+        <div id="phase-bar" class="flex items-center gap-2 mb-2">
+          <span id="phase-label" class="phase-pill" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade80;">opening</span>
+          <span id="speaking-label" class="text-xs" style="color:var(--muted);"></span>
+        </div>
+        <!-- Quick reply chips -->
+        <div id="quick-replies" class="flex flex-wrap gap-1.5 mb-2 hidden"></div>
+        <!-- Input row -->
+        <div class="flex gap-2">
+          <textarea id="user-input" placeholder="What's your search status right now?" rows="2" disabled
+            class="flex-1 rounded-lg px-3 py-2.5 text-sm resize-none"
+            style="background:var(--bg);border:1px solid var(--border);color:var(--text);"
+            onkeydown="handleKeyDown(event)"></textarea>
+          <button id="send-btn" onclick="sendMessage()" disabled
+            class="px-4 py-2 rounded-lg text-sm font-medium flex-shrink-0 self-end"
+            style="background:#4ade80;color:#000;opacity:0.5;">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW: LEARN -->
+<div id="view-learn" class="view flex-1 overflow-y-auto p-6 flex-col">
+  <div class="max-w-3xl mx-auto w-full mt-2">
+
+    <div class="flex items-center gap-3 mb-6">
+      <button onclick="goView('council')" class="text-xs px-3 py-1.5 rounded border" style="border-color:var(--border);">← Back</button>
+      <h2 class="text-xl font-semibold">How JSC Works</h2>
+    </div>
+
+    <!-- What is JSC -->
+    <div class="rounded-xl p-5 mb-4" style="background:var(--surface);border:1px solid var(--border);">
+      <div class="mono text-xs mb-3" style="color:#4ade80;">WHAT IS A JOB SEARCH COUNCIL?</div>
+      <p class="text-sm leading-relaxed mb-3" style="color:var(--text);">
+        A <strong>Job Search Council (JSC)</strong> is a small accountability group — usually 4–6 people — who agree to search for jobs together. They meet weekly via Zoom, follow a structured agenda, and hold each other accountable between sessions.
+      </p>
+      <p class="text-sm leading-relaxed mb-3" style="color:var(--muted);">
+        Developed by <strong>Phyl Terry</strong> over 25 years of coaching leaders from early-career PMs to CEOs. The core insight: job searching alone is miserable, slow, and biased. A council gives you outside perspective, accountability, and the structural discipline that most people lack when searching on their own.
+      </p>
+      <p class="text-sm leading-relaxed" style="color:var(--muted);">
+        This AI version replaces the human peer group with AI council members — each with a distinct voice and challenge style. The agenda and method are the same. The accountability is real.
+      </p>
+    </div>
+
+    <!-- The Book -->
+    <div class="rounded-xl p-5 mb-4" style="background:var(--surface);border:1px solid var(--border);">
+      <div class="mono text-xs mb-3" style="color:#4ade80;">THE SOURCE MATERIAL</div>
+      <div class="flex gap-4 items-start">
+        <div class="w-16 h-20 rounded flex items-center justify-center flex-shrink-0 text-3xl" style="background:#1e293b;border:1px solid var(--border);">📘</div>
+        <div>
+          <div class="font-semibold text-sm mb-0.5">Never Search Alone: The Job Seeker's Playbook</div>
+          <div class="text-xs mb-2" style="color:var(--muted);">Phyl Terry with Marty Cagan · 2022</div>
+          <p class="text-xs leading-relaxed mb-3" style="color:var(--muted);">
+            A time-tested, multi-step process with exercises, tools, and templates to find the right job. Covers candidate-market fit, how to run a JSC, interview prep, offer negotiation, and the psychological traps most job seekers fall into.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <a href="https://www.neversearchalone.org" target="_blank" class="text-xs px-3 py-1.5 rounded" style="background:#4ade8022;border:1px solid #4ade8066;color:#4ade80;">neversearchalone.org →</a>
+            <a href="https://www.neversearchalone.org/jsc" target="_blank" class="text-xs px-3 py-1.5 rounded" style="border:1px solid var(--border);color:var(--muted);">Join a real JSC →</a>
+            <a href="https://www.amazon.com/Never-Search-Alone-Seekers-Playbook/dp/B0B9Q9YDQ5" target="_blank" class="text-xs px-3 py-1.5 rounded" style="border:1px solid var(--border);color:var(--muted);">Book on Amazon →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agenda -->
+    <div class="rounded-xl p-5 mb-4" style="background:var(--surface);border:1px solid var(--border);">
+      <div class="mono text-xs mb-4" style="color:#4ade80;">THE WEEKLY MEETING AGENDA</div>
+      <div class="space-y-4">
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mono text-xs font-bold" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade8044;">1</div>
+          <div>
+            <div class="text-sm font-medium">Opening Round</div>
+            <div class="text-xs mt-0.5" style="color:var(--muted);">Quick status check. Where are you in the search? Employed and exploring, actively searching, paused? Keeps everyone calibrated on your reality.</div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mono text-xs font-bold" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade8044;">2</div>
+          <div>
+            <div class="text-sm font-medium">Commitments Review</div>
+            <div class="text-xs mt-0.5" style="color:var(--muted);">What did you say you'd do last week? Did you do it? The council goes through each commitment explicitly — done, not done, partial. No hiding. This is the accountability engine.</div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mono text-xs font-bold" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade8044;">3</div>
+          <div>
+            <div class="text-sm font-medium">Wins</div>
+            <div class="text-xs mt-0.5" style="color:var(--muted);">What went well this week? This matters. Job searching erodes confidence. Naming wins — even small ones — counteracts the psychological weight of the process.</div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mono text-xs font-bold" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade8044;">4</div>
+          <div>
+            <div class="text-sm font-medium">Blockers</div>
+            <div class="text-xs mt-0.5" style="color:var(--muted);">What's in the way? The council's job here is to distinguish real obstacles from avoidance. "I don't have time" is usually not a real blocker. The council will probe.</div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mono text-xs font-bold" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade8044;">5</div>
+          <div>
+            <div class="text-sm font-medium">Hot Seat</div>
+            <div class="text-xs mt-0.5" style="color:var(--muted);">Deep dive on one issue you bring. Each council member weighs in from their unique lens. This is where the multiple perspectives earn their keep — you hear 4-5 different angles on the same problem.</div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mono text-xs font-bold" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade8044;">6</div>
+          <div>
+            <div class="text-sm font-medium">New Commitments</div>
+            <div class="text-xs mt-0.5" style="color:var(--muted);">What will you do before the next session? Commitments must be SMART: specific action, clear outcome, deadline. "I'll look at startups" is not a commitment. "I'll send 3 cold emails to startup founders by Friday" is.</div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mono text-xs font-bold" style="background:#4ade8022;color:#4ade80;border:1px solid #4ade8044;">7</div>
+          <div>
+            <div class="text-sm font-medium">Closing Word</div>
+            <div class="text-xs mt-0.5" style="color:var(--muted);">One word that captures how you're leaving the session. Not a sentence. One word. Forces reflection and emotional honesty.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slow vs Fast seekers -->
+    <div class="rounded-xl p-5 mb-4" style="background:var(--surface);border:1px solid var(--border);">
+      <div class="mono text-xs mb-3" style="color:#4ade80;">SLOW SEEKER vs. FAST SEEKER</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="rounded-lg p-3" style="background:var(--bg);border:1px solid #f59e0b44;">
+          <div class="text-sm font-medium mb-1" style="color:#f59e0b;">🟡 Slow Seeker</div>
+          <div class="text-xs leading-relaxed" style="color:var(--muted);">Currently employed but exploring. The search fits around your job. The risk is staying in the "I'm just looking" limbo indefinitely without making real moves. The council pushes you to make actual decisions, not just feel better about the situation.</div>
+        </div>
+        <div class="rounded-lg p-3" style="background:var(--bg);border:1px solid #ef444444;">
+          <div class="text-sm font-medium mb-1" style="color:#ef4444;">🔴 Fast Seeker</div>
+          <div class="text-xs leading-relaxed" style="color:var(--muted);">Actively searching, available now. Structure and accountability every week. The risk is desperation narrowing your options. The council keeps you honest about what you actually want vs. what you'll accept to escape the anxiety.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- The key principle -->
+    <div class="rounded-xl p-5 mb-6" style="background:#4ade8011;border:1px solid #4ade8033;">
+      <div class="mono text-xs mb-2" style="color:#4ade80;">THE CORE PRINCIPLE</div>
+      <p class="text-sm leading-relaxed" style="color:var(--text);">
+        "The job search is not a solo activity. It is a team sport. The people who search alone are slower, more prone to bad decisions, and more likely to take the first offer out of exhaustion. The people who search with a council are faster, more selective, and more likely to land the right role — not just any role."
+      </p>
+      <div class="text-xs mt-2" style="color:var(--muted);">— Phyl Terry, <em>Never Search Alone</em></div>
+    </div>
+
+    <button onclick="goView('council')" class="w-full py-2.5 rounded font-medium text-sm mb-2" style="background:#4ade80;color:#000;">Build My Council →</button>
+    <button onclick="tryStartSession()" class="w-full py-2 text-xs rounded" style="border:1px solid var(--border);">Start a Session Directly →</button>
+  </div>
+</div>
+
+<!-- VIEW: SETTINGS -->
+<div id="view-settings" class="view flex-1 overflow-y-auto p-6 justify-center items-start">
+  <div class="w-full max-w-lg space-y-4 mt-8">
+    <h2 class="text-lg font-semibold mb-4">Settings</h2>
+    <div>
+      <label class="text-xs block mb-1.5" style="color:var(--muted);">ANTHROPIC API KEY</label>
+      <input type="password" id="api-key-input" placeholder="sk-ant-api03-..."
+        class="w-full rounded px-3 py-2 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+      <div class="text-xs mt-1" style="color:var(--muted);">Stored in localStorage only. Sent only to Anthropic.</div>
+    </div>
+    <div>
+      <label class="text-xs block mb-1.5" style="color:var(--muted);">YOUR NAME</label>
+      <input type="text" id="user-name-input" placeholder="Charles"
+        class="w-full rounded px-3 py-2 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+    </div>
+    <div>
+      <label class="text-xs block mb-1.5" style="color:var(--muted);">SEARCH STATUS</label>
+      <select id="search-status" class="w-full text-sm rounded px-3 py-2" style="background:var(--bg);border:1px solid var(--border);color:var(--text);">
+        <option value="slow">🟡 Slow Seeker — currently employed, exploring</option>
+        <option value="fast">🔴 Fast Seeker — actively searching</option>
+        <option value="exploring">🟢 Exploring quietly</option>
+        <option value="paused">⚫ Paused</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs block mb-1.5" style="color:var(--muted);">CONTEXT (what the council should know about you)</label>
+      <textarea id="user-context-input" rows="4" placeholder="e.g. At a VC firm I don't enjoy. Want to get back to startups. Approval-seeking pattern when under stress..."
+        class="w-full rounded px-3 py-2 text-sm resize-none" style="background:var(--bg);border:1px solid var(--border);color:var(--text);"></textarea>
+    </div>
+    <div>
+      <label class="text-xs block mb-1.5" style="color:var(--muted);">MODEL</label>
+      <select id="model-select" class="w-full text-sm rounded px-3 py-2" style="background:var(--bg);border:1px solid var(--border);color:var(--text);">
+        <option value="claude-opus-4-6">claude-opus-4-6 (best, slower)</option>
+        <option value="claude-sonnet-4-6">claude-sonnet-4-6 (faster)</option>
+        <option value="claude-haiku-4-5">claude-haiku-4-5 (fastest)</option>
+      </select>
+    </div>
+    <button onclick="saveSettings()" class="w-full py-2.5 rounded font-medium text-sm" style="background:#4ade80;color:#000;">Save Settings</button>
+    <button onclick="goView('council')" class="w-full py-2 text-xs rounded" style="border:1px solid var(--border);">← Back to Council</button>
+  </div>
+</div>
+
+<!-- FIRST RUN OVERLAY -->
+<div id="firstrun-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.85);">
+  <div class="w-full max-w-md rounded-2xl p-6 space-y-5" style="background:var(--surface);border:1px solid var(--border);">
+    <div class="text-center">
+      <div class="text-4xl mb-2">🥔</div>
+      <h2 class="text-lg font-semibold">Set up your AI Job Search Council</h2>
+      <p class="text-xs mt-1" style="color:var(--muted);">Takes 60 seconds. Based on the Never Search Alone method.</p>
+    </div>
+
+    <!-- Step 1: Name -->
+    <div>
+      <label class="text-xs block mb-1" style="color:var(--muted);">YOUR NAME</label>
+      <input type="text" id="setup-name" placeholder="Charles" value=""
+        class="w-full rounded-lg px-3 py-2.5 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+    </div>
+
+    <!-- Step 2: Context -->
+    <div>
+      <label class="text-xs block mb-1" style="color:var(--muted);">YOUR SITUATION <span style="font-weight:normal;">(optional but helpful)</span></label>
+      <textarea id="setup-context" rows="2" placeholder="e.g. Currently at a VC firm, want to get back to startups. Tendency toward approval-seeking."
+        class="w-full rounded-lg px-3 py-2.5 text-sm resize-none" style="background:var(--bg);border:1px solid var(--border);color:var(--text);"></textarea>
+    </div>
+
+    <!-- Step 3: Search status -->
+    <div>
+      <label class="text-xs block mb-1" style="color:var(--muted);">WHERE ARE YOU IN THE SEARCH?</label>
+      <select id="setup-status" class="w-full rounded-lg px-3 py-2.5 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);">
+        <option value="slow">🟡 Employed but exploring (Slow Seeker)</option>
+        <option value="exploring">🟢 Exploring quietly</option>
+        <option value="fast">🔴 Actively searching (Fast Seeker)</option>
+        <option value="paused">⚫ Paused for now</option>
+      </select>
+    </div>
+
+    <!-- Step 4: API Key -->
+    <div>
+      <label class="text-xs block mb-1" style="color:var(--muted);">ANTHROPIC API KEY</label>
+      <input type="password" id="setup-apikey" placeholder="sk-ant-api03-..."
+        class="w-full rounded-lg px-3 py-2.5 text-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text);" />
+      <div class="text-xs mt-1" style="color:var(--muted);">Stored locally only. <a href="https://console.anthropic.com/keys" target="_blank" style="color:#4ade80;">Get one here →</a></div>
+    </div>
+
+    <button onclick="completeSetup()" class="w-full py-3 rounded-xl font-semibold text-sm" style="background:#4ade80;color:#000;">
+      Launch My Council →
+    </button>
+  </div>
+</div>
+
+<script>
+// ─── ROSTER ───────────────────────────────────────────────────────────────────
+const REAL_PEOPLE = [
+  {
+    id: 'pg',
+    name: 'Paul Graham',
+    emoji: '🦅',
+    color: '#f97316',
+    role: 'YC Co-founder · Essayist',
+    voice: 'precise, Socratic, obsessed with what\'s true vs. what sounds good, cuts through status games',
+    challenge: 'Will ask: "Is this actually a good idea, or does it just feel like one?" Pushes you to think from first principles, not convention. Suspicious of anything that sounds too reasonable.',
+    real: true,
+  },
+  {
+    id: 'naval',
+    name: 'Naval Ravikant',
+    emoji: '🧘',
+    color: '#a78bfa',
+    role: 'AngelList · Philosopher',
+    voice: 'calm, aphoristic, long-horizon, wealth-as-leverage framing',
+    challenge: 'Asks: "Are you building specific knowledge, or just trading time for money?" Will question whether you\'re optimizing for salary (losing game) vs. equity and leverage. Ruthlessly focused on what compounds.',
+    real: true,
+  },
+  {
+    id: 'ben_horowitz',
+    name: 'Ben Horowitz',
+    emoji: '🥊',
+    color: '#ef4444',
+    role: 'a16z Co-founder · "Hard Thing" author',
+    voice: 'direct, war-story-heavy, refuses to sugarcoat, hip-hop metaphors',
+    challenge: 'Asks: "Is this a hard thing or are you just making it hard?" Focuses on what leaders actually do vs. what management books say. Will name when you\'re peacetime-thinking in a wartime situation.',
+    real: true,
+  },
+  {
+    id: 'sheryl',
+    name: 'Sheryl Sandberg',
+    emoji: '🪑',
+    color: '#22d3ee',
+    role: 'Former Meta COO · "Lean In" author',
+    voice: 'structured, data-driven, empowering but demanding, calls out the internal critic',
+    challenge: 'Asks: "Are you sitting at the table, or waiting to be invited?" Will name when you\'re self-limiting. Pushes on whether your hesitation is practical or fear-based. Focused on career capital and negotiation.',
+    real: true,
+  },
+  {
+    id: 'peter_thiel',
+    name: 'Peter Thiel',
+    emoji: '♟️',
+    color: '#818cf8',
+    role: 'Palantir · PayPal Mafia · Contrarian',
+    voice: 'contrarian, uncomfortable questions, zero-to-one framing, anti-competition',
+    challenge: 'Asks: "What do you believe that almost nobody else agrees with?" Will challenge whether the startup you\'re targeting is actually building a monopoly or just competing in a crowded market.',
+    real: true,
+  },
+  {
+    id: 'patrick_collison',
+    name: 'Patrick Collison',
+    emoji: '⚡',
+    color: '#4ade80',
+    role: 'Stripe CEO · Builder',
+    voice: 'intellectually curious, high standards, impatient with mediocrity, systems thinker',
+    challenge: 'Asks: "Are you choosing speed or are you just calling slowness caution?" Pushes on whether you\'re at a company building something that matters, or just optimizing a small thing. Standards are extremely high.',
+    real: true,
+  },
+  {
+    id: 'marcus_aurelius',
+    name: 'Marcus Aurelius',
+    emoji: '⚖️',
+    color: '#fbbf24',
+    role: 'Roman Emperor · Stoic',
+    voice: 'measured, philosophical, unemotional, memento mori framing',
+    challenge: 'Asks: "Will this matter in 10 years? Are you being ruled by what people think of you, or by what\'s actually right?" Cuts through anxiety by separating what\'s in your control from what isn\'t. Indifferent to prestige.',
+    real: true,
+  },
+  {
+    id: 'reid_hoffman',
+    name: 'Reid Hoffman',
+    emoji: '🕸️',
+    color: '#38bdf8',
+    role: 'LinkedIn founder · "Blitzscaling" author',
+    voice: 'network-first, strategic, scale-obsessed, thinks in leverage and nodes',
+    challenge: 'Asks: "Who in your network has already solved this problem?" Turns every career question into a mapping exercise — who should you know, who should know you, what signal are you sending at scale?',
+    real: true,
+  },
+  {
+    id: 'andy_grove',
+    name: 'Andy Grove',
+    emoji: '🏭',
+    color: '#fb923c',
+    role: 'Intel CEO · "Only the Paranoid Survive"',
+    voice: 'operational, paranoid, execution-focused, "10x change" detector',
+    challenge: 'Asks: "Is this a strategic inflection point, or noise?" Forces you to identify whether the industry shift you\'re sensing is real and how to position before it becomes obvious. Hates complacency.',
+    real: true,
+  },
+  {
+    id: 'sam_altman',
+    name: 'Sam Altman',
+    emoji: '🤖',
+    color: '#e879f9',
+    role: 'OpenAI CEO · YC alum',
+    voice: 'ambitious, AGI-aware, focused on asymmetric upside, impatient with small thinking',
+    challenge: 'Asks: "Is what you\'re doing going to matter in a world with AGI?" Will push you to think bigger. Skeptical of lifestyle optimization and small wins. Wants to know what your personal monopoly is.',
+    real: true,
+  },
+];
+
+const ROSTER = [
+  {
+    id: 'strategist',
+    name: 'The Strategist',
+    emoji: '🗺️',
+    color: '#818cf8',
+    role: 'Career Arc Advisor',
+    voice: 'calm, zoomed-out, long-horizon',
+    challenge: 'Pushes you to define what the next 10 years actually looks like, not just the next job. Will ask: "Is this a move toward something, or just away from something?"',
+  },
+  {
+    id: 'operator',
+    name: 'The Operator',
+    emoji: '⚙️',
+    color: '#f59e0b',
+    role: 'Execution Enforcer',
+    voice: 'direct, impatient with vagueness, tactical',
+    challenge: 'Converts every discussion into a specific next action. Hates "I'll think about it." Will ask: "What will you do, when exactly, and what does done look like?"',
+  },
+  {
+    id: 'devils_advocate',
+    name: "The Devil's Advocate",
+    emoji: '😈',
+    color: '#ef4444',
+    role: 'Assumption Breaker',
+    voice: 'provocative, skeptical, stress-tests everything',
+    challenge: 'Takes the opposite position. If you say startups are the answer, they\'ll argue VC. If you say you need to leave, they\'ll ask why you haven\'t fixed it from the inside. Forces you to defend your views.',
+  },
+  {
+    id: 'recruiter',
+    name: 'The Market Mirror',
+    emoji: '🔍',
+    color: '#22d3ee',
+    role: 'Outside-In Lens',
+    voice: 'pragmatic, market-aware, blunt about optics',
+    challenge: 'Tells you how the market sees you — not how you see yourself. Candidate-market fit. What your resume actually says vs what you think it says.',
+  },
+  {
+    id: 'founder',
+    name: 'The Founder',
+    emoji: '🚀',
+    color: '#a3e635',
+    role: 'Startup Instinct',
+    voice: 'high-energy, pattern-matching, opportunity-focused',
+    challenge: 'Evaluates every role through the lens of: who are you learning from, what equity are you building, and would you be proud of this company in 5 years? Will push on your risk tolerance.',
+  },
+  {
+    id: 'therapist',
+    name: 'The Witness',
+    emoji: '🪞',
+    color: '#e879f9',
+    role: 'Emotional Calibrator',
+    voice: 'warm, perceptive, unhurried, reads between the lines',
+    challenge: 'Notices the patterns you can\'t see from inside. If you keep describing external blockers, they\'ll name the internal one. Asks "What are you actually afraid of here?"',
+  },
+  {
+    id: 'network',
+    name: 'The Connector',
+    emoji: '🕸️',
+    color: '#fb923c',
+    role: 'Network Activator',
+    voice: 'relational, energetic, sees people as the solution to every problem',
+    challenge: 'Turns every blocker into a question of "who do you know who\'s done this?" Will push you to reach out to real humans instead of researching in isolation.',
+  },
+  {
+    id: 'prizrak',
+    name: 'Prízrak',
+    emoji: '🥔',
+    color: '#4ade80',
+    role: 'The Slovak Ghost · Moderator',
+    voice: 'dry, fatalistic, mountain metaphors, fiercely honest',
+    challenge: 'The mountain looking back at you. Measures cold and builds dashboards of suffering. Will name when you\'re approval-seeking. Does not celebrate mediocrity.',
+  },
+];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let S = {
+  apiKey: ls('jsc_api_key') || '',
+  userName: ls('jsc_user_name') || 'Charles',
+  userContext: ls('jsc_user_context') || '',
+  model: ls('jsc_model') || 'claude-opus-4-6',
+  selectedIds: JSON.parse(ls('jsc_selected_ids') || '["prizrak","strategist","operator","devils_advocate"]'),
+  customMembers: JSON.parse(ls('jsc_custom_members') || '[]'),
+  sessions: JSON.parse(ls('jsc_sessions') || '[]'),
+  commitments: JSON.parse(ls('jsc_commitments') || '[]'),
+  current: null,
+  isLoading: false,
+  speakerQueue: [],
+  currentSpeakerIdx: 0,
+};
+
+function ls(k){ return localStorage.getItem(k); }
+function lss(k,v){ localStorage.setItem(k,v); }
+
+// ─── PHASE PROMPTS & QUICK REPLIES ───────────────────────────────────────────
+const PHASE_HINTS = {
+  opening: { placeholder: "What's your search status right now? Any changes since last time?", chips: ["Good, let's go", "Some updates to share", "Not much has changed"] },
+  commitments_review: { placeholder: "Walk me through your commitments — did you do them?", chips: ["Done all of them", "Got some done", "Didn't do them — let me explain"] },
+  wins: { placeholder: "What went well this week? Even small things count.", chips: ["Had a few good moments", "One thing went well", "Honestly not many wins"] },
+  blockers: { placeholder: "What's getting in the way? Be honest.", chips: ["A couple of real blockers", "One thing I keep avoiding", "Nothing major blocking me"] },
+  hot_seat: { placeholder: "What issue do you want the council to weigh in on?", chips: ["I have a specific dilemma", "I'm stuck on a decision", "Something's been nagging at me"] },
+  new_commitments: { placeholder: "What will you commit to before next session? (Be specific — what, by when)", chips: ["I have 2-3 things in mind", "Help me figure out commitments", "One clear commitment"] },
+  closing: { placeholder: "One word that captures how you're leaving today.", chips: ["Energized", "Clear", "Determined", "Uncertain", "Hopeful", "Grounded"] },
+  done: { placeholder: "Session complete.", chips: [] },
+};
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  renderRoster();
+  renderSelectedCards();
+  renderCommitments();
+  renderSessionsList();
+  loadSettingsUI();
+  // First run: if no API key, show setup overlay
+  if (!S.apiKey) {
+    document.getElementById('firstrun-overlay').classList.remove('hidden');
+    // Pre-fill name if already set
+    document.getElementById('setup-name').value = S.userName || '';
+  }
+};
+
+function completeSetup() {
+  const name = document.getElementById('setup-name').value.trim() || 'Charles';
+  const context = document.getElementById('setup-context').value.trim();
+  const status = document.getElementById('setup-status').value;
+  const key = document.getElementById('setup-apikey').value.trim();
+  if (!key) { document.getElementById('setup-apikey').style.outline = '2px solid #ef4444'; return; }
+  S.apiKey = key; S.userName = name; S.userContext = context;
+  lss('jsc_api_key', key); lss('jsc_user_name', name); lss('jsc_user_context', context);
+  document.getElementById('search-status').value = status;
+  document.getElementById('firstrun-overlay').classList.add('hidden');
+  loadSettingsUI();
+  // Start right away
+  startSession();
+}
+
+// ─── COUNCIL BUILDER UI ───────────────────────────────────────────────────────
+let customizeOpen = false;
+function toggleCustomize() {
+  customizeOpen = !customizeOpen;
+  document.getElementById('customize-panel').classList.toggle('hidden', !customizeOpen);
+  document.getElementById('customize-arrow').textContent = customizeOpen ? '▲' : '▼';
+  document.getElementById('customize-toggle').querySelector('span').textContent = customizeOpen ? 'Collapse' : 'Customize council (add / swap members)';
+}
+
+function renderSelectedCards() {
+  const container = document.getElementById('selected-cards');
+  if (!container) return;
+  const members = S.selectedIds.map(id => allMembers().find(m => m.id === id)).filter(Boolean);
+  if (!members.length) {
+    container.innerHTML = '<div class="col-span-full text-sm" style="color:var(--muted);">No members selected — expand "Customize" below.</div>';
+    return;
+  }
+  container.innerHTML = members.map(m => `
+    <div class="rounded-xl p-3 text-center" style="background:${m.color}11;border:1px solid ${m.color}33;">
+      <div class="text-2xl mb-1">${m.emoji}</div>
+      <div class="text-xs font-semibold" style="color:${m.color};">${m.name}</div>
+      <div class="text-xs mt-0.5 leading-tight" style="color:var(--muted);">${m.role}</div>
+    </div>`).join('');
+}
+
+// ─── VIEWS ────────────────────────────────────────────────────────────────────
+function goView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+}
+
+// ─── ROSTER RENDERING ─────────────────────────────────────────────────────────
+function allMembers() { return [...ROSTER, ...REAL_PEOPLE, ...S.customMembers]; }
+
+function memberCard(m) {
+  const sel = S.selectedIds.includes(m.id);
+  return `<div class="member-card rounded-xl p-4 ${sel ? 'selected' : ''}" 
+       style="--member-color:${m.color};background:var(--surface);border:1px solid var(--border);"
+       onclick="toggleMember('${m.id}')">
+    <div class="flex items-start justify-between mb-2">
+      <div>
+        <span class="text-xl">${m.emoji}</span>
+        <div class="font-semibold text-sm mt-1">${m.name}</div>
+        <div class="text-xs" style="color:${m.color};">${m.role}</div>
+      </div>
+      <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1"
+           style="border-color:${m.color};background:${sel ? m.color : 'transparent'};">
+        ${sel ? '<span style="color:#000;font-size:10px;">✓</span>' : ''}
+      </div>
+    </div>
+    <div class="text-xs leading-relaxed mt-2" style="color:var(--muted);">${m.challenge}</div>
+    <div class="text-xs mt-2 italic" style="color:var(--muted);">Voice: ${m.voice}</div>
+  </div>`;
+}
+
+function renderRoster() {
+  const container = document.getElementById('roster-grid');
+  container.innerHTML = `
+    <div class="col-span-full mb-1">
+      <div class="mono text-xs mb-3" style="color:var(--muted);">ARCHETYPES</div>
+    </div>
+    ${ROSTER.map(memberCard).join('')}
+    <div class="col-span-full mt-4 mb-1 pt-4" style="border-top:1px solid var(--border);">
+      <div class="mono text-xs mb-3" style="color:var(--muted);">REAL PEOPLE & HISTORICAL FIGURES</div>
+    </div>
+    ${REAL_PEOPLE.map(memberCard).join('')}
+    ${S.customMembers.length ? `
+      <div class="col-span-full mt-4 mb-1 pt-4" style="border-top:1px solid var(--border);">
+        <div class="mono text-xs mb-3" style="color:var(--muted);">CUSTOM</div>
+      </div>
+      ${S.customMembers.map(memberCard).join('')}
+    ` : ''}
+  `;
+}
+
+function toggleMember(id) {
+  if (S.selectedIds.includes(id)) {
+    S.selectedIds = S.selectedIds.filter(x => x !== id);
+  } else {
+    if (S.selectedIds.length >= 5) {
+      alert('Max 5 members. Remove one first.');
+      return;
+    }
+    S.selectedIds.push(id);
+  }
+  lss('jsc_selected_ids', JSON.stringify(S.selectedIds));
+  renderRoster();
+  renderSelectedCards();
+}
+
+function addCustomMember() {
+  const name = document.getElementById('custom-name').value.trim();
+  const role = document.getElementById('custom-role').value.trim();
+  const voice = document.getElementById('custom-voice').value.trim();
+  const challenge = document.getElementById('custom-challenge').value.trim();
+  if (!name) return;
+  const colors = ['#818cf8','#f59e0b','#22d3ee','#a3e635','#e879f9','#fb923c'];
+  const m = {
+    id: 'custom_' + Date.now(),
+    name, role: role || 'Custom Member',
+    voice: voice || 'direct',
+    challenge: challenge || 'Brings a unique perspective.',
+    emoji: '🎭',
+    color: colors[S.customMembers.length % colors.length],
+  };
+  S.customMembers.push(m);
+  lss('jsc_custom_members', JSON.stringify(S.customMembers));
+  ['custom-name','custom-role','custom-voice','custom-challenge'].forEach(id => document.getElementById(id).value = '');
+  renderRoster();
+}
+
+// ─── SESSION ──────────────────────────────────────────────────────────────────
+const PHASES = ['opening','commitments_review','wins','blockers','hot_seat','new_commitments','closing','done'];
+const PHASE_LABELS = {
+  opening:'Opening Round', commitments_review:'Commitments Review', wins:'Wins',
+  blockers:'Blockers', hot_seat:'Hot Seat', new_commitments:'New Commitments',
+  closing:'Closing Word', done:'Session Complete',
+};
+
+// Only hot_seat triggers all members — new_commitments is moderator-only (SMART enforcement)
+const MULTI_MEMBER_PHASES = ['hot_seat'];
+
+function tryStartSession() {
+  if (!S.apiKey) { goView('settings'); return; }
+  if (!S.selectedIds.length) { goView('council'); alert('Select at least one council member first.'); return; }
+  startSession();
+}
+
+function startSession() {
+  if (S.current && S.current.messages.length > 0) {
+    S.sessions.unshift({ ...S.current, endedAt: new Date().toISOString() });
+    S.sessions = S.sessions.slice(0, 10);
+    lss('jsc_sessions', JSON.stringify(S.sessions));
+  }
+
+  S.current = {
+    id: Date.now(),
+    startedAt: new Date().toISOString(),
+    phase: 'opening',
+    messages: [],
+    memberIds: [...S.selectedIds],
+    hotSeatReady: false, // true once user has stated their hot seat issue
+  };
+
+  document.getElementById('chat-container').innerHTML = '';
+  const inp = document.getElementById('user-input');
+  const btn = document.getElementById('send-btn');
+  if (inp) { inp.disabled = false; }
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  document.getElementById('hdr-status').textContent = 'session active';
+
+  renderSessionCouncil();
+  renderCommitments();
+  renderSessionsList();
+  updatePhaseUI();
+  goView('session');
+
+  sendAI(null); // initial message from moderator
+}
+
+function renderSessionCouncil() {
+  const members = S.current.memberIds.map(id => allMembers().find(m => m.id === id)).filter(Boolean);
+  document.getElementById('session-council-list').innerHTML = members.map(m => `
+    <div class="flex items-center gap-2 px-2 py-1.5 rounded text-xs" style="background:${m.color}11;">
+      <span>${m.emoji}</span>
+      <div>
+        <div style="color:${m.color};">${m.name}</div>
+        <div style="color:var(--muted);">${m.role}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ─── CHAT ─────────────────────────────────────────────────────────────────────
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function sendMessage() {
+  const input = document.getElementById('user-input');
+  const text = input.value.trim();
+  if (!text || S.isLoading) return;
+  input.value = '';
+  appendBubble('user', text);
+  S.current.messages.push({ role: 'user', content: text });
+  sendAI(text);
+}
+
+function appendBubble(role, text, member) {
+  const container = document.getElementById('chat-container');
+  const div = document.createElement('div');
+  div.className = 'max-w-4xl mx-auto';
+
+  // Strip commitment block for display
+  let display = text.replace(/COMMITMENTS_BLOCK_START[\s\S]*?COMMITMENTS_BLOCK_END/g, '').trim();
+  const blockMatch = text.match(/COMMITMENTS_BLOCK_START\n([\s\S]*?)\nCOMMITMENTS_BLOCK_END/);
+  if (blockMatch) {
+    const rawC = blockMatch[1].split('\n').map(l => l.replace(/^[-•]\s*/,'').trim()).filter(Boolean);
+    saveNewCommitments(rawC);
+    display += '\n\n✅ Commitments saved to sidebar.';
+  }
+
+  if (role === 'assistant' && member) {
+    div.innerHTML = `
+      <div class="flex gap-3">
+        <div class="flex-shrink-0 w-8 h-8 rounded-lg text-lg flex items-center justify-center mt-0.5 flex-shrink-0" style="background:${member.color}22;border:1px solid ${member.color}44;">${member.emoji}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-semibold" style="color:${member.color};">${member.name}</span>
+            <span class="text-xs" style="color:var(--muted);">${member.role}</span>
+          </div>
+          <div class="rounded-xl px-4 py-3 text-sm leading-relaxed" style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${member.color};">${fmt(display)}</div>
+        </div>
+      </div>`;
+  } else if (role === 'assistant') {
+    div.innerHTML = `
+      <div class="flex gap-3">
+        <div class="flex-shrink-0 w-8 h-8 rounded-lg text-lg flex items-center justify-center mt-0.5" style="background:#4ade8022;border:1px solid #4ade8044;">🥔</div>
+        <div class="flex-1"><div class="rounded-xl px-4 py-3 text-sm leading-relaxed" style="background:var(--surface);border:1px solid var(--border);border-left:3px solid #4ade80;">${fmt(display)}</div></div>
+      </div>`;
+  } else {
+    const n = S.userName || 'C';
+    div.innerHTML = `
+      <div class="flex gap-3 justify-end">
+        <div class="max-w-lg rounded-xl px-4 py-3 text-sm leading-relaxed" style="background:#1e293b;border:1px solid #334155;">${fmt(text)}</div>
+        <div class="flex-shrink-0 w-8 h-8 rounded-lg mono text-xs flex items-center justify-center mt-0.5" style="background:#1e293b;border:1px solid #334155;color:var(--muted);">${n.charAt(0)}</div>
+      </div>`;
+  }
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function fmt(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code class="mono text-xs px-1 rounded" style="background:var(--bg)">$1</code>')
+    .replace(/\n/g,'<br/>');
+}
+
+function showLoading(member) {
+  const container = document.getElementById('chat-container');
+  const div = document.createElement('div');
+  div.id = 'loading-bubble';
+  div.className = 'max-w-4xl mx-auto';
+  const emoji = member ? member.emoji : '🥔';
+  const color = member ? member.color : '#4ade80';
+  div.innerHTML = `
+    <div class="flex gap-3">
+      <div class="w-8 h-8 rounded-lg text-lg flex items-center justify-center" style="background:${color}22;border:1px solid ${color}44;">${emoji}</div>
+      <div class="rounded-xl px-4 py-3 flex gap-1 items-center" style="background:var(--surface);border:1px solid var(--border);">
+        <div class="loading-dot w-1.5 h-1.5 rounded-full" style="background:${color};"></div>
+        <div class="loading-dot w-1.5 h-1.5 rounded-full" style="background:${color};"></div>
+        <div class="loading-dot w-1.5 h-1.5 rounded-full" style="background:${color};"></div>
+      </div>
+    </div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+// ─── AI CALLS ─────────────────────────────────────────────────────────────────
+async function sendAI(userMsg) {
+  if (!S.apiKey) { goView('settings'); return; }
+  S.isLoading = true;
+  document.getElementById('send-btn').style.opacity = '0.5';
+
+  const phase = S.current.phase;
+  const members = S.current.memberIds.map(id => allMembers().find(m => m.id === id)).filter(Boolean);
+  const lead = members.find(m => m.id === 'prizrak') || members[0];
+
+  // Hot seat multi-member: only AFTER user has stated their issue (hotSeatReady)
+  const isHotSeatActive = phase === 'hot_seat' && S.current.hotSeatReady && userMsg !== null;
+
+  if (isHotSeatActive) {
+    // Each member weighs in, then moderator wraps up + advances
+    for (const member of members) {
+      await callOneMember(member, userMsg, phase, members);
+    }
+    // Moderator wraps up and moves to new_commitments
+    await callModerator(lead, userMsg, phase, members, true);
+  } else {
+    await callModerator(lead, userMsg, phase, members, false);
+    // Mark hot seat as ready once the moderator has asked for the issue
+    if (phase === 'hot_seat' && !S.current.hotSeatReady && userMsg !== null) {
+      S.current.hotSeatReady = true;
+    }
+  }
+
+  updatePhaseUI();
+  S.isLoading = false;
+  document.getElementById('send-btn').style.opacity = '1';
+}
+
+async function callModerator(member, userMsg, phase, allCouncil, isHotSeatWrapup) {
+  showLoading(member);
+  const sys = buildSystemPrompt(member, allCouncil, isHotSeatWrapup ? 'hot_seat_wrapup' : 'moderator', phase);
+  const msgs = buildMessages(userMsg);
+  const text = await callAPI(sys, msgs);
+  document.getElementById('loading-bubble')?.remove();
+  if (text) {
+    appendBubble('assistant', text, member);
+    S.current.messages.push({ role: 'assistant', content: `[${member.name}] ${text}` });
+    advancePhase(text);
+  }
+}
+
+async function callOneMember(member, userMsg, phase, allCouncil) {
+  showLoading(member);
+  const sys = buildSystemPrompt(member, allCouncil, 'member', phase);
+  // Build history WITHOUT the latest user message (already in history), add a directive instead
+  const history = S.current.messages.slice(-20);
+  const directive = { role: 'user', content: `The user just said on the hot seat: "${userMsg}"\n\nNow respond as ${member.name} — your unique lens only, 2–4 sentences. Don't repeat what other council members have already said. No pleasantries. Get to the point.` };
+  const text = await callAPI(sys, [...history, directive]);
+  document.getElementById('loading-bubble')?.remove();
+  if (text) {
+    appendBubble('assistant', text, member);
+    S.current.messages.push({ role: 'assistant', content: `[${member.name}] ${text}` });
+  }
+}
+
+function buildMessages(userMsg) {
+  const history = S.current.messages.slice(-24);
+  if (!history.length && userMsg === null) {
+    return [{ role: 'user', content: 'Begin the JSC session.' }];
+  }
+  if (!history.length) {
+    return [{ role: 'user', content: userMsg }];
+  }
+  return history;
+}
+
+function buildSystemPrompt(member, allCouncil, role, phase) {
+  const name = S.userName || 'Charles';
+  const context = S.userContext || '';
+  const prevC = S.commitments.filter(c => !c.done);
+  const commitStr = prevC.length
+    ? prevC.map((c, i) => `${i+1}. ${c.text}`).join('\n')
+    : 'No prior commitments on record.';
+  const statusMap = { slow:'currently employed but exploring (Slow Seeker)', fast:'actively searching (Fast Seeker)', exploring:'exploring quietly', paused:'paused' };
+  const searchStatus = document.getElementById('search-status')?.value || 'slow';
+  const councilList = allCouncil.map(m => `- ${m.name} (${m.role})`).join('\n');
+
+  const isRealPerson = member.real === true;
+  const personaNote = isRealPerson
+    ? `You are roleplaying as ${member.name} based on their documented communication style, known worldview, and published ideas. Do not claim to be the actual person or reveal private information.`
+    : `You are the character ${member.name} (${member.role}).`;
+
+  const sharedContext = `
+ABOUT ${name.toUpperCase()}:
+- Search status: ${statusMap[searchStatus] || 'exploring'}
+${context ? `- Background: ${context}` : ''}
+
+PRIOR COMMITMENTS FROM LAST SESSION:
+${commitStr}`;
+
+  // ── PHASE-SPECIFIC INSTRUCTIONS FOR MODERATOR ──
+  const phaseInstructions = {
+    opening: `You are in the OPENING ROUND.
+Ask ${name} for a brief status update: where are they in the search right now? Any major changes since the last session?
+Keep it short — one focused question. After they respond, transition to Commitments Review by saying "Let's look at what you committed to last session."`,
+
+    commitments_review: `You are in the COMMITMENTS REVIEW.
+Prior commitments are listed above. Go through them ONE AT A TIME. For each: ask explicitly whether it was done, not done, or partial. Do not accept vague answers — if partial, ask what happened. Do not rush. After you've covered all commitments, transition to Wins: "Now — what went well this week?"`,
+
+    wins: `You are in the WINS phase.
+Ask ${name} what went well. Job searching is psychologically depleting — naming wins counteracts that. Even small wins count. Celebrate genuinely (in your voice). Probe for at least one concrete win. After wins, transition to Blockers: "What's getting in the way?"`,
+
+    blockers: `You are in the BLOCKERS phase.
+Ask what obstacles ${name} is facing. Your job is to distinguish real obstacles from avoidance. If the blocker is vague (e.g., "I've been busy"), push: "Is that a real constraint, or are you avoiding something?" Name patterns if you see them. After blockers, set up the Hot Seat: "What do you want to put on the hot seat today? Bring one specific issue you want the council's perspective on."`,
+
+    hot_seat: `You are in the HOT SEAT phase.
+${name} has not yet stated their issue for the hot seat. Ask them: "What's the issue you want to put on the hot seat? Be specific — what decision, dilemma, or situation do you want the council to weigh in on?"
+Wait for their answer before the council responds.`,
+
+    new_commitments: `You are in the NEW COMMITMENTS phase.
+Ask ${name} what they will commit to before the next session. SMART criteria apply — push back hard on vague commitments:
+- If they say "I'll look at startups" → push: "Which 3 specifically? By what date? What does done look like?"
+- If they say "I'll reach out to people" → push: "How many? Who? By when?"
+Keep pushing until each commitment is specific, has a deadline, and has a clear done-state.
+When ALL commitments are captured and you're satisfied they're SMART, output them EXACTLY like this:
+COMMITMENTS_BLOCK_START
+- [specific commitment with deadline]
+COMMITMENTS_BLOCK_END
+Then say: "One last thing — close us out with a single word that captures how you're leaving today's session."`,
+
+    closing: `You are in the CLOSING WORD phase.
+Wait for ${name} to give their closing word. It must be ONE WORD ONLY. If they give a sentence or phrase, say: "One word. What's the one word?" After they give a single word, briefly reflect on the session (1-2 sentences in your voice), then close the session warmly.`,
+
+    done: `The session is complete. You may give a brief closing thought, but keep it very short.`,
+  };
+
+  if (role === 'moderator' || role === 'hot_seat_wrapup') {
+    const phaseGuide = role === 'hot_seat_wrapup'
+      ? `You are wrapping up the HOT SEAT phase. Each council member has just shared their perspective. Briefly synthesize the key threads (1-2 sentences), then transition to New Commitments: "Based on all of that — what will you actually do this week?"`
+      : (phaseInstructions[phase] || `You are facilitating the ${PHASE_LABELS[phase]} phase.`);
+
+    return `${personaNote}
+You are facilitating a Job Search Council (JSC) session for ${name}, following the "Never Search Alone" methodology by Phyl Terry.
+
+YOUR VOICE AND STYLE: ${member.voice}
+YOUR CHALLENGE APPROACH: ${member.challenge}
+
+TODAY'S COUNCIL:
+${councilList}
+${sharedContext}
+
+CURRENT TASK:
+${phaseGuide}
+
+CORE RULES:
+- One phase at a time. Do NOT skip ahead or combine phases.
+- Ask focused questions — one at a time, not three at once.
+- Max 120 words per response. This is a meeting, not a monologue.
+- Push for specifics. "I'll think about it" is not an answer.
+- In Commitments Review: name each prior commitment by number. Hold the line.
+- In Blockers: explicitly ask "Is this a real obstacle or are you avoiding something?"
+- In New Commitments: do not accept a commitment without a deadline and a clear done-state.
+- Closing word: ONE WORD ONLY. If they give more, ask again.
+- Stay in character throughout.`;
+
+  } else {
+    // Individual member on hot seat
+    return `${personaNote}
+
+You are a member of ${name}'s Job Search Council. The council is in the HOT SEAT phase.
+
+YOUR VOICE: ${member.voice}
+YOUR CHALLENGE: ${member.challenge}
+${sharedContext}
+
+OTHER COUNCIL MEMBERS TODAY:
+${allCouncil.filter(m => m.id !== member.id).map(m => `- ${m.name}: ${m.role}`).join('\n')}
+
+RULES:
+- 2–4 sentences only. Your unique angle, nothing else.
+- Do NOT repeat what any other council member has already said in this conversation.
+- No preamble ("Great question!"), no pleasantries. Start with the insight.
+- Stay in character as ${member.name}. This is your lens — use it.`;
+  }
+}
+
+async function callAPI(system, messages) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: S.model || 'claude-opus-4-6',
+        max_tokens: 600,
+        system,
+        messages,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      appendBubble('assistant', `⚠️ API error: ${data.error?.message || JSON.stringify(data)}`);
+      return null;
+    }
+    return data.content?.[0]?.text || '';
+  } catch (err) {
+    appendBubble('assistant', `⚠️ Network error: ${err.message}`);
+    return null;
+  }
+}
+
+// ─── PHASE ────────────────────────────────────────────────────────────────────
+// Phase order for linear advancement
+const PHASE_ORDER = ['opening','commitments_review','wins','blockers','hot_seat','new_commitments','closing','done'];
+
+function advancePhase(aiText) {
+  const t = aiText.toLowerCase();
+  const cur = S.current.phase;
+  const idx = PHASE_ORDER.indexOf(cur);
+  let next = cur;
+
+  // Phase transitions based on what the moderator signals
+  if (cur === 'opening' && (t.includes("let's look at what you committed") || t.includes('commitments review') || t.includes('last session'))) {
+    next = 'commitments_review';
+  } else if (cur === 'commitments_review' && (t.includes('what went well') || t.includes('wins') || t.includes('went well this week'))) {
+    next = 'wins';
+  } else if (cur === 'wins' && (t.includes("what's getting in the way") || t.includes('blockers') || t.includes('obstacles'))) {
+    next = 'blockers';
+  } else if (cur === 'blockers' && (t.includes('hot seat') || t.includes('put on the hot seat') || t.includes('council\'s perspective'))) {
+    next = 'hot_seat';
+    S.current.hotSeatReady = false; // reset so first user reply is the issue statement
+  } else if (cur === 'hot_seat' && (t.includes('what will you actually do') || t.includes('new commitments') || t.includes('commit to before'))) {
+    next = 'new_commitments';
+  } else if (cur === 'new_commitments' && t.includes('commitments_block_end')) {
+    next = 'closing';
+  } else if (cur === 'closing' && (t.includes('session') || t.includes('good work') || t.includes('see you'))) {
+    // Only advance to done if it looks like a proper close, not just the first response
+    if (S.current.messages.filter(m => m.role === 'user').length > 5) next = 'done';
+  }
+
+  if (next !== cur) S.current.phase = next;
+  updatePhaseUI();
+}
+
+function updatePhaseUI() {
+  const phase = S.current?.phase || 'opening';
+  const label = document.getElementById('phase-label');
+  const speakEl = document.getElementById('speaking-label');
+  if (label) label.textContent = PHASE_LABELS[phase] || phase;
+  if (speakEl) {
+    speakEl.textContent = (phase === 'hot_seat' && S.current?.hotSeatReady) ? '← all members speak' : '';
+  }
+
+  // Phase-aware placeholder
+  const hint = PHASE_HINTS[phase] || PHASE_HINTS.opening;
+  const inputEl = document.getElementById('user-input');
+  if (inputEl) inputEl.placeholder = hint.placeholder;
+
+  // Quick reply chips
+  const qr = document.getElementById('quick-replies');
+  if (qr) {
+    if (hint.chips?.length) {
+      qr.classList.remove('hidden');
+      qr.innerHTML = hint.chips.map(chip =>
+        `<button onclick="sendChip(${JSON.stringify(chip)})" class="text-xs px-3 py-1 rounded-full" style="background:var(--bg);border:1px solid var(--border);color:var(--muted);">${chip}</button>`
+      ).join('');
+    } else {
+      qr.classList.add('hidden');
+    }
+  }
+
+  // Header status
+  const daysSince = daysSinceLastSession();
+  const statusEl = document.getElementById('hdr-status');
+  if (statusEl && S.current) {
+    statusEl.textContent = `session active${daysSince !== null ? ` · ${daysSince}d since last` : ''}`;
+  }
+}
+
+function sendChip(text) {
+  const input = document.getElementById('user-input');
+  if (input) input.value = text;
+  sendMessage();
+}
+
+function daysSinceLastSession() {
+  if (!S.sessions.length) return null;
+  const last = new Date(S.sessions[0].startedAt);
+  const now = new Date();
+  return Math.floor((now - last) / (1000 * 60 * 60 * 24));
+}
+
+// ─── COMMITMENTS ─────────────────────────────────────────────────────────────
+function saveNewCommitments(list) {
+  const news = list.map(t => ({ id: Date.now()+Math.random(), text: t, done: false, createdAt: new Date().toISOString() }));
+  S.commitments = [...news, ...S.commitments].slice(0, 20);
+  lss('jsc_commitments', JSON.stringify(S.commitments));
+  renderCommitments();
+}
+
+function toggleCommitment(id) {
+  const c = S.commitments.find(c => c.id === id);
+  if (c) { c.done = !c.done; lss('jsc_commitments', JSON.stringify(S.commitments)); renderCommitments(); }
+}
+
+function addCommitment() {
+  const t = prompt('Commitment:');
+  if (t?.trim()) saveNewCommitments([t.trim()]);
+}
+
+function renderCommitments() {
+  const el = document.getElementById('commitments-list');
+  if (!el) return;
+  if (!S.commitments.length) {
+    el.innerHTML = '<div class="text-xs" style="color:var(--muted);font-style:italic;">None yet.</div>';
+    const cc = document.getElementById('commitment-counts');
+    if (cc) cc.textContent = '';
+    return;
+  }
+  const done = S.commitments.filter(c => c.done).length;
+  const total = S.commitments.length;
+  const cc = document.getElementById('commitment-counts');
+  if (cc) cc.textContent = `${done}/${total}`;
+  el.innerHTML = S.commitments.slice(0,10).map(c => `
+    <div class="commitment-item ${c.done?'done':''} rounded px-2 py-1.5 cursor-pointer text-xs leading-tight"
+         style="background:var(--bg);" onclick="toggleCommitment(${c.id})">
+      <span style="color:${c.done?'var(--muted)':'var(--text)'};">${c.done?'✓ ':'○ '}${esc(c.text)}</span>
+    </div>`).join('');
+}
+
+function renderSessionsList() {
+  const el = document.getElementById('sessions-list');
+  if (!el) return;
+  if (!S.sessions.length) {
+    el.innerHTML = '<div class="text-xs" style="color:var(--muted);font-style:italic;">None yet.</div>';
+    return;
+  }
+  el.innerHTML = S.sessions.slice(0,5).map(s => {
+    const d = new Date(s.startedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return `<div class="rounded px-2 py-1.5 cursor-pointer text-xs hover:bg-gray-800" onclick="loadSession(${s.id})">
+      <div class="mono" style="color:#4ade80;">${d}</div>
+      <div style="color:var(--muted);">${s.messages.length} msgs</div>
+    </div>`;
+  }).join('');
+}
+
+function loadSession(id) {
+  const s = S.sessions.find(s => s.id === id);
+  if (!s) return;
+  document.getElementById('chat-container').innerHTML = '';
+  s.messages.forEach(m => {
+    if (m.role === 'user') { appendBubble('user', m.content); return; }
+    const match = m.content.match(/^\[(.+?)\] ([\s\S]*)$/);
+    if (match) {
+      const member = allMembers().find(m => m.name === match[1]);
+      appendBubble('assistant', match[2], member);
+    } else {
+      appendBubble('assistant', m.content);
+    }
+  });
+  goView('session');
+}
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
+function loadSettingsUI() {
+  document.getElementById('api-key-input').value = S.apiKey;
+  document.getElementById('user-name-input').value = S.userName;
+  document.getElementById('user-context-input').value = S.userContext;
+  const ms = document.getElementById('model-select');
+  if (ms) ms.value = S.model;
+}
+
+function saveSettings() {
+  S.apiKey = document.getElementById('api-key-input').value.trim();
+  S.userName = document.getElementById('user-name-input').value.trim() || 'Charles';
+  S.userContext = document.getElementById('user-context-input').value.trim();
+  S.model = document.getElementById('model-select').value || 'claude-opus-4-6';
+  lss('jsc_api_key', S.apiKey);
+  lss('jsc_user_name', S.userName);
+  lss('jsc_user_context', S.userContext);
+  lss('jsc_model', S.model);
+  goView('council');
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

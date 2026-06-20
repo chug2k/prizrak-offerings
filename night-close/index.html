@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Night Close</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+    * { font-family: 'IBM Plex Mono', monospace; }
+    body { background: #080808; color: #c8bfa8; }
+    textarea, input { background: #0f0f0f; border-color: #2a2a2a; color: #c8bfa8; }
+    textarea:focus, input:focus { outline: none; border-color: #555; }
+    textarea::placeholder, input::placeholder { color: #3a3a3a; }
+    .section-label { color: #444; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .fade-in { animation: fadeIn 0.6s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .blink { animation: blink 1.5s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<div class="max-w-lg mx-auto px-4 py-8">
+
+  <!-- Header -->
+  <div class="mb-8 fade-in">
+    <p class="text-zinc-700 text-xs tracking-widest uppercase">Prizrak / End of Day</p>
+    <h1 class="text-xl font-bold text-zinc-300 mt-1">NIGHT CLOSE</h1>
+    <p class="text-zinc-700 text-xs mt-1" id="time-display"></p>
+    <p class="text-zinc-600 text-xs mt-3 leading-relaxed">Dump what's unresolved. The brain does not sleep well while holding open loops. Write it here. Let the machine hold it. Go to sleep.</p>
+  </div>
+
+  <div id="form-area" class="space-y-5 fade-in">
+
+    <!-- Open loops -->
+    <div>
+      <div class="section-label">Open loops — things unfinished today</div>
+      <div id="loops-list" class="space-y-2 mb-2"></div>
+      <div class="flex gap-2">
+        <input id="loop-input" type="text" placeholder="Add an open loop..." class="flex-1 border p-2 text-sm"/>
+        <button onclick="addItem('loop')" class="border border-zinc-700 text-zinc-500 hover:text-zinc-300 px-3 text-xs transition-colors">ADD</button>
+      </div>
+    </div>
+
+    <!-- Unresolved decisions -->
+    <div>
+      <div class="section-label">Decisions still floating</div>
+      <div id="decisions-list" class="space-y-2 mb-2"></div>
+      <div class="flex gap-2">
+        <input id="decision-input" type="text" placeholder="e.g. SF trip, reply to Tara..." class="flex-1 border p-2 text-sm"/>
+        <button onclick="addItem('decision')" class="border border-zinc-700 text-zinc-500 hover:text-zinc-300 px-3 text-xs transition-colors">ADD</button>
+      </div>
+    </div>
+
+    <!-- What can wait -->
+    <div>
+      <div class="section-label">What can wait until tomorrow</div>
+      <textarea id="can-wait" rows="2" placeholder="These do not need to be solved tonight..." class="w-full border p-2 text-sm resize-none"></textarea>
+    </div>
+
+    <!-- Tomorrow's first move -->
+    <div>
+      <div class="section-label">Tomorrow's first move — one thing only</div>
+      <input id="first-move" type="text" placeholder="The single thing to do first..." class="w-full border p-2 text-sm"/>
+    </div>
+
+    <!-- One good thing -->
+    <div>
+      <div class="section-label">One thing from today that worked</div>
+      <input id="good-thing" type="text" placeholder="Doesn't have to be big..." class="w-full border p-2 text-sm"/>
+    </div>
+
+    <button onclick="closeDay()" class="w-full border border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300 py-3 text-xs tracking-widest uppercase transition-colors mt-2">
+      CLOSE THE DAY
+    </button>
+  </div>
+
+  <!-- Closed state -->
+  <div id="closed-area" class="hidden fade-in text-center py-12">
+    <p class="text-zinc-600 text-xs tracking-widest uppercase mb-4">Day closed</p>
+    <p class="text-zinc-400 text-sm" id="closed-summary"></p>
+    <p class="text-zinc-700 text-xs mt-6">First move tomorrow: <span id="closed-first-move" class="text-zinc-500"></span></p>
+    <div class="mt-8 text-zinc-800 text-xs leading-relaxed">
+      <p>The machine is holding it.</p>
+      <p>Go to sleep.</p>
+      <p class="mt-4 blink">▮</p>
+    </div>
+    <button onclick="reopen()" class="mt-8 border border-zinc-800 text-zinc-700 hover:text-zinc-500 px-4 py-2 text-xs tracking-widest transition-colors">REOPEN</button>
+  </div>
+
+  <!-- History -->
+  <div id="history-area" class="mt-10">
+    <div class="section-label mb-3">Previous closes</div>
+    <div id="history-list" class="space-y-3"></div>
+  </div>
+
+  <div class="text-center text-zinc-800 text-xs py-8">
+    PRIZRAK / NIGHT CLOSE — the loop stays open until you write it down
+  </div>
+</div>
+
+<script>
+  const loops = [];
+  const decisions = [];
+
+  document.getElementById('time-display').textContent = new Date().toLocaleString('en-US', {
+    weekday:'long', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'
+  });
+
+  function addItem(type) {
+    const inputId = type === 'loop' ? 'loop-input' : 'decision-input';
+    const listId = type === 'loop' ? 'loops-list' : 'decisions-list';
+    const arr = type === 'loop' ? loops : decisions;
+    const input = document.getElementById(inputId);
+    const val = input.value.trim();
+    if (!val) return;
+    arr.push(val);
+    input.value = '';
+    renderItems(listId, arr, type);
+  }
+
+  function renderItems(listId, arr, type) {
+    document.getElementById(listId).innerHTML = arr.map((item, i) => `
+      <div class="flex gap-2 items-center border border-zinc-900 p-2">
+        <span class="text-zinc-700 text-xs">▸</span>
+        <span class="flex-1 text-sm text-zinc-400">${item}</span>
+        <button onclick="removeItem('${type}', ${i})" class="text-zinc-700 hover:text-red-500 text-xs transition-colors">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function removeItem(type, i) {
+    if (type === 'loop') { loops.splice(i, 1); renderItems('loops-list', loops, 'loop'); }
+    else { decisions.splice(i, 1); renderItems('decisions-list', decisions, 'decision'); }
+  }
+
+  // Enter key support
+  ['loop-input', 'decision-input'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addItem(id === 'loop-input' ? 'loop' : 'decision');
+      }
+    });
+  });
+
+  function closeDay() {
+    const firstMove = document.getElementById('first-move').value.trim();
+    const goodThing = document.getElementById('good-thing').value.trim();
+    const canWait = document.getElementById('can-wait').value.trim();
+    const ts = new Date().toLocaleString();
+
+    const entry = { ts, loops: [...loops], decisions: [...decisions], canWait, firstMove, goodThing };
+    const key = 'night_closes';
+    const saved = JSON.parse(localStorage.getItem(key) || '[]');
+    saved.unshift(entry);
+    localStorage.setItem(key, JSON.stringify(saved.slice(0, 14)));
+
+    const totalItems = loops.length + decisions.length;
+    document.getElementById('closed-summary').textContent =
+      totalItems > 0
+        ? `${totalItems} item${totalItems !== 1 ? 's' : ''} logged. ${goodThing ? '"' + goodThing + '"' : 'One good thing noted.'}`
+        : goodThing ? `"${goodThing}"` : 'Logged.';
+    document.getElementById('closed-first-move').textContent = firstMove || '(not set)';
+
+    document.getElementById('form-area').classList.add('hidden');
+    document.getElementById('closed-area').classList.remove('hidden');
+    renderHistory();
+  }
+
+  function reopen() {
+    document.getElementById('closed-area').classList.add('hidden');
+    document.getElementById('form-area').classList.remove('hidden');
+  }
+
+  function renderHistory() {
+    const key = 'night_closes';
+    const saved = JSON.parse(localStorage.getItem(key) || '[]');
+    document.getElementById('history-list').innerHTML = saved.slice(0, 5).map(e => `
+      <div class="border border-zinc-900 p-3 text-xs">
+        <div class="text-zinc-700 mb-2">${e.ts}</div>
+        ${e.loops.length ? `<div class="text-zinc-600 mb-1">Loops: ${e.loops.join(' · ')}</div>` : ''}
+        ${e.decisions.length ? `<div class="text-zinc-600 mb-1">Decisions: ${e.decisions.join(' · ')}</div>` : ''}
+        ${e.firstMove ? `<div class="text-zinc-500">→ ${e.firstMove}</div>` : ''}
+        ${e.goodThing ? `<div class="text-zinc-600 mt-1 italic">"${e.goodThing}"</div>` : ''}
+      </div>
+    `).join('') || '<p class="text-zinc-800 text-xs">No previous closes.</p>';
+  }
+
+  renderHistory();
+</script>
+</body>
+</html>

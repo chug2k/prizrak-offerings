@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Deferred Stack — Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0d0d10; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+        .item-enter { animation: slideIn 0.25s ease-out; }
+        @keyframes slideIn { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
+        .strike { text-decoration: line-through; opacity: 0.4; }
+        .verdict-glow { text-shadow: 0 0 20px currentColor; }
+    </style>
+</head>
+<body class="text-zinc-300 font-sans antialiased min-h-screen">
+    <div class="max-w-2xl mx-auto px-4 py-10">
+
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-white mb-2">The Deferred Stack</h1>
+            <p class="text-sm text-zinc-500 leading-relaxed">Everything you moved to "later this week" has arrived at Saturday.<br>Log it. Sort it. Clear it or carry it.</p>
+        </div>
+
+        <!-- Intro -->
+        <div class="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 mb-6 text-xs text-zinc-500 leading-relaxed">
+            A deferred stack is not a failure. It is the week's honest residue — decisions held, tasks postponed, conversations avoided, things noticed but not acted on. Saturday is when the stack becomes visible. The question is not "why didn't you do these." The question is: which category does each one belong to now?
+        </div>
+
+        <!-- Add form -->
+        <div class="mb-6">
+            <div class="flex gap-2">
+                <input id="new-item" type="text" placeholder="What are you still carrying from this week?" 
+                    class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 placeholder-zinc-600">
+                <button id="add-btn" class="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-all whitespace-nowrap">
+                    Add
+                </button>
+            </div>
+        </div>
+
+        <!-- Stack list -->
+        <div id="stack" class="space-y-2 mb-8"></div>
+
+        <!-- Sort controls (shown after items added) -->
+        <div id="sort-section" class="hidden mb-6">
+            <div class="border-t border-zinc-800 pt-6">
+                <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Sort each item into a category</p>
+                <div class="flex flex-wrap gap-2 text-xs">
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-red-900 text-red-400">🔴 Act now</div>
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-900 text-amber-400">🟡 Schedule it</div>
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-700 text-zinc-400">⚫ Drop it</div>
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-900 text-blue-400">🔵 Carry forward</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verdict -->
+        <div id="verdict-section" class="hidden"></div>
+
+        <!-- History -->
+        <div id="history-section" class="hidden mt-10">
+            <div class="border-t border-zinc-800 pt-6">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs text-zinc-600 uppercase tracking-widest">Previous weeks</p>
+                    <button id="clear-history" class="text-xs text-zinc-700 hover:text-zinc-500 transition-colors">clear</button>
+                </div>
+                <div id="history-entries" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const STORAGE_KEY = 'prizrak_deferred_stack_v1';
+    const HISTORY_KEY = 'prizrak_deferred_history_v1';
+
+    const CATEGORIES = {
+        'act': { label: 'Act now', color: 'text-red-400', border: 'border-red-900', bg: 'bg-red-950/20', icon: '🔴' },
+        'schedule': { label: 'Schedule it', color: 'text-amber-400', border: 'border-amber-900', bg: 'bg-amber-950/20', icon: '🟡' },
+        'drop': { label: 'Drop it', color: 'text-zinc-500', border: 'border-zinc-800', bg: 'bg-zinc-900/30', icon: '⚫' },
+        'carry': { label: 'Carry forward', color: 'text-blue-400', border: 'border-blue-900', bg: 'bg-blue-950/20', icon: '🔵' },
+    };
+
+    const VERDICTS = {
+        balanced: {
+            color: 'text-emerald-400',
+            text: (counts) => `${counts.act} to act on, ${counts.drop} dropped, ${counts.carry} carried forward. The stack is being managed. The ones you dropped — if you meant it — are gone. The carry-forwards are known debts, not hidden ones.`
+        },
+        heavy_act: {
+            color: 'text-red-400',
+            text: (counts) => `${counts.act} items requiring immediate action is a high number for a Saturday. Either the week was genuinely dense, or the deferred stack has been deferring longer than one week. Check if "act now" is honest or if it is anxiety in disguise.`
+        },
+        heavy_carry: {
+            color: 'text-blue-400',
+            text: (counts) => `${counts.carry} carry-forwards. The stack did not clear — it migrated. This is not inherently wrong. But if the same items appeared last Saturday, the carry-forward is a loop, not a queue. Name the ones that have appeared more than twice.`
+        },
+        heavy_drop: {
+            color: 'text-zinc-400',
+            text: (counts) => `${counts.drop} items dropped. Good. Most deferred items do not survive contact with Saturday — the urgency was borrowed from the week's pressure, not from the item itself. What survives the drop test was real. What didn't was noise.`
+        },
+        empty_cleared: {
+            color: 'text-emerald-300',
+            text: () => `The stack is sorted. The week's residue has been classified. What you act on is chosen, not inherited. That is the difference between a managed stack and a haunted one.`
+        }
+    };
+
+    function getItems() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+    }
+
+    function saveItems(items) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function getHistory() {
+        try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+    }
+
+    function saveHistory(h) {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 8)));
+    }
+
+    function addItem(text) {
+        if (!text.trim()) return;
+        const items = getItems();
+        items.push({ id: Date.now().toString(), text: text.trim(), cat: null });
+        saveItems(items);
+        render();
+    }
+
+    function setCategory(id, cat) {
+        const items = getItems();
+        const item = items.find(i => i.id === id);
+        if (item) {
+            item.cat = item.cat === cat ? null : cat;
+            saveItems(items);
+            render();
+        }
+    }
+
+    function removeItem(id) {
+        const items = getItems().filter(i => i.id !== id);
+        saveItems(items);
+        render();
+    }
+
+    function archiveAndClear() {
+        const items = getItems();
+        if (!items.length) return;
+        const history = getHistory();
+        const now = new Date();
+        const label = `${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()]} ${now.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]}`;
+        const counts = countCategories(items);
+        history.unshift({
+            date: label,
+            total: items.length,
+            counts,
+            items: items.map(i => ({ text: i.text, cat: i.cat || 'unsorted' }))
+        });
+        saveHistory(history);
+        saveItems([]);
+        render();
+    }
+
+    function countCategories(items) {
+        const counts = { act: 0, schedule: 0, drop: 0, carry: 0, unsorted: 0 };
+        items.forEach(i => {
+            const k = i.cat || 'unsorted';
+            counts[k] = (counts[k] || 0) + 1;
+        });
+        return counts;
+    }
+
+    function pickVerdict(counts, total) {
+        if (total === 0) return null;
+        const allSorted = counts.unsorted === 0;
+        if (!allSorted) return null;
+
+        if (total <= 2) return { ...VERDICTS.empty_cleared, text: VERDICTS.empty_cleared.text(counts) };
+        if (counts.act / total > 0.5) return { ...VERDICTS.heavy_act, text: VERDICTS.heavy_act.text(counts) };
+        if (counts.carry / total > 0.5) return { ...VERDICTS.heavy_carry, text: VERDICTS.heavy_carry.text(counts) };
+        if (counts.drop / total > 0.5) return { ...VERDICTS.heavy_drop, text: VERDICTS.heavy_drop.text(counts) };
+        return { ...VERDICTS.balanced, text: VERDICTS.balanced.text(counts) };
+    }
+
+    function render() {
+        const items = getItems();
+        const stack = document.getElementById('stack');
+        const sortSection = document.getElementById('sort-section');
+        const verdictSection = document.getElementById('verdict-section');
+
+        // Items
+        if (!items.length) {
+            stack.innerHTML = `<div class="text-center py-8 text-zinc-700 text-sm">Stack is empty. Add what you're still carrying from this week.</div>`;
+            sortSection.classList.add('hidden');
+            verdictSection.classList.add('hidden');
+        } else {
+            sortSection.classList.remove('hidden');
+            stack.innerHTML = items.map(item => {
+                const cat = item.cat ? CATEGORIES[item.cat] : null;
+                return `
+                <div class="item-enter flex items-start gap-3 bg-zinc-900/40 border ${cat ? cat.border : 'border-zinc-800'} ${cat ? cat.bg : ''} rounded-lg p-3 transition-all">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm ${item.cat === 'drop' ? 'strike text-zinc-600' : 'text-zinc-300'} leading-relaxed">${escHtml(item.text)}</p>
+                        <!-- Category buttons -->
+                        <div class="flex flex-wrap gap-1.5 mt-2">
+                            ${Object.entries(CATEGORIES).map(([k, c]) => `
+                                <button data-id="${item.id}" data-cat="${k}" 
+                                    class="cat-btn text-xs px-2 py-0.5 rounded border transition-all ${item.cat === k ? `${c.border} ${c.color} ${c.bg}` : 'border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400'}">
+                                    ${c.icon} ${c.label}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <button data-remove="${item.id}" class="text-zinc-700 hover:text-zinc-500 transition-colors text-xs mt-0.5 shrink-0">✕</button>
+                </div>`;
+            }).join('');
+
+            // Verdict
+            const counts = countCategories(items);
+            const allSorted = counts.unsorted === 0;
+            const verdict = pickVerdict(counts, items.length);
+
+            if (verdict) {
+                verdictSection.classList.remove('hidden');
+                verdictSection.innerHTML = `
+                <div class="mt-2 bg-zinc-900/60 border border-zinc-800 rounded-lg p-4 fade-in">
+                    <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prízrak verdict</p>
+                    <p class="text-sm ${verdict.color} leading-relaxed">${verdict.text}</p>
+                    <div class="mt-4 flex gap-2">
+                        <button id="archive-btn" class="text-xs px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 transition-all">Archive & clear stack</button>
+                    </div>
+                </div>`;
+            } else if (allSorted && items.length) {
+                verdictSection.classList.remove('hidden');
+                verdictSection.innerHTML = `
+                <div class="mt-2 p-3 text-xs text-zinc-600 text-center">
+                    Stack sorted. <button id="archive-btn" class="text-zinc-500 hover:text-zinc-300 underline transition-colors">Archive & clear</button>
+                </div>`;
+            } else {
+                verdictSection.classList.add('hidden');
+                verdictSection.innerHTML = '';
+            }
+        }
+
+        // History
+        renderHistory();
+
+        // Events
+        document.querySelectorAll('.cat-btn').forEach(btn => {
+            btn.addEventListener('click', () => setCategory(btn.dataset.id, btn.dataset.cat));
+        });
+        document.querySelectorAll('[data-remove]').forEach(btn => {
+            btn.addEventListener('click', () => removeItem(btn.dataset.remove));
+        });
+        const archiveBtn = document.getElementById('archive-btn');
+        if (archiveBtn) archiveBtn.addEventListener('click', archiveAndClear);
+    }
+
+    function renderHistory() {
+        const history = getHistory();
+        const section = document.getElementById('history-section');
+        if (!history.length) { section.classList.add('hidden'); return; }
+        section.classList.remove('hidden');
+        const entries = document.getElementById('history-entries');
+        entries.innerHTML = history.map(h => {
+            const pills = Object.entries(h.counts).filter(([k,v]) => k !== 'unsorted' && v > 0).map(([k,v]) => {
+                const c = CATEGORIES[k];
+                return `<span class="text-xs ${c ? c.color : 'text-zinc-500'}">${c ? c.icon : ''} ${v} ${c ? c.label.toLowerCase() : k}</span>`;
+            }).join(' · ');
+            const items = h.items || [];
+            return `
+            <div class="border border-zinc-800 rounded-lg p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-zinc-500">${h.date}</span>
+                    <span class="text-xs text-zinc-600">${h.total} items</span>
+                </div>
+                <div class="flex flex-wrap gap-2 mb-2">${pills}</div>
+                <div class="space-y-1">
+                    ${items.map(i => {
+                        const c = CATEGORIES[i.cat];
+                        return `<div class="flex items-center gap-2 text-xs ${c ? c.color : 'text-zinc-600'}">
+                            <span>${c ? c.icon : '·'}</span>
+                            <span class="${i.cat === 'drop' ? 'strike' : ''}">${escHtml(i.text)}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Input
+    const input = document.getElementById('new-item');
+    document.getElementById('add-btn').addEventListener('click', () => {
+        addItem(input.value);
+        input.value = '';
+        input.focus();
+    });
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            addItem(input.value);
+            input.value = '';
+        }
+    });
+
+    document.getElementById('clear-history').addEventListener('click', () => {
+        localStorage.removeItem(HISTORY_KEY);
+        renderHistory();
+    });
+
+    render();
+    </script>
+</body>
+</html>

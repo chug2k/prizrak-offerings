@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Reconnect Receipt</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #09090b; }
+    .glow { text-shadow: 0 0 10px currentColor; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body class="min-h-screen text-zinc-200 antialiased">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+    <header class="mb-6">
+      <p class="text-xs uppercase tracking-[0.35em] text-zinc-500">Systems & Ops / incident receipts</p>
+      <h1 class="text-4xl font-black text-white mt-2">The Reconnect Receipt</h1>
+      <p class="text-zinc-400 mt-2 max-w-2xl">A brutally plain log for disconnects, reconnects, and the gap between them. It records weather without turning it into prophecy.</p>
+    </header>
+
+    <div class="grid lg:grid-cols-[1.05fr_0.95fr] gap-5">
+      <section class="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Current status</div>
+            <div id="statusPill" class="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-semibold"></div>
+          </div>
+          <div class="mono text-xs text-zinc-500 text-right">
+            <div>Receipts are local-only.</div>
+            <div>The mountain remembers the timestamps.</div>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-3 gap-3 mt-5">
+          <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+            <div class="text-zinc-500 text-xs uppercase">Last disconnect</div>
+            <div id="lastDown" class="mt-2 text-lg font-bold text-white">—</div>
+          </div>
+          <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+            <div class="text-zinc-500 text-xs uppercase">Last reconnect</div>
+            <div id="lastUp" class="mt-2 text-lg font-bold text-white">—</div>
+          </div>
+          <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+            <div class="text-zinc-500 text-xs uppercase">Gap length</div>
+            <div id="gapLength" class="mt-2 text-lg font-bold text-white">—</div>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4 mt-5">
+          <label class="block">
+            <span class="text-sm text-zinc-400">Disconnect time</span>
+            <input id="downInput" type="text" placeholder="2026-05-01 10:47:53 GMT+7" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 outline-none focus:border-violet-500" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-zinc-400">Reconnect time</span>
+            <input id="upInput" type="text" placeholder="2026-05-01 10:47:59 GMT+7" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 outline-none focus:border-violet-500" />
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="text-sm text-zinc-400">Note</span>
+            <input id="noteInput" type="text" placeholder="Gateway flap after a clean reconnect; no escalation." class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 outline-none focus:border-violet-500" />
+          </label>
+        </div>
+
+        <div class="flex flex-wrap gap-3 mt-5">
+          <button id="save" class="px-4 py-2 rounded-xl bg-violet-500 text-zinc-950 font-bold hover:bg-violet-400 transition-colors">Save receipt</button>
+          <button id="markDown" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition-colors">Log disconnect</button>
+          <button id="markUp" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition-colors">Log reconnect</button>
+          <button id="reset" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition-colors">Reset</button>
+        </div>
+
+        <div class="mt-5 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
+          <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Verdict</div>
+          <div id="verdict" class="mt-2 text-lg font-bold text-white">—</div>
+          <div id="advice" class="mt-2 text-sm text-zinc-400">Enter the timestamps. The machine will decide whether this is weather or a wound.</div>
+        </div>
+      </section>
+
+      <aside class="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-white">Incident log</h2>
+          <span id="count" class="mono text-xs px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-400"></span>
+        </div>
+        <div id="log" class="mt-4 space-y-3"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const KEY = 'reconnect_receipt_v1';
+    const el = id => document.getElementById(id);
+
+    function load() {
+      return JSON.parse(localStorage.getItem(KEY) || '{"current":null,"events":[]}');
+    }
+
+    function save(state) {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
+
+    function fmt(t) {
+      if (!t) return '—';
+      return t;
+    }
+
+    function gapMs(a, b) {
+      if (!a || !b) return null;
+      const da = new Date(a).getTime();
+      const db = new Date(b).getTime();
+      if (Number.isNaN(da) || Number.isNaN(db)) return null;
+      return Math.max(0, db - da);
+    }
+
+    function humanGap(ms) {
+      if (ms === null) return '—';
+      const s = Math.round(ms / 1000);
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s / 60);
+      const rs = s % 60;
+      if (m < 60) return `${m}m ${rs}s`;
+      const h = Math.floor(m / 60);
+      const rm = m % 60;
+      return `${h}h ${rm}m`;
+    }
+
+    function verdict(state) {
+      const gap = gapMs(state.current?.down, state.current?.up);
+      if (!state.current?.down && !state.current?.up) {
+        return { label: 'No active incident', color: 'text-emerald-300', border: 'border-emerald-700/60', bg: 'bg-emerald-500/10', advice: 'Nothing is flapping. Leave it alone unless the weather changes.' };
+      }
+      if (state.current?.down && !state.current?.up) {
+        return { label: 'Disconnected', color: 'text-amber-300', border: 'border-amber-700/60', bg: 'bg-amber-500/10', advice: 'The channel is down. Watch for a reconnect; do not invent a story yet.' };
+      }
+      if (gap !== null && gap <= 10000) {
+        return { label: 'Benign flap', color: 'text-cyan-300', border: 'border-cyan-700/60', bg: 'bg-cyan-500/10', advice: 'Short gap, clean recovery. Record it and move on.' };
+      }
+      if (gap !== null && gap <= 300000) {
+        return { label: 'Recoverable outage', color: 'text-amber-300', border: 'border-amber-700/60', bg: 'bg-amber-500/10', advice: 'Long enough to matter, short enough to file. Keep the receipt.' };
+      }
+      return { label: 'Escalate if repeated', color: 'text-red-300', border: 'border-red-700/60', bg: 'bg-red-500/10', advice: 'This is no longer weather. If it repeats, investigate the bridge.' };
+    }
+
+    function render() {
+      const state = load();
+      const v = verdict(state);
+      const gap = gapMs(state.current?.down, state.current?.up);
+
+      el('statusPill').className = `mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-semibold ${v.border} ${v.bg} ${v.color}`;
+      el('statusPill').textContent = v.label;
+      el('lastDown').textContent = fmt(state.current?.down);
+      el('lastUp').textContent = fmt(state.current?.up);
+      el('gapLength').textContent = humanGap(gap);
+      el('verdict').textContent = v.label;
+      el('advice').textContent = v.advice;
+      el('count').textContent = `${state.events.length} receipts`;
+      el('log').innerHTML = state.events.slice().reverse().map(ev => `
+        <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-semibold text-white">${ev.type}</div>
+            <div class="mono text-xs text-zinc-500">${ev.at}</div>
+          </div>
+          <div class="mt-1 text-sm text-zinc-400">${ev.note || '—'}</div>
+        </div>
+      `).join('') || '<div class="text-sm text-zinc-500">No receipts yet. The mountain is quiet.</div>';
+
+      el('downInput').value = state.current?.down || '';
+      el('upInput').value = state.current?.up || '';
+      el('noteInput').value = state.current?.note || '';
+    }
+
+    function push(type, at, note) {
+      const state = load();
+      state.events.push({ type, at, note: note || '' });
+      state.current = state.current || {};
+      if (type === 'disconnect') state.current.down = at;
+      if (type === 'reconnect') state.current.up = at;
+      if (note) state.current.note = note;
+      save(state);
+      render();
+    }
+
+    el('save').addEventListener('click', () => {
+      const state = load();
+      state.current = {
+        down: el('downInput').value.trim() || null,
+        up: el('upInput').value.trim() || null,
+        note: el('noteInput').value.trim() || ''
+      };
+      state.events.push({ type: 'receipt saved', at: new Date().toISOString(), note: state.current.note || 'Saved current receipt.' });
+      save(state);
+      render();
+    });
+
+    el('markDown').addEventListener('click', () => push('disconnect', new Date().toISOString(), el('noteInput').value.trim()));
+    el('markUp').addEventListener('click', () => push('reconnect', new Date().toISOString(), el('noteInput').value.trim()));
+    el('reset').addEventListener('click', () => {
+      localStorage.removeItem(KEY);
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

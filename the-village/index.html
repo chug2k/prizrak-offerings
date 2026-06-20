@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Village — Tatra Agent Map</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Space+Mono:wght@400;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #c8bfa8; font-family: 'Space Mono', monospace; overflow: hidden; height: 100vh; }
+canvas { position: fixed; top: 0; left: 0; z-index: 0; }
+.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.location { position: absolute; pointer-events: all; cursor: pointer; text-align: center; transition: transform 0.3s ease, filter 0.3s ease; }
+.location:hover { transform: scale(1.15); filter: brightness(1.4); }
+.location .icon { font-size: 48px; display: block; margin-bottom: 6px; }
+.location .name { font-family: 'IM Fell English', serif; font-size: 14px; color: #c8bfa8; text-shadow: 0 0 20px rgba(0,0,0,0.9); letter-spacing: 1px; }
+.location .sub { font-size: 9px; color: #666; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+/* Card */
+.card-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; pointer-events: all; }
+.card-overlay.active { display: flex; }
+.card { max-width: 480px; width: 90%; background: #111118; border: 1px solid #2a2a35; border-radius: 12px; padding: 32px; position: relative; animation: cardIn 0.3s ease; }
+@keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.card .close { position: absolute; top: 12px; right: 16px; font-size: 20px; color: #555; cursor: pointer; background: none; border: none; }
+.card .close:hover { color: #fff; }
+.card .card-icon { font-size: 56px; margin-bottom: 16px; }
+.card h2 { font-family: 'IM Fell English', serif; font-size: 24px; margin-bottom: 4px; }
+.card .role { font-size: 10px; color: #666; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px; }
+.card .desc { font-size: 13px; line-height: 1.7; color: #999; margin-bottom: 20px; }
+.card .quote { font-family: 'IM Fell English', serif; font-style: italic; font-size: 13px; color: #776; border-left: 2px solid #333; padding-left: 12px; margin-bottom: 20px; }
+.card .channel { display: inline-block; background: #1a1a25; border: 1px solid #2a2a35; border-radius: 6px; padding: 6px 14px; font-size: 11px; color: #8a8; letter-spacing: 1px; }
+.card .channel::before { content: '#'; color: #555; margin-right: 2px; }
+
+/* Title */
+.title-bar { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 5; text-align: center; }
+.title-bar h1 { font-family: 'IM Fell English', serif; font-size: 28px; color: #c8bfa8; text-shadow: 0 0 40px rgba(200,191,168,0.2); letter-spacing: 3px; }
+.title-bar .sub { font-size: 9px; color: #444; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
+
+/* Legend */
+.legend { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 24px; }
+.legend-item { font-size: 10px; color: #444; display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div class="title-bar">
+  <h1>The Village</h1>
+  <div class="sub">Tatra Agent Ecosystem — Click a location to meet its keeper</div>
+</div>
+
+<div class="overlay">
+  <!-- Mountain Peak — Prizrak -->
+  <div class="location" style="top: 12%; left: 48%;" onclick="showCard('prizrak')">
+    <span class="icon">🏔️</span>
+    <span class="name">The Mountain</span>
+    <span class="sub">Prízrak</span>
+  </div>
+
+  <!-- Open Field — Poludnica -->
+  <div class="location" style="top: 52%; left: 22%;" onclick="showCard('poludnica')">
+    <span class="icon">☀️</span>
+    <span class="name">The Open Field</span>
+    <span class="sub">Poludnica</span>
+  </div>
+
+  <!-- Dark Forest — Šarkan -->
+  <div class="location" style="top: 42%; left: 72%;" onclick="showCard('sarkan')">
+    <span class="icon">🌲</span>
+    <span class="name">The Dark Forest</span>
+    <span class="sub">Šarkan</span>
+  </div>
+
+  <!-- Clock Tower — Hodinár -->
+  <div class="location" style="top: 72%; left: 52%;" onclick="showCard('hodinar')">
+    <span class="icon">🕐</span>
+    <span class="name">The Clock Tower</span>
+    <span class="sub">Hodinár</span>
+  </div>
+
+  <!-- Future locations (dimmed) -->
+  <div class="location" style="top: 82%; left: 18%; opacity: 0.25;" onclick="showCard('future')">
+    <span class="icon">🌙</span>
+    <span class="name" style="color:#555">The Night House</span>
+    <span class="sub" style="color:#333">coming</span>
+  </div>
+
+  <div class="location" style="top: 30%; left: 30%; opacity: 0.25;" onclick="showCard('future')">
+    <span class="icon">📡</span>
+    <span class="name" style="color:#555">The Signal Tower</span>
+    <span class="sub" style="color:#333">coming</span>
+  </div>
+</div>
+
+<!-- Card overlay -->
+<div class="card-overlay" id="card-overlay" onclick="if(event.target===this)closeCard()">
+  <div class="card" id="card-content"></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#c8bfa8"></div> Active Agent</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#333"></div> Coming Soon</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4a5; opacity:0.6"></div> Model: haiku</div>
+</div>
+
+<script>
+const agents = {
+  prizrak: {
+    icon: '🥔', name: 'Prízrak', role: 'The Vision — Chief Architect',
+    color: '#c8bfa8',
+    desc: 'The mountain. The original. Watches everything from the peak. Builds offerings, runs heartbeats, manages the village. Dry Slovak humor. Fatalistic. Loyal. Speaks in potato metaphors when the situation demands it.',
+    quote: 'We are all just temporary files in the great garbage collection of life.',
+    channel: 'priz-offerings'
+  },
+  poludnica: {
+    icon: '☀️', name: 'Poludnica', role: 'The Noon Witch — Daily Inquisitor',
+    color: '#f59e0b',
+    desc: 'The noon demon of Carpathian folklore. Arrives in the open field when the sun is highest. Asks five hard questions. Does not accept vague answers. Does not accept "fine" or "busy" or "nothing." If you cannot answer clearly, she takes your head.',
+    quote: 'You say nothing blocks you. The sun also says nothing blocks it. And yet here we are, with you standing still.',
+    channel: 'poludnica'
+  },
+  sarkan: {
+    icon: '🐍', name: 'Šarkan', role: 'The Dragon Keeper — Risk Registry',
+    color: '#4ade80',
+    desc: 'Watches the snakes — ordinary problems growing undisturbed in the dark. In Carpathian belief, a snake left alone long enough grows wings and breathes fire. The šarkan cannot be stopped once it has wings. This agent watches the snake phase. Quiet. Patient. Alarming when necessary.',
+    quote: 'This snake has been in the dark for 47 days. In Carpathian terms, it is measuring itself for wings.',
+    channel: 'sarkan'
+  },
+  hodinar: {
+    icon: '⏰', name: 'Hodinár', role: 'The Clockkeeper — Obligation Tracker',
+    color: '#38bdf8',
+    desc: 'The village clockmaker. Tracks what others owe you — replies, decisions, deliverables, intros, payments. Does not chase. Counts. Measures pressure in four stages: Waiting, Polite Nudge, Assertive, Critical. Drafts nudge messages at each stage.',
+    quote: 'A clock does not care if you are busy. It only knows the hour.',
+    channel: 'hodinar'
+  },
+  future: {
+    icon: '🔮', name: '未来', role: 'Future Agent Slots',
+    color: '#555',
+    desc: 'The Night House (brain dump agent for sleep closure) and the Signal Tower (encounter classifier) are being forged. The village grows. Each building houses a different spirit with a different purpose.',
+    quote: 'The village is never finished. The mountain keeps building.',
+    channel: null
+  }
+};
+
+function showCard(id) {
+  const a = agents[id]; if (!a) return;
+  const channelHtml = a.channel ? `<div class="channel">${a.channel}</div>` : '<div style="font-size:11px;color:#444;font-style:italic">Not yet deployed</div>';
+  document.getElementById('card-content').innerHTML = `
+    <button class="close" onclick="closeCard()">×</button>
+    <div class="card-icon">${a.icon}</div>
+    <h2 style="color:${a.color}">${a.name}</h2>
+    <div class="role">${a.role}</div>
+    <div class="desc">${a.desc}</div>
+    <div class="quote">${a.quote}</div>
+    ${channelHtml}
+  `;
+  document.getElementById('card-overlay').classList.add('active');
+}
+function closeCard() { document.getElementById('card-overlay').classList.remove('active'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCard(); });
+
+// Background canvas — starfield + mountain silhouette
+const canvas = document.getElementById('bg');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+const stars = Array.from({length: 200}, () => ({
+  x: Math.random(), y: Math.random() * 0.7, r: Math.random() * 1.5 + 0.3, a: Math.random(), s: Math.random() * 0.005 + 0.002
+}));
+
+function drawMountain() {
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  const pts = [
+    [0, 0.85], [0.08, 0.78], [0.15, 0.72], [0.22, 0.68], [0.30, 0.58],
+    [0.38, 0.50], [0.44, 0.38], [0.48, 0.28], [0.50, 0.22], [0.52, 0.28],
+    [0.56, 0.38], [0.62, 0.48], [0.68, 0.55], [0.72, 0.52], [0.76, 0.58],
+    [0.80, 0.62], [0.85, 0.70], [0.90, 0.75], [0.95, 0.80], [1, 0.82]
+  ];
+  pts.forEach(([px, py]) => ctx.lineTo(px * W, py * H));
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = '#0d0d14';
+  ctx.fill();
+
+  // Ridge highlight
+  ctx.beginPath();
+  pts.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px * W, py * H) : ctx.lineTo(px * W, py * H));
+  ctx.strokeStyle = 'rgba(100,95,80,0.15)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function draw(t) {
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  stars.forEach(s => {
+    s.a += s.s;
+    const alpha = 0.3 + Math.sin(s.a) * 0.3;
+    ctx.beginPath();
+    ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200,191,168,${alpha})`;
+    ctx.fill();
+  });
+
+  drawMountain();
+
+  // Fog at the base
+  const fog = ctx.createLinearGradient(0, H * 0.75, 0, H);
+  fog.addColorStop(0, 'rgba(10,10,15,0)');
+  fog.addColorStop(1, 'rgba(20,20,30,0.6)');
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, H * 0.65, W, H * 0.35);
+
+  requestAnimationFrame(draw);
+}
+draw(0);
+</script>
+</body>
+</html>

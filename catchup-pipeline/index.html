@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catchup Pipeline</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f0f11; }
+    .card { transition: box-shadow 0.15s, transform 0.15s; }
+    .card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+    .dragging { opacity: 0.4; }
+    .drag-over { outline: 2px dashed #6366f1; outline-offset: 2px; }
+    input, textarea { background: #1c1c22 !important; }
+    input:focus, textarea:focus { outline: none; border-color: #6366f1 !important; }
+  </style>
+</head>
+<body class="text-gray-200 min-h-screen p-6 font-mono">
+
+  <div class="max-w-5xl mx-auto">
+    <header class="mb-8">
+      <h1 class="text-2xl font-bold text-white tracking-tight">Catchup Pipeline</h1>
+      <p class="text-zinc-500 text-sm mt-1">Track who you're reaching out to, who's booked, and who you've met. Drag to move.</p>
+    </header>
+
+    <!-- Add contact form -->
+    <div class="mb-8 bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex gap-3 items-end flex-wrap">
+      <div class="flex-1 min-w-48">
+        <label class="text-xs text-zinc-500 block mb-1">Name</label>
+        <input id="inp-name" type="text" placeholder="Daan" class="w-full border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+      </div>
+      <div class="flex-1 min-w-48">
+        <label class="text-xs text-zinc-500 block mb-1">Context / Goal</label>
+        <input id="inp-ctx" type="text" placeholder="AI chat, intro call" class="w-full border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+      </div>
+      <div class="w-36">
+        <label class="text-xs text-zinc-500 block mb-1">Date / Time</label>
+        <input id="inp-date" type="text" placeholder="Mar 25 10am" class="w-full border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+      </div>
+      <button onclick="addContact()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-colors">+ Add</button>
+    </div>
+
+    <!-- Kanban columns -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="board"></div>
+  </div>
+
+  <script>
+  const STORAGE_KEY = 'prizrak_pipeline_v1';
+  const COLUMNS = [
+    { id: 'idea',      label: '💡 Ideas',       color: 'text-zinc-400',   border: 'border-zinc-700' },
+    { id: 'outreach',  label: '📤 Outreached',  color: 'text-yellow-400', border: 'border-yellow-800' },
+    { id: 'scheduled', label: '📅 Scheduled',   color: 'text-indigo-400', border: 'border-indigo-800' },
+    { id: 'met',       label: '✅ Met',          color: 'text-green-400',  border: 'border-green-800' },
+  ];
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData(); }
+    catch(e) { return defaultData(); }
+  }
+
+  function defaultData() {
+    return {
+      contacts: [
+        { id: 'pru',  name: 'Pru',  ctx: 'Hannah Life Tech — intro catchup',  date: 'Mon Mar 9 · 9:30 AM ICT',  col: 'scheduled' },
+        { id: 'tara', name: 'Tara', ctx: 'Coaching / leadership — in person D1', date: 'Wed Mar 25 · 10 AM ICT', col: 'scheduled' },
+        { id: 'daan', name: 'Daan', ctx: 'AI enthusiast — online catchup',    date: 'Pending reply',             col: 'outreach'  },
+      ]
+    };
+  }
+
+  function save(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  let dragId = null;
+
+  function render() {
+    const data = load();
+    const board = document.getElementById('board');
+    board.innerHTML = COLUMNS.map(col => {
+      const cards = data.contacts.filter(c => c.col === col.id);
+      return `
+      <div class="bg-zinc-900 border ${col.border} rounded-xl p-4 min-h-48"
+           ondragover="event.preventDefault(); this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="drop(event, '${col.id}')">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-bold ${col.color}">${col.label}</h2>
+          <span class="text-xs text-zinc-600 font-mono">${cards.length}</span>
+        </div>
+        <div class="space-y-3">
+          ${cards.map(c => cardHTML(c)).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function cardHTML(c) {
+    return `
+    <div class="card bg-zinc-800 border border-zinc-700 rounded-lg p-3 cursor-grab active:cursor-grabbing"
+         draggable="true"
+         ondragstart="dragStart(event, '${c.id}')"
+         ondragend="dragEnd(event)">
+      <div class="flex justify-between items-start gap-2 mb-1">
+        <span class="font-bold text-white text-sm">${esc(c.name)}</span>
+        <button onclick="deleteContact('${c.id}')" class="text-zinc-600 hover:text-red-400 text-xs leading-none transition-colors flex-shrink-0" title="Remove">✕</button>
+      </div>
+      ${c.ctx  ? `<p class="text-zinc-400 text-xs mb-1">${esc(c.ctx)}</p>` : ''}
+      ${c.date ? `<p class="text-indigo-400 text-xs font-mono">${esc(c.date)}</p>` : ''}
+    </div>`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function dragStart(e, id) {
+    dragId = id;
+    e.currentTarget.classList.add('dragging');
+  }
+
+  function dragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  }
+
+  function drop(e, colId) {
+    e.currentTarget.classList.remove('drag-over');
+    if (!dragId) return;
+    const data = load();
+    const contact = data.contacts.find(c => c.id === dragId);
+    if (contact) { contact.col = colId; save(data); render(); }
+    dragId = null;
+  }
+
+  function addContact() {
+    const name = document.getElementById('inp-name').value.trim();
+    if (!name) return;
+    const data = load();
+    data.contacts.push({
+      id: 'c' + Date.now(),
+      name,
+      ctx:  document.getElementById('inp-ctx').value.trim(),
+      date: document.getElementById('inp-date').value.trim(),
+      col: 'idea'
+    });
+    save(data);
+    ['inp-name','inp-ctx','inp-date'].forEach(id => document.getElementById(id).value = '');
+    render();
+  }
+
+  function deleteContact(id) {
+    const data = load();
+    data.contacts = data.contacts.filter(c => c.id !== id);
+    save(data);
+    render();
+  }
+
+  // Enter key on last input triggers add
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement.id === 'inp-date') addContact();
+  });
+
+  render();
+  </script>
+</body>
+</html>

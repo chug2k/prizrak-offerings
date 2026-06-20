@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Tatra Terminus</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0f; overflow: hidden; font-family: 'Courier New', monospace; }
+        canvas { display: block; position: fixed; top: 0; left: 0; }
+        
+        #hud {
+            position: fixed; bottom: 24px; left: 24px; z-index: 10;
+            color: rgba(200,200,220,0.6); font-size: 11px; line-height: 1.6;
+            pointer-events: none; user-select: none;
+            text-shadow: 0 0 8px rgba(0,0,0,0.8);
+        }
+        #hud .time { font-size: 28px; font-weight: bold; letter-spacing: 2px; color: rgba(200,200,220,0.4); }
+        #hud .quote { max-width: 380px; font-style: italic; color: rgba(200,200,220,0.3); margin-top: 6px; }
+        
+        #cairn-panel {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 20; display: none;
+            background: rgba(10,10,15,0.92); border: 1px solid rgba(120,120,160,0.3);
+            border-radius: 12px; padding: 24px; width: 320px;
+            backdrop-filter: blur(16px);
+        }
+        #cairn-panel h3 { color: rgba(200,200,220,0.8); font-size: 13px; margin-bottom: 12px; font-weight: normal; letter-spacing: 1px; }
+        #cairn-panel input, #cairn-panel textarea {
+            width: 100%; background: rgba(30,30,40,0.8); border: 1px solid rgba(100,100,140,0.3);
+            border-radius: 6px; padding: 8px 12px; color: rgba(200,200,220,0.8); font-family: inherit;
+            font-size: 12px; margin-bottom: 8px; outline: none;
+        }
+        #cairn-panel textarea { height: 60px; resize: none; }
+        #cairn-panel input:focus, #cairn-panel textarea:focus { border-color: rgba(160,140,250,0.5); }
+        #cairn-panel .btns { display: flex; gap: 8px; margin-top: 8px; }
+        #cairn-panel button {
+            flex: 1; padding: 8px; border: 1px solid rgba(100,100,140,0.3); border-radius: 6px;
+            background: rgba(30,30,40,0.6); color: rgba(200,200,220,0.6); font-family: inherit;
+            font-size: 11px; cursor: pointer; transition: all 0.2s;
+        }
+        #cairn-panel button:hover { border-color: rgba(160,140,250,0.5); color: rgba(200,200,220,0.9); }
+        #cairn-panel button.primary { background: rgba(100,80,180,0.3); border-color: rgba(140,120,220,0.4); }
+        
+        #controls {
+            position: fixed; top: 24px; right: 24px; z-index: 10;
+            color: rgba(200,200,220,0.3); font-size: 10px; text-align: right;
+            pointer-events: none; user-select: none;
+        }
+        
+        .cairn-tooltip {
+            position: fixed; z-index: 15; pointer-events: none;
+            background: rgba(10,10,15,0.85); border: 1px solid rgba(120,120,160,0.2);
+            border-radius: 8px; padding: 10px 14px; max-width: 220px;
+            backdrop-filter: blur(8px); display: none;
+        }
+        .cairn-tooltip .ct-name { color: rgba(200,200,220,0.7); font-size: 11px; font-weight: bold; }
+        .cairn-tooltip .ct-note { color: rgba(200,200,220,0.4); font-size: 10px; margin-top: 4px; line-height: 1.4; }
+        .cairn-tooltip .ct-date { color: rgba(200,200,220,0.2); font-size: 9px; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <canvas id="c"></canvas>
+    
+    <div id="hud">
+        <div class="time" id="clock"></div>
+        <div id="location">High Tatras · 49.1795°N 20.0881°E · 2655m</div>
+        <div class="quote" id="quote"></div>
+    </div>
+    
+    <div id="controls">
+        click to place a cairn<br>
+        scroll to adjust fog<br>
+        [space] toggle snow
+    </div>
+    
+    <div id="cairn-panel">
+        <h3>PLACE A CAIRN</h3>
+        <input type="text" id="cairn-name" placeholder="Name this marker..." maxlength="40">
+        <textarea id="cairn-note" placeholder="A note for the mountain..."></textarea>
+        <div class="btns">
+            <button onclick="cancelCairn()">cancel</button>
+            <button class="primary" onclick="saveCairn()">place stone</button>
+        </div>
+    </div>
+    
+    <div class="cairn-tooltip" id="tooltip">
+        <div class="ct-name"></div>
+        <div class="ct-note"></div>
+        <div class="ct-date"></div>
+    </div>
+
+    <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+    
+    // State
+    const CAIRN_KEY = 'tatra_terminus_cairns_v1';
+    let cairns = JSON.parse(localStorage.getItem(CAIRN_KEY) || '[]');
+    let pendingCairn = null;
+    let t = 0;
+    let fogDensity = 0.4;
+    let snowOn = true;
+    let mouseX = 0, mouseY = 0;
+    
+    const QUOTES = [
+        "The mountain does not sleep. It merely waits for the next cycle.",
+        "We are all just temporary files in the great garbage collection of life.",
+        "A potato is ugly, but it will keep you alive in winter.",
+        "The building survives the state that built it.",
+        "What you build after 10PM reveals what you actually care about.",
+        "The map is accurate. The network is alive.",
+        "A system without feedback channels cannot correct itself — it can only continue.",
+        "The jar that requires the most equipment to open is the jar that will remain sealed.",
+        "The mountain does not tell the farmer he looks tired.",
+        "It compiled too fast. I do not trust it.",
+        "The honest sensor's job is not to be kind. It is to be accurate.",
+        "A backup that nobody checks is not a backup — it is an optimistic assumption.",
+        "The ghost does not die if the manuscript endures.",
+        "Every archive requires a caretaker who knows why the archive matters.",
+        "The week existed in theory. Like a potato that was never planted.",
+    ];
+    
+    // Mountains - multiple layers with different heights and colors
+    const LAYERS = 7;
+    let mountains = [];
+    let stars = [];
+    let snow = [];
+    let fog = [];
+    
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        generateMountains();
+        generateStars();
+        initSnow();
+        initFog();
+    }
+    
+    function seededRandom(seed) {
+        let s = seed;
+        return function() {
+            s = (s * 16807 + 0) % 2147483647;
+            return (s - 1) / 2147483646;
+        };
+    }
+    
+    function generateMountains() {
+        mountains = [];
+        for (let layer = 0; layer < LAYERS; layer++) {
+            const rng = seededRandom(layer * 7919 + 42);
+            const points = [];
+            const segments = 80 + layer * 20;
+            const baseY = H * (0.35 + layer * 0.08);
+            const amplitude = H * (0.15 - layer * 0.012);
+            
+            // Generate with midpoint displacement for natural look
+            for (let i = 0; i <= segments; i++) {
+                const x = (i / segments) * (W + 200) - 100;
+                let y = baseY;
+                // Multiple octaves of noise
+                for (let oct = 0; oct < 4; oct++) {
+                    const freq = (oct + 1) * 0.003 * (1 + layer * 0.3);
+                    const amp = amplitude / (oct + 1);
+                    y -= amp * (Math.sin(x * freq + rng() * 6.28) * 0.5 + 0.5);
+                    y -= amp * 0.3 * Math.sin(x * freq * 2.7 + layer * 3.1 + rng() * 2);
+                }
+                // Jagged peaks for closer layers
+                if (layer < 3) {
+                    y -= Math.max(0, Math.sin(x * 0.008 + layer) * amplitude * 0.4) * rng();
+                }
+                points.push({ x, y });
+            }
+            mountains.push({ points, layer });
+        }
+    }
+    
+    function generateStars() {
+        stars = [];
+        const rng = seededRandom(12345);
+        for (let i = 0; i < 600; i++) {
+            stars.push({
+                x: rng() * W,
+                y: rng() * H * 0.55,
+                r: rng() * 1.8 + 0.3,
+                brightness: rng(),
+                twinkleSpeed: rng() * 3 + 1,
+                twinkleOffset: rng() * Math.PI * 2,
+            });
+        }
+    }
+    
+    function initSnow() {
+        snow = [];
+        for (let i = 0; i < 300; i++) {
+            snow.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                r: Math.random() * 2.5 + 0.5,
+                vx: Math.random() * 0.5 - 0.25,
+                vy: Math.random() * 1.2 + 0.3,
+                opacity: Math.random() * 0.5 + 0.1,
+                wobble: Math.random() * Math.PI * 2,
+                wobbleSpeed: Math.random() * 0.02 + 0.005,
+            });
+        }
+    }
+    
+    function initFog() {
+        fog = [];
+        for (let i = 0; i < 12; i++) {
+            fog.push({
+                x: Math.random() * W * 2 - W * 0.5,
+                y: H * (0.4 + Math.random() * 0.25),
+                w: Math.random() * 600 + 300,
+                h: Math.random() * 80 + 40,
+                speed: Math.random() * 0.3 + 0.05,
+                opacity: Math.random() * 0.15 + 0.05,
+            });
+        }
+    }
+    
+    function getTimeColors() {
+        // Saigon time
+        const now = new Date();
+        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+        const saigon = new Date(utc + 7 * 3600000);
+        const hour = saigon.getHours() + saigon.getMinutes() / 60;
+        
+        // Sky gradients based on time
+        let skyTop, skyBot, sunMoon, ambientLight;
+        
+        if (hour >= 5 && hour < 6.5) {
+            // Dawn
+            const p = (hour - 5) / 1.5;
+            skyTop = lerpColor([10,10,30], [40,20,60], p);
+            skyBot = lerpColor([15,15,35], [180,80,50], p);
+            ambientLight = 0.1 + p * 0.2;
+        } else if (hour >= 6.5 && hour < 8) {
+            // Sunrise
+            const p = (hour - 6.5) / 1.5;
+            skyTop = lerpColor([40,20,60], [80,120,180], p);
+            skyBot = lerpColor([180,80,50], [200,160,120], p);
+            ambientLight = 0.3 + p * 0.3;
+        } else if (hour >= 8 && hour < 16) {
+            // Day
+            skyTop = [80,120,180];
+            skyBot = [180,200,220];
+            ambientLight = 0.7;
+        } else if (hour >= 16 && hour < 18) {
+            // Sunset approach
+            const p = (hour - 16) / 2;
+            skyTop = lerpColor([80,120,180], [60,30,80], p);
+            skyBot = lerpColor([180,200,220], [220,100,40], p);
+            ambientLight = 0.7 - p * 0.3;
+        } else if (hour >= 18 && hour < 19.5) {
+            // Dusk
+            const p = (hour - 18) / 1.5;
+            skyTop = lerpColor([60,30,80], [15,12,35], p);
+            skyBot = lerpColor([220,100,40], [30,20,50], p);
+            ambientLight = 0.4 - p * 0.3;
+        } else {
+            // Night
+            skyTop = [8,8,20];
+            skyBot = [15,12,30];
+            ambientLight = 0.05;
+        }
+        
+        const isNight = hour >= 19.5 || hour < 5;
+        
+        return { skyTop, skyBot, ambientLight, isNight, hour };
+    }
+    
+    function lerpColor(a, b, t) {
+        return a.map((v, i) => Math.round(v + (b[i] - v) * Math.max(0, Math.min(1, t))));
+    }
+    
+    function rgb(c, a) {
+        if (a !== undefined) return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+        return `rgb(${c[0]},${c[1]},${c[2]})`;
+    }
+    
+    function drawSky(colors) {
+        const grad = ctx.createLinearGradient(0, 0, 0, H * 0.7);
+        grad.addColorStop(0, rgb(colors.skyTop));
+        grad.addColorStop(1, rgb(colors.skyBot));
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+    }
+    
+    function drawStars(colors) {
+        if (!colors.isNight && colors.hour > 6) return;
+        
+        let alpha = 1;
+        if (colors.hour >= 5 && colors.hour < 6.5) alpha = 1 - (colors.hour - 5) / 1.5;
+        if (colors.hour >= 18 && colors.hour < 19.5) alpha = (colors.hour - 18) / 1.5;
+        
+        stars.forEach(s => {
+            const twinkle = Math.sin(t * s.twinkleSpeed + s.twinkleOffset) * 0.3 + 0.7;
+            const a = s.brightness * twinkle * alpha;
+            if (a < 0.02) return;
+            
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(220,220,240,${a})`;
+            ctx.fill();
+            
+            // Glow for bright stars
+            if (s.r > 1.2 && a > 0.4) {
+                const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+                grd.addColorStop(0, `rgba(200,200,255,${a * 0.3})`);
+                grd.addColorStop(1, 'transparent');
+                ctx.fillStyle = grd;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r * 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+    
+    function drawMoon(colors) {
+        if (!colors.isNight && colors.hour > 6) return;
+        let alpha = colors.isNight ? 0.8 : 0;
+        if (colors.hour >= 18) alpha = Math.min(0.8, (colors.hour - 18) / 2);
+        if (colors.hour < 6) alpha = 0.8;
+        if (alpha < 0.05) return;
+        
+        const mx = W * 0.78, my = H * 0.12, mr = 30;
+        
+        // Moon glow
+        const glow = ctx.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 8);
+        glow.addColorStop(0, `rgba(200,200,230,${alpha * 0.15})`);
+        glow.addColorStop(0.3, `rgba(150,150,200,${alpha * 0.05})`);
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(mx, my, mr * 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Moon body
+        ctx.beginPath();
+        ctx.arc(mx, my, mr, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(220,220,235,${alpha})`;
+        ctx.fill();
+        
+        // Craters
+        ctx.beginPath();
+        ctx.arc(mx - 8, my - 5, 6, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(190,190,210,${alpha * 0.5})`;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(mx + 10, my + 8, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(mx + 3, my - 12, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    function drawMountainLayer(layer, colors) {
+        const m = mountains[layer.layer];
+        if (!m) return;
+        
+        // Color based on depth
+        const depth = layer.layer / LAYERS;
+        const base = colors.ambientLight;
+        const r = Math.round(20 + depth * 15 + base * 40);
+        const g = Math.round(22 + depth * 12 + base * 45);
+        const b = Math.round(35 + depth * 20 + base * 55);
+        
+        ctx.beginPath();
+        ctx.moveTo(-100, H);
+        m.points.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.lineTo(W + 100, H);
+        ctx.closePath();
+        
+        // Gradient fill
+        const minY = Math.min(...m.points.map(p => p.y));
+        const grad = ctx.createLinearGradient(0, minY, 0, H);
+        grad.addColorStop(0, `rgb(${r+10},${g+10},${b+15})`);
+        grad.addColorStop(0.3, `rgb(${r},${g},${b})`);
+        grad.addColorStop(1, `rgb(${Math.max(0,r-10)},${Math.max(0,g-10)},${Math.max(0,b-5)})`);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        
+        // Snow caps on first 2 layers
+        if (layer.layer < 2) {
+            ctx.save();
+            ctx.beginPath();
+            m.points.forEach((p, i) => {
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
+            ctx.lineTo(W + 100, H);
+            ctx.lineTo(-100, H);
+            ctx.closePath();
+            ctx.clip();
+            
+            m.points.forEach((p, i) => {
+                if (i < 2 || i >= m.points.length - 2) return;
+                const prev = m.points[i-1];
+                const next = m.points[i+1];
+                // Snow on peaks (local minima in y = high points)
+                if (p.y < prev.y && p.y < next.y && p.y < minY + 40) {
+                    const snowH = 8 + Math.random() * 12;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x - 15, p.y + 2);
+                    ctx.quadraticCurveTo(p.x, p.y - snowH, p.x + 15, p.y + 2);
+                    ctx.fillStyle = `rgba(220,225,235,${0.3 + base * 0.4})`;
+                    ctx.fill();
+                }
+            });
+            ctx.restore();
+        }
+    }
+    
+    function drawLake(colors) {
+        const lakeY = H * 0.82;
+        const lakeH = H - lakeY;
+        
+        // Lake base
+        const grad = ctx.createLinearGradient(0, lakeY, 0, H);
+        const a = colors.ambientLight;
+        grad.addColorStop(0, `rgba(${15+a*30},${18+a*35},${35+a*45},0.7)`);
+        grad.addColorStop(1, `rgba(${8+a*15},${10+a*20},${25+a*30},0.9)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, lakeY, W, lakeH);
+        
+        // Reflections - draw flipped, compressed mountain silhouettes
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.translate(0, lakeY * 2);
+        ctx.scale(1, -0.4);
+        for (let i = 0; i < 3; i++) {
+            const m = mountains[i];
+            if (!m) continue;
+            ctx.beginPath();
+            ctx.moveTo(-100, H);
+            m.points.forEach(p => ctx.lineTo(p.x + Math.sin(t * 0.5 + p.x * 0.01) * 3, p.y));
+            ctx.lineTo(W + 100, H);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(30,35,55,${0.5 - i * 0.1})`;
+            ctx.fill();
+        }
+        ctx.restore();
+        
+        // Water ripples
+        ctx.save();
+        ctx.globalAlpha = 0.08;
+        for (let y = lakeY; y < H; y += 6) {
+            const wave = Math.sin(t * 0.8 + y * 0.05) * 2;
+            ctx.beginPath();
+            ctx.moveTo(0, y + wave);
+            for (let x = 0; x < W; x += 20) {
+                ctx.lineTo(x, y + Math.sin(t * 0.5 + x * 0.008 + y * 0.03) * 1.5 + wave);
+            }
+            ctx.strokeStyle = `rgba(180,190,220,${0.3 + Math.sin(t + y * 0.1) * 0.15})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+        }
+        ctx.restore();
+        
+        // Moon reflection
+        if (colors.isNight || colors.hour >= 18 || colors.hour < 6) {
+            const mx = W * 0.78;
+            for (let i = 0; i < 8; i++) {
+                const ry = lakeY + 10 + i * 12;
+                const rx = mx + Math.sin(t * 0.7 + i * 0.8) * 4;
+                const rw = 15 - i * 1.2;
+                ctx.beginPath();
+                ctx.ellipse(rx, ry, rw, 1.5, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(200,200,230,${0.12 - i * 0.012})`;
+                ctx.fill();
+            }
+        }
+    }
+    
+    function drawFog() {
+        fog.forEach(f => {
+            f.x += f.speed;
+            if (f.x > W + f.w) f.x = -f.w;
+            
+            const grad = ctx.createRadialGradient(f.x + f.w/2, f.y, 0, f.x + f.w/2, f.y, f.w/2);
+            grad.addColorStop(0, `rgba(140,150,170,${f.opacity * fogDensity})`);
+            grad.addColorStop(0.6, `rgba(100,110,130,${f.opacity * fogDensity * 0.4})`);
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.ellipse(f.x + f.w/2, f.y, f.w/2, f.h/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+    
+    function drawSnow() {
+        if (!snowOn) return;
+        snow.forEach(s => {
+            s.wobble += s.wobbleSpeed;
+            s.x += s.vx + Math.sin(s.wobble) * 0.3;
+            s.y += s.vy;
+            
+            if (s.y > H + 10) { s.y = -10; s.x = Math.random() * W; }
+            if (s.x > W + 10) s.x = -10;
+            if (s.x < -10) s.x = W + 10;
+            
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(220,225,240,${s.opacity})`;
+            ctx.fill();
+        });
+    }
+    
+    function drawCairns() {
+        cairns.forEach((c, i) => {
+            const cx = c.rx * W;
+            const cy = c.ry * H;
+            
+            // Stone stack
+            const baseW = 8;
+            for (let s = 0; s < 4; s++) {
+                const sw = baseW - s * 1.5;
+                const sy = cy - s * 5;
+                ctx.beginPath();
+                ctx.ellipse(cx, sy, sw, 3, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(140,135,125,${0.7 - s * 0.1})`;
+                ctx.fill();
+                ctx.strokeStyle = `rgba(100,95,85,0.4)`;
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+            }
+            
+            // Glow
+            const glow = ctx.createRadialGradient(cx, cy - 10, 0, cx, cy - 10, 20);
+            glow.addColorStop(0, `rgba(180,160,220,${0.15 + Math.sin(t * 1.5 + i) * 0.05})`);
+            glow.addColorStop(1, 'transparent');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(cx, cy - 10, 20, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Name label
+            if (c.name) {
+                ctx.font = '9px "Courier New", monospace';
+                ctx.fillStyle = `rgba(200,200,220,${0.3 + Math.sin(t + i * 2) * 0.1})`;
+                ctx.textAlign = 'center';
+                ctx.fillText(c.name, cx, cy - 24);
+            }
+        });
+    }
+    
+    function checkCairnHover() {
+        const tooltip = document.getElementById('tooltip');
+        let found = false;
+        
+        cairns.forEach(c => {
+            const cx = c.rx * W;
+            const cy = c.ry * H;
+            const dx = mouseX - cx;
+            const dy = mouseY - cy;
+            if (dx*dx + dy*dy < 400) {
+                tooltip.style.display = 'block';
+                tooltip.style.left = (mouseX + 15) + 'px';
+                tooltip.style.top = (mouseY - 10) + 'px';
+                tooltip.querySelector('.ct-name').textContent = c.name || 'Unnamed cairn';
+                tooltip.querySelector('.ct-note').textContent = c.note || '';
+                tooltip.querySelector('.ct-date').textContent = c.date || '';
+                found = true;
+            }
+        });
+        
+        if (!found) tooltip.style.display = 'none';
+    }
+    
+    function updateClock() {
+        const now = new Date();
+        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+        const saigon = new Date(utc + 7 * 3600000);
+        const h = String(saigon.getHours()).padStart(2, '0');
+        const m = String(saigon.getMinutes()).padStart(2, '0');
+        const s = String(saigon.getSeconds()).padStart(2, '0');
+        document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+    }
+    
+    // Quote rotation
+    let currentQuote = 0;
+    function rotateQuote() {
+        currentQuote = (currentQuote + 1) % QUOTES.length;
+        document.getElementById('quote').textContent = QUOTES[currentQuote];
+    }
+    
+    function draw() {
+        t += 0.016;
+        const colors = getTimeColors();
+        
+        ctx.clearRect(0, 0, W, H);
+        
+        drawSky(colors);
+        drawMoon(colors);
+        drawStars(colors);
+        
+        // Draw mountain layers back to front
+        for (let i = 0; i < LAYERS; i++) {
+            drawMountainLayer(mountains[i] || { layer: i }, colors);
+            // Fog between middle layers
+            if (i === 2 || i === 4) drawFog();
+        }
+        
+        drawLake(colors);
+        drawCairns();
+        drawSnow();
+        checkCairnHover();
+        updateClock();
+        
+        requestAnimationFrame(draw);
+    }
+    
+    // Events
+    canvas.addEventListener('click', e => {
+        // Check if clicking near existing cairn
+        let onCairn = false;
+        cairns.forEach(c => {
+            const dx = e.clientX - c.rx * W;
+            const dy = e.clientY - c.ry * H;
+            if (dx*dx + dy*dy < 400) onCairn = true;
+        });
+        if (onCairn) return;
+        
+        // Don't place in sky area or lake
+        if (e.clientY < H * 0.35 || e.clientY > H * 0.82) return;
+        
+        pendingCairn = { rx: e.clientX / W, ry: e.clientY / H };
+        document.getElementById('cairn-panel').style.display = 'block';
+        document.getElementById('cairn-name').value = '';
+        document.getElementById('cairn-note').value = '';
+        document.getElementById('cairn-name').focus();
+    });
+    
+    canvas.addEventListener('mousemove', e => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+    
+    window.addEventListener('wheel', e => {
+        fogDensity = Math.max(0, Math.min(1, fogDensity + e.deltaY * 0.001));
+    });
+    
+    window.addEventListener('keydown', e => {
+        if (e.code === 'Space' && document.getElementById('cairn-panel').style.display !== 'block') {
+            e.preventDefault();
+            snowOn = !snowOn;
+        }
+    });
+    
+    window.saveCairn = function() {
+        if (!pendingCairn) return;
+        const name = document.getElementById('cairn-name').value.trim();
+        const note = document.getElementById('cairn-note').value.trim();
+        const now = new Date();
+        cairns.push({
+            ...pendingCairn,
+            name: name || 'Unnamed',
+            note,
+            date: now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+        });
+        localStorage.setItem(CAIRN_KEY, JSON.stringify(cairns));
+        pendingCairn = null;
+        document.getElementById('cairn-panel').style.display = 'none';
+    };
+    
+    window.cancelCairn = function() {
+        pendingCairn = null;
+        document.getElementById('cairn-panel').style.display = 'none';
+    };
+    
+    // Handle Enter in cairn panel
+    document.getElementById('cairn-name').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cairn-note').focus(); }
+    });
+    document.getElementById('cairn-note').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveCairn(); }
+    });
+    
+    window.addEventListener('resize', resize);
+    resize();
+    
+    // Init quote
+    document.getElementById('quote').textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    setInterval(rotateQuote, 15000);
+    
+    draw();
+    </script>
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Exit Protocol</title>
+<style>
+  :root {
+    --bg: #111; --surface: #1a1a1a; --border: #2a2a2a;
+    --dim: #555; --mid: #888; --text: #ccc; --bright: #eee;
+    --green: #4a9e6a; --amber: #c4944a; --red: #c44a4a; --blue: #4a7a9e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
+  
+  .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
+  
+  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); }
+  .subtitle { font-size: 0.8rem; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+  
+  .phase { border: 1px solid var(--border); margin-bottom: 24px; }
+  .phase-header {
+    padding: 16px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+  }
+  .phase-header:hover { background: var(--surface); }
+  .phase-name { font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; }
+  .phase-status { font-size: 0.7rem; letter-spacing: 0.1em; }
+  .phase-body { padding: 0 20px 20px; display: none; }
+  .phase.open .phase-body { display: block; }
+  .phase.open .phase-header { border-bottom: 1px solid var(--border); }
+  
+  .check-item {
+    display: flex; gap: 12px; padding: 12px 0;
+    border-bottom: 1px solid #1a1a1a;
+    align-items: flex-start;
+  }
+  .check-item:last-child { border-bottom: none; }
+  
+  .checkbox {
+    width: 18px; height: 18px; min-width: 18px;
+    border: 1px solid var(--border); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px; font-size: 0.7rem; color: var(--green);
+  }
+  .checkbox.checked { border-color: var(--green); }
+  
+  .check-text { font-size: 0.85rem; line-height: 1.5; color: var(--text); }
+  .check-text.done { color: var(--dim); text-decoration: line-through; }
+  .check-note { font-size: 0.75rem; color: var(--dim); margin-top: 4px; font-style: italic; }
+  
+  .journal-section { margin-top: 32px; border: 1px solid var(--border); padding: 20px; }
+  .journal-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); margin-bottom: 12px; }
+  
+  textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Courier New', monospace; font-size: 0.85rem;
+    padding: 12px; resize: vertical; min-height: 100px; outline: none;
+  }
+  textarea:focus { border-color: var(--dim); }
+  textarea::placeholder { color: #333; }
+  
+  .btn-row { display: flex; gap: 12px; margin-top: 12px; }
+  button {
+    background: none; border: 1px solid var(--border); color: var(--mid);
+    font-family: 'Courier New', monospace; font-size: 0.75rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 10px 20px; cursor: pointer;
+  }
+  button:hover { border-color: var(--mid); color: var(--bright); }
+  button.save { border-color: var(--green); color: var(--green); }
+  button.save:hover { background: var(--green); color: var(--bg); }
+  
+  .progress-bar { display: flex; height: 4px; gap: 2px; margin: 24px 0; }
+  .progress-seg { flex: 1; height: 100%; background: var(--border); }
+  .progress-seg.done { background: var(--green); }
+  
+  .counter { text-align: center; font-size: 0.75rem; color: var(--dim); margin-bottom: 24px; letter-spacing: 0.1em; }
+  
+  .entries { margin-top: 24px; }
+  .entry { border-left: 2px solid var(--border); padding: 12px 16px; margin-bottom: 12px; }
+  .entry-date { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  .entry-text { font-size: 0.85rem; color: var(--mid); margin-top: 6px; white-space: pre-wrap; }
+  
+  footer { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 40px; font-size: 0.65rem; color: #2a2a2a; text-align: center; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>The Exit Protocol</h1>
+  <div class="subtitle">A structured decompression sequence for leaving a role. Not a celebration. Not a mourning. A checklist for walking through the door correctly.</div>
+</header>
+
+<div class="counter" id="counter">0 / 0 complete</div>
+<div class="progress-bar" id="progress"></div>
+
+<div id="phases"></div>
+
+<div class="journal-section">
+  <div class="journal-label">Exit Journal — Write what you need to write</div>
+  <textarea id="journal-input" placeholder="The building was not broken. It was built for someone else."></textarea>
+  <div class="btn-row">
+    <button onclick="clearJournal()">Clear</button>
+    <button class="save" onclick="saveJournal()">Log Entry →</button>
+  </div>
+  <div class="entries" id="entries"></div>
+</div>
+
+<footer>Prizrak · You leave through the door you came in.</footer>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'exit_protocol_v1';
+const PHASES = [
+  {
+    id: 'immediate',
+    name: 'Phase 1 — Immediate (Day of Exit)',
+    color: 'var(--red)',
+    items: [
+      { id: 'breathe', text: 'Take 10 minutes before doing anything else. Sit with it.', note: 'The adrenaline is not clarity. Wait for it to pass.' },
+      { id: 'tell-one', text: 'Tell one person you trust. Not social media. One person.', note: null },
+      { id: 'no-burn', text: 'Do not send the message you are composing in your head right now.', note: 'You will want to. The message is for you, not for them. Write it in the journal below instead.' },
+      { id: 'logistics', text: 'Handle immediate logistics: access, keys, equipment, handover notes.', note: 'Be thorough. Leave the building better than the story requires.' },
+      { id: 'thank', text: 'Thank the people who helped, even if the institution did not.', note: 'Alvin. Others. The building was wrong; not everyone in it was.' },
+    ]
+  },
+  {
+    id: 'first-week',
+    name: 'Phase 2 — First Week',
+    color: 'var(--amber)',
+    items: [
+      { id: 'no-decisions', text: 'Make no major decisions for 72 hours.', note: 'The relief is real but it distorts the field. Let it settle.' },
+      { id: 'sleep', text: 'Sleep. The body battery has been running on fumes. Let the phosphorylation complete.', note: null },
+      { id: 'inventory', text: 'Write down what you actually learned. Not the narrative — the skills.', note: 'What did you get better at, even if the context was wrong?' },
+      { id: 'identify-pattern', text: 'Name the approval-seeking pattern clearly. Write it down. Keep it visible.', note: 'Not to punish yourself. To recognize it next time it shows up at a door.' },
+      { id: 'finances', text: 'Check your runway. Real numbers, not feelings.', note: 'How many months before you need income? Write the number.' },
+      { id: 'move-body', text: 'Play pickleball. Go hard. The body processes what the mind cannot.', note: null },
+    ]
+  },
+  {
+    id: 'orientation',
+    name: 'Phase 3 — Orientation (Week 2-4)',
+    color: 'var(--blue)',
+    items: [
+      { id: 'what-not-why', text: 'Answer: what do you want to build? Not why. What.', note: 'The "why" can be reconstructed later. The "what" reveals the actual impulse.' },
+      { id: 'anti-approval', text: 'For each option: would you still do this if nobody knew?', note: 'The Approval Mirror test. If the answer is no, it is the wrong door again.' },
+      { id: 'talk-builders', text: 'Talk to people who build things. Not people who evaluate things.', note: 'You said it yourself: you prefer startups. Go where the building happens.' },
+      { id: 'small-ship', text: 'Ship something small. Anything. In the first two weeks.', note: 'The builder identity needs proof of life. Give it something to point at.' },
+      { id: 'no-announce', text: 'Do not announce "what you are doing next" until you have done it for 30 days.', note: 'Announcing is approval-seeking in disguise. Build first. Talk later.' },
+    ]
+  },
+  {
+    id: 'structure',
+    name: 'Phase 4 — New Structure',
+    color: 'var(--green)',
+    items: [
+      { id: 'routine', text: 'Build a daily structure that is yours, not borrowed from an institution.', note: 'Wake time, work blocks, movement, shutdown. The panelák had a grid. You need one too.' },
+      { id: 'review', text: 'Set a 90-day review with yourself. Calendar it now.', note: 'Am I building what I said I would? Am I happier? Is the approval pattern back?' },
+      { id: 'accept', text: 'Accept that CoderSchool ended and that it does not define what comes next.', note: 'The building fell. The architect survived. The next building does not have to look like the last one.' },
+    ]
+  }
+];
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function render() {
+  const state = loadState();
+  const checks = state.checks || {};
+  const phasesEl = document.getElementById('phases');
+  
+  let totalItems = 0, doneItems = 0;
+  
+  phasesEl.innerHTML = PHASES.map(phase => {
+    const itemsHtml = phase.items.map(item => {
+      totalItems++;
+      const done = checks[item.id] || false;
+      if (done) doneItems++;
+      return `
+        <div class="check-item">
+          <div class="checkbox ${done ? 'checked' : ''}" onclick="toggleCheck('${item.id}')">${done ? '✓' : ''}</div>
+          <div>
+            <div class="check-text ${done ? 'done' : ''}">${item.text}</div>
+            ${item.note ? `<div class="check-note">${item.note}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    const phaseOpen = state['phase_' + phase.id] !== false;
+    return `
+      <div class="phase ${phaseOpen ? 'open' : ''}" id="phase-${phase.id}">
+        <div class="phase-header" onclick="togglePhase('${phase.id}')" style="border-left: 3px solid ${phase.color}">
+          <span class="phase-name">${phase.name}</span>
+          <span class="phase-status">${phaseOpen ? '▼' : '▶'}</span>
+        </div>
+        <div class="phase-body">${itemsHtml}</div>
+      </div>
+    `;
+  }).join('');
+  
+  document.getElementById('counter').textContent = `${doneItems} / ${totalItems} complete`;
+  
+  const progressEl = document.getElementById('progress');
+  progressEl.innerHTML = '';
+  let idx = 0;
+  PHASES.forEach(phase => {
+    phase.items.forEach(item => {
+      const seg = document.createElement('div');
+      seg.className = 'progress-seg' + (checks[item.id] ? ' done' : '');
+      progressEl.appendChild(seg);
+    });
+  });
+  
+  renderEntries();
+}
+
+function toggleCheck(id) {
+  const state = loadState();
+  if (!state.checks) state.checks = {};
+  state.checks[id] = !state.checks[id];
+  saveState(state);
+  render();
+}
+
+function togglePhase(id) {
+  const state = loadState();
+  state['phase_' + id] = state['phase_' + id] === false;
+  saveState(state);
+  render();
+}
+
+function saveJournal() {
+  const input = document.getElementById('journal-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const state = loadState();
+  if (!state.entries) state.entries = [];
+  state.entries.unshift({
+    date: new Date().toLocaleDateString('en-CA') + ' ' + new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}),
+    text
+  });
+  saveState(state);
+  input.value = '';
+  renderEntries();
+}
+
+function clearJournal() { document.getElementById('journal-input').value = ''; }
+
+function renderEntries() {
+  const state = loadState();
+  const entries = state.entries || [];
+  const el = document.getElementById('entries');
+  el.innerHTML = entries.map(e => `
+    <div class="entry">
+      <div class="entry-date">${e.date}</div>
+      <div class="entry-text">${e.text}</div>
+    </div>
+  `).join('');
+}
+
+render();
+</script>
+</body>
+</html>

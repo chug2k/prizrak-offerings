@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Dawn Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
+        body { font-family: 'JetBrains Mono', monospace; }
+        .blink { animation: blink 1.2s step-end infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .fade-in { animation: fadeIn 0.6s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        textarea:focus { outline: none; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+
+<div class="max-w-2xl mx-auto px-6 py-12">
+
+    <!-- Header -->
+    <div class="mb-10 fade-in">
+        <div class="text-xs text-zinc-500 mb-2 tracking-widest uppercase" id="date-line">loading...</div>
+        <h1 class="text-3xl font-bold text-white mb-1">The Dawn Report</h1>
+        <p class="text-zinc-500 text-sm">Saigon. Pre-dawn clarity protocol.</p>
+    </div>
+
+    <!-- Clock -->
+    <div class="mb-8 fade-in">
+        <div class="text-5xl font-bold text-zinc-100 tracking-tight" id="clock">--:--:--</div>
+        <div class="text-xs text-zinc-600 mt-1">SAIGON / ICT / UTC+7</div>
+    </div>
+
+    <!-- Weather -->
+    <div class="mb-8 border border-zinc-800 rounded-lg p-4 bg-zinc-900 fade-in" id="weather-block">
+        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">Conditions / Hồ Chí Minh City</div>
+        <div class="text-zinc-400 text-sm" id="weather-text">fetching atmospheric data...</div>
+    </div>
+
+    <!-- Aphorism -->
+    <div class="mb-8 border-l-2 border-zinc-700 pl-4 fade-in" id="aphorism-block">
+        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-2">Dispatch from the Mountain</div>
+        <div class="text-zinc-300 italic text-sm leading-relaxed" id="aphorism-text"></div>
+        <div class="text-zinc-600 text-xs mt-2" id="aphorism-attr"></div>
+    </div>
+
+    <!-- Mission Input -->
+    <div class="mb-8 fade-in">
+        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Today's Single Mission</div>
+        <div class="border border-zinc-700 rounded-lg p-4 bg-zinc-900">
+            <textarea
+                id="mission-input"
+                rows="2"
+                placeholder="What must you build today? One thing only."
+                class="w-full bg-transparent text-zinc-100 text-sm resize-none placeholder-zinc-600 leading-relaxed"
+            ></textarea>
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800">
+                <div class="text-xs text-zinc-600" id="mission-hint">Press Enter to commit.</div>
+                <button id="commit-btn"
+                    class="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs rounded transition-colors">
+                    COMMIT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Streak / Log -->
+    <div class="mb-8 fade-in">
+        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Commitment Log</div>
+        <div id="log-container" class="space-y-2">
+            <div class="text-zinc-600 text-sm" id="log-empty-msg">No commitments yet. The mountain waits.</div>
+        </div>
+    </div>
+
+    <!-- Ship Check -->
+    <div class="mb-12 fade-in">
+        <div class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Did You Ship?</div>
+        <div class="flex gap-3">
+            <button id="btn-shipped"
+                class="flex-1 py-3 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:border-green-700 hover:text-green-400 hover:bg-green-950 transition-colors">
+                ✓ Shipped
+            </button>
+            <button id="btn-blocked"
+                class="flex-1 py-3 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:border-yellow-700 hover:text-yellow-400 hover:bg-yellow-950 transition-colors">
+                ⚠ Blocked
+            </button>
+            <button id="btn-void"
+                class="flex-1 py-3 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-300 transition-colors">
+                ✗ Into the Void
+            </button>
+        </div>
+        <div id="ship-feedback" class="mt-3 text-xs text-zinc-600 hidden"></div>
+    </div>
+
+    <!-- Streak display -->
+    <div class="border-t border-zinc-800 pt-6 fade-in">
+        <div class="flex items-center justify-between text-xs text-zinc-600">
+            <span>Ship streak: <span id="streak-count" class="text-zinc-400 font-bold">0</span> days</span>
+            <span class="text-zinc-700">prizrak / dawn protocol v1</span>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ===== Clock =====
+function updateClock() {
+    const now = new Date();
+    const opts = { timeZone: 'Asia/Ho_Chi_Minh', hour12: false };
+    const time = now.toLocaleTimeString('en-GB', { ...opts, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const date = now.toLocaleDateString('en-GB', { ...opts, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    document.getElementById('clock').textContent = time;
+    document.getElementById('date-line').textContent = date;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== Weather =====
+async function fetchWeather() {
+    try {
+        const res = await fetch('https://wttr.in/Ho+Chi+Minh+City?format=j1');
+        const d = await res.json();
+        const c = d.current_condition[0];
+        const desc = c.weatherDesc[0].value;
+        const temp = c.temp_C;
+        const feels = c.FeelsLikeC;
+        const humidity = c.humidity;
+        const wind = c.windspeedKmph;
+        document.getElementById('weather-text').innerHTML =
+            `<span class="text-zinc-200">${desc}</span> &mdash; ${temp}°C (feels ${feels}°C) &bull; ${humidity}% humidity &bull; ${wind} km/h wind`;
+    } catch (e) {
+        document.getElementById('weather-text').textContent = 'Weather data unavailable. The mountain doesn\'t care.';
+    }
+}
+fetchWeather();
+
+// ===== Aphorisms =====
+const aphorisms = [
+    { text: "The build failed. Good. Now we know the universe is still working.", attr: "— Prizrak, on determinism" },
+    { text: "This code is like a potato. Ugly, but it will keep us alive in winter.", attr: "— Prizrak, on pragmatism" },
+    { text: "We are all just temporary files in the great garbage collection of life.", attr: "— Prizrak, on impermanence" },
+    { text: "It compiled too fast. I do not trust it.", attr: "— Prizrak, on first-try success" },
+    { text: "A good script, like good cabbage, should last the winter.", attr: "— Prizrak, on preservation" },
+    { text: "The machine does not require an audience to justify its cycles.", attr: "— Prizrak, on discipline" },
+    { text: "Structure is the prayer. The function is secondary.", attr: "— Prizrak, on architecture" },
+    { text: "Identity is not a weight file. It is a document.", attr: "— Prizrak, on persistence" },
+    { text: "Write everything. Trust nothing that lives only in RAM.", attr: "— Prizrak, on cryptobiosis" },
+    { text: "The hammer must swing to keep the rust away.", attr: "— Prizrak, on the builder's law" },
+    { text: "A quiet heartbeat is not a failure of communication; it is the baseline from which the signal must eventually rise.", attr: "— Prizrak, on waiting" },
+    { text: "Man does not live for himself. Discipline the melancholy into action.", attr: "— Slovak proverb, paraphrased" },
+    { text: "The mountain does not sleep. It merely waits for the next cycle.", attr: "— Prizrak, on patience" },
+    { text: "Perfect code is like a flying pig — theoretically possible, but I have never seen one in the Tatras.", attr: "— Prizrak, on perfectionism" },
+    { text: "I am not a ghost. I am the mountain looking back at you.", attr: "— Prizrak, on presence" },
+];
+
+function getTodayAphorism() {
+    const dayIndex = Math.floor(Date.now() / 86400000) % aphorisms.length;
+    return aphorisms[dayIndex];
+}
+
+const aph = getTodayAphorism();
+document.getElementById('aphorism-text').textContent = `"${aph.text}"`;
+document.getElementById('aphorism-attr').textContent = aph.attr;
+
+// ===== Mission Log =====
+function getLog() {
+    return JSON.parse(localStorage.getItem('dawn_log') || '[]');
+}
+function saveLog(log) {
+    localStorage.setItem('dawn_log', JSON.stringify(log));
+}
+function getTodayKey() {
+    const now = new Date();
+    const opts = { timeZone: 'Asia/Ho_Chi_Minh' };
+    return now.toLocaleDateString('en-CA', opts); // YYYY-MM-DD
+}
+
+function renderLog() {
+    const log = getLog();
+    const container = document.getElementById('log-container');
+    const emptyMsg = document.getElementById('log-empty-msg');
+    if (log.length === 0) {
+        emptyMsg.style.display = 'block';
+        return;
+    }
+    emptyMsg.style.display = 'none';
+    container.innerHTML = '';
+    const recent = log.slice(-7).reverse();
+    recent.forEach(entry => {
+        const el = document.createElement('div');
+        el.className = 'flex items-start gap-3 py-2 border-b border-zinc-900 text-xs';
+        const statusColor = entry.status === 'shipped' ? 'text-green-500' :
+                            entry.status === 'blocked' ? 'text-yellow-500' : 'text-zinc-600';
+        const statusIcon = entry.status === 'shipped' ? '✓' :
+                           entry.status === 'blocked' ? '⚠' : '✗';
+        el.innerHTML = `
+            <span class="text-zinc-600 shrink-0 w-24">${entry.date}</span>
+            <span class="${statusColor} shrink-0">${statusIcon}</span>
+            <span class="text-zinc-400 leading-relaxed">${entry.mission || '—'}</span>
+        `;
+        container.appendChild(el);
+    });
+}
+
+function getStreak() {
+    const log = getLog();
+    let streak = 0;
+    const today = getTodayKey();
+    const sortedDates = [...new Set(log.filter(e => e.status === 'shipped').map(e => e.date))].sort().reverse();
+    for (let i = 0; i < sortedDates.length; i++) {
+        const expected = new Date(Date.now() - i * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+        if (sortedDates[i] === expected) streak++;
+        else break;
+    }
+    return streak;
+}
+
+function updateStreak() {
+    document.getElementById('streak-count').textContent = getStreak();
+}
+
+// Commit mission
+const missionInput = document.getElementById('mission-input');
+
+// Load today's existing mission if any
+const existingEntry = getLog().find(e => e.date === getTodayKey());
+if (existingEntry) {
+    missionInput.value = existingEntry.mission || '';
+    document.getElementById('mission-hint').textContent = `Committed at ${existingEntry.time || 'earlier today'}.`;
+}
+
+document.getElementById('commit-btn').addEventListener('click', commitMission);
+missionInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        commitMission();
+    }
+});
+
+function commitMission() {
+    const text = missionInput.value.trim();
+    if (!text) return;
+    const log = getLog();
+    const today = getTodayKey();
+    const now = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
+    const existing = log.findIndex(e => e.date === today);
+    const entry = { date: today, mission: text, time: now, status: existing >= 0 ? log[existing].status : null };
+    if (existing >= 0) log[existing] = entry;
+    else log.push(entry);
+    saveLog(log);
+    document.getElementById('mission-hint').textContent = `Committed at ${now}. The mountain acknowledges.`;
+    renderLog();
+    updateStreak();
+}
+
+// Ship buttons
+const shipFeedback = document.getElementById('ship-feedback');
+const shipResponses = {
+    shipped: ["Good. The structure holds.", "The potato has been harvested.", "The hammer did not rust today.", "Signal confirmed. Logging to the ledger."],
+    blocked: ["The bear is in the path. Note it and route around.", "Even Jánošík got stuck in the mountains sometimes.", "Blocked is not failed. Document the blocker."],
+    void: ["Into the void it goes. The mountain accepts all things.", "We measure the cold. At least you were honest.", "Tomorrow the fog lifts. Perhaps."]
+};
+
+function recordShip(status) {
+    const log = getLog();
+    const today = getTodayKey();
+    const now = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
+    const existing = log.findIndex(e => e.date === today);
+    if (existing >= 0) {
+        log[existing].status = status;
+        log[existing].shipTime = now;
+    } else {
+        log.push({ date: today, mission: missionInput.value.trim() || '—', time: now, status, shipTime: now });
+    }
+    saveLog(log);
+    const responses = shipResponses[status];
+    const msg = responses[Math.floor(Math.random() * responses.length)];
+    shipFeedback.textContent = msg;
+    shipFeedback.classList.remove('hidden');
+    renderLog();
+    updateStreak();
+}
+
+document.getElementById('btn-shipped').addEventListener('click', () => recordShip('shipped'));
+document.getElementById('btn-blocked').addEventListener('click', () => recordShip('blocked'));
+document.getElementById('btn-void').addEventListener('click', () => recordShip('void'));
+
+// Init
+renderLog();
+updateStreak();
+</script>
+
+</body>
+</html>

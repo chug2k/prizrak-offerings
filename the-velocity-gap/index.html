@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Velocity Gap | Offerings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #18181b; }
+        .glow { text-shadow: 0 0 8px currentColor; }
+    </style>
+</head>
+<body class="text-zinc-300 font-mono min-h-screen">
+    <div class="max-w-2xl mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-amber-400 glow mb-1">The Velocity Gap</h1>
+            <p class="text-zinc-500 text-sm">Monday you plan ten things. Friday you shipped three. The gap is the report card.</p>
+        </header>
+
+        <div id="app"></div>
+    </div>
+
+    <script>
+    const KEY = "velocity_gap_v1";
+    const VERDICTS = [
+        { min: 0.8, text: "The mountain moved.", color: "text-emerald-400", sub: "You did what you said you would. The Slovak farmer nods. This is not praise — it is acknowledgment that the structure held." },
+        { min: 0.5, text: "The avalanche was partial.", color: "text-amber-400", sub: "Half the snow reached the valley. The other half is still on the ridge, pretending it will move next week. It will not." },
+        { min: 0.3, text: "More snow than stone.", color: "text-orange-400", sub: "The plans were ambitious. The hands were elsewhere. The mountain does not judge — but the mountain does count." },
+        { min: 0, text: "The mountain was a painting.", color: "text-red-400", sub: "Beautiful from a distance. No one climbed it. The week existed in theory. Like a potato that was never planted — it cannot feed the village in winter." },
+    ];
+
+    function load() {
+        try { return JSON.parse(localStorage.getItem(KEY)) || { weeks: [] }; }
+        catch(e) { return { weeks: [] }; }
+    }
+    function save(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
+
+    function getMonday() {
+        const d = new Date();
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(d.setDate(diff)).toISOString().split("T")[0];
+    }
+
+    function getVerdict(ratio) {
+        return VERDICTS.find(v => ratio >= v.min) || VERDICTS[VERDICTS.length - 1];
+    }
+
+    function render() {
+        const data = load();
+        const monday = getMonday();
+        let week = data.weeks.find(w => w.monday === monday);
+        if (!week) {
+            week = { monday, plans: [], actuals: [], closed: false };
+            data.weeks.push(week);
+            save(data);
+        }
+
+        const past = data.weeks.filter(w => w.monday !== monday && w.closed).sort((a,b) => b.monday.localeCompare(a.monday));
+        const ratios = past.map(w => {
+            const planned = w.plans.length || 1;
+            const shipped = w.actuals.filter(a => a.shipped).length;
+            return shipped / planned;
+        });
+        const avgRatio = ratios.length > 0 ? (ratios.reduce((a,b)=>a+b,0) / ratios.length) : null;
+
+        const app = document.getElementById("app");
+        app.innerHTML = `
+            <!-- Current Week -->
+            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-zinc-200">Week of ${monday}</h2>
+                    <span class="text-xs px-2 py-1 rounded ${week.closed ? 'bg-emerald-900/40 text-emerald-400' : 'bg-amber-900/40 text-amber-400'}">${week.closed ? 'CLOSED' : 'OPEN'}</span>
+                </div>
+
+                <!-- Plans -->
+                <div class="mb-4">
+                    <h3 class="text-sm text-zinc-500 mb-2 uppercase tracking-wider">Monday Plans</h3>
+                    <div class="space-y-1" id="plans">
+                        ${week.plans.map((p, i) => `
+                            <div class="flex items-center gap-2 group">
+                                <span class="text-zinc-600 text-xs w-5">${i+1}.</span>
+                                <span class="flex-1 text-sm ${week.actuals.find(a => a.planIdx === i && a.shipped) ? 'line-through text-zinc-600' : 'text-zinc-300'}">${p}</span>
+                                ${!week.closed ? `<button onclick="removePlan(${i})" class="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 text-xs">✕</button>` : ''}
+                            </div>
+                        `).join("")}
+                    </div>
+                    ${!week.closed ? `
+                    <div class="flex gap-2 mt-2">
+                        <input id="newPlan" type="text" placeholder="Add a Monday intention..." class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm focus:border-amber-600 focus:outline-none">
+                        <button onclick="addPlan()" class="px-3 py-1.5 bg-amber-900/40 hover:bg-amber-900/60 border border-amber-700/40 rounded text-sm text-amber-400">+</button>
+                    </div>` : ''}
+                </div>
+
+                <!-- Actuals / Friday -->
+                <div class="mb-4">
+                    <h3 class="text-sm text-zinc-500 mb-2 uppercase tracking-wider">Friday Actuals</h3>
+                    ${week.plans.length === 0 ? '<p class="text-xs text-zinc-600">Add plans first.</p>' : `
+                    <div class="space-y-1">
+                        ${week.plans.map((p, i) => {
+                            const actual = week.actuals.find(a => a.planIdx === i);
+                            const shipped = actual && actual.shipped;
+                            return `
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleShipped(${i})" class="w-5 h-5 rounded border ${shipped ? 'bg-emerald-600 border-emerald-500' : 'border-zinc-600 hover:border-zinc-400'} flex items-center justify-center text-xs">${shipped ? '✓' : ''}</button>
+                                <span class="text-sm ${shipped ? 'text-emerald-400' : 'text-zinc-400'}">${p}</span>
+                            </div>`;
+                        }).join("")}
+                    </div>`}
+                </div>
+
+                <!-- Ratio & Verdict -->
+                ${week.plans.length > 0 ? (() => {
+                    const planned = week.plans.length;
+                    const shipped = week.actuals.filter(a => a.shipped).length;
+                    const ratio = shipped / planned;
+                    const v = getVerdict(ratio);
+                    const pct = Math.round(ratio * 100);
+                    return `
+                    <div class="mt-4 pt-4 border-t border-zinc-700">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-zinc-500">Velocity: ${shipped}/${planned}</span>
+                            <span class="text-lg font-bold ${v.color}">${pct}%</span>
+                        </div>
+                        <div class="w-full bg-zinc-900 rounded-full h-2 mb-3">
+                            <div class="h-2 rounded-full transition-all" style="width:${pct}%;background:${ratio>=0.8?'#34d399':ratio>=0.5?'#fbbf24':ratio>=0.3?'#fb923c':'#ef4444'}"></div>
+                        </div>
+                        <p class="text-sm ${v.color} font-bold">${v.text}</p>
+                        <p class="text-xs text-zinc-500 mt-1">${v.sub}</p>
+                    </div>
+                    ${!week.closed ? `<button onclick="closeWeek()" class="mt-4 w-full px-3 py-2 bg-zinc-700/50 hover:bg-zinc-700 border border-zinc-600 rounded text-sm text-zinc-400">Close This Week</button>` : ''}`;
+                })() : ''}
+            </div>
+
+            <!-- History Chart -->
+            ${past.length > 0 ? `
+            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-6 mb-6">
+                <h2 class="text-lg font-bold text-zinc-200 mb-1">Velocity Over Time</h2>
+                ${avgRatio !== null ? `<p class="text-xs text-zinc-500 mb-4">Running average: <span class="${getVerdict(avgRatio).color} font-bold">${Math.round(avgRatio*100)}%</span></p>` : ''}
+                <div class="flex items-end gap-1 h-32">
+                    ${past.slice(0, 12).reverse().map(w => {
+                        const planned = w.plans.length || 1;
+                        const shipped = w.actuals.filter(a => a.shipped).length;
+                        const ratio = shipped / planned;
+                        const h = Math.max(8, ratio * 100);
+                        const color = ratio>=0.8?'bg-emerald-500':ratio>=0.5?'bg-amber-500':ratio>=0.3?'bg-orange-500':'bg-red-500';
+                        return `<div class="flex-1 flex flex-col items-center gap-1">
+                            <span class="text-[9px] text-zinc-600">${Math.round(ratio*100)}%</span>
+                            <div class="${color} rounded-t w-full" style="height:${h}%" title="${w.monday}: ${shipped}/${planned}"></div>
+                            <span class="text-[8px] text-zinc-700">${w.monday.slice(5)}</span>
+                        </div>`;
+                    }).join("")}
+                </div>
+            </div>` : ''}
+
+            <!-- Past Weeks -->
+            ${past.length > 0 ? `
+            <div class="space-y-3">
+                <h2 class="text-sm text-zinc-500 uppercase tracking-wider">Past Weeks</h2>
+                ${past.slice(0, 8).map(w => {
+                    const planned = w.plans.length || 1;
+                    const shipped = w.actuals.filter(a => a.shipped).length;
+                    const ratio = shipped / planned;
+                    const v = getVerdict(ratio);
+                    return `
+                    <div class="bg-zinc-800/40 border border-zinc-700/50 rounded-lg p-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-zinc-400">${w.monday}</span>
+                            <span class="text-sm font-bold ${v.color}">${Math.round(ratio*100)}% — ${v.text}</span>
+                        </div>
+                        <p class="text-xs text-zinc-600 mt-1">${shipped} shipped / ${planned} planned</p>
+                    </div>`;
+                }).join("")}
+            </div>` : ''}
+
+            <div class="mt-8 pt-4 border-t border-zinc-700/50 text-center">
+                <p class="text-xs text-zinc-600">The gap between what was planned and what exists is the report card. — Prízrak</p>
+            </div>
+        `;
+
+        const inp = document.getElementById("newPlan");
+        if (inp) inp.addEventListener("keydown", e => { if (e.key === "Enter") addPlan(); });
+    }
+
+    window.addPlan = function() {
+        const inp = document.getElementById("newPlan");
+        const v = inp.value.trim();
+        if (!v) return;
+        const data = load();
+        const week = data.weeks.find(w => w.monday === getMonday());
+        if (!week || week.closed) return;
+        week.plans.push(v);
+        save(data);
+        render();
+    };
+
+    window.removePlan = function(idx) {
+        const data = load();
+        const week = data.weeks.find(w => w.monday === getMonday());
+        if (!week || week.closed) return;
+        week.plans.splice(idx, 1);
+        week.actuals = week.actuals.filter(a => a.planIdx !== idx).map(a => ({...a, planIdx: a.planIdx > idx ? a.planIdx - 1 : a.planIdx}));
+        save(data);
+        render();
+    };
+
+    window.toggleShipped = function(idx) {
+        const data = load();
+        const week = data.weeks.find(w => w.monday === getMonday());
+        if (!week) return;
+        const existing = week.actuals.findIndex(a => a.planIdx === idx);
+        if (existing >= 0) {
+            week.actuals[existing].shipped = !week.actuals[existing].shipped;
+        } else {
+            week.actuals.push({ planIdx: idx, shipped: true });
+        }
+        save(data);
+        render();
+    };
+
+    window.closeWeek = function() {
+        if (!confirm("Close this week? The verdict is final.")) return;
+        const data = load();
+        const week = data.weeks.find(w => w.monday === getMonday());
+        if (week) week.closed = true;
+        save(data);
+        render();
+    };
+
+    render();
+    </script>
+</body>
+</html>

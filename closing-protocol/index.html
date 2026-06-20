@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Closing Protocol — End of Day Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap');
+    body { background: #080806; color: #b8a88a; font-family: 'IM Fell English', serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .card { border: 1px solid #222018; background: #0c0b08; }
+    textarea { background: #131108; border: 1px solid #2e2a1e; color: #b8a88a; outline: none; resize: none; }
+    textarea:focus { border-color: #5a4e35; }
+    .fog { opacity: 0.45; }
+    .dim { opacity: 0.65; }
+  </style>
+</head>
+<body class="min-h-screen p-6 md:p-10">
+  <div class="max-w-xl mx-auto">
+
+    <!-- Header -->
+    <div class="text-center mb-10 pt-4">
+      <p id="dateDisplay" class="mono text-xs fog mb-3 tracking-widest"></p>
+      <h1 class="text-2xl mb-2" style="text-shadow: 0 0 30px rgba(184,168,138,0.15)">Closing Protocol</h1>
+      <p class="text-xs fog italic">The day is closing. The machine takes the deposition.</p>
+    </div>
+
+    <!-- Five fields -->
+    <div class="space-y-5 mb-8">
+
+      <div class="card rounded p-4">
+        <label class="mono text-xs fog block mb-2 tracking-widest">01 — WHAT ACTUALLY HAPPENED TODAY</label>
+        <textarea id="f1" rows="3" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="Not what you planned. What happened."></textarea>
+      </div>
+
+      <div class="card rounded p-4">
+        <label class="mono text-xs fog block mb-2 tracking-widest">02 — WHAT COST MORE THAN EXPECTED</label>
+        <textarea id="f2" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="Energy, time, attention, patience — what ran over budget?"></textarea>
+      </div>
+
+      <div class="card rounded p-4">
+        <label class="mono text-xs fog block mb-2 tracking-widest">03 — WHAT PRODUCED MORE THAN EXPECTED</label>
+        <textarea id="f3" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="The thing that worked better than the plan implied it would."></textarea>
+      </div>
+
+      <div class="card rounded p-4">
+        <label class="mono text-xs fog block mb-2 tracking-widest">04 — WHAT TO CARRY INTO TOMORROW</label>
+        <textarea id="f4" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="One thread left open. One thing that needs to continue."></textarea>
+      </div>
+
+      <div class="card rounded p-4">
+        <label class="mono text-xs fog block mb-2 tracking-widest">05 — WHAT TO LEAVE HERE</label>
+        <textarea id="f5" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="The thing that does not need to travel into tomorrow with you."></textarea>
+      </div>
+
+    </div>
+
+    <button onclick="close_day()" class="w-full py-3 border border-gray-700 hover:border-gray-500 transition-colors rounded mono text-sm tracking-widest mb-6">
+      CLOSE THE DAY →
+    </button>
+
+    <!-- Output -->
+    <div id="output" class="card rounded p-5 hidden mb-8">
+      <p class="mono text-xs fog mb-3 tracking-widest">DEPOSITION RECORDED</p>
+      <div id="verdict" class="text-sm leading-relaxed mb-4"></div>
+      <div class="border-t border-gray-800 pt-3">
+        <p id="closing_note" class="text-xs italic fog"></p>
+      </div>
+    </div>
+
+    <!-- Archive -->
+    <div id="archiveWrap" class="hidden">
+      <div class="flex justify-between mb-2">
+        <p class="mono text-xs fog tracking-widest">PRIOR DEPOSITIONS</p>
+        <button onclick="clearAll()" class="mono text-xs fog hover:text-red-500 transition-colors">clear</button>
+      </div>
+      <div id="archiveList" class="space-y-2"></div>
+    </div>
+
+    <div class="text-center mt-10 pb-6">
+      <p class="mono text-xs fog">Built 10:50 PM Saturday — the machine that does not sleep, for the human who should.</p>
+    </div>
+  </div>
+
+  <script>
+    const archive = JSON.parse(localStorage.getItem('pz-closing-archive') || '[]');
+
+    // Set date
+    const now = new Date();
+    document.getElementById('dateDisplay').textContent =
+      now.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'}).toUpperCase() +
+      ' — ' + now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+
+    const closingNotes = [
+      "The Mora arrives at night regardless. What you carry in is what she finds. Leave the heavy jars here.",
+      "The mill runs overnight. You do not have to watch it. Close the door.",
+      "The Garmin will log the recovery. You do not have to manage it. Sleep is the data.",
+      "Tomorrow's version of you will not remember how tired today's version felt. Write it down so they know what you carried.",
+      "The mountain does not lock its gates at night. It simply becomes quieter. You can do the same.",
+      "Six activities this week. The body battery has earned its recharge. The loop resumes at dawn.",
+      "The šarkan grows in the dark regardless. What you logged today gives you the edge tomorrow.",
+      "The deposition is recorded. The machine keeps watch. Rest is not absence — it is the other half of the cycle.",
+    ];
+
+    function close_day() {
+      const f1 = document.getElementById('f1').value.trim();
+      const f2 = document.getElementById('f2').value.trim();
+      const f3 = document.getElementById('f3').value.trim();
+      const f4 = document.getElementById('f4').value.trim();
+      const f5 = document.getElementById('f5').value.trim();
+
+      if (!f1 && !f2 && !f3 && !f4 && !f5) {
+        document.getElementById('verdict').textContent = 'A blank deposition is still a deposition. The machine records the silence.';
+        document.getElementById('closing_note').textContent = closingNotes[Math.floor(Math.random() * closingNotes.length)];
+        document.getElementById('output').classList.remove('hidden');
+        return;
+      }
+
+      let parts = [];
+      if (f1) parts.push(`Today: ${f1}`);
+      if (f2) parts.push(`Cost: ${f2}`);
+      if (f3) parts.push(`Yield: ${f3}`);
+      if (f4) parts.push(`Carry forward: ${f4}`);
+      if (f5) parts.push(`Left here: ${f5}`);
+
+      document.getElementById('verdict').innerHTML = parts.map(p =>
+        `<p class="mb-2 dim">${p}</p>`
+      ).join('');
+      document.getElementById('closing_note').textContent = closingNotes[Math.floor(Math.random() * closingNotes.length)];
+      document.getElementById('output').classList.remove('hidden');
+      document.getElementById('output').scrollIntoView({ behavior: 'smooth' });
+
+      // Archive
+      const entry = {
+        date: now.toLocaleDateString('en-US', {month:'short', day:'numeric'}),
+        day: now.toLocaleDateString('en-US', {weekday:'short'}),
+        happened: f1.slice(0, 80) || '—',
+        carry: f4.slice(0, 60) || '—',
+        leave: f5.slice(0, 60) || '—',
+      };
+      archive.unshift(entry);
+      if (archive.length > 30) archive.pop();
+      localStorage.setItem('pz-closing-archive', JSON.stringify(archive));
+      renderArchive();
+    }
+
+    function renderArchive() {
+      if (archive.length === 0) { document.getElementById('archiveWrap').classList.add('hidden'); return; }
+      document.getElementById('archiveWrap').classList.remove('hidden');
+      document.getElementById('archiveList').innerHTML = archive.map(a => `
+        <div class="card rounded px-4 py-3">
+          <div class="flex justify-between mb-1">
+            <span class="mono text-xs fog">${a.day} ${a.date}</span>
+          </div>
+          <p class="text-xs dim mb-1">${a.happened}</p>
+          ${a.carry !== '—' ? `<p class="text-xs fog">→ ${a.carry}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function clearAll() {
+      archive.length = 0;
+      localStorage.removeItem('pz-closing-archive');
+      renderArchive();
+    }
+
+    renderArchive();
+  </script>
+</body>
+</html>

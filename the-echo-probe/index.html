@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Echo Probe | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #18181b; }
+        .glass { background: rgba(24, 24, 27, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(63, 63, 70, 0.4); }
+        input[type="range"] { accent-color: #8b5cf6; }
+    </style>
+</head>
+<body class="text-zinc-300 font-sans antialiased min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-2xl w-full glass rounded-2xl shadow-2xl p-8">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-white mb-2">The Echo Probe</h1>
+            <p class="text-zinc-500 text-sm italic">Verify the signal. Silence the echo.</p>
+        </header>
+
+        <div id="input-form" class="space-y-6">
+            <div>
+                <label class="block text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">The Core Belief / Strategy</label>
+                <textarea id="belief" rows="3" class="w-full bg-zinc-900/50 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200 focus:outline-none focus:border-violet-500 transition-colors resize-none" placeholder="What do you currently assume to be true?"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">The Strongest Counter-Evidence</label>
+                <textarea id="counter" rows="3" class="w-full bg-zinc-900/50 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200 focus:outline-none focus:border-violet-500 transition-colors resize-none" placeholder="What is the most uncomfortable truth that contradicts this?"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-xs font-mono uppercase tracking-wider text-zinc-500">Internal Confidence</label>
+                        <span id="conf-val" class="text-xs text-violet-400 font-mono">50%</span>
+                    </div>
+                    <input type="range" id="confidence" min="0" max="100" value="50" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-xs font-mono uppercase tracking-wider text-zinc-500">Counterweight</label>
+                        <span id="counter-val" class="text-xs text-rose-400 font-mono">50%</span>
+                    </div>
+                    <input type="range" id="counterweight" min="0" max="100" value="50" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+
+            <button onclick="probe()" class="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold py-3 rounded-lg transition-all transform active:scale-95 shadow-lg">
+                Run Probe
+            </button>
+        </div>
+
+        <div id="results" class="hidden space-y-8 animate-in fade-in duration-500">
+            <div class="text-center border-b border-zinc-800 pb-6">
+                <div class="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Echo Intensity</div>
+                <div id="echo-score" class="text-6xl font-bold text-white">0%</div>
+                <p id="verdict" class="text-sm text-zinc-400 mt-2 italic"></p>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="text-xs font-mono uppercase tracking-wider text-zinc-500">The Diagnostic</h3>
+                <div id="diagnostic" class="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 text-sm leading-relaxed">
+                </div>
+            </div>
+
+            <button onclick="reset()" class="w-full py-2 text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors">
+                ← Back to Input
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const confidenceInput = document.getElementById('confidence');
+        const counterweightInput = document.getElementById('counterweight');
+        const confVal = document.getElementById('conf-val');
+        const counterVal = document.getElementById('counter-val');
+
+        confidenceInput.oninput = () => confVal.innerText = confidenceInput.value + '%';
+        counterweightInput.oninput = () => counterVal.innerText = counterweightInput.value + '%';
+
+        function probe() {
+            const belief = document.getElementById('belief').value;
+            const counter = document.getElementById('counter').value;
+
+            if (!belief || !counter) {
+                alert("Please fill in both the belief and the counter-evidence.");
+                return;
+            }
+
+            const c = parseInt(confidenceInput.value);
+            const w = parseInt(counterweightInput.value);
+
+            // Formula: E = C / (C + W)
+            // If c=100, w=0 -> E = 1 (Echo chamber)
+            // If c=0, w=100 -> E = 0 (Reality)
+            // To avoid division by zero:
+            let echoScore = 0;
+            if (c + w === 0) {
+                echoScore = 50; // Neutral
+            } else {
+                echoScore = (c / (c + w)) * 100;
+            }
+
+            document.getElementById('echo-score').innerText = Math.round(echoScore) + '%';
+            document.getElementById('input-form').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+
+            const verdictEl = document.getElementById('verdict');
+            const diagEl = document.getElementById('diagnostic');
+
+            if (echoScore > 80) {
+                verdictEl.innerText = "Pure Echo";
+                verdictEl.className = "text-sm text-rose-400 mt-2 italic";
+                diagEl.innerHTML = `You are operating in a closed loop. The current belief is so strong it has swallowed the counter-evidence. You are not deciding; you are confirming.<br><br><strong>Task:</strong> Find a source of truth that has no stake in your success.`;
+            } else if (echoScore > 50) {
+                verdictEl.innerText = "Loud Resonance";
+                verdictEl.className = "text-sm text-orange-400 mt-2 italic";
+                diagEl.innerHTML = `There is a struggle between your conviction and the reality presented. You are likely tilting toward your own comfort.<br><br><strong>Task:</strong> Amplify the counter-weight. Give it more weight in your next decision cycle.`;
+            } else if (echoScore > 20) {
+                verdictEl.innerText = "Interference Pattern";
+                verdictEl.className = "text-sm text-cyan-400 mt-2 italic";
+                diagEl.innerHTML = `The signal is messy but potentially honest. The tension between your certainty and the truth is where the actual learning happens.<br><br><strong>Task:</strong> Use this tension to refine the strategy before committing resources.`;
+            } else {
+                verdictEl.innerText = "Reality Check";
+                verdictEl.className = "text-sm text-emerald-400 mt-2 italic";
+                diagEl.innerHTML = `The counter-evidence has dominated the signal. You are facing a hard truth or an inevitable disruption.<br><br><strong>Task:</strong> Abandon the failing model and rebuild on the ground you've actually found.`;
+            }
+        }
+
+        function reset() {
+            document.getElementById('input-form').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

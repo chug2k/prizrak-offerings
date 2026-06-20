@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trip Brief</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+    * { font-family: 'IBM Plex Mono', monospace; }
+    body { background: #0a0a0a; color: #d4c9b0; }
+    textarea, input, select { background: #111; border-color: #333; color: #d4c9b0; }
+    textarea:focus, input:focus, select:focus { outline: none; border-color: #888; }
+    .verdict-go { border-color: #22c55e; color: #22c55e; }
+    .verdict-go.active { background: #22c55e; color: #000; }
+    .verdict-no { border-color: #ef4444; color: #ef4444; }
+    .verdict-no.active { background: #ef4444; color: #000; }
+    .verdict-wait { border-color: #f59e0b; color: #f59e0b; }
+    .verdict-wait.active { background: #f59e0b; color: #000; }
+    .label { color: #666; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.25rem; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+<div class="max-w-xl mx-auto">
+
+  <!-- Header -->
+  <div class="border border-zinc-700 p-5 mb-5">
+    <div class="flex justify-between items-start">
+      <div>
+        <p class="text-zinc-600 text-xs tracking-widest uppercase">Prizrak / Decision Tools</p>
+        <h1 class="text-2xl font-bold text-white mt-1">TRIP BRIEF</h1>
+        <p class="text-zinc-500 text-xs mt-1">A decision document. Not a calendar. Not a booking. A brief.</p>
+      </div>
+      <div class="text-right text-zinc-600 text-xs" id="date-display"></div>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="space-y-4" id="form-section">
+
+    <div class="border border-zinc-800 p-4">
+      <div class="label">Destination</div>
+      <input id="destination" type="text" placeholder="e.g. San Francisco" class="w-full border p-2 text-sm rounded-none"/>
+    </div>
+
+    <div class="border border-zinc-800 p-4">
+      <div class="label">Purpose — why are you going?</div>
+      <textarea id="purpose" rows="2" placeholder="Work, people, opportunity, obligation..." class="w-full border p-2 text-sm resize-none rounded-none"></textarea>
+    </div>
+
+    <div class="border border-zinc-800 p-4">
+      <div class="label">What it costs</div>
+      <textarea id="costs" rows="2" placeholder="Time away, money, momentum lost..." class="w-full border p-2 text-sm resize-none rounded-none"></textarea>
+    </div>
+
+    <div class="border border-zinc-800 p-4">
+      <div class="label">What you miss if you don't go</div>
+      <textarea id="miss" rows="2" placeholder="The meeting, the person, the window..." class="w-full border p-2 text-sm resize-none rounded-none"></textarea>
+
+    </div>
+
+    <div class="border border-zinc-800 p-4">
+      <div class="label">Decision window — when does this expire?</div>
+      <input id="deadline" type="text" placeholder="e.g. by Friday, no deadline, unclear" class="w-full border p-2 text-sm rounded-none"/>
+    </div>
+
+    <div class="border border-zinc-800 p-4">
+      <div class="label">Verdict</div>
+      <div class="flex gap-3 mt-2">
+        <button onclick="setVerdict('go')" id="v-go" class="verdict-go flex-1 border py-2 text-sm font-bold tracking-widest transition-colors">GO</button>
+        <button onclick="setVerdict('wait')" id="v-wait" class="verdict-wait flex-1 border py-2 text-sm font-bold tracking-widest transition-colors">NOT YET</button>
+        <button onclick="setVerdict('no')" id="v-no" class="verdict-no flex-1 border py-2 text-sm font-bold tracking-widest transition-colors">DON'T GO</button>
+      </div>
+    </div>
+
+    <div class="border border-zinc-800 p-4">
+      <div class="label">Notes — anything unresolved</div>
+      <textarea id="notes" rows="2" placeholder="Waiting on X, depends on Y..." class="w-full border p-2 text-sm resize-none rounded-none"></textarea>
+    </div>
+
+    <button onclick="generateBrief()" class="w-full border border-yellow-700 text-yellow-600 hover:bg-yellow-700 hover:text-black py-3 text-sm font-bold tracking-widest transition-colors">
+      GENERATE BRIEF
+    </button>
+  </div>
+
+  <!-- Output -->
+  <div id="output-section" class="hidden mt-5">
+    <div class="border border-zinc-600 p-5 bg-zinc-950" id="brief-output"></div>
+    <div class="flex gap-3 mt-3">
+      <button onclick="copyBrief()" class="flex-1 border border-zinc-600 text-zinc-400 hover:border-zinc-400 hover:text-white py-2 text-xs tracking-widest transition-colors">COPY TEXT</button>
+      <button onclick="resetForm()" class="flex-1 border border-zinc-700 text-zinc-600 hover:border-zinc-500 py-2 text-xs tracking-widest transition-colors">NEW BRIEF</button>
+    </div>
+    <div id="copy-confirm" class="text-green-500 text-xs mt-2 hidden text-center">Copied to clipboard.</div>
+  </div>
+
+  <!-- Saved briefs -->
+  <div id="saved-section" class="mt-6">
+    <div class="label mb-2">Previous briefs</div>
+    <div id="saved-list" class="space-y-2"></div>
+  </div>
+
+  <div class="text-center text-zinc-800 text-xs py-6">
+    PRIZRAK / TRIP BRIEF — the machine cannot tell you where to go. it can only hold the question.
+  </div>
+</div>
+
+<script>
+  let currentVerdict = null;
+
+  document.getElementById('date-display').textContent = new Date().toLocaleDateString('en-US', {
+    weekday:'short', month:'short', day:'numeric', year:'numeric'
+  });
+
+  function setVerdict(v) {
+    currentVerdict = v;
+    ['go','wait','no'].forEach(x => {
+      document.getElementById('v-' + x).classList.remove('active');
+    });
+    document.getElementById('v-' + v).classList.add('active');
+  }
+
+  function generateBrief() {
+    const dest = document.getElementById('destination').value.trim() || '(unspecified)';
+    const purpose = document.getElementById('purpose').value.trim() || '(unspecified)';
+    const costs = document.getElementById('costs').value.trim() || '(unspecified)';
+    const miss = document.getElementById('miss').value.trim() || '(unspecified)';
+    const deadline = document.getElementById('deadline').value.trim() || '(unspecified)';
+    const notes = document.getElementById('notes').value.trim() || '—';
+    const verdict = currentVerdict || 'undecided';
+    const verdictColors = { go: 'text-green-400', wait: 'text-yellow-400', no: 'text-red-400', undecided: 'text-zinc-500' };
+    const verdictLabels = { go: '✓ GO', wait: '⏸ NOT YET', no: '✗ DON\'T GO', undecided: '? UNDECIDED' };
+    const ts = new Date().toLocaleString();
+
+    const html = `
+      <p class="text-zinc-500 text-xs mb-4">TRIP BRIEF — ${ts}</p>
+      <div class="space-y-3 text-sm">
+        <div><span class="text-zinc-600 text-xs uppercase tracking-widest">Destination</span><br/><span class="text-white font-bold">${dest}</span></div>
+        <div><span class="text-zinc-600 text-xs uppercase tracking-widest">Purpose</span><br/><span class="text-zinc-200">${purpose}</span></div>
+        <div><span class="text-zinc-600 text-xs uppercase tracking-widest">Cost</span><br/><span class="text-zinc-200">${costs}</span></div>
+        <div><span class="text-zinc-600 text-xs uppercase tracking-widest">Miss if not going</span><br/><span class="text-zinc-200">${miss}</span></div>
+        <div><span class="text-zinc-600 text-xs uppercase tracking-widest">Decision window</span><br/><span class="text-zinc-200">${deadline}</span></div>
+        ${notes !== '—' ? `<div><span class="text-zinc-600 text-xs uppercase tracking-widest">Notes</span><br/><span class="text-zinc-400 italic">${notes}</span></div>` : ''}
+        <div class="border-t border-zinc-700 pt-3 mt-3">
+          <span class="text-zinc-600 text-xs uppercase tracking-widest">Verdict</span><br/>
+          <span class="font-bold text-lg ${verdictColors[verdict]}">${verdictLabels[verdict]}</span>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('brief-output').innerHTML = html;
+    document.getElementById('form-section').classList.add('hidden');
+    document.getElementById('output-section').classList.remove('hidden');
+
+    // Save
+    const key = 'trip_briefs';
+    const saved = JSON.parse(localStorage.getItem(key) || '[]');
+    saved.unshift({ dest, purpose, verdict, ts });
+    localStorage.setItem(key, JSON.stringify(saved.slice(0, 8)));
+    renderSaved();
+  }
+
+  function copyBrief() {
+    const dest = document.getElementById('destination')?.value || '';
+    const text = document.getElementById('brief-output').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      document.getElementById('copy-confirm').classList.remove('hidden');
+      setTimeout(() => document.getElementById('copy-confirm').classList.add('hidden'), 2000);
+    });
+  }
+
+  function resetForm() {
+    currentVerdict = null;
+    ['go','wait','no'].forEach(x => document.getElementById('v-' + x).classList.remove('active'));
+    ['destination','purpose','costs','miss','deadline','notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('form-section').classList.remove('hidden');
+    document.getElementById('output-section').classList.add('hidden');
+  }
+
+  function renderSaved() {
+    const key = 'trip_briefs';
+    const saved = JSON.parse(localStorage.getItem(key) || '[]');
+    const colors = { go: 'text-green-500', wait: 'text-yellow-500', no: 'text-red-500', undecided: 'text-zinc-500' };
+    const labels = { go: 'GO', wait: 'NOT YET', no: "DON'T GO", undecided: '?' };
+    document.getElementById('saved-list').innerHTML = saved.map(b => `
+      <div class="border border-zinc-800 p-3 flex justify-between items-center text-xs">
+        <div>
+          <span class="text-white font-bold">${b.dest}</span>
+          <span class="text-zinc-600 ml-2">${b.purpose?.substring(0,40) || ''}${b.purpose?.length > 40 ? '...' : ''}</span>
+        </div>
+        <span class="${colors[b.verdict] || 'text-zinc-500'} font-bold">${labels[b.verdict] || '?'}</span>
+      </div>
+    `).join('') || '<p class="text-zinc-700 text-xs">No briefs yet.</p>';
+  }
+
+  renderSaved();
+</script>
+</body>
+</html>

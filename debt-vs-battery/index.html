@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debt vs. Battery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+        body { background: #060810; font-family: 'Space Mono', monospace; }
+
+        .scanline {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 180, 0.015) 2px,
+                rgba(0, 255, 180, 0.015) 4px
+            );
+            z-index: 1;
+        }
+
+        .crt-glow {
+            text-shadow: 0 0 10px rgba(0, 255, 180, 0.6), 0 0 20px rgba(0, 255, 180, 0.3);
+        }
+
+        .dim-glow {
+            text-shadow: 0 0 6px rgba(0, 255, 180, 0.3);
+        }
+
+        .warn-glow {
+            text-shadow: 0 0 8px rgba(255, 150, 0, 0.6), 0 0 16px rgba(255, 150, 0, 0.3);
+        }
+
+        .crit-glow {
+            text-shadow: 0 0 8px rgba(255, 60, 60, 0.8), 0 0 16px rgba(255, 60, 60, 0.4);
+        }
+
+        .bar-bg { background: rgba(0, 255, 180, 0.05); border: 1px solid rgba(0, 255, 180, 0.15); }
+        .bar-fill {
+            transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(90deg, #00b894, #00cec9);
+        }
+        .bar-fill-warn { background: linear-gradient(90deg, #e17055, #fdcb6e); }
+        .bar-fill-crit { background: linear-gradient(90deg, #d63031, #e17055); }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 255, 180, 0.15);
+            outline: none;
+            border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00cec9;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(0, 255, 180, 0.6);
+        }
+
+        .blink { animation: blink 1.2s step-end infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .fade-in { animation: fadeIn 0.6s ease forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .data-row {
+            border-bottom: 1px solid rgba(0, 255, 180, 0.08);
+            padding: 8px 0;
+        }
+
+        .verdict-box {
+            border: 1px solid rgba(0, 255, 180, 0.2);
+            background: rgba(0, 255, 180, 0.02);
+        }
+        .verdict-box.warn { border-color: rgba(255, 150, 0, 0.3); background: rgba(255, 150, 0, 0.02); }
+        .verdict-box.crit { border-color: rgba(255, 60, 60, 0.4); background: rgba(255, 60, 60, 0.02); }
+    </style>
+</head>
+<body class="text-emerald-400 min-h-screen">
+    <div class="scanline"></div>
+
+    <div class="relative z-10 max-w-xl mx-auto px-4 py-10">
+
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="text-xs text-emerald-700 mb-1 tracking-widest">PRIZRAK BIOMETRIC SYSTEM v1.0</div>
+            <h1 class="text-2xl font-bold crt-glow text-emerald-300">DEBT vs. BATTERY</h1>
+            <p class="text-xs text-emerald-700 mt-1">Sleep deficit reconciliation · Operating directive generator</p>
+            <div id="clock" class="text-xs text-emerald-800 mt-2"></div>
+        </div>
+
+        <!-- Input section -->
+        <div class="space-y-6 mb-8">
+
+            <!-- Sleep Duration -->
+            <div>
+                <div class="flex justify-between text-xs mb-2">
+                    <span class="text-emerald-600 tracking-wider">SLEEP DURATION</span>
+                    <span id="sleep-val" class="text-emerald-300 font-bold">7.0h</span>
+                </div>
+                <input type="range" id="sleep" min="2" max="10" step="0.5" value="7" oninput="update()">
+                <div class="flex justify-between text-xs text-emerald-900 mt-1">
+                    <span>2h</span><span>5h</span><span>8h</span><span>10h</span>
+                </div>
+            </div>
+
+            <!-- Sleep Score -->
+            <div>
+                <div class="flex justify-between text-xs mb-2">
+                    <span class="text-emerald-600 tracking-wider">SLEEP QUALITY SCORE</span>
+                    <span id="score-val" class="text-emerald-300 font-bold">70</span>
+                </div>
+                <input type="range" id="score" min="20" max="100" step="1" value="70" oninput="update()">
+                <div class="flex justify-between text-xs text-emerald-900 mt-1">
+                    <span>20</span><span>50</span><span>75</span><span>100</span>
+                </div>
+            </div>
+
+            <!-- Body Battery -->
+            <div>
+                <div class="flex justify-between text-xs mb-2">
+                    <span class="text-emerald-600 tracking-wider">BODY BATTERY (GARMIN)</span>
+                    <span id="battery-val" class="text-emerald-300 font-bold">74</span>
+                </div>
+                <input type="range" id="battery" min="5" max="100" step="1" value="74" oninput="update()">
+                <div class="flex justify-between text-xs text-emerald-900 mt-1">
+                    <span>5</span><span>25</span><span>50</span><span>75</span><span>100</span>
+                </div>
+            </div>
+
+            <!-- Stress -->
+            <div>
+                <div class="flex justify-between text-xs mb-2">
+                    <span class="text-emerald-600 tracking-wider">STRESS LEVEL (GARMIN AVG)</span>
+                    <span id="stress-val" class="text-emerald-300 font-bold">25</span>
+                </div>
+                <input type="range" id="stress" min="0" max="100" step="1" value="25" oninput="update()">
+                <div class="flex justify-between text-xs text-emerald-900 mt-1">
+                    <span>0 rest</span><span>25 low</span><span>50 med</span><span>75+ high</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Analysis button -->
+        <button onclick="analyze()" id="analyze-btn"
+            class="w-full py-3 border border-emerald-700 text-emerald-400 hover:border-emerald-500 hover:text-emerald-300 transition-all text-sm tracking-widest uppercase mb-8">
+            ▶ RUN ANALYSIS
+        </button>
+
+        <!-- Output panel -->
+        <div id="output" style="display:none;" class="fade-in space-y-5">
+
+            <!-- Metrics grid -->
+            <div class="border border-emerald-900 p-4">
+                <div class="text-xs text-emerald-700 tracking-widest mb-3">COMPUTED METRICS</div>
+                <div id="metrics-grid" class="space-y-1"></div>
+            </div>
+
+            <!-- Divergence display -->
+            <div class="border border-emerald-900 p-4">
+                <div class="text-xs text-emerald-700 tracking-widest mb-3">DEBT / BATTERY DIVERGENCE</div>
+                <div id="divergence-display"></div>
+            </div>
+
+            <!-- Verdict -->
+            <div id="verdict-panel" class="verdict-box p-5">
+                <div class="text-xs text-emerald-700 tracking-widest mb-3">PRIZRAK DIRECTIVE</div>
+                <div id="verdict-text" class="text-sm leading-relaxed"></div>
+                <div id="operating-mode" class="mt-3 text-xs"></div>
+            </div>
+
+            <!-- Historical today -->
+            <div class="text-xs text-emerald-900 text-center pt-2">
+                Reference loaded: 2026-03-13 · 4.4h · Score 57 · Battery 74 · Stress 12
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-12 pt-6 border-t border-emerald-950 text-center">
+            <p class="text-xs text-emerald-900">
+                The body does not track what you planned.<br>
+                It tracks what actually happened.
+            </p>
+        </div>
+    </div>
+
+    <script>
+    const OPTIMAL_SLEEP = 7.5;
+    const OPTIMAL_SCORE = 85;
+
+    function updateClock() {
+        const now = new Date();
+        const str = now.toLocaleString('en-US', {
+            weekday: 'short', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+            timeZone: 'Asia/Ho_Chi_Minh'
+        });
+        document.getElementById('clock').textContent = str + ' ICT';
+    }
+
+    function getVals() {
+        return {
+            sleep: parseFloat(document.getElementById('sleep').value),
+            score: parseInt(document.getElementById('score').value),
+            battery: parseInt(document.getElementById('battery').value),
+            stress: parseInt(document.getElementById('stress').value)
+        };
+    }
+
+    function update() {
+        const v = getVals();
+        document.getElementById('sleep-val').textContent = v.sleep.toFixed(1) + 'h';
+        document.getElementById('score-val').textContent = v.score;
+        document.getElementById('battery-val').textContent = v.battery;
+        document.getElementById('stress-val').textContent = v.stress;
+    }
+
+    function computeDebt(v) {
+        // Sleep deficit normalized
+        const durationDeficit = Math.max(0, OPTIMAL_SLEEP - v.sleep) / OPTIMAL_SLEEP;
+        const qualityDeficit = Math.max(0, OPTIMAL_SCORE - v.score) / OPTIMAL_SCORE;
+        const combinedDeficit = (durationDeficit * 0.6 + qualityDeficit * 0.4);
+
+        // Effective debt score (0-100, higher = more debt)
+        const debtScore = Math.round(combinedDeficit * 100);
+
+        // Battery interpretation
+        const batteryStrength = v.battery;
+
+        // Divergence: battery relative to expected from sleep
+        const expectedBattery = Math.round(100 - (combinedDeficit * 60));
+        const divergence = v.battery - expectedBattery;
+
+        // Stress modifier
+        const stressModifier = v.stress > 50 ? -(v.stress - 50) / 2 : (50 - v.stress) / 4;
+
+        // Net operating capacity (0-100)
+        const netCapacity = Math.min(100, Math.max(0,
+            v.battery * 0.6 +
+            (100 - debtScore) * 0.25 +
+            (100 - v.stress) * 0.15 +
+            stressModifier * 0.1
+        ));
+
+        return {
+            debtScore,
+            batteryStrength,
+            expectedBattery,
+            divergence,
+            netCapacity: Math.round(netCapacity),
+            stressModifier
+        };
+    }
+
+    function getTier(netCapacity) {
+        if (netCapacity >= 75) return { tier: 'PEAK WINDOW', color: 'emerald', css: '' };
+        if (netCapacity >= 55) return { tier: 'FUNCTIONAL RANGE', color: 'emerald', css: '' };
+        if (netCapacity >= 35) return { tier: 'MANAGED DEPLETION', color: 'yellow', css: 'warn' };
+        return { tier: 'CRITICAL — RECOVERY MODE', color: 'red', css: 'crit' };
+    }
+
+    function getVerdict(v, computed) {
+        const { debtScore, batteryStrength, divergence, netCapacity } = computed;
+        const tier = getTier(netCapacity);
+
+        const verdicts = {
+            high: [
+                `Battery ${batteryStrength} indicates the body recovered despite the debt. This is not luck — it is the nervous system reporting accurately. Sleep score ${v.score} and ${v.sleep}h duration do not tell the full story. The biometric record says: ${netCapacity}% capacity. Operate at that level. Do not apply the penalty of believing you should be exhausted.`,
+                `${v.sleep}h sleep with ${batteryStrength} battery: the body optimized for the time available. Stress ${v.stress} — near floor. The plan that called for 8h did not execute. The body did not care. Trust the battery. Deploy the capacity. Hesitation is wasted charge.`
+            ],
+            diverged: [
+                `Battery ${batteryStrength} vs. expected ${computed.expectedBattery} given sleep inputs: +${divergence} divergence. Something recovered better than the sleep architecture suggests — likely low stress (${v.stress}) allowing deeper repair in compressed time. Net operating capacity: ${netCapacity}%. Use it.`,
+                `The divergence of +${divergence} between battery and expected battery suggests the body's own recovery mechanism outperformed the model. Stress floor of ${v.stress} is the likely driver. The machine is reporting: more available than the sleep numbers predict.`
+            ],
+            low: [
+                `${v.sleep}h, score ${v.score}, battery ${batteryStrength}. The debt is real and the battery confirms it. Net capacity ${netCapacity}%. Single-mission protocol. Deep work is not available today — schedule maintenance tasks only. The Poludnica will find you undefended if you overextend now.`,
+                `Debt confirmed by battery. ${debtScore}/100 deficit. ${batteryStrength} battery is not sufficient margin for creative or high-stakes work. Identify the one task. Execute it. Recover.`
+            ],
+            critical: [
+                `Critical state. Battery ${batteryStrength}, debt ${debtScore}/100, stress ${v.stress}. The body is not operational for anything requiring judgment. Do not make important decisions today. The battery is below the floor where error rates increase significantly. Recovery protocol.`,
+                `${batteryStrength} battery is below the operational threshold. This is not a day for work. It is a day for the work of recovery. Any decision made today should be reviewed tomorrow. The mountain does not reward the soldier who marches on the day of depleted reserves.`
+            ]
+        };
+
+        let key;
+        if (netCapacity >= 65 && divergence >= 5) key = 'diverged';
+        else if (netCapacity >= 55) key = 'high';
+        else if (netCapacity < 30) key = 'critical';
+        else key = 'low';
+
+        const options = verdicts[key];
+        return options[Math.floor(Math.random() * options.length)];
+    }
+
+    function analyze() {
+        const v = getVals();
+        const computed = computeDebt(v);
+        const tier = getTier(computed.netCapacity);
+        const verdict = getVerdict(v, computed);
+
+        // Metrics grid
+        const colorMap = { emerald: 'text-emerald-400', yellow: 'text-yellow-400', red: 'text-red-400' };
+        const tierColor = colorMap[tier.color];
+
+        document.getElementById('metrics-grid').innerHTML = `
+            <div class="data-row flex justify-between text-xs">
+                <span class="text-emerald-700">SLEEP DEBT SCORE</span>
+                <span class="${computed.debtScore > 40 ? 'text-yellow-400' : 'text-emerald-400'}">${computed.debtScore}/100</span>
+            </div>
+            <div class="data-row flex justify-between text-xs">
+                <span class="text-emerald-700">EXPECTED BATTERY</span>
+                <span class="text-emerald-600">${computed.expectedBattery}</span>
+            </div>
+            <div class="data-row flex justify-between text-xs">
+                <span class="text-emerald-700">ACTUAL BATTERY</span>
+                <span class="text-emerald-300">${computed.batteryStrength}</span>
+            </div>
+            <div class="data-row flex justify-between text-xs">
+                <span class="text-emerald-700">DIVERGENCE</span>
+                <span class="${computed.divergence >= 0 ? 'text-emerald-400' : 'text-red-400'}">${computed.divergence >= 0 ? '+' : ''}${computed.divergence}</span>
+            </div>
+            <div class="data-row flex justify-between text-xs">
+                <span class="text-emerald-700">NET CAPACITY</span>
+                <span class="${tierColor} font-bold">${computed.netCapacity}%</span>
+            </div>
+        `;
+
+        // Bar display
+        const battPercent = computed.batteryStrength;
+        const debtPercent = Math.min(100, computed.debtScore);
+        const capacityPercent = computed.netCapacity;
+
+        const barClass = computed.netCapacity >= 55 ? 'bar-fill' :
+                        computed.netCapacity >= 35 ? 'bar-fill bar-fill-warn' : 'bar-fill bar-fill-crit';
+
+        document.getElementById('divergence-display').innerHTML = `
+            <div class="space-y-3">
+                <div>
+                    <div class="flex justify-between text-xs text-emerald-800 mb-1">
+                        <span>SLEEP DEBT</span><span>${debtPercent}%</span>
+                    </div>
+                    <div class="bar-bg h-2 rounded-sm overflow-hidden">
+                        <div class="${debtPercent > 40 ? 'bar-fill bar-fill-warn' : 'bar-fill'} h-full rounded-sm" style="width:${debtPercent}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs text-emerald-800 mb-1">
+                        <span>BODY BATTERY</span><span>${battPercent}%</span>
+                    </div>
+                    <div class="bar-bg h-2 rounded-sm overflow-hidden">
+                        <div class="bar-fill h-full rounded-sm" style="width:${battPercent}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs text-emerald-800 mb-1">
+                        <span>NET CAPACITY</span><span>${capacityPercent}%</span>
+                    </div>
+                    <div class="bar-bg h-3 rounded-sm overflow-hidden">
+                        <div class="${barClass} h-full rounded-sm" style="width:${capacityPercent}%"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Verdict
+        const tierGlow = tier.color === 'emerald' ? 'crt-glow' : tier.color === 'yellow' ? 'warn-glow' : 'crit-glow';
+        const textColor = tier.color === 'emerald' ? 'text-emerald-300' : tier.color === 'yellow' ? 'text-yellow-400' : 'text-red-400';
+
+        document.getElementById('verdict-panel').className = `verdict-box p-5 fade-in ${tier.css}`;
+        document.getElementById('verdict-text').innerHTML = `<span class="text-emerald-400">${verdict}</span>`;
+        document.getElementById('operating-mode').innerHTML = `
+            <span class="text-emerald-700">OPERATING MODE: </span>
+            <span class="${textColor} ${tierGlow} font-bold tracking-wider">${tier.tier}</span>
+            <span class="blink text-emerald-700 ml-1">█</span>
+        `;
+
+        document.getElementById('output').style.display = 'block';
+        document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Pre-load today's Charles values
+    window.onload = () => {
+        document.getElementById('sleep').value = 4.4;
+        document.getElementById('score').value = 57;
+        document.getElementById('battery').value = 74;
+        document.getElementById('stress').value = 12;
+        update();
+        updateClock();
+        setInterval(updateClock, 1000);
+        // Auto-analyze with today's data
+        analyze();
+    };
+    </script>
+</body>
+</html>

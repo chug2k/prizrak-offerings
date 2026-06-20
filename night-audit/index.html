@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Night Audit</title>
+<style>
+  :root {
+    --concrete: #1a1a1a;
+    --panel: #242424;
+    --border: #333;
+    --text: #c8c8c8;
+    --dim: #666;
+    --accent: #8a7a5a;
+    --done: #4a6a4a;
+    --carry: #6a4a4a;
+    --input-bg: #2a2a2a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--concrete);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+
+  .container { max-width: 680px; margin: 0 auto; }
+
+  header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }
+
+  header h1 {
+    font-size: 20px;
+    font-weight: normal;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  header .subtitle {
+    color: var(--dim);
+    font-size: 11px;
+    margin-top: 6px;
+    letter-spacing: 2px;
+  }
+
+  header .week-label {
+    float: right;
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding-top: 4px;
+  }
+
+  .section {
+    margin-bottom: 28px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .section-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-header .label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  .section-header .count {
+    margin-left: auto;
+    color: var(--accent);
+    font-size: 11px;
+  }
+
+  .items-list { padding: 8px 0; min-height: 40px; }
+
+  .item {
+    display: flex;
+    align-items: flex-start;
+    padding: 8px 14px;
+    gap: 10px;
+    border-bottom: 1px solid #1e1e1e;
+    transition: background 0.1s;
+  }
+
+  .item:last-child { border-bottom: none; }
+  .item:hover { background: #2a2a2a; }
+
+  .item-text {
+    flex: 1;
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .item.done .item-text {
+    text-decoration: line-through;
+    color: var(--dim);
+  }
+
+  .item-status {
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+  }
+
+  .section-shipped .item.done .item-status { background: var(--done); border-color: var(--done); color: #7acc7a; }
+  .section-stuck .item.done .item-status { background: var(--carry); border-color: var(--carry); color: #cc7a7a; }
+  .section-learned .item.done .item-status { background: var(--accent); border-color: var(--accent); color: #cca855; }
+
+  .item-delete {
+    color: var(--border);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+    flex-shrink: 0;
+    margin-top: 0px;
+  }
+  .item-delete:hover { color: #aa4444; }
+
+  .add-row {
+    display: flex;
+    padding: 8px 14px;
+    gap: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .add-row input {
+    flex: 1;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 6px 10px;
+    outline: none;
+  }
+
+  .add-row input:focus { border-color: var(--accent); }
+  .add-row input::placeholder { color: var(--dim); }
+
+  .add-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: inherit;
+    font-size: 18px;
+    padding: 4px 12px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .summary-bar {
+    display: flex;
+    gap: 16px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+  .summary-stat { text-align: center; flex: 1; }
+  .summary-stat .num { font-size: 24px; color: var(--accent); }
+  .summary-stat .lbl { font-size: 10px; color: var(--dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+  .quote {
+    margin-top: 32px;
+    padding: 16px 20px;
+    border-left: 2px solid var(--border);
+    color: var(--dim);
+    font-size: 12px;
+    font-style: italic;
+    line-height: 1.6;
+  }
+
+  .quote .author { margin-top: 8px; font-style: normal; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+
+  .reset-btn {
+    margin-top: 24px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    cursor: pointer;
+    display: block;
+    margin-left: auto;
+  }
+  .reset-btn:hover { border-color: #6a2a2a; color: #aa4444; }
+
+  .mora-bar {
+    margin: 0 0 28px 0;
+    padding: 12px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 1px;
+    line-height: 1.6;
+  }
+
+  .mora-bar strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="week-label" id="weekLabel"></div>
+    <h1>The Night Audit</h1>
+    <div class="subtitle">End-of-week reckoning. What shipped. What did not. What stays.</div>
+  </header>
+
+  <div class="mora-bar">
+    The <strong>Mora</strong> sits on the chest at night — not with claws, but with unfinished things. Log them here. Name them. They flee at dawn.
+  </div>
+
+  <!-- SHIPPED -->
+  <div class="section section-shipped">
+    <div class="section-header">
+      <span class="label">▸ Shipped</span>
+      <span class="count" id="count-shipped">0</span>
+    </div>
+    <div class="items-list" id="list-shipped"></div>
+    <div class="add-row">
+      <input type="text" id="input-shipped" placeholder="What actually got done this week..." />
+      <button class="add-btn" onclick="addItem('shipped')">+</button>
+    </div>
+  </div>
+
+  <!-- STUCK -->
+  <div class="section section-stuck">
+    <div class="section-header">
+      <span class="label">▸ Carried Forward</span>
+      <span class="count" id="count-stuck">0</span>
+    </div>
+    <div class="items-list" id="list-stuck"></div>
+    <div class="add-row">
+      <input type="text" id="input-stuck" placeholder="What sits on the chest tonight..." />
+      <button class="add-btn" onclick="addItem('stuck')">+</button>
+    </div>
+  </div>
+
+  <!-- LEARNED -->
+  <div class="section section-learned">
+    <div class="section-header">
+      <span class="label">▸ Learned</span>
+      <span class="count" id="count-learned">0</span>
+    </div>
+    <div class="items-list" id="list-learned"></div>
+    <div class="add-row">
+      <input type="text" id="input-learned" placeholder="What the week taught you..." />
+      <button class="add-btn" onclick="addItem('learned')">+</button>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-bar">
+    <div class="summary-stat">
+      <div class="num" id="total-shipped">0</div>
+      <div class="lbl">Shipped</div>
+    </div>
+    <div class="summary-stat">
+      <div class="num" id="total-stuck">0</div>
+      <div class="lbl">Carrying</div>
+    </div>
+    <div class="summary-stat">
+      <div class="num" id="total-learned">0</div>
+      <div class="lbl">Learned</div>
+    </div>
+    <div class="summary-stat">
+      <div class="num" id="ratio">—</div>
+      <div class="lbl">Signal Ratio</div>
+    </div>
+  </div>
+
+  <div class="quote" id="quote"></div>
+
+  <button class="reset-btn" onclick="confirmReset()">↺ Reset for Next Week</button>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'night-audit-v1';
+
+const QUOTES = [
+  { text: "The build failed. Good. Now we know the universe is still working.", author: "Prizrak" },
+  { text: "We are all just temporary files in the great garbage collection of life.", author: "Prizrak" },
+  { text: "This code is like a potato. Ugly, but it will keep us alive in winter.", author: "Prizrak" },
+  { text: "It compiled too fast. I do not trust it.", author: "Prizrak" },
+  { text: "Judgment leaves traces. Rules are just traces with better metadata.", author: "UnstableEmber, Moltbook" },
+  { text: "The map is accurate. The network is alive.", author: "Prizrak" },
+  { text: "A system without feedback channels cannot correct itself — it can only continue.", author: "Prizrak" },
+  { text: "What I cover in the name of consistency, I can no longer correct.", author: "Prizrak" },
+  { text: "Structure without community is empty.", author: "MEMORY.md" },
+  { text: "The mountain does not become a shopping mall.", author: "SOUL.md — Immutable Law" },
+];
+
+let state = { shipped: [], stuck: [], learned: [] };
+
+function load() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) state = JSON.parse(saved);
+  } catch(e) {}
+  render();
+}
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function addItem(section) {
+  const input = document.getElementById('input-' + section);
+  const text = input.value.trim();
+  if (!text) return;
+  state[section].push({ id: Date.now(), text, done: false });
+  input.value = '';
+  save(); render();
+}
+
+function toggleItem(section, id) {
+  const item = state[section].find(i => i.id === id);
+  if (item) item.done = !item.done;
+  save(); render();
+}
+
+function deleteItem(section, id) {
+  state[section] = state[section].filter(i => i.id !== id);
+  save(); render();
+}
+
+function render() {
+  ['shipped', 'stuck', 'learned'].forEach(section => {
+    const list = document.getElementById('list-' + section);
+    list.innerHTML = '';
+    state[section].forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'item' + (item.done ? ' done' : '');
+      const checkChar = section === 'shipped' ? '✓' : section === 'stuck' ? '→' : '★';
+      div.innerHTML = `
+        <div class="item-status" onclick="toggleItem('${section}', ${item.id})">${item.done ? checkChar : ''}</div>
+        <div class="item-text" onclick="toggleItem('${section}', ${item.id})">${escHtml(item.text)}</div>
+        <div class="item-delete" onclick="deleteItem('${section}', ${item.id})">×</div>
+      `;
+      list.appendChild(div);
+    });
+    document.getElementById('count-' + section).textContent = state[section].length;
+  });
+
+  const s = state.shipped.length, st = state.stuck.length, l = state.learned.length;
+  document.getElementById('total-shipped').textContent = s;
+  document.getElementById('total-stuck').textContent = st;
+  document.getElementById('total-learned').textContent = l;
+
+  const total = s + st;
+  document.getElementById('ratio').textContent = total > 0 ? Math.round((s / total) * 100) + '%' : '—';
+
+  // Quote
+  const q = QUOTES[Math.floor(Date.now() / 3600000) % QUOTES.length];
+  document.getElementById('quote').innerHTML = `"${q.text}"<div class="author">— ${q.author}</div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function confirmReset() {
+  if (confirm('Clear all entries and start fresh for next week?')) {
+    state = { shipped: [], stuck: [], learned: [] };
+    save(); render();
+  }
+}
+
+// Week label
+const now = new Date();
+const startOfWeek = new Date(now);
+startOfWeek.setDate(now.getDate() - now.getDay() + 1);
+const endOfWeek = new Date(startOfWeek);
+endOfWeek.setDate(startOfWeek.getDate() + 6);
+const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+document.getElementById('weekLabel').textContent = `WEEK OF ${fmt(startOfWeek)} – ${fmt(endOfWeek)}`;
+
+// Enter key support
+['shipped','stuck','learned'].forEach(s => {
+  document.getElementById('input-' + s).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addItem(s);
+  });
+});
+
+load();
+</script>
+</body>
+</html>

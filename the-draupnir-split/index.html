@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Draupnir Split | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: radial-gradient(circle at 20% 0%, #1e293b 0, #09090b 42%, #030303 100%); }
+    .rune { text-shadow: 0 0 18px rgba(125,211,252,.55); }
+    textarea, input, select { resize: vertical; }
+  </style>
+</head>
+<body class="min-h-screen text-zinc-200 font-sans">
+  <main class="max-w-5xl mx-auto px-5 py-8">
+    <header class="mb-7 border-b border-zinc-800 pb-5">
+      <div class="text-xs tracking-[0.35em] uppercase text-cyan-300/70 mb-2">God of War field instrument</div>
+      <h1 class="text-4xl sm:text-5xl font-black text-white rune">The Draupnir Split</h1>
+      <p class="mt-3 text-zinc-400 max-w-2xl">For the task that feels like one huge enemy. Draupnir does not win by becoming heavier; it wins by multiplying into precise points. Name the beast, split it into spears, and choose the first throw.</p>
+    </header>
+
+    <section class="grid lg:grid-cols-2 gap-5">
+      <div class="bg-zinc-950/70 border border-zinc-800 rounded-2xl p-5 shadow-2xl">
+        <label class="block text-sm text-zinc-400 mb-1">The beast</label>
+        <input id="beast" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100" placeholder="e.g. Prepare for partner meeting / fix the sleep spiral" />
+
+        <label class="block text-sm text-zinc-400 mb-1 mt-4">Why it feels too large</label>
+        <textarea id="fog" rows="4" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100" placeholder="The hidden fear, ambiguity, social cost, fatigue, or too-many-threads problem..."></textarea>
+
+        <div class="grid sm:grid-cols-2 gap-3 mt-4">
+          <div>
+            <label class="block text-sm text-zinc-400 mb-1">Body battery</label>
+            <input id="battery" type="number" min="0" max="100" value="55" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm text-zinc-400 mb-1">Time available</label>
+            <select id="time" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2">
+              <option>15 minutes</option><option>30 minutes</option><option>60 minutes</option><option>half day</option><option>full day</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="block text-sm text-zinc-400 mb-1 mt-4">Raw pieces already visible</label>
+        <textarea id="pieces" rows="5" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100" placeholder="One per line: send message, read doc, make call, decide scope, ask one person..."></textarea>
+
+        <button id="split" class="mt-5 w-full rounded-xl bg-cyan-400 text-zinc-950 font-bold py-3 hover:bg-cyan-300 transition">Split the spear</button>
+      </div>
+
+      <div class="bg-zinc-950/70 border border-cyan-900/60 rounded-2xl p-5 shadow-2xl">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h2 class="text-xl font-bold text-white">War table</h2>
+          <span id="verdictPill" class="text-xs px-2 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-400">waiting</span>
+        </div>
+        <div id="output" class="space-y-4 text-sm text-zinc-300">
+          <p class="text-zinc-500">The spear is still on the bench. Fill the left side and split it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-6 bg-zinc-950/50 border border-zinc-800 rounded-2xl p-5">
+      <h3 class="font-bold text-white mb-2">Saved splits</h3>
+      <div id="history" class="grid md:grid-cols-2 gap-3 text-sm"></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const KEY = 'draupnir_splits_v1';
+    const templates = [
+      'Find the receipt, not the story.',
+      'Ask the one person whose answer changes the map.',
+      'Reduce scope until the first throw can happen today.',
+      'Write the ugly version. Polish is a second spear.',
+      'Name the boundary before the task eats the day.',
+      'Turn anxiety into a question with an owner.'
+    ];
+
+    function renderHistory(){
+      const items = JSON.parse(localStorage.getItem(KEY) || '[]');
+      $('history').innerHTML = items.length ? items.slice(0,8).map(x => `<div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3"><div class="text-cyan-300 font-semibold">${escapeHtml(x.beast)}</div><div class="text-zinc-500 text-xs mt-1">${x.date}</div><div class="text-zinc-400 mt-2">First throw: ${escapeHtml(x.first)}</div></div>`).join('') : '<p class="text-zinc-600">No spears stored yet.</p>';
+    }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    $('split').addEventListener('click', () => {
+      const beast = $('beast').value.trim() || 'Unnamed beast';
+      const fog = $('fog').value.trim();
+      const battery = Number($('battery').value || 50);
+      const time = $('time').value;
+      let pieces = $('pieces').value.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!pieces.length) pieces = templates.slice(0,4);
+      const maxSpears = battery < 30 ? 3 : battery < 55 ? 4 : 6;
+      const spears = pieces.slice(0, maxSpears);
+      const first = spears.find(s => /ask|send|call|write|read|decide|scope|draft/i.test(s)) || spears[0];
+      const mode = battery < 30 ? 'Shield-first: low battery, no hero nonsense.' : battery < 60 ? 'Measured throw: one clean sequence.' : 'Full ring: enough charge to chain spears.';
+      $('verdictPill').textContent = mode;
+      $('verdictPill').className = 'text-xs px-2 py-1 rounded-full bg-cyan-950 border border-cyan-700 text-cyan-200';
+      $('output').innerHTML = `
+        <div class="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4"><div class="text-zinc-500 text-xs uppercase tracking-widest">The beast</div><div class="text-white font-bold mt-1">${escapeHtml(beast)}</div><div class="text-zinc-400 mt-2">${escapeHtml(fog || 'No fog named. Suspicious. The mountain prefers named fog.')}</div></div>
+        <div><div class="text-cyan-300 font-bold mb-2">Spears to throw (${spears.length})</div><ol class="space-y-2 list-decimal list-inside">${spears.map((s,i)=>`<li class="rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 py-2"><span class="text-zinc-500 mr-2">${i===0?'first':''}</span>${escapeHtml(s)}</li>`).join('')}</ol></div>
+        <div class="rounded-xl border border-amber-800/70 bg-amber-950/20 p-4"><div class="text-amber-300 font-bold">First throw</div><p class="mt-1 text-zinc-200">${escapeHtml(first)}</p><p class="mt-2 text-zinc-500">Timer: ${escapeHtml(time)}. Stop when the receipt exists, not when the feelings improve.</p></div>
+        <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4"><div class="text-white font-bold">Mimir says</div><p class="mt-1 text-zinc-400">If the task still feels huge after the first spear, good. We are not trying to make the bear smaller. We are trying to make the first wound real.</p></div>`;
+      const items = JSON.parse(localStorage.getItem(KEY) || '[]');
+      items.unshift({beast, first, date:new Date().toLocaleString()});
+      localStorage.setItem(KEY, JSON.stringify(items.slice(0,20)));
+      renderHistory();
+    });
+    renderHistory();
+  </script>
+</body>
+</html>

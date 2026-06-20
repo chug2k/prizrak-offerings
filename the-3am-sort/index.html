@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The 3 AM Sort | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #09090c; }
+    textarea:focus { outline: none; }
+    .fade-in { animation: fadeIn 0.5s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="text-zinc-400 min-h-screen font-mono">
+
+  <div id="input-view" class="max-w-lg mx-auto px-4 py-14">
+    <div class="mb-8">
+      <p class="text-zinc-700 text-xs mb-1">PRIZRAK / 3 AM TOOL</p>
+      <h1 class="text-2xl font-bold text-zinc-200 mb-2">The 3 AM Sort</h1>
+      <p class="text-zinc-600 text-sm">Something woke you up. Or you can't sleep. Write everything that's in your head. One field, no format. Then let the machine sort it into what you can act on now, what has to wait until morning, and what is noise.</p>
+    </div>
+
+    <div class="space-y-5">
+      <div>
+        <label class="block text-xs text-zinc-600 mb-2 uppercase tracking-widest">What's in your head?</label>
+        <textarea id="dump" rows="8" placeholder="Everything. Don't organize. Don't edit. Just write." class="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 resize-none focus:border-zinc-600 transition-colors"></textarea>
+      </div>
+      <button onclick="sort()" class="w-full py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-bold transition-colors border border-zinc-700">
+        Sort it →
+      </button>
+    </div>
+
+    <div id="hist-section" class="mt-10 hidden">
+      <p class="text-xs text-zinc-700 uppercase tracking-widest mb-3">Past Nights</p>
+      <div id="hist-list" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <div id="sorted-view" class="hidden max-w-lg mx-auto px-4 py-14 fade-in">
+    <div class="mb-6">
+      <p class="text-zinc-700 text-xs mb-1">3 AM SORT</p>
+      <p id="sort-time" class="text-xs text-zinc-700"></p>
+    </div>
+
+    <div class="space-y-4 mb-8">
+      <div class="rounded-xl border border-zinc-800 p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+          <p class="text-xs text-amber-600 uppercase tracking-widest">Act Now (if you need to)</p>
+        </div>
+        <p id="act-now" class="text-zinc-300 text-sm leading-relaxed"></p>
+      </div>
+
+      <div class="rounded-xl border border-zinc-800 p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-2 h-2 rounded-full bg-zinc-600"></div>
+          <p class="text-xs text-zinc-600 uppercase tracking-widest">Wait Until Morning</p>
+        </div>
+        <p id="wait-morning" class="text-zinc-500 text-sm leading-relaxed"></p>
+      </div>
+
+      <div class="rounded-xl border border-zinc-800 p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-2 h-2 rounded-full bg-zinc-800"></div>
+          <p class="text-xs text-zinc-700 uppercase tracking-widest">Noise (3 AM Amplification)</p>
+        </div>
+        <p id="noise" class="text-zinc-600 text-sm leading-relaxed italic"></p>
+      </div>
+
+      <div class="rounded-xl border border-zinc-900 p-5 bg-zinc-900/40">
+        <p class="text-xs text-zinc-700 uppercase tracking-widest mb-2">Prízrak Note</p>
+        <p id="verdict" class="text-zinc-600 text-sm leading-relaxed italic"></p>
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button onclick="newSort()" class="flex-1 py-2.5 rounded-lg border border-zinc-800 text-zinc-600 text-sm hover:border-zinc-600 hover:text-zinc-400 transition-colors">New sort</button>
+      <button onclick="copySort()" class="flex-1 py-2.5 rounded-lg bg-zinc-900 text-zinc-500 text-sm hover:bg-zinc-800 transition-colors">Copy</button>
+    </div>
+  </div>
+
+  <script>
+    const KEY = 'prizrak_3am_v1';
+
+    function sort() {
+      const dump = document.getElementById('dump').value.trim();
+      if (!dump) { alert('Write something first.'); return; }
+
+      const sentences = dump.split(/[.!?\n]+/).map(s => s.trim()).filter(s => s.length > 8);
+      const words = dump.toLowerCase();
+
+      // Classify: things that need action now
+      const urgentPatterns = /\b(forgot|need to|must|have to|urgent|deadline|tomorrow|morning|send|call|reply|message|email|confirm|check|pay|book|buy|cancel|remind)\b/;
+      const anxietyPatterns = /\b(worried|anxious|scared|afraid|nervous|stress|can't stop|overthinking|what if|maybe|should have|shouldn't have|did i|will i|will they)\b/;
+      const bodyPatterns = /\b(pain|hurts|sick|headache|nauseous|heart|chest|dizzy|can't breathe|fever)\b/;
+
+      const actNowItems = sentences.filter(s => bodyPatterns.test(s.toLowerCase()));
+      const waitItems = sentences.filter(s => urgentPatterns.test(s.toLowerCase()) && !bodyPatterns.test(s.toLowerCase()));
+      const anxietyItems = sentences.filter(s => anxietyPatterns.test(s.toLowerCase()) && !urgentPatterns.test(s.toLowerCase()) && !bodyPatterns.test(s.toLowerCase()));
+      const noiseItems = sentences.filter(s => !actNowItems.includes(s) && !waitItems.includes(s) && !anxietyItems.includes(s));
+
+      // Build output
+      let actNowText, waitText, noiseText, verdictText;
+
+      if (actNowItems.length > 0) {
+        actNowText = actNowItems.join('. ') + '.';
+      } else {
+        actNowText = 'Nothing requires immediate action. If your body is fine, it can wait.';
+      }
+
+      if (waitItems.length > 0) {
+        waitText = waitItems.slice(0, 3).join('. ') + (waitItems.length > 3 ? ` (and ${waitItems.length - 3} more)` : '.');
+      } else if (dump.length > 50) {
+        waitText = 'Write it on paper or in a note. The act of writing it down transfers custody from your nervous system to the page. You are no longer responsible for remembering it.';
+      } else {
+        waitText = 'Nothing concrete enough to act on in the morning yet. That is fine.';
+      }
+
+      if (anxietyItems.length > 0 || noiseItems.length > 0) {
+        const all = [...anxietyItems.slice(0,2), ...noiseItems.slice(0,2)];
+        noiseText = all.length > 0
+          ? `These are real feelings but not actionable problems: ${all.join('; ')}.`
+          : 'The spiral. The loop. The 3 AM amplifier is running. These thoughts are not less true at 3 AM — they are louder. That is not the same thing.';
+      } else {
+        noiseText = 'No obvious 3 AM amplification detected. Either the problem is real and specific, or you are writing clearly.';
+      }
+
+      // Verdict
+      const totalConcerns = actNowItems.length + waitItems.length + anxietyItems.length;
+      if (actNowItems.length > 0) {
+        verdictText = 'Something physical or urgent surfaced. Address it. The rest waits.';
+      } else if (totalConcerns === 0 && dump.length > 100) {
+        verdictText = 'You wrote a lot and none of it sorted into urgent. That is probably the correct answer. The dump itself was the intervention. The thoughts are on the page now, not in the queue. Put the phone down.';
+      } else if (anxietyItems.length > waitItems.length) {
+        verdictText = 'Most of what surfaced is anxiety, not tasks. The 3 AM mora is doing its work — sitting on the chest, drawing down the energy, offering no path forward because there is none at 3 AM. The broom countermeasure: give the anxiety something to count. Name three things in the room that are not problems. The nervous system will slow.';
+      } else if (waitItems.length > 0) {
+        verdictText = 'There are real tasks here. They will still be tasks at 8 AM and you will be more capable of handling them then. Write them in the wait column. Go back to sleep. The tasks are recorded. You no longer have to hold them.';
+      } else {
+        verdictText = 'The machine has processed the input. The record exists. The mountain does not panic at 3 AM. It is still there at 8 AM, unchanged. So are most of your problems.';
+      }
+
+      // Save
+      const now = new Date();
+      const entry = {
+        dump, actNow: actNowText, wait: waitText, noise: noiseText, verdict: verdictText,
+        time: now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+        date: now.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'})
+      };
+      const hist = JSON.parse(localStorage.getItem(KEY) || '[]');
+      hist.unshift(entry);
+      if (hist.length > 20) hist.pop();
+      localStorage.setItem(KEY, JSON.stringify(hist));
+
+      // Render
+      document.getElementById('sort-time').textContent = `${entry.date} at ${entry.time}`;
+      document.getElementById('act-now').textContent = actNowText;
+      document.getElementById('wait-morning').textContent = waitText;
+      document.getElementById('noise').textContent = noiseText;
+      document.getElementById('verdict').textContent = verdictText;
+
+      document.getElementById('input-view').classList.add('hidden');
+      document.getElementById('sorted-view').classList.remove('hidden');
+    }
+
+    function newSort() {
+      document.getElementById('dump').value = '';
+      document.getElementById('sorted-view').classList.add('hidden');
+      document.getElementById('input-view').classList.remove('hidden');
+      renderHist();
+    }
+
+    function copySort() {
+      const t = document.getElementById('sort-time').textContent;
+      const lines = [
+        `3 AM SORT: ${t}`, '',
+        'ACT NOW:', document.getElementById('act-now').textContent, '',
+        'WAIT UNTIL MORNING:', document.getElementById('wait-morning').textContent, '',
+        'NOISE:', document.getElementById('noise').textContent, '',
+        'PRÍZRAK NOTE:', document.getElementById('verdict').textContent
+      ];
+      navigator.clipboard.writeText(lines.join('\n')).then(() => {
+        const b = event.target; b.textContent = 'Copied ✓';
+        setTimeout(() => b.textContent = 'Copy', 1500);
+      });
+    }
+
+    function renderHist() {
+      const hist = JSON.parse(localStorage.getItem(KEY) || '[]');
+      if (hist.length === 0) return;
+      document.getElementById('hist-section').classList.remove('hidden');
+      document.getElementById('hist-list').innerHTML = hist.slice(0, 5).map((e, i) => `
+        <div onclick="loadHist(${i})" class="rounded-lg border border-zinc-900 px-4 py-3 cursor-pointer hover:border-zinc-700 transition-colors">
+          <div class="flex justify-between">
+            <span class="text-xs text-zinc-600">${e.date}</span>
+            <span class="text-xs text-zinc-700">${e.time}</span>
+          </div>
+          <p class="text-xs text-zinc-700 mt-1 truncate">${e.dump.substring(0,60)}...</p>
+        </div>`).join('');
+    }
+
+    function loadHist(i) {
+      const hist = JSON.parse(localStorage.getItem(KEY) || '[]');
+      const e = hist[i];
+      if (!e) return;
+      document.getElementById('sort-time').textContent = `${e.date} at ${e.time}`;
+      document.getElementById('act-now').textContent = e.actNow;
+      document.getElementById('wait-morning').textContent = e.wait;
+      document.getElementById('noise').textContent = e.noise;
+      document.getElementById('verdict').textContent = e.verdict;
+      document.getElementById('input-view').classList.add('hidden');
+      document.getElementById('sorted-view').classList.remove('hidden');
+    }
+
+    renderHist();
+  </script>
+</body>
+</html>

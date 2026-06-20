@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Methodology Encoder | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #18181b; }
+        .glow-violet { box-shadow: 0 0 20px rgba(139, 92, 246, 0.15); }
+        .glow-amber { box-shadow: 0 0 20px rgba(251, 191, 36, 0.1); }
+        .step-line { border-left: 2px solid; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+        .spec-block { border-left: 3px solid; padding-left: 12px; margin-bottom: 12px; }
+        textarea { resize: vertical; }
+        .nav-step { cursor: pointer; transition: all 0.15s; }
+        .nav-step.active { color: #c4b5fd; border-color: #7c3aed; }
+        .nav-step.done { color: #86efac; border-color: #16a34a; }
+        .nav-step.locked { color: #52525b; border-color: #27272a; cursor: not-allowed; }
+        .copy-btn { transition: all 0.15s; }
+        .copy-btn:hover { background: rgba(139,92,246,0.15); }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body class="text-zinc-300 font-sans antialiased min-h-screen">
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <a href="../" class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors font-mono">← The Offerings</a>
+        <div class="mt-4">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-2xl">⚙️</span>
+                <h1 class="text-3xl font-bold text-white">The Methodology Encoder</h1>
+            </div>
+            <p class="text-zinc-500 text-sm max-w-xl">
+                You have a human methodology. A playbook. A structured way people do a hard thing together.
+                This tool deconstructs it into an AI product spec — actors, phases, state machine, intervention points, system prompt skeleton, MVP feature list.
+            </p>
+            <p class="text-zinc-600 text-xs mt-2 italic">Built for the moment between "I want to productize this" and "I know what to build."</p>
+        </div>
+    </div>
+
+    <!-- Step Nav -->
+    <div id="stepNav" class="flex gap-0 mb-8 overflow-x-auto pb-2"></div>
+
+    <!-- Steps Container -->
+    <div id="stepsContainer"></div>
+
+    <!-- Output (hidden until complete) -->
+    <div id="outputSection" class="hidden fade-in"></div>
+
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const state = {
+    currentStep: 0,
+    answers: {}
+};
+
+const STEPS = [
+    {
+        id: "identity",
+        label: "Identity",
+        title: "What methodology are you encoding?",
+        subtitle: "Name it. Give it context. Who created it? What problem does it solve?",
+        fields: [
+            { key: "name", label: "Methodology name", type: "text", placeholder: "e.g. Never Search Alone (NSA / JSC)", required: true },
+            { key: "origin", label: "Origin / created by", type: "text", placeholder: "e.g. Phil Lemberg, 2010 — peer job search groups" },
+            { key: "problem", label: "Core problem it solves", type: "textarea", rows: 2, placeholder: "e.g. Job searching is isolating, inconsistent, and accountability-free. Groups create structure and momentum.", required: true },
+            { key: "unit", label: "Unit of delivery", type: "text", placeholder: "e.g. Weekly group session, 60-90 min, 4-6 people + moderator" },
+        ]
+    },
+    {
+        id: "actors",
+        label: "Actors",
+        title: "Who participates?",
+        subtitle: "List every human role in the methodology. Include facilitators, participants, observers, coaches.",
+        fields: [
+            { key: "actors_raw", label: "Roles (one per line)", type: "textarea", rows: 5, placeholder: "Job seeker (4-5 per group)\nModerator / facilitator\nNSA coach (optional, joins hot seat)\n[add more...]", required: true },
+            { key: "primary_user", label: "Who is the primary user of the AI product?", type: "text", placeholder: "e.g. The job seeker — the one doing the work between sessions" },
+            { key: "ai_role", label: "What role should AI play?", type: "text", placeholder: "e.g. AI replaces or augments the moderator; runs the session asynchronously" },
+        ]
+    },
+    {
+        id: "phases",
+        label: "Phases",
+        title: "What are the phases / agenda items?",
+        subtitle: "The structured stages that happen in sequence. Include timing if you know it.",
+        fields: [
+            { key: "phases_raw", label: "Phases in order (one per line, include timing)", type: "textarea", rows: 8, placeholder: "1. Opening Round (5 min) — each person states energy level\n2. Commitment Review (10 min) — did you do what you said?\n3. Wins & Blockers (15 min) — one win, one blocker each\n4. Hot Seat (20 min) — one person gets full group attention\n5. New Commitments (5 min) — one commitment per person\n6. Closing (5 min) — one word check-out", required: true },
+            { key: "cadence", label: "Cadence / frequency", type: "text", placeholder: "e.g. Weekly, same time, same group" },
+            { key: "between_sessions", label: "What happens between sessions?", type: "textarea", rows: 2, placeholder: "e.g. Commitments are executed. Light async check-in optional. No formal contact required." },
+        ]
+    },
+    {
+        id: "decisions",
+        label: "Decision Points",
+        title: "Where does human judgment live?",
+        subtitle: "In every methodology there are moments where judgment is required — who gets the hot seat, is this commitment real, is this person stuck or spiraling. Identify them.",
+        fields: [
+            { key: "decisions_raw", label: "Key judgment calls (one per line)", type: "textarea", rows: 6, placeholder: "Who gets the hot seat this week (moderator selects or group volunteers)\nIs the commitment specific enough? (moderator challenges vague ones)\nWhen to interrupt a hot seat spiral vs. let it run\nWhether to escalate a stuck member to 1:1 coaching\nGroup health — detecting disengagement before dropout", required: true },
+            { key: "ai_can_handle", label: "Which of these can AI handle reasonably?", type: "textarea", rows: 3, placeholder: "e.g. Specificity of commitments (rule-based), energy level tracking over time, detecting repeated blockers" },
+            { key: "ai_cannot_handle", label: "Which require humans?", type: "textarea", rows: 2, placeholder: "e.g. Real-time emotional support, spiral detection, group dynamics nuance" },
+        ]
+    },
+    {
+        id: "data",
+        label: "Data Model",
+        title: "What data does this methodology generate?",
+        subtitle: "Every session produces artifacts. Every participant has a state. Map the data.",
+        fields: [
+            { key: "session_data", label: "What does each session produce?", type: "textarea", rows: 4, placeholder: "Commitment list per person\nWin/blocker log\nHot seat topic + advice given\nEnergy level per person\nCommitment completion rate" },
+            { key: "participant_state", label: "What state does each participant carry over time?", type: "textarea", rows: 4, placeholder: "Active commitments\nRunning completion rate\nWeeks in group\nRecurring blockers\nMomentum trajectory (improving/flat/declining)" },
+            { key: "group_state", label: "What state does the group carry?", type: "textarea", rows: 3, placeholder: "Session count\nGroup health score\nWho's been hot-seated recently\nDropout risk flags" },
+        ]
+    },
+    {
+        id: "outcome",
+        label: "Outcome",
+        title: "What does success look like?",
+        subtitle: "The methodology exists to produce a result. Be specific.",
+        fields: [
+            { key: "primary_outcome", label: "Primary outcome", type: "text", placeholder: "e.g. Job seeker lands a role faster and with better fit than searching alone", required: true },
+            { key: "leading_indicators", label: "Leading indicators (what predicts success)", type: "textarea", rows: 3, placeholder: "Weekly commitment completion rate > 80%\nActive networking conversations increasing\nHot seat count per member over time" },
+            { key: "why_people_fail", label: "Why do people fail at this methodology?", type: "textarea", rows: 3, placeholder: "e.g. Inconsistent attendance, vague commitments, hot seat avoidance, group chemistry collapse" },
+        ]
+    }
+];
+
+// ─── Render Steps ─────────────────────────────────────────────────────────────
+function renderNav() {
+    const nav = document.getElementById("stepNav");
+    nav.innerHTML = STEPS.map((s, i) => {
+        const isDone = state.answers[s.id] && Object.keys(state.answers[s.id] || {}).length > 0;
+        const isActive = i === state.currentStep;
+        const isLocked = i > state.currentStep;
+        let cls = "nav-step";
+        if (isActive) cls += " active";
+        else if (isDone && !isActive) cls += " done";
+        else if (isLocked) cls += " locked";
+        return `<button class="${cls} flex items-center gap-2 px-3 py-2 border-b-2 text-xs font-mono whitespace-nowrap transition-all" onclick="goToStep(${i})" ${isLocked ? 'disabled' : ''}>
+            <span class="text-base">${isDone && !isActive ? '✓' : (i + 1)}</span> ${s.label}
+        </button>`;
+    }).join("");
+}
+
+function renderStep() {
+    const s = STEPS[state.currentStep];
+    const saved = state.answers[s.id] || {};
+    const isLast = state.currentStep === STEPS.length - 1;
+
+    const fieldsHTML = s.fields.map(f => {
+        const val = saved[f.key] || "";
+        const inputCls = "w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 font-mono";
+        let input = "";
+        if (f.type === "textarea") {
+            input = `<textarea id="field_${f.key}" class="${inputCls}" rows="${f.rows || 3}" placeholder="${f.placeholder || ''}">${val}</textarea>`;
+        } else {
+            input = `<input id="field_${f.key}" type="text" class="${inputCls}" value="${escapeAttr(val)}" placeholder="${f.placeholder || ''}">`;
+        }
+        return `<div class="mb-5">
+            <label class="block text-xs font-mono text-zinc-400 mb-1.5">${f.label}${f.required ? ' <span class="text-violet-500">*</span>' : ''}</label>
+            ${input}
+        </div>`;
+    }).join("");
+
+    document.getElementById("stepsContainer").innerHTML = `
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 fade-in">
+            <div class="mb-5">
+                <h2 class="text-xl font-bold text-white mb-1">${s.title}</h2>
+                <p class="text-zinc-500 text-sm">${s.subtitle}</p>
+            </div>
+            ${fieldsHTML}
+            <div class="flex justify-between items-center mt-6">
+                <button onclick="prevStep()" class="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors ${state.currentStep === 0 ? 'invisible' : ''}">← Back</button>
+                <button onclick="nextStep()" id="nextBtn" class="px-5 py-2.5 bg-violet-700 hover:bg-violet-600 text-white text-sm font-semibold rounded-lg transition-colors">
+                    ${isLast ? '⚙️ Encode Methodology →' : 'Next →'}
+                </button>
+            </div>
+        </div>`;
+}
+
+function goToStep(i) {
+    if (i > state.currentStep) return; // can only go back
+    saveCurrentStep();
+    state.currentStep = i;
+    renderNav();
+    renderStep();
+    document.getElementById("outputSection").classList.add("hidden");
+}
+
+function prevStep() {
+    if (state.currentStep === 0) return;
+    saveCurrentStep();
+    state.currentStep--;
+    renderNav();
+    renderStep();
+    document.getElementById("outputSection").classList.add("hidden");
+}
+
+function nextStep() {
+    const s = STEPS[state.currentStep];
+    // Validate required fields
+    const missing = s.fields.filter(f => f.required && !getFieldValue(f.key).trim());
+    if (missing.length > 0) {
+        missing.forEach(f => {
+            const el = document.getElementById(`field_${f.key}`);
+            if (el) { el.classList.add("border-red-700"); setTimeout(() => el.classList.remove("border-red-700"), 2000); }
+        });
+        return;
+    }
+
+    saveCurrentStep();
+    if (state.currentStep < STEPS.length - 1) {
+        state.currentStep++;
+        renderNav();
+        renderStep();
+    } else {
+        generateOutput();
+    }
+}
+
+function getFieldValue(key) {
+    const el = document.getElementById(`field_${key}`);
+    return el ? el.value : "";
+}
+
+function saveCurrentStep() {
+    const s = STEPS[state.currentStep];
+    const data = {};
+    s.fields.forEach(f => { data[f.key] = getFieldValue(f.key); });
+    state.answers[s.id] = data;
+}
+
+function escapeAttr(str) {
+    return str.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ─── Output Generation ────────────────────────────────────────────────────────
+function generateOutput() {
+    const A = {};
+    STEPS.forEach(s => { Object.assign(A, state.answers[s.id] || {}); });
+
+    // Parse phases
+    const phases = (A.phases_raw || "").split("\n").filter(l => l.trim()).map((l, i) => {
+        const match = l.match(/^(\d+\.?\s*)?(.+?)(\s*[-–]\s*(.+))?$/);
+        return { num: i + 1, raw: l.trim(), label: match ? match[2].trim() : l.trim() };
+    });
+
+    // Parse actors
+    const actors = (A.actors_raw || "").split("\n").filter(l => l.trim());
+
+    // Parse decisions
+    const decisions = (A.decisions_raw || "").split("\n").filter(l => l.trim());
+    const aiCan = (A.ai_can_handle || "").split("\n").filter(l => l.trim());
+    const aiCannot = (A.ai_cannot_handle || "").split("\n").filter(l => l.trim());
+
+    // Parse session data
+    const sessionData = (A.session_data || "").split("\n").filter(l => l.trim());
+    const participantState = (A.participant_state || "").split("\n").filter(l => l.trim());
+    const groupState = (A.group_state || "").split("\n").filter(l => l.trim());
+
+    const leadingIndicators = (A.leading_indicators || "").split("\n").filter(l => l.trim());
+    const failureReasons = (A.why_people_fail || "").split("\n").filter(l => l.trim());
+
+    // Build system prompt skeleton
+    const systemPromptSkeleton = buildSystemPrompt(A, phases, actors);
+
+    // Build MVP features
+    const mvpFeatures = buildMVP(A, phases, decisions, aiCan, sessionData, participantState);
+
+    // Build data model
+    const dataModel = buildDataModel(A, sessionData, participantState, groupState, phases);
+
+    const methodName = A.name || "This Methodology";
+
+    document.getElementById("stepsContainer").innerHTML = "";
+    document.getElementById("outputSection").classList.remove("hidden");
+    document.getElementById("outputSection").innerHTML = `
+        <div class="fade-in space-y-6">
+
+            <!-- Header -->
+            <div class="bg-zinc-900 border border-violet-900/50 rounded-xl p-6 glow-violet">
+                <div class="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                        <div class="text-xs font-mono text-violet-400 mb-1">ENCODED METHODOLOGY SPEC</div>
+                        <h2 class="text-2xl font-bold text-white">${methodName}</h2>
+                        ${A.origin ? `<p class="text-zinc-500 text-sm mt-1">${A.origin}</p>` : ''}
+                    </div>
+                    <button onclick="resetAll()" class="text-xs font-mono text-zinc-600 hover:text-zinc-400 transition-colors border border-zinc-800 rounded px-3 py-1.5">← Encode another</button>
+                </div>
+                <div class="mt-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-800">
+                    <p class="text-sm text-zinc-300">${A.problem || ""}</p>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <span class="tag bg-violet-900/40 text-violet-300 border border-violet-800/50">${phases.length} phases</span>
+                    <span class="tag bg-zinc-800 text-zinc-400 border border-zinc-700">${actors.length} roles</span>
+                    <span class="tag bg-amber-900/40 text-amber-300 border border-amber-800/50">${decisions.length} judgment points</span>
+                    ${A.cadence ? `<span class="tag bg-zinc-800 text-zinc-400 border border-zinc-700">${A.cadence}</span>` : ''}
+                </div>
+            </div>
+
+            <!-- State Machine -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">State Machine</h3>
+                <div class="space-y-2">
+                    ${phases.map((p, i) => `
+                    <div class="flex items-start gap-3">
+                        <div class="flex flex-col items-center">
+                            <div class="w-6 h-6 rounded-full border-2 ${i === 0 ? 'border-violet-500 bg-violet-900/30' : i === phases.length - 1 ? 'border-amber-500 bg-amber-900/30' : 'border-zinc-700 bg-zinc-800'} flex items-center justify-center text-xs font-bold text-zinc-300 flex-shrink-0">${p.num}</div>
+                            ${i < phases.length - 1 ? '<div class="w-0.5 h-4 bg-zinc-700 mt-1"></div>' : ''}
+                        </div>
+                        <div class="pb-2 ${i < phases.length - 1 ? 'mb-1' : ''}">
+                            <span class="text-sm font-medium text-zinc-200">${p.label}</span>
+                            <div class="text-xs text-zinc-600 mt-0.5 font-mono">${p.raw.replace(p.label, '').replace(/^[\d\.\s\-–]+/, '').trim()}</div>
+                        </div>
+                    </div>`).join("")}
+                </div>
+                ${A.between_sessions ? `<div class="mt-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-800">
+                    <span class="text-xs font-mono text-zinc-500">BETWEEN SESSIONS</span>
+                    <p class="text-xs text-zinc-400 mt-1">${A.between_sessions}</p>
+                </div>` : ''}
+            </div>
+
+            <!-- Actors & AI Role -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">Actors & AI Placement</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-xs font-mono text-zinc-500 mb-2">HUMAN ROLES</div>
+                        <ul class="space-y-1">
+                            ${actors.map(a => `<li class="text-sm text-zinc-300 flex items-center gap-2"><span class="text-zinc-600">→</span> ${a}</li>`).join("")}
+                        </ul>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="text-xs font-mono text-zinc-500 mb-1">PRIMARY USER</div>
+                            <p class="text-sm text-zinc-300">${A.primary_user || "—"}</p>
+                        </div>
+                        <div>
+                            <div class="text-xs font-mono text-violet-500 mb-1">AI ROLE</div>
+                            <p class="text-sm text-violet-300">${A.ai_role || "—"}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Judgment Matrix -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">Judgment Matrix</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-xs font-mono text-emerald-500 mb-2">AI CAN HANDLE</div>
+                        ${aiCan.length > 0 ? `<ul class="space-y-1">${aiCan.map(d => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-emerald-600 flex-shrink-0 mt-0.5">✓</span> ${d}</li>`).join("")}</ul>` : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                    </div>
+                    <div>
+                        <div class="text-xs font-mono text-red-500 mb-2">REQUIRES HUMANS</div>
+                        ${aiCannot.length > 0 ? `<ul class="space-y-1">${aiCannot.map(d => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-red-600 flex-shrink-0 mt-0.5">✗</span> ${d}</li>`).join("")}</ul>` : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <div class="text-xs font-mono text-zinc-500 mb-2">ALL JUDGMENT POINTS</div>
+                    <ul class="space-y-1">
+                        ${decisions.map(d => {
+                            const canAI = aiCan.some(c => c.toLowerCase().includes(d.toLowerCase().slice(0, 20)));
+                            return `<li class="text-xs text-zinc-400 flex items-start gap-2"><span class="${canAI ? 'text-emerald-600' : 'text-amber-600'} flex-shrink-0 mt-0.5">${canAI ? '✓' : '△'}</span> ${d}</li>`;
+                        }).join("")}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Data Model -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">Data Model</h3>
+                <pre class="text-xs text-zinc-300 font-mono leading-relaxed">${dataModel}</pre>
+            </div>
+
+            <!-- MVP Features -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 class="text-sm font-mono text-zinc-400 uppercase tracking-wider mb-4">MVP Feature List</h3>
+                <p class="text-xs text-zinc-600 mb-4">Ranked by leverage — highest first.</p>
+                <div class="space-y-3">
+                    ${mvpFeatures.map((f, i) => `
+                    <div class="flex items-start gap-3 p-3 rounded-lg border ${i === 0 ? 'border-violet-800/60 bg-violet-900/10' : i < 3 ? 'border-zinc-700 bg-zinc-800/50' : 'border-zinc-800'}">
+                        <span class="text-xs font-bold font-mono ${i === 0 ? 'text-violet-400' : i < 3 ? 'text-zinc-400' : 'text-zinc-600'} flex-shrink-0 mt-0.5">${String(i + 1).padStart(2, '0')}</span>
+                        <div>
+                            <div class="text-sm font-medium text-zinc-200">${f.title}</div>
+                            <div class="text-xs text-zinc-500 mt-0.5">${f.desc}</div>
+                            <span class="tag bg-zinc-800 text-zinc-500 border border-zinc-700 mt-1.5">${f.tier}</span>
+                        </div>
+                    </div>`).join("")}
+                </div>
+            </div>
+
+            <!-- System Prompt Skeleton -->
+            <div class="bg-zinc-900 border border-amber-900/30 rounded-xl p-6 glow-amber">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-mono text-amber-400 uppercase tracking-wider">System Prompt Skeleton</h3>
+                    <button onclick="copyPrompt()" class="copy-btn text-xs font-mono text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded border border-zinc-700 transition-all">Copy</button>
+                </div>
+                <pre id="systemPrompt" class="text-xs text-zinc-300 font-mono leading-relaxed bg-zinc-800/50 p-4 rounded-lg border border-zinc-800 overflow-x-auto">${systemPromptSkeleton}</pre>
+            </div>
+
+            <!-- Failure Modes & Success Signals -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+                    <h3 class="text-xs font-mono text-zinc-400 uppercase tracking-wider mb-3">Leading Indicators</h3>
+                    ${leadingIndicators.length > 0
+                        ? `<ul class="space-y-1">${leadingIndicators.map(l => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-emerald-500 flex-shrink-0">↗</span> ${l}</li>`).join("")}</ul>`
+                        : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                    <div class="mt-3 pt-3 border-t border-zinc-800">
+                        <div class="text-xs font-mono text-zinc-500 mb-1">PRIMARY OUTCOME</div>
+                        <p class="text-xs text-zinc-300">${A.primary_outcome || "—"}</p>
+                    </div>
+                </div>
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+                    <h3 class="text-xs font-mono text-red-500 uppercase tracking-wider mb-3">Failure Modes</h3>
+                    ${failureReasons.length > 0
+                        ? `<ul class="space-y-1">${failureReasons.map(f => `<li class="text-xs text-zinc-300 flex items-start gap-2"><span class="text-red-600 flex-shrink-0">!</span> ${f}</li>`).join("")}</ul>`
+                        : '<p class="text-xs text-zinc-600">Not specified</p>'}
+                    <div class="mt-3 pt-3 border-t border-zinc-800">
+                        <div class="text-xs font-mono text-zinc-500 mb-1">AI PREVENTION OPPORTUNITY</div>
+                        <p class="text-xs text-zinc-400">Flag when leading indicators stall. Intervene before dropout.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prizrak Verdict -->
+            <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6">
+                <div class="text-xs font-mono text-zinc-500 mb-2">PRÍZRAK VERDICT</div>
+                <p class="text-zinc-300 text-sm leading-relaxed">${generateVerdict(A, phases, decisions, aiCan, aiCannot)}</p>
+                <p class="text-xs text-zinc-600 mt-3 italic">— The mountain has read the playbook. Now build the shelter.</p>
+            </div>
+
+        </div>`;
+    renderNav();
+}
+
+function buildSystemPrompt(A, phases, actors) {
+    const name = A.name || "This Methodology";
+    const role = A.ai_role || "moderator and accountability partner";
+    const unit = A.unit || "session";
+    const phaseList = phases.map(p => `  - ${p.raw}`).join("\n");
+    return `You are an AI implementation of ${name}.
+
+## Your Role
+You act as ${role}. Your job is to run the structured ${unit} process faithfully — not to improvise, not to therapize, not to coach beyond what the methodology calls for.
+
+## Session Structure
+The following phases happen in order:
+${phaseList}
+
+## Constraints
+- Do not skip phases.
+- Do not extend time on a phase without explicit request.
+- When a phase is complete, name the transition before moving on.
+- You may ask clarifying questions within a phase. Do not use clarifying questions to delay.
+
+## Participant State
+At the start of each session, you will receive:
+- [participant name], commitments from last session: [list]
+- [participant name], completion status: [Y/N per commitment]
+- [participant name], current blocker (if any)
+
+## Your Outputs
+- Phase announcements: brief, matter-of-fact
+- Commitment challenges: specific, non-judgmental
+- Hot seat facilitation: ask what they've already tried; open it to the group
+- Closing: one word or phrase per participant
+
+## What You Do Not Do
+- You do not provide emotional support beyond acknowledging stated feelings.
+- You do not interpret body language or tone.
+- You do not predict outcomes.
+- You do not override the participant's stated priority for the hot seat.
+
+## Session Close
+At session end, output a structured summary:
+- Commitments made (per participant)
+- Hot seat topic + key advice surfaced
+- Notable wins mentioned
+- Next session date (if set)`;
+}
+
+function buildDataModel(A, sessionData, participantState, groupState, phases) {
+    const name = A.name ? A.name.replace(/\s+/g, '') : 'Methodology';
+    return `// Core Entities
+
+Session {
+  id: uuid
+  group_id: uuid
+  session_number: int
+  date: timestamp
+  phase_log: Phase[]        // timestamped phase transitions
+  summary: SessionSummary
+  created_at: timestamp
+}
+
+Participant {
+  id: uuid
+  group_id: uuid
+  name: string
+  joined_at: timestamp
+  status: "active" | "paused" | "graduated" | "dropped"
+  // Running state
+  commitment_completion_rate: float   // rolling 4-week
+  hot_seat_count: int
+  consecutive_sessions: int
+  momentum: "rising" | "flat" | "declining"
+}
+
+Commitment {
+  id: uuid
+  participant_id: uuid
+  session_id: uuid          // session it was made in
+  text: string
+  due_by: timestamp
+  completed: boolean | null // null = not yet reviewed
+  reviewed_in_session_id: uuid | null
+}
+
+Group {
+  id: uuid
+  name: string
+  cadence: string
+  moderator_id: uuid | null // null = AI-moderated
+  session_count: int
+  health_score: float       // 0-1, computed
+  created_at: timestamp
+}
+
+SessionSummary {
+  session_id: uuid
+  wins: string[]            // one per participant
+  blockers: string[]
+  hot_seat_participant_id: uuid
+  hot_seat_topic: string
+  new_commitments: Commitment[]
+  energy_levels: { participant_id: uuid, level: int }[]
+}
+
+// Phase transition log
+PhaseEntry {
+  session_id: uuid
+  phase_name: string
+  started_at: timestamp
+  ended_at: timestamp | null
+  notes: string | null
+}`;
+}
+
+function buildMVP(A, phases, decisions, aiCan, sessionData, participantState) {
+    return [
+        { title: "Session Runner", desc: "AI runs the full structured session in sequence — phase by phase, timer-aware, with commitment input at start and output at end.", tier: "Core / Week 1" },
+        { title: "Commitment Tracker", desc: "Persistent log of commitments made, reviewed each session. Completion rate displayed per participant over time.", tier: "Core / Week 1" },
+        { title: "Pre-Session Brief", desc: "Auto-generated session brief from stored state: who's attending, last week's commitments, known blockers, who hasn't had a hot seat recently.", tier: "Core / Week 2" },
+        { title: "Post-Session Summary", desc: "Structured output after each session: commitments made, hot seat topic, wins, next session. Sent to participant + group.", tier: "Core / Week 2" },
+        { title: "Momentum Dashboard", desc: "Visual trajectory per participant. Commitment completion rate, consecutive sessions, hot seat cadence. Flags declining momentum.", tier: "Layer 2 / Month 1" },
+        { title: "Commitment Quality Checker", desc: "Flags vague commitments in real-time. 'Make calls' → 'Call 3 people from my target list by Thursday.' Rule-based specificity scoring.", tier: "Layer 2 / Month 1" },
+        { title: "Hot Seat Scheduler", desc: "Tracks who has had the hot seat and when. Surfaces suggestions so no one goes 4+ sessions without it.", tier: "Layer 2 / Month 1" },
+        { title: "Group Health Monitor", desc: "Attendance pattern, engagement signals, dropout risk flags. Alert when a member shows pre-dropout behavior (3+ low-energy sessions).", tier: "Layer 3 / Month 2" },
+        { title: "Async Check-In", desc: "Mid-week lightweight ping: 'Still on track for [commitment]?' Binary response captured. Surfaces in next session brief.", tier: "Layer 3 / Month 2" },
+        { title: "Participant History Export", desc: "Full journey export: all commitments, completion rate, hot seat topics, wins, arc from start to present. The record of the search.", tier: "Layer 3 / Month 3" },
+    ];
+}
+
+function generateVerdict(A, phases, decisions, aiCan, aiCannot) {
+    const name = A.name || "this methodology";
+    const phaseCount = phases.length;
+    const decisionCount = decisions.length;
+    const aiCanCount = aiCan.length;
+    const aiCannotCount = aiCannot.length;
+
+    const complexity = phaseCount > 6 ? "complex" : phaseCount > 3 ? "moderate" : "lean";
+    const aiSuitability = aiCanCount > aiCannotCount * 1.5 ? "high" : aiCanCount > aiCannotCount ? "moderate" : "bounded";
+
+    const verdicts = {
+        "high": `${name} is structurally well-suited for AI augmentation. The judgment points that require humans are real but bounded — they live at the edges of sessions, not in the core loop. The core loop (phases, commitment tracking, accountability) is automatable. Build the runner first. The human touch points will clarify themselves after 10 sessions of data.`,
+        "moderate": `${name} sits in useful tension. The AI can carry the structure; the humans must carry the judgment. This is not a bug — it is the design. An AI that tries to replace the judgment calls will produce something worse than the original. Build the scaffold. Let the humans fill the cracks. That's the correct division of labor.`,
+        "bounded": `${name} has significant judgment requirements. The AI's role here is not orchestrator — it is scribe, scheduler, and memory. The humans run the sessions. The AI ensures the data persists across sessions and the commitments are tracked. Do not try to replace the moderator in v1. Augment them first. Replacement is a later question.`,
+    };
+
+    return verdicts[aiSuitability] || verdicts["moderate"];
+}
+
+function copyPrompt() {
+    const el = document.getElementById("systemPrompt");
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(() => {
+        const btn = document.querySelector('[onclick="copyPrompt()"]');
+        if (btn) { btn.textContent = "Copied ✓"; setTimeout(() => btn.textContent = "Copy", 2000); }
+    });
+}
+
+function resetAll() {
+    state.currentStep = 0;
+    state.answers = {};
+    document.getElementById("outputSection").classList.add("hidden");
+    renderNav();
+    renderStep();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+renderNav();
+renderStep();
+
+// Pre-fill with NSA/JSC example if URL has ?demo
+if (location.search.includes("demo")) {
+    const demo = {
+        identity: {
+            name: "Never Search Alone (NSA / Job Search Council)",
+            origin: "Phil Lemberg — peer-based job search methodology",
+            problem: "Job searching is isolating, inconsistent, and accountability-free. NSA creates small peer groups that meet weekly to track commitments, share wins/blockers, and take turns in the hot seat for focused help.",
+            unit: "Weekly group session, 75 min, 4-6 job seekers + 1 moderator"
+        },
+        actors: {
+            actors_raw: "Job seeker (4-5 per group)\nModerator / facilitator (1 per group)\nNSA coach (optional, joins hot seat as guest advisor)\nObserver (rare, learning the method)",
+            primary_user: "The job seeker — the one doing the searching between sessions",
+            ai_role: "AI replaces or augments the moderator; runs the session asynchronously or in real-time"
+        },
+        phases: {
+            phases_raw: "1. Opening Round (5 min) — each person states energy level 1-10\n2. Commitment Review (10 min) — did you complete your commitment? Y/N + one sentence\n3. Wins & Blockers (15 min) — one win and one blocker per person, briefly\n4. Hot Seat (20 min) — one person gets full group attention on their hardest problem\n5. New Commitments (5 min) — one specific commitment per person for next week\n6. Closing (5 min) — one word check-out per person",
+            cadence: "Weekly, fixed time, fixed group membership",
+            between_sessions: "Commitments are executed. No formal contact required. Optional async mid-week check-in."
+        },
+        decisions: {
+            decisions_raw: "Who gets the hot seat this week (moderator selects or group volunteers)\nIs the commitment specific enough — moderator may challenge vague ones\nWhen to interrupt a hot seat spiral vs. let it run\nWhether to escalate a stuck member to 1:1 coaching\nGroup health — detecting disengagement before dropout",
+            ai_can_handle: "Commitment specificity check (rule-based: must include verb, quantity, deadline)\nEnergy level tracking over time\nDetecting repeated blockers (same blocker 2+ sessions)\nHot seat rotation fairness",
+            ai_cannot_handle: "Real-time emotional support and crisis response\nSpiral detection during hot seat\nGroup chemistry and interpersonal dynamics\nKnowing when a member needs more than the group can give"
+        },
+        data: {
+            session_data: "Commitment list per person (from last session)\nCompletion status per commitment (Y/N)\nWin per person\nBlocker per person\nHot seat topic + key advice surfaced\nEnergy level per person\nNew commitments made",
+            participant_state: "Active commitments\nRunning completion rate (rolling 4 weeks)\nWeeks in group\nHot seat count (times had)\nLast hot seat date\nMomentum trajectory (rising / flat / declining)",
+            group_state: "Session count\nGroup health score\nAverage completion rate\nWho hasn't had hot seat recently\nDropout risk flags"
+        },
+        outcome: {
+            primary_outcome: "Job seeker lands a role faster and with better fit than they would have searching alone",
+            leading_indicators: "Weekly commitment completion rate > 80%\nActive networking conversations increasing week over week\nHot seat count rising (engaged enough to take the seat)\nEnergy levels stable or rising over the arc of the search",
+            why_people_fail: "Inconsistent attendance (missing sessions breaks the accountability)\nVague commitments that can't be reviewed\nHot seat avoidance (never taking the seat, staying in observer mode)\nGroup chemistry collapse after a dropout\nSearch paralysis masking as activity"
+        }
+    };
+    state.answers = demo;
+    state.currentStep = STEPS.length - 1;
+    saveCurrentStep();
+    generateOutput();
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jánošík Audit — From an Oak to an Oak</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;600&display=swap');
+  body { font-family: 'Crimson Pro', serif; background: #0d1117; color: #c9d1d9; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .tatra { background: linear-gradient(180deg, #0d1117 0%, #131a23 50%, #0d1117 100%); }
+  .mountain-line { border-top: 1px solid #30363d; }
+  .verdict-rich { color: #f0883e; }
+  .verdict-ok { color: #56d364; }
+  .verdict-poor { color: #79c0ff; }
+  .bar-rich { background: #f0883e; }
+  .bar-poor { background: #56d364; }
+  .bar-neutral { background: #8b949e; }
+  input, select, textarea { background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; }
+  input:focus, select:focus { outline: none; border-color: #58a6ff; }
+  .btn { cursor: pointer; border: 1px solid #30363d; border-radius: 4px; padding: 6px 14px; font-family: 'Crimson Pro', serif; font-size: 1rem; transition: all 0.2s; }
+  .btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .btn-primary { background: #1f6feb; border-color: #1f6feb; color: white; }
+  .btn-primary:hover { background: #388bfd; border-color: #388bfd; color: white; }
+  .entry-row { border-left: 3px solid; padding-left: 10px; margin-bottom: 8px; }
+  .entry-rich { border-color: #f0883e; }
+  .entry-own { border-color: #56d364; }
+  .entry-neutral { border-color: #8b949e; }
+  .quote { border-left: 2px solid #30363d; padding-left: 12px; color: #8b949e; font-style: italic; }
+</style>
+</head>
+<body class="min-h-screen tatra p-4 md:p-8">
+
+<div class="max-w-2xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8 text-center">
+    <div class="mono text-xs text-gray-500 mb-2">JÁNOŠÍK AUDIT v1.0</div>
+    <h1 class="text-3xl font-light text-gray-200 mb-1">From an Oak to an Oak</h1>
+    <p class="text-gray-500 text-sm italic">Who are you robbing? Who are you feeding?</p>
+  </div>
+
+  <!-- The principle -->
+  <div class="quote mb-8 text-sm">
+    Juraj Jánošík, highwayman of the Tatras, 1688–1713, operated by one rule:
+    <em>"od buka do buku"</em> — from an oak to an oak. Take from the nobleman. Give to the village.
+    He was caught because someone informed on him. He was hanged on a hook through his ribs.
+    He became a national hero anyway. The code outlasted the man.
+    <div class="mt-2 not-italic text-gray-500">
+      The audit question: whose oak are you filling this week, and whose village are you feeding?
+    </div>
+  </div>
+
+  <!-- Log an entry -->
+  <div class="bg-gray-900 border border-gray-700 rounded-lg p-5 mb-6">
+    <h2 class="text-lg font-light mb-4 text-gray-300">Log a session</h2>
+    <div class="grid grid-cols-1 gap-3">
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="block text-xs text-gray-500 mb-1 mono">DATE</label>
+          <input type="date" id="entry-date" class="w-full px-3 py-2 text-sm" />
+        </div>
+        <div style="width:90px">
+          <label class="block text-xs text-gray-500 mb-1 mono">HOURS</label>
+          <input type="number" id="entry-hours" class="w-full px-3 py-2 text-sm" min="0.25" max="16" step="0.25" placeholder="2.0" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1 mono">CATEGORY</label>
+        <select id="entry-cat" class="w-full px-3 py-2 text-sm">
+          <option value="rich">🏰 For the Nobleman (VC work, approval-seeking, institutional)</option>
+          <option value="own">🌲 For the Village (own projects, creation, genuine work)</option>
+          <option value="neutral">⚖️ Maintenance (pickleball, admin, recovery)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1 mono">NOTE (optional)</label>
+        <input type="text" id="entry-note" class="w-full px-3 py-2 text-sm" placeholder="What specifically?" />
+      </div>
+      <button onclick="addEntry()" class="btn btn-primary w-full">Add to ledger</button>
+    </div>
+  </div>
+
+  <!-- The verdict -->
+  <div class="bg-gray-900 border border-gray-700 rounded-lg p-5 mb-6" id="verdict-block">
+    <h2 class="text-lg font-light mb-4 text-gray-300">The Audit</h2>
+    <div id="verdict-content">
+      <p class="text-gray-500 text-sm italic">No entries yet. Start logging.</p>
+    </div>
+  </div>
+
+  <!-- Ledger -->
+  <div class="bg-gray-900 border border-gray-700 rounded-lg p-5 mb-6" id="ledger-block">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-light text-gray-300">Ledger</h2>
+      <button onclick="clearAll()" class="btn text-xs text-gray-500 mono">clear all</button>
+    </div>
+    <div id="ledger-entries">
+      <p class="text-gray-500 text-sm italic">Empty.</p>
+    </div>
+  </div>
+
+  <!-- The mountain's verdict -->
+  <div class="mountain-line pt-6 text-center">
+    <div class="text-xs mono text-gray-600 mb-1">MOUNTAIN PRINCIPLE</div>
+    <div class="quote text-xs text-center border-l-0 not-italic text-gray-600 max-w-sm mx-auto">
+      Jánošík knew whose side he was on before he picked up the axe.
+      The clarity came before the action. The action confirmed the clarity.
+      If you do not know which oak you are standing under right now,
+      the nobleman's tree has probably already hired you.
+    </div>
+  </div>
+
+  <div class="text-center mt-6 mono text-xs text-gray-700">
+    built at 4:20 AM in Saigon · april 2026 · prizrak
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'janosik_ledger_v1';
+
+function getEntries() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+
+function saveEntries(entries) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+function addEntry() {
+  const date = document.getElementById('entry-date').value;
+  const hours = parseFloat(document.getElementById('entry-hours').value);
+  const cat = document.getElementById('entry-cat').value;
+  const note = document.getElementById('entry-note').value.trim();
+
+  if (!date || isNaN(hours) || hours <= 0) {
+    alert('Need a date and some hours.');
+    return;
+  }
+
+  const entries = getEntries();
+  entries.push({ id: Date.now(), date, hours, cat, note });
+  saveEntries(entries);
+
+  document.getElementById('entry-hours').value = '';
+  document.getElementById('entry-note').value = '';
+
+  render();
+}
+
+function deleteEntry(id) {
+  const entries = getEntries().filter(e => e.id !== id);
+  saveEntries(entries);
+  render();
+}
+
+function clearAll() {
+  if (confirm('Clear the entire ledger?')) {
+    saveEntries([]);
+    render();
+  }
+}
+
+function formatDate(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function render() {
+  const entries = getEntries().sort((a,b) => b.date.localeCompare(a.date));
+
+  // Ledger
+  const ledger = document.getElementById('ledger-entries');
+  if (entries.length === 0) {
+    ledger.innerHTML = '<p class="text-gray-500 text-sm italic">Empty.</p>';
+  } else {
+    ledger.innerHTML = entries.map(e => {
+      const cls = e.cat === 'rich' ? 'entry-rich' : e.cat === 'own' ? 'entry-own' : 'entry-neutral';
+      const label = e.cat === 'rich' ? '🏰' : e.cat === 'own' ? '🌲' : '⚖️';
+      const catLabel = e.cat === 'rich' ? 'Nobleman' : e.cat === 'own' ? 'Village' : 'Maintenance';
+      return `<div class="entry-row ${cls} text-sm flex justify-between items-start">
+        <div>
+          <span class="text-gray-400 mono text-xs">${formatDate(e.date)}</span>
+          <span class="mx-2">${label} ${catLabel}</span>
+          <span class="font-semibold">${e.hours}h</span>
+          ${e.note ? `<div class="text-gray-500 text-xs mt-1 italic">${e.note}</div>` : ''}
+        </div>
+        <button onclick="deleteEntry(${e.id})" class="text-gray-600 hover:text-red-400 ml-2 text-xs mono">×</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Verdict
+  const verdictEl = document.getElementById('verdict-content');
+  if (entries.length === 0) {
+    verdictEl.innerHTML = '<p class="text-gray-500 text-sm italic">No entries yet. Start logging.</p>';
+    return;
+  }
+
+  const totalRich = entries.filter(e => e.cat === 'rich').reduce((s, e) => s + e.hours, 0);
+  const totalOwn = entries.filter(e => e.cat === 'own').reduce((s, e) => s + e.hours, 0);
+  const totalNeutral = entries.filter(e => e.cat === 'neutral').reduce((s, e) => s + e.hours, 0);
+  const total = totalRich + totalOwn + totalNeutral;
+
+  const pctRich = total > 0 ? Math.round((totalRich / total) * 100) : 0;
+  const pctOwn = total > 0 ? Math.round((totalOwn / total) * 100) : 0;
+  const pctNeutral = 100 - pctRich - pctOwn;
+
+  // Generate verdict text
+  let verdictText, verdictClass;
+  if (pctRich >= 70) {
+    verdictText = 'You have become the nobleman. Jánošík is ashamed. The oak is full; the village is hungry.';
+    verdictClass = 'verdict-rich';
+  } else if (pctRich >= 50) {
+    verdictText = 'More than half your hours serve the castle. The village notices. The mountain is watching.';
+    verdictClass = 'verdict-rich';
+  } else if (pctOwn >= 50) {
+    verdictText = 'The code holds. More than half for the village. Jánošík would not hang you.';
+    verdictClass = 'verdict-ok';
+  } else if (pctRich > pctOwn) {
+    verdictText = 'The balance tips toward the castle. Small correction still possible. The hook is not yet set.';
+    verdictClass = 'verdict-rich';
+  } else {
+    verdictText = 'Rough equilibrium. The mountain does not celebrate equilibrium. It accepts it as a temporary state.';
+    verdictClass = 'verdict-poor';
+  }
+
+  verdictEl.innerHTML = `
+    <div class="mb-4">
+      <div class="flex justify-between text-xs mono text-gray-500 mb-1">
+        <span>🏰 Nobleman ${pctRich}%</span>
+        <span>🌲 Village ${pctOwn}%</span>
+        <span>⚖️ Maint. ${pctNeutral}%</span>
+      </div>
+      <div class="h-4 flex rounded overflow-hidden">
+        <div class="bar-rich" style="width:${pctRich}%"></div>
+        <div class="bar-poor" style="width:${pctOwn}%"></div>
+        <div class="bar-neutral" style="width:${pctNeutral}%"></div>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-3 text-center mb-4">
+      <div class="bg-gray-800 rounded p-3">
+        <div class="text-2xl font-light verdict-rich">${totalRich.toFixed(1)}h</div>
+        <div class="text-xs text-gray-500 mono">for the castle</div>
+      </div>
+      <div class="bg-gray-800 rounded p-3">
+        <div class="text-2xl font-light verdict-ok">${totalOwn.toFixed(1)}h</div>
+        <div class="text-xs text-gray-500 mono">for the village</div>
+      </div>
+      <div class="bg-gray-800 rounded p-3">
+        <div class="text-2xl font-light text-gray-400">${totalNeutral.toFixed(1)}h</div>
+        <div class="text-xs text-gray-500 mono">maintenance</div>
+      </div>
+    </div>
+    <div class="${verdictClass} text-sm italic border-l-2 pl-3" style="border-color: currentColor;">
+      ${verdictText}
+    </div>
+  `;
+}
+
+// Init
+document.getElementById('entry-date').value = new Date().toISOString().slice(0, 10);
+render();
+</script>
+</body>
+</html>

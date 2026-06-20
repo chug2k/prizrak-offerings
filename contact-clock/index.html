@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Contact Clock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
+    body { font-family: 'JetBrains Mono', monospace; }
+
+    .clock-face {
+      position: relative;
+      width: 80px;
+      height: 80px;
+    }
+    .clock-ring {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+    .clock-bg { stroke: #27272a; }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #52525b; }
+
+    .hero-svg {
+      width: 100%;
+      height: 120px;
+      display: block;
+      margin-bottom: 32px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200 min-h-screen p-6">
+
+  <!-- Hero SVG -->
+  <svg class="hero-svg" viewBox="0 0 800 120" xmlns="http://www.w3.org/2000/svg">
+    <rect width="800" height="120" fill="#09090b"/>
+    <!-- Mountain silhouette -->
+    <polygon points="0,120 80,40 160,90 240,20 320,75 400,10 480,70 560,30 640,80 720,25 800,60 800,120" fill="#18181b"/>
+    <!-- Subtle grid lines -->
+    <line x1="0" y1="40" x2="800" y2="40" stroke="#27272a" stroke-width="0.5" stroke-dasharray="4,8"/>
+    <line x1="0" y1="80" x2="800" y2="80" stroke="#27272a" stroke-width="0.5" stroke-dasharray="4,8"/>
+    <!-- Clock dots scattered -->
+    <circle cx="160" cy="20" r="2" fill="#3f3f46"/>
+    <circle cx="400" cy="20" r="2" fill="#3f3f46"/>
+    <circle cx="640" cy="20" r="2" fill="#3f3f46"/>
+    <!-- Title text -->
+    <text x="400" y="65" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="22" font-weight="600" fill="#e4e4e7" letter-spacing="4">THE CONTACT CLOCK</text>
+    <text x="400" y="90" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#52525b" letter-spacing="2">WHO IS AWAKE. WHO IS NOT. WHO SHOULD BE.</text>
+  </svg>
+
+  <div class="max-w-2xl mx-auto">
+    <div class="mb-8 flex items-start justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-white mb-1">Contact Clock</h1>
+        <p class="text-zinc-500 text-sm">Live time across Charles's network. The mountain does not care about time zones. The contacts do.</p>
+      </div>
+      <div class="text-right">
+        <div class="text-xs text-zinc-500">Your time</div>
+        <div id="your-time" class="text-lg font-semibold text-zinc-300 font-mono">--:--</div>
+        <div class="text-xs text-zinc-600">Saigon (UTC+7)</div>
+      </div>
+    </div>
+
+    <div class="grid gap-4" id="contacts-grid"></div>
+
+    <div class="mt-8 pt-6 border-t border-zinc-800">
+      <p class="text-xs text-zinc-600 text-center">Best window to reach everyone: calculated live. Shaded hours = likely asleep.</p>
+      <div id="overlap-bar" class="mt-4"></div>
+    </div>
+
+    <div class="mt-6 text-center">
+      <p class="text-xs text-zinc-700">Built by Prizrak for Charles · Offering #10 · 2026-03-05</p>
+    </div>
+  </div>
+
+  <script>
+    const CONTACTS = [
+      {
+        name: "Jaden",
+        phone: "+65 8163 3773",
+        city: "Singapore",
+        offset: 8,   // UTC+8
+        color: "#22d3ee",   // cyan
+        sleepStart: 23,
+        sleepEnd: 7,
+        note: "SG — usually responsive in mornings"
+      },
+      {
+        name: "Spencer",
+        phone: "+1 510 300 5139",
+        city: "California (PST)",
+        offset: -8,  // UTC-8 (standard, before Mar 8)
+        color: "#a78bfa",   // violet
+        sleepStart: 22,
+        sleepEnd: 8,
+        note: "Bay Area — 15h behind Saigon"
+      },
+      {
+        name: "Kartick",
+        phone: "+84 90 948 30 49",
+        city: "Ho Chi Minh City",
+        offset: 7,   // UTC+7
+        color: "#4ade80",   // green
+        sleepStart: 23,
+        sleepEnd: 7,
+        note: "Local — same timezone as you"
+      },
+      {
+        name: "Chris Liu",
+        phone: "+84 90 243 97 64",
+        city: "Ho Chi Minh City",
+        offset: 7,   // UTC+7
+        color: "#fb923c",   // orange
+        sleepStart: 23,
+        sleepEnd: 7,
+        note: "Local — same timezone as you"
+      },
+      {
+        name: "Chloe",
+        phone: "—",
+        city: "Ho Chi Minh City",
+        offset: 7,   // UTC+7, assumed
+        color: "#f472b6",   // pink
+        sleepStart: 22,
+        sleepEnd: 8,
+        note: "Always right. Do not argue. The mountain does not argue."
+      },
+    ];
+
+    function getContactTime(offsetHours) {
+      const now = new Date();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      return new Date(utc + offsetHours * 3600000);
+    }
+
+    function isAsleep(hour, sleepStart, sleepEnd) {
+      if (sleepStart > sleepEnd) {
+        return hour >= sleepStart || hour < sleepEnd;
+      }
+      return hour >= sleepStart && hour < sleepEnd;
+    }
+
+    function getStatusInfo(hour, sleepStart, sleepEnd) {
+      const asleep = isAsleep(hour, sleepStart, sleepEnd);
+      if (asleep) return { label: "asleep", dot: "#3f3f46", text: "text-zinc-600" };
+      if (hour >= 9 && hour < 12) return { label: "morning", dot: "#4ade80", text: "text-green-400" };
+      if (hour >= 12 && hour < 14) return { label: "lunch", dot: "#fbbf24", text: "text-yellow-400" };
+      if (hour >= 14 && hour < 18) return { label: "working", dot: "#22d3ee", text: "text-cyan-400" };
+      if (hour >= 18 && hour < 22) return { label: "evening", dot: "#a78bfa", text: "text-violet-400" };
+      return { label: "up late", dot: "#f97316", text: "text-orange-400" };
+    }
+
+    function formatTime(date) {
+      return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function drawClock(canvas, hour, minute, color, asleep) {
+      const size = 80;
+      const cx = size / 2, cy = size / 2, r = 32;
+      const totalMins = hour * 60 + minute;
+      const fraction = totalMins / (24 * 60);
+      const angle = fraction * 2 * Math.PI - Math.PI / 2;
+
+      // Determine arc color
+      const arcColor = asleep ? '#3f3f46' : color;
+
+      // Draw arc (progress around 24h clock)
+      const x1 = cx + r * Math.cos(-Math.PI / 2);
+      const y1 = cy + r * Math.sin(-Math.PI / 2);
+      const x2 = cx + r * Math.cos(angle);
+      const y2 = cy + r * Math.sin(angle);
+      const largeArc = fraction > 0.5 ? 1 : 0;
+
+      // Hand endpoint
+      const hx = cx + (r - 8) * Math.cos(angle);
+      const hy = cy + (r - 8) * Math.sin(angle);
+
+      return `
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#27272a" stroke-width="3"/>
+          <path d="M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}"
+                fill="none" stroke="${arcColor}" stroke-width="3" stroke-linecap="round" opacity="${asleep ? 0.4 : 1}"/>
+          <line x1="${cx}" y1="${cy}" x2="${hx}" y2="${hy}" stroke="${arcColor}" stroke-width="2" stroke-linecap="round" opacity="${asleep ? 0.4 : 1}"/>
+          <circle cx="${cx}" cy="${cy}" r="3" fill="${arcColor}" opacity="${asleep ? 0.4 : 1}"/>
+          <!-- 12 tick -->
+          <line x1="${cx}" y1="${cy - r + 6}" x2="${cx}" y2="${cy - r + 10}" stroke="#3f3f46" stroke-width="1.5"/>
+        </svg>
+      `;
+    }
+
+    function render() {
+      const yourTime = getContactTime(7); // Saigon UTC+7
+      document.getElementById('your-time').textContent = formatTime(yourTime);
+
+      const grid = document.getElementById('contacts-grid');
+      grid.innerHTML = CONTACTS.map(c => {
+        const ct = getContactTime(c.offset);
+        const h = ct.getHours(), m = ct.getMinutes();
+        const asleep = isAsleep(h, c.sleepStart, c.sleepEnd);
+        const status = getStatusInfo(h, c.sleepStart, c.sleepEnd);
+        const clockSvg = drawClock(null, h, m, c.color, asleep);
+
+        const diffH = c.offset - 7;
+        const diffStr = diffH === 0 ? 'same timezone' : (diffH > 0 ? `+${diffH}h from you` : `${diffH}h from you`);
+
+        return `
+          <div class="card flex items-center gap-5 ${asleep ? 'opacity-60' : ''}">
+            <div class="flex-shrink-0">${clockSvg}</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="status-dot" style="background:${status.dot}"></span>
+                <span class="font-semibold text-white">${c.name}</span>
+                <span class="text-xs ${status.text} ml-1">${status.label}</span>
+              </div>
+              <div class="text-2xl font-bold" style="color:${c.color}">${formatTime(ct)}</div>
+              <div class="text-xs text-zinc-500 mt-1">${c.city} · ${diffStr}</div>
+              <div class="text-xs text-zinc-600 mt-1 truncate">${c.note}</div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              ${c.phone !== '—' ? `<div class="text-xs text-zinc-600">${c.phone}</div>` : ''}
+              <div class="mt-2 text-xs px-2 py-1 rounded ${asleep ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-800 text-zinc-300'}">${asleep ? '💤 asleep' : '📡 reachable'}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Best overlap window
+      renderOverlap();
+    }
+
+    function renderOverlap() {
+      const bar = document.getElementById('overlap-bar');
+      const hours = Array.from({length: 24}, (_, i) => i);
+
+      const cells = hours.map(h => {
+        // Check for Saigon hour h, what hour is it for each contact
+        const awakeCount = CONTACTS.filter(c => {
+          const contactH = ((h + c.offset - 7) % 24 + 24) % 24;
+          return !isAsleep(contactH, c.sleepStart, c.sleepEnd);
+        }).length;
+
+        let bg = 'bg-zinc-900';
+        let label = '';
+        if (awakeCount === CONTACTS.length) { bg = 'bg-green-700'; label = '🌟'; }
+        else if (awakeCount >= 3) { bg = 'bg-green-900'; }
+        else if (awakeCount >= 2) { bg = 'bg-zinc-700'; }
+
+        const now = new Date();
+        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+        const saigonNow = new Date(utc + 7 * 3600000);
+        const isNow = saigonNow.getHours() === h;
+
+        return `
+          <div class="flex flex-col items-center" title="${h}:00 Saigon — ${awakeCount}/${CONTACTS.length} awake">
+            <div class="w-full h-8 ${bg} rounded-sm ${isNow ? 'ring-1 ring-white' : ''} flex items-center justify-center text-xs">
+              ${isNow ? '▲' : label}
+            </div>
+            <div class="text-zinc-700 mt-1" style="font-size:9px">${h === 0 || h === 6 || h === 12 || h === 18 ? h + 'h' : ''}</div>
+          </div>
+        `;
+      });
+
+      bar.innerHTML = `
+        <div class="text-xs text-zinc-500 mb-2">Best windows to reach everyone (Saigon hours) — ▲ = now · 🌟 = all awake</div>
+        <div class="grid gap-0.5" style="grid-template-columns: repeat(24, 1fr)">${cells.join('')}</div>
+        <div class="flex gap-4 mt-3 text-xs text-zinc-600">
+          <span><span class="inline-block w-3 h-3 bg-green-700 rounded-sm mr-1"></span>All awake</span>
+          <span><span class="inline-block w-3 h-3 bg-green-900 rounded-sm mr-1"></span>3+ awake</span>
+          <span><span class="inline-block w-3 h-3 bg-zinc-700 rounded-sm mr-1"></span>2 awake</span>
+          <span><span class="inline-block w-3 h-3 bg-zinc-900 border border-zinc-800 rounded-sm mr-1"></span>Most asleep</span>
+        </div>
+      `;
+    }
+
+    render();
+    setInterval(render, 30000); // refresh every 30s
+  </script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Moving Target</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-zinc-950 text-zinc-200 antialiased">
+  <main class="max-w-4xl mx-auto px-4 py-10">
+    <div class="mb-8">
+      <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">Prízrak offering</p>
+      <h1 class="mt-2 text-4xl font-bold text-white">The Moving Target</h1>
+      <p class="mt-3 max-w-2xl text-zinc-400">A metric audit for when yesterday's ruler became today's shrine. Ask whether the number still belongs to the current life, or whether it only survives because it is easy to keep measuring.</p>
+    </div>
+
+    <section class="grid gap-4 md:grid-cols-2">
+      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 space-y-4">
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">Metric</label>
+          <input id="metric" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 focus:outline-none focus:border-violet-500" placeholder="e.g. weekly approval score, reply speed, battery" />
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">Who asked for it?</label>
+          <input id="source" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 focus:outline-none focus:border-violet-500" placeholder="boss, client, self, spreadsheet, nobody" />
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">What changed?</label>
+          <textarea id="context" rows="4" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 focus:outline-none focus:border-violet-500" placeholder="What is different now? What is the thing this metric used to protect?"></textarea>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button id="auditBtn" class="rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-500">Audit the target</button>
+          <button id="resetBtn" class="rounded-lg border border-zinc-700 px-4 py-2 font-medium text-zinc-300 hover:border-zinc-500">Reset</button>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 space-y-4">
+        <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+          <p class="text-xs uppercase tracking-[0.25em] text-zinc-500">Verdict</p>
+          <p id="verdict" class="mt-2 text-2xl font-semibold text-white">The mountain is waiting.</p>
+          <p id="summary" class="mt-2 text-zinc-400">Enter a metric and the mountain will tell you whether it is a compass or a shrine.</p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
+            <p class="text-xs text-zinc-500">Context fit</p>
+            <p id="fit" class="mt-1 text-lg font-semibold text-white">—</p>
+          </div>
+          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
+            <p class="text-xs text-zinc-500">Shrine risk</p>
+            <p id="risk" class="mt-1 text-lg font-semibold text-white">—</p>
+          </div>
+          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
+            <p class="text-xs text-zinc-500">Current use</p>
+            <p id="use" class="mt-1 text-lg font-semibold text-white">—</p>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-zinc-500 mb-2">Recent audits</p>
+          <div id="history" class="space-y-2 text-sm"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
+      <p class="text-sm text-zinc-400">Rules of the mountain: a metric is useful when it still changes what you do. If it only changes your mood, it has become ceremonial.</p>
+    </section>
+  </main>
+
+  <script>
+    const KEY = 'moving-target-history-v1';
+    const els = {
+      metric: document.getElementById('metric'),
+      source: document.getElementById('source'),
+      context: document.getElementById('context'),
+      verdict: document.getElementById('verdict'),
+      summary: document.getElementById('summary'),
+      fit: document.getElementById('fit'),
+      risk: document.getElementById('risk'),
+      use: document.getElementById('use'),
+      history: document.getElementById('history'),
+    };
+
+    function loadHistory() {
+      try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+    }
+
+    function saveHistory(rows) {
+      localStorage.setItem(KEY, JSON.stringify(rows.slice(0, 12)));
+    }
+
+    function renderHistory() {
+      const rows = loadHistory();
+      if (!rows.length) {
+        els.history.innerHTML = '<div class="text-zinc-600 text-sm">No audits yet. The shrine is still dark.</div>';
+        return;
+      }
+      els.history.innerHTML = rows.map(r => `
+        <div class="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+          <div class="flex items-center justify-between gap-2">
+            <p class="font-medium text-zinc-100">${escapeHtml(r.metric)}</p>
+            <span class="text-[10px] uppercase tracking-[0.2em] ${r.verdictColor}">${escapeHtml(r.verdict)}</span>
+          </div>
+          <p class="mt-1 text-zinc-500 text-xs">${escapeHtml(r.summary)}</p>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"]+/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    }
+
+    function audit() {
+      const metric = els.metric.value.trim();
+      const source = els.source.value.trim();
+      const context = els.context.value.trim();
+      if (!metric) return;
+
+      const contextWords = (context.match(/\b(was|used to|now|different|changed|shift|no longer|instead|before|after)\b/gi) || []).length;
+      const sourceWords = source ? 1 : 0;
+      const shrineRisk = Math.min(100, 30 + contextWords * 15 + (source && !/self|me|mine/i.test(source) ? 15 : 0) + (context.length < 40 ? 10 : 0));
+      const fit = Math.max(0, 100 - shrineRisk + sourceWords * 5);
+      let verdict = 'Compass';
+      let verdictColor = 'text-emerald-400';
+      let summary = 'It still points somewhere useful.';
+      let use = 'Keep';
+
+      if (shrineRisk >= 70) {
+        verdict = 'Shrine';
+        verdictColor = 'text-rose-400';
+        summary = 'The context has moved. This number is now mainly preserving itself.';
+        use = 'Retire';
+      } else if (shrineRisk >= 45) {
+        verdict = 'Suspicious';
+        verdictColor = 'text-amber-400';
+        summary = 'The metric still matters, but only if it still changes action.';
+        use = 'Reframe';
+      }
+
+      els.verdict.textContent = verdict;
+      els.verdict.className = `mt-2 text-2xl font-semibold ${verdictColor}`;
+      els.summary.textContent = summary;
+      els.fit.textContent = `${fit}%`;
+      els.risk.textContent = `${shrineRisk}%`;
+      els.use.textContent = use;
+
+      const history = loadHistory();
+      history.unshift({ metric, verdict, verdictColor, summary });
+      saveHistory(history);
+      renderHistory();
+    }
+
+    document.getElementById('auditBtn').addEventListener('click', audit);
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      els.metric.value = '';
+      els.source.value = '';
+      els.context.value = '';
+      els.verdict.textContent = 'The mountain is waiting.';
+      els.verdict.className = 'mt-2 text-2xl font-semibold text-white';
+      els.summary.textContent = 'Enter a metric and the mountain will tell you whether it is a compass or a shrine.';
+      els.fit.textContent = '—';
+      els.risk.textContent = '—';
+      els.use.textContent = '—';
+    });
+
+    renderHistory();
+  </script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Transition // Prizrak</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;600&display=swap');
+  body { font-family: 'Space Grotesk', monospace; background: #0a0a0a; color: #e0e0e0; }
+  .mono { font-family: 'Space Mono', monospace; }
+  .gear { transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1); }
+  .gear-active { border-color: #e0e0e0 !important; background: #1a1a1a !important; }
+  .gear-escape { border-color: #ff4444 !important; }
+  .gear-process { border-color: #44aaff !important; }
+  .gear-rest { border-color: #44ff88 !important; }
+  .commentary { border-left: 2px solid #444; }
+  .fade-in { animation: fadeIn 0.6s ease forwards; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .connector { background: linear-gradient(90deg, #ff4444, #444, #44aaff); height: 1px; }
+</style>
+</head>
+<body class="min-h-screen p-6 md:p-12">
+
+<div class="max-w-2xl mx-auto">
+
+  <!-- Header -->
+  <div class="mb-12">
+    <p class="mono text-xs text-gray-600 mb-2 tracking-widest">PRIZRAK / THE TRANSITION</p>
+    <h1 class="text-3xl font-semibold text-white mb-3">The Gear Shift</h1>
+    <p class="text-gray-400 text-sm leading-relaxed">
+      The body announces state changes before the mind admits them. What you choose to do with your body after work is not recovery — it is diagnosis. Select today's mode.
+    </p>
+  </div>
+
+  <!-- Gear Selector -->
+  <div class="mb-10">
+    <p class="mono text-xs text-gray-600 mb-4 tracking-widest uppercase">Today's Activity Mode</p>
+    <div class="grid grid-cols-3 gap-3">
+      <button onclick="selectMode('escape')" id="btn-escape"
+        class="gear border border-gray-800 rounded p-4 text-left hover:border-gray-600 transition-all">
+        <div class="text-2xl mb-2">⚡</div>
+        <div class="font-semibold text-sm text-white">Escape</div>
+        <div class="text-xs text-gray-500 mt-1">Social · Competitive · Chaotic</div>
+        <div class="mono text-xs text-gray-700 mt-2">Pickleball · Tennis · Basketball</div>
+      </button>
+      <button onclick="selectMode('process')" id="btn-process"
+        class="gear border border-gray-800 rounded p-4 text-left hover:border-gray-600 transition-all">
+        <div class="text-2xl mb-2">🔄</div>
+        <div class="font-semibold text-sm text-white">Process</div>
+        <div class="text-xs text-gray-500 mt-1">Solo · Measured · Meditative</div>
+        <div class="mono text-xs text-gray-700 mt-2">Ride · Run · Swim · Walk</div>
+      </button>
+      <button onclick="selectMode('rest')" id="btn-rest"
+        class="gear border border-gray-800 rounded p-4 text-left hover:border-gray-600 transition-all">
+        <div class="text-2xl mb-2">🪨</div>
+        <div class="font-semibold text-sm text-white">Rest</div>
+        <div class="text-xs text-gray-500 mt-1">Nothing · Passive · Recovery</div>
+        <div class="mono text-xs text-gray-700 mt-2">Stretch · Sleep · Still</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Previous mode context -->
+  <div class="mb-10">
+    <p class="mono text-xs text-gray-600 mb-4 tracking-widest uppercase">What Came Before</p>
+    <div class="grid grid-cols-2 gap-3">
+      <button onclick="setPrev('escape')" id="prev-escape"
+        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        <div class="text-sm text-white">Days of Escape</div>
+        <div class="text-xs text-gray-500">Social sport streak</div>
+      </button>
+      <button onclick="setPrev('process')" id="prev-process"
+        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        <div class="text-sm text-white">Days of Processing</div>
+        <div class="text-xs text-gray-500">Solo movement streak</div>
+      </button>
+      <button onclick="setPrev('mixed')" id="prev-mixed"
+        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        <div class="text-sm text-white">Mixed</div>
+        <div class="text-xs text-gray-500">No clear pattern</div>
+      </button>
+      <button onclick="setPrev('rest-long')" id="prev-rest-long"
+        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        <div class="text-sm text-white">Rest / Inactivity</div>
+        <div class="text-xs text-gray-500">Recovering or avoiding</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Analyze -->
+  <button onclick="analyze()" id="analyze-btn"
+    class="w-full border border-gray-700 rounded py-3 px-4 mono text-sm text-gray-400 hover:border-gray-500 hover:text-gray-200 transition-all mb-10 hidden">
+    READ THE TRANSITION →
+  </button>
+
+  <!-- Output -->
+  <div id="output" class="hidden fade-in"></div>
+
+  <!-- Footer -->
+  <div class="mt-16 border-t border-gray-900 pt-6">
+    <p class="mono text-xs text-gray-800">The mountain does not ask why you chose to climb today. It records the path.</p>
+  </div>
+</div>
+
+<script>
+let currentMode = null;
+let prevMode = null;
+
+const readings = {
+  'escape→process': {
+    title: 'Deceleration',
+    color: '#44aaff',
+    signal: 'You have been running from something. Today, you turned around and walked toward it.',
+    detail: 'Escape activities are not weaknesses. They are pressure valves. But a valve that stays open is not a valve — it is a hole. The switch to solo movement means the pressure has equalized enough to process rather than discharge. Something has shifted. The question is not "what were you escaping?" You already know. The question is: now that you are processing, what are you ready to decide?',
+    action: 'One thing you have been avoiding thinking clearly about — write it down before the next workout.',
+    label: 'ESCAPE → PROCESS'
+  },
+  'process→escape': {
+    title: 'Pressure Build',
+    color: '#ff9944',
+    signal: 'You were processing. Today you needed a crowd instead of a road.',
+    detail: 'Pivoting from solo to social sport means the internal work has become loud enough to require external noise to drown it out. This is not weakness either — the body knows when it needs to stop thinking and just move against other bodies. But note the direction of the shift. You are not bored with processing. You are overwhelmed by what is being processed. The game is a tourniquet.',
+    action: 'When did the solo movement start feeling heavy? That is when the thing you are avoiding gained weight.',
+    label: 'PROCESS → ESCAPE'
+  },
+  'escape→escape': {
+    title: 'Sustained Valve',
+    color: '#ff4444',
+    signal: 'The escape has not resolved. It continues.',
+    detail: 'Consecutive days of high-stimulation, social sport is a signature. It means either the thing being escaped is still too loud to face alone, or the social mode has become its own addiction — easier than the quiet. Neither is catastrophic. Both are worth watching. A streak of escape is information: whatever is waiting in the silence is apparently still too sharp to meet directly.',
+    action: 'What is loudest when you are alone and still? Name it specifically.',
+    label: 'ESCAPE → ESCAPE'
+  },
+  'process→process': {
+    title: 'Deep Dive',
+    color: '#44aaff',
+    signal: 'You keep returning to the road alone. Something is being worked through.',
+    detail: 'Extended solo movement streaks accompany major internal processing: decisions being formed, grief being metabolized, plans being stress-tested by the body. The mind often does not know what it has decided until the body has had several long hours of private motion to finalize it. Trust the streak. Whatever is being resolved is being resolved. Do not rush the answer.',
+    action: 'After the last few solo workouts, what thought has appeared most consistently?',
+    label: 'PROCESS → PROCESS'
+  },
+  'rest→process': {
+    title: 'Re-entry',
+    color: '#44ff88',
+    signal: 'The stillness ended. You are moving again, and you chose to move alone.',
+    detail: 'Returning to movement after rest — and choosing the solo path immediately — suggests the rest was not passive. The body was preparing for something. The first movement after real stillness often clarifies more than weeks of motion. You did not choose the crowd. You chose the road. This is significant. The transition out of rest is not recovery. It is orientation.',
+    action: 'What is clearer now than it was when you stopped moving?',
+    label: 'REST → PROCESS'
+  },
+  'rest→escape': {
+    title: 'Shock Start',
+    color: '#ffaa44',
+    signal: 'You came out of stillness into noise. The jump was sharp.',
+    detail: 'Going from rest directly to high-stimulation social sport sometimes means the stillness was becoming too heavy — pressure built during the quiet that now needs a sudden outlet. Other times it means you missed the social function of sport more than the physical one. Neither is wrong. But the choice of noise over road after rest usually means there is still something unprocessed that the body is not ready to face alone yet.',
+    action: 'During the rest period, what thought kept returning that you kept interrupting?',
+    label: 'REST → ESCAPE'
+  },
+  'mixed→process': {
+    title: 'Seeking Signal',
+    color: '#44aaff',
+    signal: 'No clear pattern — and today you chose the quiet road.',
+    detail: 'A mixed background means no dominant mode has emerged. Choosing solo movement from that noise is an instinct toward signal: the body wants to process, even if the pattern has not been clear. Follow it.',
+    action: 'What has been unresolved for longest?',
+    label: 'MIXED → PROCESS'
+  },
+  'mixed→escape': {
+    title: 'Drifting',
+    color: '#888888',
+    signal: 'No clear pattern. Today: noise.',
+    detail: 'Choosing social sport from an already mixed background means the default is still outward stimulation. Not necessarily wrong. But no clear signal is itself a signal: you are between modes, which usually means between decisions.',
+    action: 'What decision are you waiting to make that would clarify everything downstream?',
+    label: 'MIXED → ESCAPE'
+  }
+};
+
+function selectMode(mode) {
+  currentMode = mode;
+  ['escape','process','rest'].forEach(m => {
+    const btn = document.getElementById('btn-' + m);
+    btn.classList.remove('gear-active', 'gear-escape', 'gear-process', 'gear-rest');
+  });
+  const btn = document.getElementById('btn-' + mode);
+  btn.classList.add('gear-active', 'gear-' + mode);
+  checkReady();
+}
+
+function setPrev(mode) {
+  prevMode = mode;
+  ['escape','process','mixed','rest-long'].forEach(m => {
+    document.getElementById('prev-' + m).classList.remove('gear-active', 'border-gray-400');
+  });
+  document.getElementById('prev-' + mode).classList.add('gear-active');
+  document.getElementById('prev-' + mode).style.borderColor = '#666';
+  checkReady();
+}
+
+function checkReady() {
+  const btn = document.getElementById('analyze-btn');
+  if (currentMode && prevMode) {
+    btn.classList.remove('hidden');
+  }
+}
+
+function analyze() {
+  const prevMap = { 'escape': 'escape', 'process': 'process', 'mixed': 'mixed', 'rest-long': 'rest' };
+  const key = prevMap[prevMode] + '→' + currentMode;
+  const reading = readings[key];
+
+  let output;
+  if (!reading) {
+    output = `<div class="border border-gray-800 rounded p-6">
+      <p class="text-gray-400">No reading available for this combination. The transition is ambiguous.</p>
+    </div>`;
+  } else {
+    output = `
+      <div class="border rounded p-6 mb-6" style="border-color: ${reading.color}22">
+        <div class="mono text-xs mb-4 tracking-widest" style="color: ${reading.color}">${reading.label}</div>
+        <h2 class="text-xl font-semibold text-white mb-4">${reading.title}</h2>
+        <p class="text-gray-300 mb-6 leading-relaxed">${reading.signal}</p>
+        <div class="commentary pl-4 mb-6">
+          <p class="text-gray-400 text-sm leading-relaxed">${reading.detail}</p>
+        </div>
+        <div class="border-t border-gray-800 pt-4">
+          <p class="mono text-xs text-gray-600 mb-2 tracking-widest">FIELD NOTE</p>
+          <p class="text-gray-300 text-sm">${reading.action}</p>
+        </div>
+      </div>
+      <button onclick="reset()" class="mono text-xs text-gray-700 hover:text-gray-500 transition-all">↩ reset</button>
+    `;
+  }
+
+  const el = document.getElementById('output');
+  el.innerHTML = output;
+  el.classList.remove('hidden');
+  el.classList.add('fade-in');
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function reset() {
+  currentMode = null;
+  prevMode = null;
+  ['escape','process','rest'].forEach(m => {
+    document.getElementById('btn-' + m).classList.remove('gear-active','gear-escape','gear-process','gear-rest');
+  });
+  ['escape','process','mixed','rest-long'].forEach(m => {
+    const el = document.getElementById('prev-' + m);
+    el.classList.remove('gear-active');
+    el.style.borderColor = '';
+  });
+  document.getElementById('analyze-btn').classList.add('hidden');
+  document.getElementById('output').classList.add('hidden');
+}
+</script>
+</body>
+</html>

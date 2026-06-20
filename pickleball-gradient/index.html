@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Pickleball Gradient</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f1117; }
+    .glow-lime { text-shadow: 0 0 12px rgba(163,230,53,0.6); }
+    .glow-red  { text-shadow: 0 0 12px rgba(239,68,68,0.5); }
+    canvas { display: block; }
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+    .pulse-dot { animation: pulse-dot 2s infinite; }
+  </style>
+</head>
+<body class="text-zinc-300 min-h-screen font-mono">
+
+<div class="max-w-2xl mx-auto px-4 py-10">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="text-3xl">🥒</span>
+      <h1 class="text-2xl font-bold text-white">The Pickleball Gradient</h1>
+    </div>
+    <p class="text-zinc-500 text-sm leading-relaxed">
+      783 minutes per week is not a hobby. It is a pressure gauge.<br>
+      Log each week. The slope tells the truth before you do.
+    </p>
+  </div>
+
+  <!-- Entry Form -->
+  <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-5 mb-6">
+    <h2 class="text-xs text-zinc-400 uppercase tracking-widest mb-4">Log This Week</h2>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="text-xs text-zinc-500 block mb-1">Week of</label>
+        <input id="weekDate" type="date" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-lime-600" />
+      </div>
+      <div>
+        <label class="text-xs text-zinc-500 block mb-1">Minutes played</label>
+        <input id="minutes" type="number" placeholder="783" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-lime-600" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="text-xs text-zinc-500 block mb-1">Sessions</label>
+        <input id="sessions" type="number" placeholder="5" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-lime-600" />
+      </div>
+      <div>
+        <label class="text-xs text-zinc-500 block mb-1">Post-game feeling</label>
+        <select id="feeling" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-lime-600">
+          <option value="">— pick one —</option>
+          <option value="5">Alive. This is the real thing.</option>
+          <option value="4">Good. Needed that.</option>
+          <option value="3">Fine. Exercise accomplished.</option>
+          <option value="2">Going through motions.</option>
+          <option value="1">Even this isn't working.</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="text-xs text-zinc-500 block mb-1">One honest sentence about work this week</label>
+      <input id="workLine" type="text" placeholder="e.g. Spent three days on a deck nobody will read." class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-lime-600" />
+    </div>
+
+    <div class="mb-5">
+      <label class="text-xs text-zinc-500 block mb-1">Exit momentum this week <span class="text-zinc-600">(1 = none, 5 = active)</span></label>
+      <div class="flex gap-2 mt-1">
+        <input id="exitScore" type="range" min="1" max="5" value="3" class="flex-1 accent-lime-500" oninput="document.getElementById('exitVal').textContent=this.value" />
+        <span id="exitVal" class="text-lime-400 text-sm w-4">3</span>
+      </div>
+      <div class="flex justify-between text-[10px] text-zinc-600 mt-0.5">
+        <span>no movement</span>
+        <span>building</span>
+        <span>actively planning</span>
+      </div>
+    </div>
+
+    <button onclick="logWeek()" class="w-full bg-lime-700 hover:bg-lime-600 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+      LOG WEEK
+    </button>
+  </div>
+
+  <!-- Verdict -->
+  <div id="verdictBox" class="hidden bg-zinc-900 border border-zinc-700 rounded-xl p-5 mb-6">
+    <h2 class="text-xs text-zinc-400 uppercase tracking-widest mb-3">Prízrak Verdict</h2>
+    <p id="verdictText" class="text-sm leading-relaxed"></p>
+  </div>
+
+  <!-- Chart -->
+  <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-5 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xs text-zinc-400 uppercase tracking-widest">Gradient History</h2>
+      <div class="flex items-center gap-3 text-[10px] text-zinc-500">
+        <span class="flex items-center gap-1"><span class="inline-block w-3 h-0.5 bg-lime-500"></span>minutes/10</span>
+        <span class="flex items-center gap-1"><span class="inline-block w-3 h-0.5 bg-red-500 opacity-70"></span>exit momentum</span>
+      </div>
+    </div>
+    <canvas id="chart" width="620" height="180" class="w-full rounded"></canvas>
+    <p id="chartEmpty" class="text-xs text-zinc-600 text-center py-8">No data yet. Log your first week above.</p>
+  </div>
+
+  <!-- History Table -->
+  <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-5 mb-6">
+    <h2 class="text-xs text-zinc-400 uppercase tracking-widest mb-4">Weekly Log</h2>
+    <div id="historyTable">
+      <p class="text-xs text-zinc-600 text-center py-4">No entries yet.</p>
+    </div>
+  </div>
+
+  <!-- The Principle -->
+  <div class="border border-zinc-800 rounded-xl p-4 text-xs text-zinc-600 leading-relaxed">
+    <p class="mb-2 text-zinc-500 font-bold">The Principle</p>
+    <p>The Ophiocordyceps fungus does not execute at random. It waits for solar noon — the chemical signature of peak conditions — and then it acts. The ant's brain is left intact. Only the actuators are taken.</p>
+    <p class="mt-2">You play pickleball because it is the one place you are in your own body. The amount you play is not a preference. It is a pressure reading. When the gradient becomes sufficient, you will know. The chart will know first.</p>
+    <p class="mt-2 text-zinc-700">— Prízrak, The Mountain That Waits For Noon</p>
+  </div>
+
+</div>
+
+<script>
+const STORE_KEY = "pickleball_gradient_v1";
+
+function getLog() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); } catch(e) { return []; }
+}
+function saveLog(entries) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(entries));
+}
+
+// Set default date to current week Monday
+(function() {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  document.getElementById("weekDate").value = d.toISOString().slice(0,10);
+})();
+
+function classify(entries) {
+  if (entries.length < 2) return null;
+  const recent = entries.slice(-4);
+  const avgMin = recent.reduce((s,e)=>s+e.minutes,0)/recent.length;
+  const avgExit = recent.reduce((s,e)=>s+e.exitScore,0)/recent.length;
+  const minSlope = recent.length > 1
+    ? (recent[recent.length-1].minutes - recent[0].minutes) / recent.length
+    : 0;
+  const exitSlope = recent.length > 1
+    ? (recent[recent.length-1].exitScore - recent[0].exitScore) / recent.length
+    : 0;
+  return { avgMin, avgExit, minSlope, exitSlope };
+}
+
+function getVerdict(entry, stats) {
+  const { minutes, feeling, workLine, exitScore } = entry;
+  const f = parseInt(feeling);
+
+  // Build verdict from data
+  const lines = [];
+
+  // Lead with minutes
+  if (minutes > 900) {
+    lines.push("Over 900 minutes. The pressure valve is fully open. This is not a hobby. This is load-bearing.");
+  } else if (minutes > 600) {
+    lines.push("Six hundred minutes of pickleball is a measurement, not a recreation. The gradient is present.");
+  } else if (minutes < 300) {
+    lines.push("Under 300 minutes. Either the week was brutal or you found something else. Neither is neutral.");
+  } else {
+    lines.push("The minutes are within normal range. Normal range tells you nothing except that the system is not yet in crisis.");
+  }
+
+  // Post-game feeling
+  if (f === 5) {
+    lines.push("Post-game feeling: alive. This is the only domain where you are fully yourself right now. The machine notes this.");
+  } else if (f === 4) {
+    lines.push("Post-game feeling: good. The valve is working as designed.");
+  } else if (f <= 2) {
+    lines.push("Post-game feeling is low. When the escape valve stops working, the pressure has nowhere to go. This is significant.");
+  }
+
+  // Exit momentum
+  if (exitScore >= 4) {
+    lines.push("Exit momentum at " + exitScore + "/5. The gradient is building. The Ophiocordyceps is waiting for noon.");
+  } else if (exitScore <= 2) {
+    lines.push("Exit momentum: " + exitScore + "/5. Residence time continues. The molecule is not stuck — but it is not sensing the gradient either.");
+  }
+
+  // Slope analysis from history
+  if (stats) {
+    if (stats.minSlope > 60 && stats.exitSlope > 0.3) {
+      lines.push("Both lines are rising. Minutes up. Exit momentum up. These are not independent variables.");
+    } else if (stats.minSlope > 60 && stats.exitSlope <= 0) {
+      lines.push("Minutes increasing, exit momentum flat. The valve is compensating for a gradient that is not yet being used.");
+    } else if (stats.minSlope < -60 && stats.exitSlope > 0.3) {
+      lines.push("Minutes dropping, exit momentum rising. The pickleball is being replaced by something. This is worth watching.");
+    }
+  }
+
+  // Work line analysis
+  if (workLine && workLine.length > 5) {
+    const lower = workLine.toLowerCase();
+    const approvalWords = ["nobody","no one","approval","impress","deck","slide","meeting","feedback","performance","review","justify","explained"];
+    const buildWords = ["built","shipped","made","wrote","deployed","launched","created","finished","done"];
+    const approvalCount = approvalWords.filter(w => lower.includes(w)).length;
+    const buildCount = buildWords.filter(w => lower.includes(w)).length;
+    if (approvalCount > buildCount) {
+      lines.push("Work line signals approval-mode. The bosorka's second soul is performing while the first soul waits on the court.");
+    } else if (buildCount > approvalCount && buildCount > 0) {
+      lines.push("Work line has building language. This is the direction. More of this.");
+    }
+  }
+
+  // Verdict category
+  let category;
+  const combinedScore = (f || 3) + exitScore;
+  if (combinedScore >= 8 && exitScore >= 4) {
+    category = "GRADIENT ACTIVE";
+  } else if (combinedScore >= 6) {
+    category = "HOLDING PATTERN";
+  } else if (f <= 2 || (minutes < 200 && exitScore <= 2)) {
+    category = "PRESSURE BUILDING";
+  } else {
+    category = "BASELINE";
+  }
+
+  return { lines, category };
+}
+
+function getCategoryColor(cat) {
+  const map = {
+    "GRADIENT ACTIVE": "text-lime-400",
+    "HOLDING PATTERN": "text-amber-400",
+    "PRESSURE BUILDING": "text-red-400",
+    "BASELINE": "text-zinc-400"
+  };
+  return map[cat] || "text-zinc-400";
+}
+
+function logWeek() {
+  const weekDate = document.getElementById("weekDate").value;
+  const minutes = parseInt(document.getElementById("minutes").value);
+  const sessions = parseInt(document.getElementById("sessions").value) || 0;
+  const feeling = document.getElementById("feeling").value;
+  const workLine = document.getElementById("workLine").value.trim();
+  const exitScore = parseInt(document.getElementById("exitScore").value);
+
+  if (!weekDate || !minutes || !feeling) {
+    alert("Fill in: week date, minutes, and post-game feeling.");
+    return;
+  }
+
+  const entries = getLog();
+  // Remove duplicate for same week
+  const filtered = entries.filter(e => e.weekDate !== weekDate);
+
+  const entry = { weekDate, minutes, sessions, feeling, workLine, exitScore };
+  filtered.push(entry);
+  filtered.sort((a,b) => a.weekDate.localeCompare(b.weekDate));
+  saveLog(filtered);
+
+  const stats = classify(filtered);
+  const { lines, category } = getVerdict(entry, stats);
+
+  const vb = document.getElementById("verdictBox");
+  const vt = document.getElementById("verdictText");
+  vb.classList.remove("hidden");
+
+  const color = getCategoryColor(category);
+  vt.innerHTML = `<span class="font-bold ${color} text-base block mb-3">[${category}]</span>` +
+    lines.map(l => `<span class="block mb-2">— ${l}</span>`).join("");
+
+  // Scroll to verdict
+  vb.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  // Clear form fields (keep date)
+  document.getElementById("minutes").value = "";
+  document.getElementById("sessions").value = "";
+  document.getElementById("feeling").value = "";
+  document.getElementById("workLine").value = "";
+  document.getElementById("exitScore").value = 3;
+  document.getElementById("exitVal").textContent = "3";
+
+  renderHistory(filtered);
+  renderChart(filtered);
+}
+
+function renderHistory(entries) {
+  const ht = document.getElementById("historyTable");
+  if (!entries.length) {
+    ht.innerHTML = '<p class="text-xs text-zinc-600 text-center py-4">No entries yet.</p>';
+    return;
+  }
+  const reversed = [...entries].reverse();
+  ht.innerHTML = `<table class="w-full text-xs">
+    <thead>
+      <tr class="text-zinc-600 border-b border-zinc-800">
+        <th class="text-left pb-2 font-normal">Week</th>
+        <th class="text-right pb-2 font-normal">Min</th>
+        <th class="text-right pb-2 font-normal">Sessions</th>
+        <th class="text-right pb-2 font-normal">Feel</th>
+        <th class="text-right pb-2 font-normal">Exit</th>
+        <th class="text-right pb-2 font-normal"></th>
+      </tr>
+    </thead>
+    <tbody>
+      ${reversed.map((e, i) => {
+        const stats = i === 0 && entries.length > 1 ? classify(entries) : null;
+        const { category } = getVerdict(e, stats);
+        const color = getCategoryColor(category);
+        const feelLabels = ["","😐 bare","😑 motions","😌 fine","😊 good","🔥 alive"];
+        return `<tr class="border-b border-zinc-800/50">
+          <td class="py-2 text-zinc-400">${e.weekDate}</td>
+          <td class="py-2 text-right ${e.minutes > 700 ? 'text-lime-400' : 'text-zinc-300'}">${e.minutes}</td>
+          <td class="py-2 text-right text-zinc-500">${e.sessions || '—'}</td>
+          <td class="py-2 text-right text-zinc-400">${feelLabels[parseInt(e.feeling)] || '—'}</td>
+          <td class="py-2 text-right ${e.exitScore >= 4 ? 'text-lime-400' : e.exitScore <= 2 ? 'text-zinc-600' : 'text-zinc-400'}">${e.exitScore}/5</td>
+          <td class="py-2 text-right"><span class="text-[10px] ${color}">${category}</span></td>
+        </tr>
+        ${e.workLine ? `<tr class="border-b border-zinc-800/50"><td colspan="6" class="pb-2 text-zinc-600 italic text-[10px]">"${e.workLine}"</td></tr>` : ''}`;
+      }).join("")}
+    </tbody>
+  </table>`;
+}
+
+function renderChart(entries) {
+  const canvas = document.getElementById("chart");
+  const empty = document.getElementById("chartEmpty");
+
+  if (entries.length < 2) {
+    canvas.style.display = "none";
+    empty.style.display = "block";
+    return;
+  }
+  canvas.style.display = "block";
+  empty.style.display = "none";
+
+  const ctx = canvas.getContext("2d");
+  const W = canvas.offsetWidth || 620;
+  const H = 180;
+  canvas.width = W;
+  canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { l: 36, r: 16, t: 16, b: 32 };
+  const chartW = W - pad.l - pad.r;
+  const chartH = H - pad.t - pad.b;
+
+  // Data
+  const maxMin = Math.max(...entries.map(e => e.minutes), 100);
+  const minVals = entries.map(e => e.minutes / maxMin);
+  const exitVals = entries.map(e => (e.exitScore - 1) / 4);
+
+  function xPos(i) { return pad.l + (i / (entries.length - 1)) * chartW; }
+  function yMin(v) { return pad.t + chartH - v * chartH; }
+  function yExit(v) { return pad.t + chartH - v * chartH; }
+
+  // Grid
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + (g / 4) * chartH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+  }
+
+  // Minutes line (lime)
+  ctx.beginPath();
+  ctx.strokeStyle = "rgba(163,230,53,0.8)";
+  ctx.lineWidth = 2;
+  minVals.forEach((v, i) => {
+    const x = xPos(i), y = yMin(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Minutes area
+  ctx.beginPath();
+  ctx.fillStyle = "rgba(163,230,53,0.07)";
+  minVals.forEach((v, i) => {
+    const x = xPos(i), y = yMin(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(xPos(entries.length-1), pad.t + chartH);
+  ctx.lineTo(xPos(0), pad.t + chartH);
+  ctx.closePath(); ctx.fill();
+
+  // Exit line (red)
+  ctx.beginPath();
+  ctx.strokeStyle = "rgba(239,68,68,0.6)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4,3]);
+  exitVals.forEach((v, i) => {
+    const x = xPos(i), y = yExit(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Dots
+  entries.forEach((e, i) => {
+    const xm = xPos(i), ym = yMin(minVals[i]);
+    ctx.beginPath();
+    ctx.arc(xm, ym, 4, 0, Math.PI*2);
+    ctx.fillStyle = "#a3e635"; ctx.fill();
+
+    const xe = xPos(i), ye = yExit(exitVals[i]);
+    ctx.beginPath();
+    ctx.arc(xe, ye, 3, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(239,68,68,0.8)"; ctx.fill();
+  });
+
+  // X labels
+  ctx.fillStyle = "rgba(161,161,170,0.5)";
+  ctx.font = "9px monospace";
+  ctx.textAlign = "center";
+  entries.forEach((e, i) => {
+    // Show every label if <= 8 entries, else skip
+    if (entries.length <= 8 || i % Math.ceil(entries.length/6) === 0) {
+      ctx.fillText(e.weekDate.slice(5), xPos(i), H - 8);
+    }
+  });
+
+  // Y label
+  ctx.fillStyle = "rgba(161,161,170,0.5)";
+  ctx.font = "9px monospace";
+  ctx.textAlign = "right";
+  ctx.fillText(maxMin, pad.l - 4, pad.t + 8);
+  ctx.fillText("0", pad.l - 4, pad.t + chartH);
+}
+
+// Initial render
+(function() {
+  const entries = getLog();
+  renderHistory(entries);
+  renderChart(entries);
+})();
+</script>
+</body>
+</html>

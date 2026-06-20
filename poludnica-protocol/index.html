@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Poludnica Protocol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
+        body { background: #0a0806; }
+
+        .fell { font-family: 'IM Fell English', serif; }
+        .mono { font-family: 'Space Mono', monospace; }
+
+        .spirit-glow {
+            animation: spiritGlow 4s ease-in-out infinite;
+        }
+
+        @keyframes spiritGlow {
+            0%, 100% { opacity: 0.7; filter: drop-shadow(0 0 8px rgba(255, 200, 50, 0.4)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 20px rgba(255, 200, 50, 0.8)); }
+        }
+
+        .heat-shimmer {
+            animation: heatShimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes heatShimmer {
+            0%, 100% { transform: translateY(0px) scaleX(1); opacity: 0.6; }
+            33% { transform: translateY(-2px) scaleX(1.01); opacity: 0.8; }
+            66% { transform: translateY(1px) scaleX(0.99); opacity: 0.5; }
+        }
+
+        .dust-particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: rgba(255, 180, 40, 0.6);
+            animation: dustFloat linear infinite;
+        }
+
+        @keyframes dustFloat {
+            0% { transform: translateY(100vh) translateX(0px) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.7; }
+            90% { opacity: 0.3; }
+            100% { transform: translateY(-50px) translateX(var(--drift)) rotate(360deg); opacity: 0; }
+        }
+
+        .question-card {
+            transition: all 0.3s ease;
+        }
+
+        .question-card.active {
+            border-color: rgba(255, 180, 40, 0.6);
+            background: rgba(255, 150, 20, 0.05);
+        }
+
+        .question-card.answered {
+            border-color: rgba(100, 100, 80, 0.4);
+            background: rgba(100, 100, 80, 0.03);
+            opacity: 0.7;
+        }
+
+        textarea {
+            background: transparent;
+            resize: none;
+            outline: none;
+            caret-color: #f59e0b;
+        }
+
+        textarea:focus {
+            box-shadow: none;
+        }
+
+        .verdict-box {
+            background: linear-gradient(135deg, rgba(20, 15, 5, 0.95), rgba(30, 20, 8, 0.95));
+            border: 1px solid rgba(255, 180, 40, 0.3);
+        }
+
+        .scythe-icon {
+            font-size: 1.5rem;
+            display: inline-block;
+            animation: scytheWave 5s ease-in-out infinite;
+        }
+
+        @keyframes scytheWave {
+            0%, 100% { transform: rotate(-10deg); }
+            50% { transform: rotate(10deg); }
+        }
+
+        .progress-bar {
+            transition: width 0.5s ease;
+            background: linear-gradient(90deg, #92400e, #f59e0b);
+        }
+
+        .noon-clock {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        input[type="range"] {
+            accent-color: #f59e0b;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-amber-100 relative overflow-x-hidden">
+
+    <!-- Dust particles container -->
+    <div id="dust-container" class="fixed inset-0 pointer-events-none overflow-hidden z-0"></div>
+
+    <!-- Heat haze background -->
+    <div class="fixed inset-0 z-0" style="background: radial-gradient(ellipse at 50% 0%, rgba(120, 60, 0, 0.15) 0%, transparent 70%), radial-gradient(ellipse at 50% 100%, rgba(60, 30, 0, 0.1) 0%, transparent 70%);"></div>
+
+    <div class="relative z-10 max-w-2xl mx-auto px-4 py-8 min-h-screen">
+
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <div class="spirit-glow inline-block mb-4">
+                <div class="text-6xl">☀</div>
+            </div>
+            <h1 class="fell text-4xl text-amber-300 mb-2">The Poludnica Protocol</h1>
+            <p class="mono text-xs text-amber-700 tracking-widest uppercase">Slovak Noon Audit System</p>
+            <div id="noon-clock" class="noon-clock mono text-amber-600 text-sm mt-3"></div>
+        </div>
+
+        <!-- Lore block -->
+        <div class="mb-8 p-4 border border-amber-900/40 bg-amber-950/20 rounded-sm">
+            <p class="fell italic text-amber-400/80 text-sm leading-relaxed">
+                She arrives at noon. On the hottest days. In the open fields, exactly when you stop to rest.<br>
+                She asks difficult questions. If you cannot answer — or if you change the subject — she takes your head.<br>
+                <span class="text-amber-600">There is no escape through silence. You must engage.</span>
+            </p>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="mb-6">
+            <div class="flex justify-between mono text-xs text-amber-800 mb-1">
+                <span>QUESTIONS ANSWERED</span>
+                <span id="progress-text">0 / 5</span>
+            </div>
+            <div class="h-1 bg-amber-950 rounded-full overflow-hidden">
+                <div id="progress-bar" class="progress-bar h-full rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Questions -->
+        <div id="questions-container" class="space-y-4">
+            <!-- Rendered by JS -->
+        </div>
+
+        <!-- Submit button -->
+        <div class="mt-8 text-center" id="submit-section" style="display:none;">
+            <button id="submit-btn" onclick="renderVerdict()"
+                class="mono text-sm px-8 py-3 bg-amber-900/40 border border-amber-600/60 text-amber-300 hover:bg-amber-800/40 hover:border-amber-500 transition-all tracking-wider uppercase">
+                ☀ Face the Verdict ☀
+            </button>
+        </div>
+
+        <!-- Verdict -->
+        <div id="verdict-container" class="mt-8 fade-in" style="display:none;"></div>
+
+        <!-- Reset -->
+        <div class="mt-8 text-center" id="reset-section" style="display:none;">
+            <button onclick="resetAll()"
+                class="mono text-xs text-amber-900 hover:text-amber-700 transition-colors tracking-widest">
+                ↩ answer again
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-16 text-center">
+            <p class="mono text-xs text-amber-900/60">
+                The break that is not a break. The rest that is actually an audit.<br>
+                Know when to rest before noon arrives — or be ready to answer.
+            </p>
+        </div>
+    </div>
+
+    <script>
+    const QUESTIONS = [
+        {
+            id: 'q1',
+            number: 'I',
+            symbol: '⚔',
+            question: "What is the ONE thing that will actually move the needle today?",
+            subtext: "Not your to-do list. The thing. If nothing else happens, this is what must.",
+            placeholder: "The single mission...",
+            type: 'text'
+        },
+        {
+            id: 'q2',
+            number: 'II',
+            symbol: '⏳',
+            question: "Who are you currently blocking?",
+            subtext: "A reply not sent. A decision not made. A ball in your court. Name them.",
+            placeholder: "Name them honestly...",
+            type: 'text'
+        },
+        {
+            id: 'q3',
+            number: 'III',
+            symbol: '⚡',
+            question: "Honest energy level. Right now.",
+            subtext: "The mountain does not grade on what you had planned to feel.",
+            type: 'slider',
+            min: 1,
+            max: 10,
+            labels: ['Depleted', 'Functional', 'Sharp']
+        },
+        {
+            id: 'q4',
+            number: 'IV',
+            symbol: '🌑',
+            question: "What decision have you been avoiding?",
+            subtext: "The one that sits in the back. The one that gets heavier every day you don't touch it.",
+            placeholder: "Name the thing you keep moving to tomorrow...",
+            type: 'text'
+        },
+        {
+            id: 'q5',
+            number: 'V',
+            symbol: '🌾',
+            question: "What can you drop right now with no real consequence?",
+            subtext: "The obligation that exists only in your head. The task that costs more in anxiety than it returns.",
+            placeholder: "Drop it here. It is now officially abandoned.",
+            type: 'text'
+        }
+    ];
+
+    const VERDICTS = {
+        sharp: [
+            "The spirit passes. You see clearly. Deploy the energy before the afternoon takes it.",
+            "Sharp at noon — a rare thing. The one mission is visible, the blocks are named, the deferred decision is now an enemy with a face. Act before the heat returns.",
+            "You have answered. The spirit accepts your passage. Do not waste the clarity on meetings."
+        ],
+        functional: [
+            "Functional is sufficient if you use it correctly. The needle-mover is named. That is enough for now. Do not schedule anything that requires brilliance.",
+            "You are the field worker at noon — tired but standing. One task. The deferred decision can wait one more day, but mark it. It earns interest.",
+            "The spirit notes your honesty. Low energy declared is energy managed correctly. One mission only. Everything else is noise today."
+        ],
+        depleted: [
+            "You are running the wrong protocol at the wrong time. Name the one task, do it, and stop. The Poludnica does not negotiate with the exhausted.",
+            "The spirit sees the depletion. You should have rested before noon. The one task is the only task. Everything else is borrowed time you don't have.",
+            "Critical state. The deferred decision will wait — attempting it now produces the wrong answer. The one mission, then recovery. The mountain does not reward martyrdom."
+        ]
+    };
+
+    let answers = {};
+    let currentActive = 'q1';
+
+    function initDust() {
+        const container = document.getElementById('dust-container');
+        for (let i = 0; i < 12; i++) {
+            const p = document.createElement('div');
+            p.className = 'dust-particle';
+            const drift = (Math.random() - 0.5) * 200;
+            p.style.cssText = `
+                left: ${Math.random() * 100}%;
+                --drift: ${drift}px;
+                animation-duration: ${6 + Math.random() * 8}s;
+                animation-delay: ${Math.random() * 10}s;
+                width: ${2 + Math.random() * 3}px;
+                height: ${2 + Math.random() * 3}px;
+                opacity: ${0.3 + Math.random() * 0.4};
+            `;
+            container.appendChild(p);
+        }
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+            timeZone: 'Asia/Ho_Chi_Minh'
+        });
+        const dateStr = now.toLocaleDateString('en-US', {
+            weekday: 'long', month: 'long', day: 'numeric',
+            timeZone: 'Asia/Ho_Chi_Minh'
+        });
+
+        const hour = parseInt(now.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' }));
+        let timeLabel = '';
+        if (hour >= 11 && hour < 13) timeLabel = ' — She is here.';
+        else if (hour >= 10 && hour < 11) timeLabel = ' — She approaches.';
+        else if (hour >= 13 && hour < 16) timeLabel = ' — She has passed. Answer anyway.';
+        else if (hour >= 4 && hour < 10) timeLabel = ' — Before noon. Prepare.';
+        else timeLabel = ' — The night audit.';
+
+        document.getElementById('noon-clock').textContent = `${dateStr} · ${timeStr}${timeLabel}`;
+    }
+
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = QUESTIONS.map((q, idx) => {
+            const isFirst = idx === 0;
+            return `
+            <div id="card-${q.id}" class="question-card border border-amber-900/30 p-5 rounded-sm ${isFirst ? 'active' : ''}" onclick="activateQuestion('${q.id}')">
+                <div class="flex items-start gap-4">
+                    <div class="text-center min-w-[40px]">
+                        <div class="text-amber-600 text-lg">${q.symbol}</div>
+                        <div class="mono text-xs text-amber-800 mt-1">${q.number}</div>
+                    </div>
+                    <div class="flex-1">
+                        <p class="fell text-amber-200 text-lg leading-snug mb-1">${q.question}</p>
+                        <p class="mono text-xs text-amber-700 mb-3">${q.subtext}</p>
+                        ${renderInput(q)}
+                    </div>
+                    <div id="check-${q.id}" class="text-amber-800 text-lg mt-1" style="display:none;">✓</div>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+
+    function renderInput(q) {
+        if (q.type === 'text') {
+            return `
+            <textarea id="input-${q.id}" rows="2"
+                class="w-full mono text-sm text-amber-300 border-b border-amber-900/40 py-2 px-0 focus:border-amber-700/60 transition-colors"
+                placeholder="${q.placeholder}"
+                oninput="handleTextInput('${q.id}')"
+                onblur="checkAnswer('${q.id}')"
+            ></textarea>
+            `;
+        } else if (q.type === 'slider') {
+            return `
+            <div class="mt-2">
+                <div class="flex justify-between mono text-xs text-amber-800 mb-2">
+                    <span>${q.labels[0]}</span>
+                    <span id="slider-val-${q.id}" class="text-amber-500 font-bold">5</span>
+                    <span>${q.labels[2]}</span>
+                </div>
+                <input type="range" id="input-${q.id}" min="${q.min}" max="${q.max}" value="5"
+                    class="w-full"
+                    oninput="handleSlider('${q.id}', this.value)"
+                    onchange="checkAnswer('${q.id}')"
+                />
+                <div class="flex justify-between mono text-xs text-amber-900 mt-1">
+                    ${Array.from({length: 10}, (_, i) => `<span>${i+1}</span>`).join('')}
+                </div>
+            </div>
+            `;
+        }
+    }
+
+    function activateQuestion(id) {
+        document.querySelectorAll('.question-card').forEach(card => {
+            if (!card.classList.contains('answered')) {
+                card.classList.remove('active');
+            }
+        });
+        const card = document.getElementById(`card-${id}`);
+        if (!card.classList.contains('answered')) {
+            card.classList.add('active');
+        }
+        currentActive = id;
+        const input = document.getElementById(`input-${id}`);
+        if (input) input.focus();
+    }
+
+    function handleTextInput(id) {
+        const val = document.getElementById(`input-${id}`).value.trim();
+        answers[id] = val;
+        updateProgress();
+    }
+
+    function handleSlider(id, value) {
+        document.getElementById(`slider-val-${id}`).textContent = value;
+        answers[id] = parseInt(value);
+        checkAnswer(id);
+    }
+
+    function checkAnswer(id) {
+        const val = answers[id];
+        const hasAnswer = val !== undefined && val !== '' && val !== null;
+
+        if (hasAnswer && typeof val === 'string' && val.trim().length < 3) return;
+
+        if (hasAnswer) {
+            const card = document.getElementById(`card-${id}`);
+            card.classList.remove('active');
+            card.classList.add('answered');
+            document.getElementById(`check-${id}`).style.display = 'block';
+            updateProgress();
+
+            // Move to next question
+            const idx = QUESTIONS.findIndex(q => q.id === id);
+            if (idx < QUESTIONS.length - 1) {
+                setTimeout(() => activateQuestion(QUESTIONS[idx + 1].id), 300);
+            }
+        }
+    }
+
+    function updateProgress() {
+        const answered = QUESTIONS.filter(q => {
+            const val = answers[q.id];
+            if (val === undefined || val === '' || val === null) return false;
+            if (typeof val === 'string' && val.trim().length < 3) return false;
+            return true;
+        }).length;
+
+        document.getElementById('progress-text').textContent = `${answered} / 5`;
+        document.getElementById('progress-bar').style.width = `${(answered / 5) * 100}%`;
+
+        if (answered === 5) {
+            document.getElementById('submit-section').style.display = 'block';
+            document.getElementById('submit-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function renderVerdict() {
+        const energy = answers['q3'] || 5;
+        let tier, tierLabel, tierColor;
+
+        if (energy >= 8) {
+            tier = 'sharp';
+            tierLabel = 'PEAK WINDOW';
+            tierColor = 'text-amber-300';
+        } else if (energy >= 5) {
+            tier = 'functional';
+            tierLabel = 'FUNCTIONAL RANGE';
+            tierColor = 'text-amber-500';
+        } else {
+            tier = 'depleted';
+            tierLabel = 'CRITICAL DEPLETION';
+            tierColor = 'text-red-400';
+        }
+
+        const verdictOptions = VERDICTS[tier];
+        const verdict = verdictOptions[Math.floor(Math.random() * verdictOptions.length)];
+
+        const mission = answers['q1'] || '(unnamed)';
+        const blocking = answers['q2'] || '(no one named)';
+        const avoided = answers['q4'] || '(unnamed)';
+        const dropped = answers['q5'] || '(nothing dropped)';
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit',
+            hour12: false,
+            timeZone: 'Asia/Ho_Chi_Minh'
+        });
+
+        const verdictHtml = `
+        <div class="verdict-box p-6 rounded-sm fade-in">
+            <div class="text-center mb-6">
+                <div class="spirit-glow text-4xl mb-2">☀</div>
+                <div class="mono text-xs tracking-widest ${tierColor} uppercase">${tierLabel}</div>
+                <div class="mono text-xs text-amber-900 mt-1">${timeStr} Saigon — Poludnica has heard your answers</div>
+            </div>
+
+            <div class="fell italic text-amber-300 text-lg leading-relaxed text-center mb-6 border-t border-b border-amber-900/30 py-4">
+                "${verdict}"
+            </div>
+
+            <div class="space-y-3 mono text-xs">
+                <div class="flex gap-3">
+                    <span class="text-amber-700 min-w-[80px]">MISSION:</span>
+                    <span class="text-amber-400">${escHtml(mission)}</span>
+                </div>
+                <div class="flex gap-3">
+                    <span class="text-amber-700 min-w-[80px]">BLOCKING:</span>
+                    <span class="text-amber-400">${escHtml(blocking)}</span>
+                </div>
+                <div class="flex gap-3">
+                    <span class="text-amber-700 min-w-[80px]">ENERGY:</span>
+                    <span class="${tierColor}">${energy}/10 — ${tierLabel}</span>
+                </div>
+                <div class="flex gap-3">
+                    <span class="text-amber-700 min-w-[80px]">DEFERRED:</span>
+                    <span class="text-amber-400">${escHtml(avoided)}</span>
+                </div>
+                <div class="flex gap-3">
+                    <span class="text-amber-700 min-w-[80px]">DROPPED:</span>
+                    <span class="text-amber-700 line-through">${escHtml(dropped)}</span>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-amber-900/30 text-center">
+                <p class="mono text-xs text-amber-900">
+                    The spirit has passed. She will return tomorrow at noon.<br>
+                    Be ready with better answers.
+                </p>
+            </div>
+        </div>
+        `;
+
+        document.getElementById('verdict-container').innerHTML = verdictHtml;
+        document.getElementById('verdict-container').style.display = 'block';
+        document.getElementById('submit-section').style.display = 'none';
+        document.getElementById('reset-section').style.display = 'block';
+
+        document.getElementById('verdict-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function escHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function resetAll() {
+        answers = {};
+        currentActive = 'q1';
+        document.getElementById('verdict-container').style.display = 'none';
+        document.getElementById('reset-section').style.display = 'none';
+        document.getElementById('submit-section').style.display = 'none';
+        renderQuestions();
+        updateProgress();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Init
+    initDust();
+    renderQuestions();
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Slider init
+    setTimeout(() => {
+        const sliderQ = QUESTIONS.find(q => q.type === 'slider');
+        if (sliderQ) {
+            answers[sliderQ.id] = 5;
+        }
+    }, 100);
+    </script>
+</body>
+</html>

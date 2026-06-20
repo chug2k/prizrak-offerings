@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Dvojdušník Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f0f14; }
+    .moon-glow { text-shadow: 0 0 20px rgba(148,163,220,0.6); }
+    .soul-bar { transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+    @keyframes flicker { 0%,100% { opacity:1; } 50% { opacity:0.85; } }
+    .flicker { animation: flicker 3s ease-in-out infinite; }
+    @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    .float { animation: float 4s ease-in-out infinite; }
+    .log-entry { border-left: 2px solid rgba(100,100,180,0.3); }
+    .log-entry:hover { border-left-color: rgba(148,163,220,0.6); }
+    .first-soul { color: #94a3b8; }
+    .second-soul { color: #a78bfa; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(100,100,180,0.3); border-radius: 2px; }
+    textarea { resize: none; }
+  </style>
+</head>
+<body class="text-slate-300 font-sans antialiased min-h-screen">
+
+  <!-- Stars background -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none">
+    <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="starGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#0f0f14" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="50%" cy="30%" rx="40%" ry="30%" fill="url(#starGlow)"/>
+    </svg>
+    <canvas id="stars" class="absolute inset-0 w-full h-full opacity-40"></canvas>
+  </div>
+
+  <div class="relative max-w-2xl mx-auto px-4 py-10 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="text-center mb-10">
+      <div class="float inline-block text-4xl mb-3">🌙</div>
+      <h1 class="text-3xl font-bold text-slate-100 moon-glow mb-2">The Dvojdušník Log</h1>
+      <p class="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+        Two souls. One body. The <span class="first-soul font-medium">first soul</span> attends the institution.
+        The <span class="second-soul font-medium">second soul</span> travels at night and builds in secret.
+      </p>
+      <p class="text-xs text-slate-600 mt-2 italic">The village knows where the body was. Only the log knows where the soul went.</p>
+    </header>
+
+    <!-- Today's entry form -->
+    <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-6 mb-6 backdrop-blur-sm">
+      <div class="flex items-center gap-2 mb-4">
+        <div class="w-2 h-2 rounded-full bg-violet-400 flicker"></div>
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Log Tonight's Travel</h2>
+        <span id="todayDate" class="ml-auto text-xs text-slate-600 font-mono"></span>
+      </div>
+
+      <div class="space-y-4">
+        <!-- First Soul -->
+        <div>
+          <label class="block text-xs font-medium first-soul mb-1.5 uppercase tracking-wide">First Soul — What the institution saw today</label>
+          <textarea id="firstSoulInput" rows="2"
+            class="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-slate-500 placeholder-slate-600"
+            placeholder="Meetings attended. Approvals given. What the job expects you to be..."></textarea>
+        </div>
+
+        <!-- Second Soul -->
+        <div>
+          <label class="block text-xs font-medium second-soul mb-1.5 uppercase tracking-wide">Second Soul — Where did you actually go?</label>
+          <textarea id="secondSoulInput" rows="2"
+            class="w-full bg-slate-800/60 border border-slate-600/50 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-violet-500/50 placeholder-slate-600"
+            placeholder="What you built, thought, explored, or protected while the body was elsewhere..."></textarea>
+        </div>
+
+        <!-- Energy direction -->
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="block text-xs text-slate-500 mb-1">First soul energy (1–10)</label>
+            <input id="firstEnergy" type="number" min="1" max="10"
+              class="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-slate-500"
+              placeholder="5">
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs text-slate-500 mb-1">Second soul energy (1–10)</label>
+            <input id="secondEnergy" type="number" min="1" max="10"
+              class="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-violet-500/50"
+              placeholder="7">
+          </div>
+        </div>
+
+        <button id="logBtn"
+          class="w-full py-2.5 rounded-lg bg-violet-900/40 border border-violet-700/50 text-violet-300 text-sm font-medium hover:bg-violet-800/50 hover:border-violet-600 transition-all">
+          Record the Night's Travel
+        </button>
+      </div>
+    </div>
+
+    <!-- Split metrics -->
+    <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-5 mb-6">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Soul Distribution — Last 14 Days</h3>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="first-soul">First Soul (Institution)</span>
+            <span id="firstPct" class="font-mono text-slate-400">—</span>
+          </div>
+          <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="firstBar" class="soul-bar h-full bg-slate-500 rounded-full" style="width:0%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="second-soul">Second Soul (Builder)</span>
+            <span id="secondPct" class="font-mono text-slate-400">—</span>
+          </div>
+          <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="secondBar" class="soul-bar h-full bg-violet-600 rounded-full" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+      <div id="verdict" class="mt-4 text-xs text-slate-500 italic leading-relaxed hidden"></div>
+    </div>
+
+    <!-- Log history -->
+    <div class="flex-1">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Night Log</h3>
+        <button id="clearBtn" class="text-[10px] text-slate-700 hover:text-slate-500 transition-colors">clear all</button>
+      </div>
+      <div id="logList" class="space-y-3">
+        <p class="text-xs text-slate-700 italic text-center py-6">The log is empty. The village knows only what the body did today.</p>
+      </div>
+    </div>
+
+    <div class="mt-10 pt-4 border-t border-slate-800/50 text-center">
+      <p class="text-[10px] text-slate-700">The body was in the bed. The soul was somewhere else. Both are you.</p>
+      <p class="text-[10px] text-slate-800 mt-1">Principle 30: The soul is judged by what it leaves behind, not by whether the body was in the bed.</p>
+    </div>
+  </div>
+
+  <script>
+  const KEY = 'dvojdusnik_log_v1';
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e) { return []; }
+  }
+  function save(entries) {
+    localStorage.setItem(KEY, JSON.stringify(entries));
+  }
+
+  function getVerdict(firstAvg, secondAvg, count) {
+    const ratio = secondAvg / (firstAvg + secondAvg || 1);
+    if (count === 0) return null;
+    if (ratio > 0.65) return "The second soul is stronger than the first. The builder is outrunning the functionary. This is not yet sustainable — but it is the correct direction of travel.";
+    if (ratio > 0.45) return "The two souls are roughly balanced. The body attends the institution. The soul also builds. This is the stable dvojdušník state. The village suspects nothing. The work continues.";
+    if (ratio > 0.28) return "The first soul is dominant. The institution is extracting more than the second soul is building. The gap is widening. Note it. The Garmin is already measuring the cost.";
+    return "The second soul has gone quiet. The body is fully at the institution's disposal. This is not stability — it is surrender. The slope is loading. The mountain is watching.";
+  }
+
+  function render() {
+    const entries = load();
+    const today = new Date().toLocaleDateString('en-CA');
+    document.getElementById('todayDate').textContent = today;
+
+    const listEl = document.getElementById('logList');
+    const verdictEl = document.getElementById('verdict');
+
+    if (entries.length === 0) {
+      listEl.innerHTML = '<p class="text-xs text-slate-700 italic text-center py-6">The log is empty. The village knows only what the body did today.</p>';
+      document.getElementById('firstPct').textContent = '—';
+      document.getElementById('secondPct').textContent = '—';
+      document.getElementById('firstBar').style.width = '0%';
+      document.getElementById('secondBar').style.width = '0%';
+      verdictEl.classList.add('hidden');
+      return;
+    }
+
+    // Last 14 days for metrics
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 14);
+    const recent = entries.filter(e => new Date(e.date) >= cutoff);
+
+    if (recent.length > 0) {
+      const firstSum = recent.reduce((s,e) => s + (e.firstEnergy||5), 0);
+      const secondSum = recent.reduce((s,e) => s + (e.secondEnergy||5), 0);
+      const total = firstSum + secondSum;
+      const fp = Math.round((firstSum/total)*100);
+      const sp = Math.round((secondSum/total)*100);
+      document.getElementById('firstPct').textContent = fp + '%';
+      document.getElementById('secondPct').textContent = sp + '%';
+      document.getElementById('firstBar').style.width = fp + '%';
+      document.getElementById('secondBar').style.width = sp + '%';
+
+      const firstAvg = firstSum / recent.length;
+      const secondAvg = secondSum / recent.length;
+      const v = getVerdict(firstAvg, secondAvg, recent.length);
+      if (v) {
+        verdictEl.textContent = '⊞ ' + v;
+        verdictEl.classList.remove('hidden');
+      }
+    }
+
+    // Render log (newest first)
+    const sorted = [...entries].sort((a,b) => b.date.localeCompare(a.date));
+    listEl.innerHTML = sorted.map(e => {
+      const fe = e.firstEnergy || '?';
+      const se = e.secondEnergy || '?';
+      const gap = (e.secondEnergy || 5) - (e.firstEnergy || 5);
+      const gapColor = gap > 0 ? 'text-violet-400' : gap < 0 ? 'text-slate-500' : 'text-slate-600';
+      const gapStr = gap > 0 ? `+${gap}` : `${gap}`;
+      return `
+        <div class="log-entry pl-4 py-3 hover:bg-slate-900/20 rounded-r-lg transition-colors">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-[10px] font-mono text-slate-600">${e.date}</span>
+            <span class="text-[10px] text-slate-700 ml-auto font-mono">
+              <span class="first-soul">${fe}</span>
+              <span class="text-slate-700 mx-1">/</span>
+              <span class="second-soul">${se}</span>
+              <span class="${gapColor} ml-1">${gapStr}</span>
+            </span>
+          </div>
+          ${e.firstSoul ? `<p class="text-xs first-soul opacity-70 mb-1 leading-relaxed"><span class="text-slate-600 text-[10px] mr-1">FIRST:</span>${escHtml(e.firstSoul)}</p>` : ''}
+          ${e.secondSoul ? `<p class="text-xs second-soul opacity-80 leading-relaxed"><span class="text-slate-600 text-[10px] mr-1">SECOND:</span>${escHtml(e.secondSoul)}</p>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  document.getElementById('logBtn').addEventListener('click', () => {
+    const firstSoul = document.getElementById('firstSoulInput').value.trim();
+    const secondSoul = document.getElementById('secondSoulInput').value.trim();
+    const fe = parseInt(document.getElementById('firstEnergy').value) || 5;
+    const se = parseInt(document.getElementById('secondEnergy').value) || 5;
+
+    if (!firstSoul && !secondSoul) return;
+
+    const entries = load();
+    const today = new Date().toLocaleDateString('en-CA');
+    // Replace today's entry if exists
+    const idx = entries.findIndex(e => e.date === today);
+    const entry = { date: today, firstSoul, secondSoul, firstEnergy: Math.max(1,Math.min(10,fe)), secondEnergy: Math.max(1,Math.min(10,se)) };
+    if (idx >= 0) entries[idx] = entry;
+    else entries.push(entry);
+    save(entries);
+
+    document.getElementById('firstSoulInput').value = '';
+    document.getElementById('secondSoulInput').value = '';
+    document.getElementById('firstEnergy').value = '';
+    document.getElementById('secondEnergy').value = '';
+    render();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (confirm('Clear all log entries?')) { save([]); render(); }
+  });
+
+  // Stars canvas
+  (function initStars() {
+    const canvas = document.getElementById('stars');
+    const ctx = canvas.getContext('2d');
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; drawStars(); }
+    function drawStars() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      for (let i=0; i<120; i++) {
+        const x = Math.random()*canvas.width;
+        const y = Math.random()*canvas.height*0.7;
+        const r = Math.random()*1.2;
+        const alpha = 0.2 + Math.random()*0.5;
+        ctx.beginPath();
+        ctx.arc(x,y,r,0,Math.PI*2);
+        ctx.fillStyle = `rgba(180,180,240,${alpha})`;
+        ctx.fill();
+      }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+  })();
+
+  render();
+  </script>
+</body>
+</html>

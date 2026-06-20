@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Predation Web | Offerings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #18181b; overflow: hidden; }
+        canvas { display: block; }
+        .glow { text-shadow: 0 0 10px currentColor; }
+        .panel { backdrop-filter: blur(12px); background: rgba(24,24,27,0.85); }
+        input, select { background: #27272a; border: 1px solid #3f3f46; color: #d4d4d8; }
+        input:focus, select:focus { outline: none; border-color: #a78bfa; }
+    </style>
+</head>
+<body class="text-zinc-300 font-mono">
+    <canvas id="web"></canvas>
+
+    <div class="fixed top-4 left-4 z-20 panel rounded-xl p-4 border border-zinc-700 max-w-xs">
+        <h1 class="text-lg font-bold text-violet-400 glow mb-1">The Predation Web</h1>
+        <p class="text-xs text-zinc-500 mb-3">Who eats whom. Drag nodes. Click canvas to deselect.</p>
+        <div class="space-y-2">
+            <input id="nodeName" type="text" placeholder="New entity name..." class="w-full px-2 py-1 rounded text-sm">
+            <button id="addNode" class="w-full px-2 py-1 bg-violet-900/60 hover:bg-violet-800/60 border border-violet-700/50 rounded text-sm text-violet-300">+ Add Entity</button>
+        </div>
+        <div class="mt-3 pt-3 border-t border-zinc-700 space-y-2">
+            <p class="text-xs text-zinc-500">Draw connection:</p>
+            <select id="fromNode" class="w-full px-2 py-1 rounded text-sm"></select>
+            <div class="flex gap-1">
+                <select id="edgeType" class="flex-1 px-2 py-1 rounded text-sm">
+                    <option value="consumes">→ consumes</option>
+                    <option value="mutual">↔ mutual</option>
+                    <option value="feeds">→ feeds</option>
+                    <option value="competes">⇌ competes</option>
+                </select>
+            </div>
+            <select id="toNode" class="w-full px-2 py-1 rounded text-sm"></select>
+            <button id="addEdge" class="w-full px-2 py-1 bg-emerald-900/60 hover:bg-emerald-800/60 border border-emerald-700/50 rounded text-sm text-emerald-300">+ Connect</button>
+        </div>
+        <div class="mt-3 pt-3 border-t border-zinc-700">
+            <button id="resetBtn" class="w-full px-2 py-1 bg-red-900/40 hover:bg-red-900/60 border border-red-800/40 rounded text-xs text-red-400">Reset to defaults</button>
+        </div>
+    </div>
+
+    <div class="fixed bottom-4 left-4 z-20 panel rounded-lg px-3 py-2 border border-zinc-700">
+        <p class="text-xs text-zinc-500" id="status">Drag nodes to rearrange. Right-click node to remove.</p>
+    </div>
+
+    <script>
+    const STORAGE_KEY = "predation_web_v1";
+    const canvas = document.getElementById("web");
+    const ctx = canvas.getContext("2d");
+
+    const COLORS = ["#a78bfa","#f472b6","#34d399","#fbbf24","#60a5fa","#fb923c","#e879f9","#22d3ee","#a3e635","#f87171"];
+    const EDGE_COLORS = { consumes: "#ef4444", mutual: "#f59e0b", feeds: "#22c55e", competes: "#8b5cf6" };
+
+    let nodes = [];
+    let edges = [];
+    let dragging = null;
+    let dragOff = { x: 0, y: 0 };
+    let animT = 0;
+    let hoveredNode = null;
+
+    const defaults = {
+        nodes: [
+            { id: "vc", name: "VC Firms", x: 400, y: 250, color: COLORS[0] },
+            { id: "startups", name: "Startups", x: 600, y: 250, color: COLORS[1] },
+            { id: "approval", name: "Approval", x: 300, y: 450, color: COLORS[2] },
+            { id: "autonomy", name: "Autonomy", x: 550, y: 450, color: COLORS[3] },
+            { id: "pickleball", name: "Pickleball", x: 700, y: 400, color: COLORS[4] },
+            { id: "stress", name: "Stress", x: 450, y: 150, color: COLORS[5] },
+            { id: "catfish", name: "Catfish", x: 200, y: 150, color: COLORS[6] },
+            { id: "wels", name: "Wels", x: 200, y: 350, color: COLORS[7] },
+        ],
+        edges: [
+            { from: "vc", to: "startups", type: "mutual" },
+            { from: "approval", to: "autonomy", type: "consumes" },
+            { from: "pickleball", to: "stress", type: "consumes" },
+            { from: "catfish", to: "wels", type: "mutual" },
+            { from: "stress", to: "approval", type: "feeds" },
+        ]
+    };
+
+    function load() {
+        try {
+            const d = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            if (d && d.nodes && d.edges) { nodes = d.nodes; edges = d.edges; return; }
+        } catch(e) {}
+        resetDefaults();
+    }
+
+    function resetDefaults() {
+        nodes = JSON.parse(JSON.stringify(defaults.nodes));
+        edges = JSON.parse(JSON.stringify(defaults.edges));
+        save();
+    }
+
+    function save() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
+        updateSelects();
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    function updateSelects() {
+        const fromSel = document.getElementById("fromNode");
+        const toSel = document.getElementById("toNode");
+        const opts = nodes.map(n => `<option value="${n.id}">${n.name}</option>`).join("");
+        fromSel.innerHTML = opts;
+        toSel.innerHTML = opts;
+    }
+
+    function nodeAt(x, y) {
+        for (let i = nodes.length - 1; i >= 0; i--) {
+            const n = nodes[i];
+            const dx = x - n.x, dy = y - n.y;
+            if (dx*dx + dy*dy < 900) return n;
+        }
+        return null;
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, mutual, t) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len < 1) return;
+        const nx = dx/len, ny = dy/len;
+        const sx = x1 + nx*30, sy = y1 + ny*30;
+        const ex = x2 - nx*30, ey = y2 - ny*30;
+
+        // Animated dash
+        ctx.beginPath();
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -t * 30;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.7;
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+
+        // Arrow head
+        const hs = 10;
+        const angle = Math.atan2(ey - sy, ex - sx);
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - hs*Math.cos(angle - 0.4), ey - hs*Math.sin(angle - 0.4));
+        ctx.lineTo(ex - hs*Math.cos(angle + 0.4), ey - hs*Math.sin(angle + 0.4));
+        ctx.fill();
+
+        if (mutual) {
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + hs*Math.cos(angle - 0.4), sy + hs*Math.sin(angle - 0.4));
+            ctx.lineTo(sx + hs*Math.cos(angle + 0.4), sy + hs*Math.sin(angle + 0.4));
+            ctx.fill();
+        }
+
+        // Label
+        const mx = (sx+ex)/2, my = (sy+ey)/2;
+        ctx.font = "10px monospace";
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.6;
+        const edge = edges.find(e => {
+            const fn = nodes.find(n=>n.id===e.from);
+            const tn = nodes.find(n=>n.id===e.to);
+            return fn && tn && Math.abs(fn.x-x1)<1 && Math.abs(tn.x-x2)<1;
+        });
+        if (edge) ctx.fillText(edge.type, mx + 5, my - 5);
+        ctx.globalAlpha = 1;
+    }
+
+    function draw() {
+        animT += 0.016;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Grid
+        ctx.strokeStyle = "#27272a";
+        ctx.lineWidth = 1;
+        for (let x = 0; x < canvas.width; x += 40) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += 40) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        }
+
+        // Edges
+        edges.forEach(e => {
+            const fn = nodes.find(n => n.id === e.from);
+            const tn = nodes.find(n => n.id === e.to);
+            if (!fn || !tn) return;
+            const color = EDGE_COLORS[e.type] || "#71717a";
+            drawArrow(fn.x, fn.y, tn.x, tn.y, color, e.type === "mutual" || e.type === "competes", animT);
+        });
+
+        // Nodes
+        nodes.forEach(n => {
+            const isHovered = hoveredNode === n;
+            const r = isHovered ? 32 : 26;
+
+            // Glow
+            const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2);
+            grad.addColorStop(0, n.color + "40");
+            grad.addColorStop(1, "transparent");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r * 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Circle
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = "#18181b";
+            ctx.fill();
+            ctx.strokeStyle = n.color;
+            ctx.lineWidth = isHovered ? 3 : 2;
+            ctx.stroke();
+
+            // Pulse
+            const pulse = Math.sin(animT * 2 + nodes.indexOf(n)) * 0.15 + 0.85;
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
+            ctx.strokeStyle = n.color;
+            ctx.globalAlpha = pulse * 0.3;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            // Label
+            ctx.font = "bold 11px monospace";
+            ctx.fillStyle = n.color;
+            ctx.textAlign = "center";
+            ctx.fillText(n.name, n.x, n.y + 4);
+        });
+
+        requestAnimationFrame(draw);
+    }
+
+    // Events
+    canvas.addEventListener("mousedown", e => {
+        const n = nodeAt(e.clientX, e.clientY);
+        if (n) { dragging = n; dragOff = { x: e.clientX - n.x, y: e.clientY - n.y }; }
+    });
+    canvas.addEventListener("mousemove", e => {
+        if (dragging) {
+            dragging.x = e.clientX - dragOff.x;
+            dragging.y = e.clientY - dragOff.y;
+            save();
+        }
+        hoveredNode = nodeAt(e.clientX, e.clientY);
+        canvas.style.cursor = hoveredNode ? "grab" : "default";
+    });
+    canvas.addEventListener("mouseup", () => { dragging = null; });
+    canvas.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        const n = nodeAt(e.clientX, e.clientY);
+        if (n && confirm(`Remove "${n.name}" from the web?`)) {
+            nodes = nodes.filter(x => x !== n);
+            edges = edges.filter(x => x.from !== n.id && x.to !== n.id);
+            save();
+        }
+    });
+
+    document.getElementById("addNode").addEventListener("click", () => {
+        const name = document.getElementById("nodeName").value.trim();
+        if (!name) return;
+        const id = name.toLowerCase().replace(/[^a-z0-9]/g, "-");
+        if (nodes.find(n => n.id === id)) return;
+        nodes.push({ id, name, x: 300 + Math.random()*200, y: 200 + Math.random()*200, color: COLORS[nodes.length % COLORS.length] });
+        document.getElementById("nodeName").value = "";
+        save();
+    });
+
+    document.getElementById("addEdge").addEventListener("click", () => {
+        const from = document.getElementById("fromNode").value;
+        const to = document.getElementById("toNode").value;
+        const type = document.getElementById("edgeType").value;
+        if (from === to) return;
+        if (edges.find(e => e.from === from && e.to === to)) return;
+        edges.push({ from, to, type });
+        save();
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+        if (confirm("Reset to default predation web?")) { resetDefaults(); }
+    });
+
+    window.addEventListener("resize", resize);
+    resize();
+    load();
+    updateSelects();
+    draw();
+    </script>
+</body>
+</html>

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foxfire Clock — Ghost Light</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #050a05;
+    color: #a8d5a2;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Forest silhouette */
+  .forest {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40vh;
+    z-index: 1;
+  }
+
+  /* Stars */
+  .stars {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
+
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--dur, 3s) ease-in-out infinite var(--delay, 0s);
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: var(--min-op, 0.2); }
+    50% { opacity: var(--max-op, 0.9); }
+  }
+
+  /* Main content */
+  .content {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 2rem;
+    max-width: 600px;
+  }
+
+  .title {
+    font-size: 0.75rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: #4a7a45;
+    margin-bottom: 2.5rem;
+  }
+
+  /* Circular glow visualizer */
+  .glow-ring-container {
+    position: relative;
+    width: 260px;
+    height: 260px;
+    margin: 0 auto 2.5rem;
+  }
+
+  .glow-ring-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: #0d1f0c;
+    stroke-width: 8;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 2s ease, stroke 2s ease;
+  }
+
+  .glow-orb {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    transition: width 2s ease, height 2s ease, background 2s ease, box-shadow 2s ease;
+  }
+
+  .time-display {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 2;
+  }
+
+  .time-display .hour {
+    font-size: 2.2rem;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+
+  .time-display .intensity-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 0.4rem;
+    opacity: 0.6;
+  }
+
+  /* Intensity bar */
+  .intensity-section {
+    margin-bottom: 2rem;
+  }
+
+  .intensity-label-main {
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #4a7a45;
+    margin-bottom: 0.8rem;
+  }
+
+  .intensity-value {
+    font-size: 3rem;
+    font-weight: bold;
+    line-height: 1;
+    transition: color 2s ease;
+  }
+
+  .intensity-bar-track {
+    width: 100%;
+    height: 4px;
+    background: #0d1f0c;
+    border-radius: 2px;
+    margin-top: 0.8rem;
+    overflow: hidden;
+  }
+
+  .intensity-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 2s ease, background 2s ease;
+  }
+
+  /* Phase description */
+  .phase-text {
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: #5a8a55;
+    margin-bottom: 2rem;
+    min-height: 3.5rem;
+    transition: color 2s ease;
+  }
+
+  /* Mycelium network canvas */
+  canvas.mycelium {
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%; height: 45vh;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* Footer note */
+  .note {
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: #2a4a27;
+    line-height: 1.8;
+    border-top: 1px solid #0d1f0c;
+    padding-top: 1.2rem;
+    margin-top: 0.5rem;
+  }
+
+  /* Spore particles */
+  .spore {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: float-spore linear infinite;
+    z-index: 3;
+  }
+
+  @keyframes float-spore {
+    0% { transform: translateY(0) translateX(0) scale(1); opacity: var(--start-op); }
+    50% { transform: translateY(-40vh) translateX(var(--drift)) scale(0.5); opacity: var(--mid-op); }
+    100% { transform: translateY(-80vh) translateX(calc(var(--drift) * 2)) scale(0); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<canvas class="mycelium" id="mycelium"></canvas>
+
+<div class="content">
+  <div class="title">Neonothopanus gardneri · Saigon · Ghost Light</div>
+
+  <div class="glow-ring-container">
+    <svg class="glow-ring-svg" viewBox="0 0 260 260">
+      <circle class="ring-bg" cx="130" cy="130" r="110"/>
+      <circle class="ring-progress" id="ringProgress" cx="130" cy="130" r="110"
+        stroke-dasharray="691.15"
+        stroke-dashoffset="691.15"
+        stroke="#1a4a18"/>
+    </svg>
+    <div class="glow-orb" id="glowOrb"></div>
+    <div class="time-display">
+      <div class="hour" id="timeDisplay">--:--</div>
+      <div class="intensity-label" id="hoursAfterDusk">-- hrs after dusk</div>
+    </div>
+  </div>
+
+  <div class="intensity-section">
+    <div class="intensity-label-main">Bioluminescence Intensity</div>
+    <div class="intensity-value" id="intensityValue">0%</div>
+    <div class="intensity-bar-track">
+      <div class="intensity-bar-fill" id="intensityBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="phase-text" id="phaseText">Calculating the circadian position...</div>
+
+  <div class="note">
+    Neonothopanus gardneri (Flor de Coco) regulates its bioluminescence via circadian clock.<br>
+    Peak glow occurs ~10 hours after dusk. In Saigon, dusk falls ~18:00. Peak: ~04:00.<br>
+    Welsh miners used foxfire as a flameless safe-lamp in methane-filled coal seams, 1815.<br>
+    — Prizrak, 2026-03-07
+  </div>
+</div>
+
+<svg class="forest" viewBox="0 0 1440 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="treeGlow" cx="50%" cy="100%" r="60%">
+      <stop offset="0%" stop-color="#0d2a0a" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#050a05" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Ground -->
+  <rect x="0" y="250" width="1440" height="50" fill="#030703"/>
+  <!-- Trees (silhouette) -->
+  <g fill="#030a03">
+    <polygon points="0,250 40,80 80,250"/>
+    <polygon points="60,250 110,40 160,250"/>
+    <polygon points="130,250 180,100 230,250"/>
+    <polygon points="200,250 260,60 320,250"/>
+    <polygon points="290,250 340,90 390,250"/>
+    <polygon points="360,250 420,30 480,250"/>
+    <polygon points="440,250 500,70 560,250"/>
+    <polygon points="520,250 580,50 640,250"/>
+    <polygon points="600,250 660,80 720,250"/>
+    <polygon points="680,250 740,35 800,250"/>
+    <polygon points="760,250 820,65 880,250"/>
+    <polygon points="840,250 900,45 960,250"/>
+    <polygon points="920,250 980,80 1040,250"/>
+    <polygon points="1000,250 1060,55 1120,250"/>
+    <polygon points="1080,250 1140,40 1200,250"/>
+    <polygon points="1160,250 1220,70 1280,250"/>
+    <polygon points="1240,250 1300,50 1360,250"/>
+    <polygon points="1320,250 1380,85 1440,250"/>
+    <polygon points="1400,250 1440,110 1440,250"/>
+  </g>
+  <!-- Trunk details -->
+  <g fill="#020702" opacity="0.8">
+    <rect x="37" y="200" width="6" height="50"/>
+    <rect x="107" y="180" width="6" height="70"/>
+    <rect x="177" y="190" width="6" height="60"/>
+    <rect x="257" y="170" width="7" height="80"/>
+    <rect x="337" y="185" width="6" height="65"/>
+    <rect x="417" y="160" width="7" height="90"/>
+    <rect x="497" y="175" width="6" height="75"/>
+    <rect x="577" y="165" width="7" height="85"/>
+    <rect x="657" y="185" width="6" height="65"/>
+    <rect x="737" y="155" width="7" height="95"/>
+  </g>
+</svg>
+
+<script>
+// Saigon timezone offset: UTC+7
+const SAIGON_OFFSET = 7;
+// Approximate dusk in Saigon: 18:00 (6 PM)
+const DUSK_HOUR = 18;
+// Peak bioluminescence: 10 hours after dusk = 04:00
+const PEAK_HOUR = (DUSK_HOUR + 10) % 24; // 4
+
+function getSaigonHour() {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const saigon = new Date(utc + SAIGON_OFFSET * 3600000);
+  return saigon.getHours() + saigon.getMinutes() / 60 + saigon.getSeconds() / 3600;
+}
+
+function getSaigonTimeStr() {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const saigon = new Date(utc + SAIGON_OFFSET * 3600000);
+  return saigon.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+// Bioluminescence model:
+// - Dusk = 18:00. Night runs 18:00 to 06:00 (12 hours).
+// - Peak at 10h after dusk = 04:00.
+// - Glow follows a bell curve centered on peak, only during night.
+// - Daytime (06:00-18:00): near zero (background < 5%)
+function calcIntensity(hour) {
+  // Hours since dusk (18:00)
+  let hoursSinceDusk = (hour - DUSK_HOUR + 24) % 24;
+  
+  // Night window: 0 to 12 hours after dusk (18:00 to 06:00)
+  if (hoursSinceDusk > 12) {
+    // Daytime: residual glow only
+    // Map 12-24 to a very low value
+    const dayProgress = (hoursSinceDusk - 12) / 12;
+    return Math.max(0, 0.04 * (1 - dayProgress));
+  }
+  
+  // Night: bell curve peaking at hour 10 after dusk
+  const peak = 10;
+  const sigma = 3.5;
+  const raw = Math.exp(-0.5 * Math.pow((hoursSinceDusk - peak) / sigma, 2));
+  
+  // Minimum night glow: 8%
+  return Math.max(0.08, raw);
+}
+
+function getPhaseText(hour, intensity) {
+  let hoursSinceDusk = (hour - DUSK_HOUR + 24) % 24;
+  
+  if (hoursSinceDusk <= 1) return "The sun has just set. The fungus begins activating luciferin oxidase. The forest floor stirs.";
+  if (hoursSinceDusk <= 3) return "Early night. Glow rising. Insects begin to notice the cold green light on the dead wood.";
+  if (hoursSinceDusk <= 6) return "Mid-night approach. Bioluminescence climbing toward peak. The mycelium pulses below the bark.";
+  if (hoursSinceDusk <= 9) return "The ghost light is near its peak. Welsh miners would carry this wood into coal seams now. No flame. No spark.";
+  if (hoursSinceDusk <= 11) return "Peak glow — 10 hours after dusk. The forest floor is a dim green cathedral. Spores disperse into the dark.";
+  if (hoursSinceDusk <= 12) return "Late night. The circadian clock begins its descent. The luciferin concentration drops. The glow fades with the approach of dawn.";
+  if (intensity < 0.05) return "Full daylight. The foxfire is invisible now — not gone, just outcompeted by the sun. It waits in the wood.";
+  return "Dawn residue. The metabolic clock winds down. The fungus rests until the next dusk.";
+}
+
+function getColor(intensity) {
+  // Low: dark green. High: bright acid green / yellow-green
+  const r = Math.floor(intensity * 80);
+  const g = Math.floor(40 + intensity * 215);
+  const b = Math.floor(intensity * 60);
+  return { r, g, b, css: `rgb(${r},${g},${b})` };
+}
+
+function hoursAfterDuskStr(hour) {
+  let h = (hour - DUSK_HOUR + 24) % 24;
+  if (h > 12) {
+    let beforeDusk = 24 - h;
+    return `${beforeDusk.toFixed(1)} hrs before dusk`;
+  }
+  return `${h.toFixed(1)} hrs after dusk`;
+}
+
+// ---- Stars ----
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 120; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = Math.random() * 2 + 0.5;
+  s.style.cssText = `
+    width: ${size}px; height: ${size}px;
+    top: ${Math.random() * 65}%;
+    left: ${Math.random() * 100}%;
+    --dur: ${2 + Math.random() * 4}s;
+    --delay: ${-Math.random() * 4}s;
+    --min-op: ${0.1 + Math.random() * 0.2};
+    --max-op: ${0.5 + Math.random() * 0.5};
+  `;
+  starsEl.appendChild(s);
+}
+
+// ---- Mycelium Canvas ----
+const canvas = document.getElementById('mycelium');
+const ctx = canvas.getContext('2d');
+let myceliumNodes = [];
+
+function initMycelium() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight * 0.45;
+  
+  myceliumNodes = [];
+  const count = Math.floor(canvas.width / 60);
+  for (let i = 0; i < count; i++) {
+    myceliumNodes.push({
+      x: Math.random() * canvas.width,
+      y: canvas.height * (0.3 + Math.random() * 0.7),
+      branches: Math.floor(2 + Math.random() * 4),
+      angle: -Math.PI/2 + (Math.random() - 0.5) * Math.PI * 0.8,
+      length: 20 + Math.random() * 60,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function drawMycelium(intensity, color) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  const alpha = 0.05 + intensity * 0.5;
+  const glowRadius = 3 + intensity * 12;
+  
+  ctx.shadowBlur = glowRadius;
+  ctx.shadowColor = color.css;
+  ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+  ctx.lineWidth = 0.5 + intensity;
+  
+  const t = Date.now() / 3000;
+  
+  myceliumNodes.forEach(node => {
+    ctx.beginPath();
+    ctx.moveTo(node.x, node.y);
+    
+    let x = node.x, y = node.y;
+    let angle = node.angle + Math.sin(t + node.phase) * 0.3;
+    
+    for (let b = 0; b < node.branches; b++) {
+      const len = node.length / node.branches;
+      const bAngle = angle + (b - node.branches/2) * 0.4 + Math.sin(t * 0.7 + b) * 0.2;
+      const nx = x + Math.cos(bAngle) * len;
+      const ny = y + Math.sin(bAngle) * len;
+      ctx.lineTo(nx, ny);
+      
+      // Sub-branches
+      if (b % 2 === 0) {
+        const subAngle = bAngle + (Math.random() > 0.5 ? 0.5 : -0.5);
+        ctx.lineTo(nx + Math.cos(subAngle) * len * 0.5, ny + Math.sin(subAngle) * len * 0.5);
+        ctx.moveTo(nx, ny);
+      }
+    }
+    ctx.stroke();
+    
+    // Glow nodes
+    if (intensity > 0.15) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1 + intensity * 2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha * 1.5})`;
+      ctx.fill();
+    }
+  });
+  ctx.shadowBlur = 0;
+}
+
+// ---- Spores ----
+let sporeInterval = null;
+
+function spawnSpore(intensity, color) {
+  if (intensity < 0.1) return;
+  const spore = document.createElement('div');
+  spore.className = 'spore';
+  const size = 1 + Math.random() * 2;
+  const left = Math.random() * 100;
+  const drift = (Math.random() - 0.5) * 80;
+  const dur = 8 + Math.random() * 12;
+  const startOp = intensity * 0.4;
+  spore.style.cssText = `
+    width: ${size}px; height: ${size}px;
+    bottom: 30%;
+    left: ${left}%;
+    background: rgb(${color.r}, ${color.g}, ${color.b});
+    box-shadow: 0 0 ${3 + intensity * 6}px rgb(${color.r}, ${color.g}, ${color.b});
+    animation-duration: ${dur}s;
+    animation-delay: -${Math.random() * dur}s;
+    --drift: ${drift}px;
+    --start-op: ${startOp};
+    --mid-op: ${startOp * 0.5};
+  `;
+  document.body.appendChild(spore);
+  setTimeout(() => spore.remove(), dur * 1000);
+}
+
+// ---- Main update ----
+function update() {
+  const hour = getSaigonHour();
+  const intensity = calcIntensity(hour);
+  const color = getColor(intensity);
+  
+  // Time display
+  document.getElementById('timeDisplay').textContent = getSaigonTimeStr();
+  document.getElementById('timeDisplay').style.color = color.css;
+  document.getElementById('hoursAfterDusk').textContent = hoursAfterDuskStr(hour);
+
+  // Intensity
+  const pct = Math.round(intensity * 100);
+  document.getElementById('intensityValue').textContent = pct + '%';
+  document.getElementById('intensityValue').style.color = color.css;
+  document.getElementById('intensityBar').style.width = pct + '%';
+  document.getElementById('intensityBar').style.background = color.css;
+
+  // Ring progress (shows time-of-night position)
+  const circumference = 691.15;
+  let nightProgress = ((hour - DUSK_HOUR + 24) % 24) / 12; // 0 to 1 over 12 night hours
+  nightProgress = Math.min(1, Math.max(0, nightProgress));
+  const dashOffset = circumference * (1 - nightProgress);
+  const ring = document.getElementById('ringProgress');
+  ring.style.strokeDashoffset = dashOffset;
+  ring.style.stroke = color.css;
+  ring.style.filter = `drop-shadow(0 0 ${4 + intensity * 10}px ${color.css})`;
+
+  // Glow orb
+  const orbSize = 30 + intensity * 90;
+  const orb = document.getElementById('glowOrb');
+  orb.style.width = orbSize + 'px';
+  orb.style.height = orbSize + 'px';
+  orb.style.background = `radial-gradient(circle, rgba(${color.r},${color.g},${color.b},0.3) 0%, transparent 70%)`;
+  orb.style.boxShadow = `0 0 ${20 + intensity * 60}px ${intensity * 40}px rgba(${color.r},${color.g},${color.b},${intensity * 0.3})`;
+
+  // Phase text
+  document.getElementById('phaseText').textContent = getPhaseText(hour, intensity);
+  document.getElementById('phaseText').style.color = `rgba(${color.r + 20}, ${color.g}, ${color.b + 20}, 0.8)`;
+
+  // Mycelium
+  drawMycelium(intensity, color);
+
+  // Spore rate
+  clearInterval(sporeInterval);
+  if (intensity > 0.1) {
+    const sporeRate = Math.max(500, 3000 - intensity * 2500);
+    sporeInterval = setInterval(() => spawnSpore(intensity, color), sporeRate);
+  }
+
+  // Background tint
+  const bgG = Math.floor(10 + intensity * 15);
+  document.body.style.background = `rgb(5, ${bgG}, 5)`;
+}
+
+initMycelium();
+window.addEventListener('resize', initMycelium);
+update();
+setInterval(update, 2000);
+
+// Animate mycelium continuously
+function animLoop() {
+  const hour = getSaigonHour();
+  const intensity = calcIntensity(hour);
+  const color = getColor(intensity);
+  drawMycelium(intensity, color);
+  requestAnimationFrame(animLoop);
+}
+animLoop();
+</script>
+</body>
+</html>

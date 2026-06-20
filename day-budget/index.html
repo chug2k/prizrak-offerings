@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Day Budget | Prizrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap');
+    body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #d4d4d4; }
+    .mono { font-family: 'Share Tech Mono', monospace; }
+
+    .battery-bar { transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+
+    .block {
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      transition: all 0.2s;
+    }
+
+    .tier-deep { border-left: 3px solid #22d3ee; }
+    .tier-meeting { border-left: 3px solid #a78bfa; }
+    .tier-admin { border-left: 3px solid #f59e0b; }
+    .tier-recovery { border-left: 3px solid #34d399; }
+    .tier-avoid { border-left: 3px solid #ef4444; opacity: 0.6; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #27272a;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #e4e4e7;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { background: #fff; }
+
+    .verdict { border-left: 3px solid #52525b; background: #111; transition: border-color 0.4s; }
+
+    .task-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 12px; font-family: 'Share Tech Mono', monospace;
+      border: 1px solid #3f3f46; background: #18181b;
+      cursor: pointer; transition: all 0.15s;
+      user-select: none;
+    }
+    .task-pill:hover { border-color: #71717a; }
+    .task-pill.done { text-decoration: line-through; opacity: 0.4; }
+
+    .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4,0,0.6,1) infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+<div class="max-w-2xl mx-auto">
+
+  <!-- Header -->
+  <div class="mb-8 border-b border-zinc-800 pb-5">
+    <h1 class="text-2xl font-semibold text-white mono">The Day Budget</h1>
+    <p class="text-zinc-500 text-sm mt-1">Allocate your cognitive reserves. The mountain does not grade on effort.</p>
+  </div>
+
+  <!-- Battery Input -->
+  <div class="block p-5 mb-6 bg-zinc-900">
+    <div class="flex items-center justify-between mb-4">
+      <span class="mono text-xs text-zinc-500 uppercase tracking-widest">Body Battery</span>
+      <span id="bb-val" class="mono text-3xl font-light text-white">65</span>
+    </div>
+
+    <input type="range" id="bb-slider" min="1" max="100" value="65" oninput="update()" class="mb-3">
+
+    <!-- Battery bar -->
+    <div class="h-2 bg-zinc-800 rounded-full overflow-hidden">
+      <div id="bb-bar" class="battery-bar h-full rounded-full" style="width:65%"></div>
+    </div>
+
+    <div class="flex justify-between mt-1">
+      <span class="mono text-xs text-zinc-600">Critical</span>
+      <span class="mono text-xs text-zinc-600">Reserve</span>
+      <span class="mono text-xs text-zinc-600">Functional</span>
+      <span class="mono text-xs text-zinc-600">Good</span>
+      <span class="mono text-xs text-zinc-600">Peak</span>
+    </div>
+  </div>
+
+  <!-- Tier label -->
+  <div id="tier-label" class="mb-6 text-center">
+    <div id="tier-name" class="mono text-xl font-light"></div>
+    <div id="tier-sub" class="text-zinc-500 text-sm mt-1"></div>
+  </div>
+
+  <!-- Day Allocation -->
+  <div class="mb-6">
+    <div class="mono text-xs text-zinc-500 uppercase tracking-widest mb-3">Today's Allocation</div>
+    <div id="allocation" class="space-y-3"></div>
+  </div>
+
+  <!-- Quick Task Log -->
+  <div class="block p-5 mb-6 bg-zinc-900">
+    <div class="mono text-xs text-zinc-500 uppercase tracking-widest mb-3">Task Queue</div>
+    <div class="flex gap-2 mb-4">
+      <input type="text" id="task-input" placeholder="Add a task for today..."
+        class="flex-1 mono text-sm bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-300 focus:outline-none focus:border-zinc-500">
+      <select id="task-tier" class="mono text-xs bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-zinc-400 focus:outline-none">
+        <option value="deep">DEEP</option>
+        <option value="meeting">MEET</option>
+        <option value="admin" selected>ADMIN</option>
+        <option value="recovery">REST</option>
+      </select>
+      <button onclick="addTask()" class="mono text-sm px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:border-zinc-500 transition-colors">+</button>
+    </div>
+    <div id="task-list" class="flex flex-wrap gap-2">
+      <span class="text-zinc-600 text-sm mono">No tasks yet.</span>
+    </div>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict rounded-r-xl p-5 mb-8" id="verdict-box">
+    <div class="mono text-xs text-zinc-600 uppercase tracking-widest mb-2">Prizrak's Directive</div>
+    <p id="verdict-text" class="text-zinc-300 text-sm leading-relaxed"></p>
+  </div>
+
+  <!-- Today's date -->
+  <div class="text-center mono text-xs text-zinc-700 pb-4" id="today-date"></div>
+</div>
+
+<script>
+const STORAGE_KEY = 'day_budget_v1';
+
+const TIERS = {
+  critical: { range:[1,25], name:'CRITICAL DEPLETION', sub:'Emergency conservation mode.', color:'#ef4444', bar:'#7f1d1d' },
+  low:      { range:[26,45], name:'LOW RESERVES', sub:'Maintenance mode only.', color:'#f59e0b', bar:'#78350f' },
+  functional:{ range:[46,65], name:'FUNCTIONAL RANGE', sub:'Selective deployment.', color:'#eab308', bar:'#713f12' },
+  good:     { range:[66,80], name:'GOOD MARGIN', sub:'Standard operations.', color:'#22d3ee', bar:'#164e63' },
+  peak:     { range:[81,100], name:'PEAK WINDOW', sub:'Full capacity. Do not waste it.', color:'#34d399', bar:'#064e3b' },
+};
+
+const ALLOCATIONS = {
+  critical: [
+    { type:'recovery', label:'Recovery & Rest', hours:'4–6h', desc:'Sleep, naps, light walks. Non-negotiable.' },
+    { type:'admin', label:'Passive Admin', hours:'1–2h', desc:'Email, scheduling. Nothing that requires judgment.' },
+    { type:'avoid', label:'Deep Work / Decisions', hours:'0h', desc:'Postpone. You will make worse decisions than a well-rested intern.' },
+    { type:'avoid', label:'Important Meetings', hours:'0h', desc:'Reschedule if possible. You cannot perform at this level.' },
+  ],
+  low: [
+    { type:'recovery', label:'Recovery Blocks', hours:'2–3h', desc:'Breaks, food, walk. Insert between tasks.' },
+    { type:'admin', label:'Admin & Coordination', hours:'3–4h', desc:'Your primary operational mode today.' },
+    { type:'meeting', label:'Light Meetings', hours:'1h max', desc:'Status calls only. No pitches, no negotiations.' },
+    { type:'avoid', label:'Deep Creative Work', hours:'0h', desc:'Not today. The well is shallow.' },
+  ],
+  functional: [
+    { type:'deep', label:'Deep Work', hours:'1–2h', desc:'One focused session, early. Not two.' },
+    { type:'meeting', label:'Meetings', hours:'2–3h', desc:'Can handle substantive calls. Stay under 3h total.' },
+    { type:'admin', label:'Admin', hours:'2h', desc:'Fill the gaps.' },
+    { type:'recovery', label:'Afternoon Recovery', hours:'30–60m', desc:'Mandatory. You will burn out the reserve.' },
+  ],
+  good: [
+    { type:'deep', label:'Deep Work', hours:'2–4h', desc:'Morning block is the priority. Guard it.' },
+    { type:'meeting', label:'Meetings', hours:'2–3h', desc:'Afternoon is meeting territory.' },
+    { type:'admin', label:'Admin', hours:'1–2h', desc:'Fill remaining gaps.' },
+    { type:'recovery', label:'Recovery', hours:'30m', desc:'One break. You have margin but not infinity.' },
+  ],
+  peak: [
+    { type:'deep', label:'Deep Work', hours:'4–6h', desc:'You have the window. Use it. This is rare.' },
+    { type:'meeting', label:'High-Stakes Meetings', hours:'2–3h', desc:'Pitches, negotiations, hard conversations — do them now.' },
+    { type:'admin', label:'Admin', hours:'1h', desc:'Minimum viable. Do not waste peak state on email.' },
+    { type:'recovery', label:'Recovery', hours:'30m', desc:'Preserve for tomorrow. The goal is sustainable peak, not burnout.' },
+  ],
+};
+
+const VERDICTS = {
+  critical: [
+    "Body battery at " + '{bb}' + ". This is not a work day. This is a recovery day with light administration attached. Every task you attempt beyond admin will cost you two tomorrow. The mountain has avalanche conditions. Do not hike.",
+    "At " + '{bb}' + " you are operating on fumes. The single most dangerous thing you can do right now is pretend this is a normal day and schedule accordingly. One anchor task. Everything else: postponed or delegated.",
+  ],
+  low: [
+    "Body battery " + '{bb}' + ". You played hard yesterday. Today the machine runs on maintenance mode. Do the admin that requires no creativity, eat something real, and do not schedule anything important after 2pm. The potato keeps you alive. You are the potato today.",
+    "Low reserves at " + '{bb}' + ". Functional, not generative. Do not mistake the ability to answer emails for the ability to make good decisions. They use different tanks. The decision tank is empty.",
+  ],
+  functional: [
+    "Body battery " + '{bb}' + ". You have one good session in you. One. Spend it on the single most important creative or strategic task on the list — not the most urgent admin item. After that session, switch to maintenance. Do not push for a second.",
+    "Functional range at " + '{bb}' + ". The machine works, but at reduced throughput. Identify your anchor task for the morning, protect it from interruption, then spend the afternoon in meeting and admin mode. No heroics.",
+  ],
+  good: [
+    "Body battery " + '{bb}' + ". Standard operations. You have margin. Use the morning for deep work, afternoons for people. Do not confuse 'good' with 'infinite' — the reserve still depletes. Budget accordingly.",
+    "Good margin at " + '{bb}' + ". This is a productive day. Morning is yours: deep, focused, no meetings before 11. Afternoon for coordination. One recovery break to carry the margin into tomorrow.",
+  ],
+  peak: [
+    "Body battery " + '{bb}' + ". This is the window. The one that does not come every day. Do not spend it on admin, Slack, or easy wins. Find the hardest most important thing on the list and attack it. Everything else can wait — this window cannot.",
+    "Peak conditions at " + '{bb}' + ". Rare. The error most people make at peak is using the energy on whatever feels urgent rather than whatever is important. Urgency is the thief of peak state. Guard the window. The mountain does not promise another clear day.",
+  ],
+};
+
+const TYPE_COLORS = { deep:'text-cyan-400', meeting:'text-violet-400', admin:'text-amber-400', recovery:'text-emerald-400' };
+const TIER_BORDER = { critical:'#ef4444', low:'#f59e0b', functional:'#eab308', good:'#22d3ee', peak:'#34d399' };
+
+let tasks = [];
+
+function getTier(bb) {
+  if (bb <= 25) return 'critical';
+  if (bb <= 45) return 'low';
+  if (bb <= 65) return 'functional';
+  if (bb <= 80) return 'good';
+  return 'peak';
+}
+
+function update() {
+  const bb = parseInt(document.getElementById('bb-slider').value);
+  document.getElementById('bb-val').textContent = bb;
+
+  const tier = getTier(bb);
+  const t = TIERS[tier];
+
+  // Bar color + width
+  document.getElementById('bb-bar').style.width = bb + '%';
+  document.getElementById('bb-bar').style.background = t.color;
+
+  // Tier label
+  document.getElementById('tier-name').textContent = t.name;
+  document.getElementById('tier-name').style.color = t.color;
+  document.getElementById('tier-sub').textContent = t.sub;
+
+  // Allocation
+  const alloc = ALLOCATIONS[tier];
+  document.getElementById('allocation').innerHTML = alloc.map(a => `
+    <div class="block tier-${a.type} p-4 bg-zinc-900">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <span class="mono text-xs ${TYPE_COLORS[a.type] || 'text-zinc-400'} uppercase">${a.type === 'avoid' ? '⛔ AVOID' : a.type.toUpperCase()}</span>
+          <div class="font-medium text-zinc-200 mt-0.5">${a.label}</div>
+          <div class="text-sm text-zinc-500 mt-0.5">${a.desc}</div>
+        </div>
+        <div class="mono text-sm text-zinc-400 whitespace-nowrap flex-shrink-0">${a.hours}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Verdict
+  const vlist = VERDICTS[tier];
+  const v = vlist[Math.floor(Math.random() * vlist.length)].replace('{bb}', bb);
+  document.getElementById('verdict-text').textContent = v;
+  document.getElementById('verdict-box').style.borderLeftColor = TIER_BORDER[tier];
+
+  // Save bb
+  localStorage.setItem('day_budget_bb', bb);
+}
+
+function addTask() {
+  const inp = document.getElementById('task-input');
+  const tier = document.getElementById('task-tier').value;
+  const text = inp.value.trim();
+  if (!text) return;
+  tasks.unshift({ text, tier, done: false, id: Date.now() });
+  inp.value = '';
+  renderTasks();
+  saveTasks();
+}
+
+function toggleTask(id) {
+  const t = tasks.find(t => t.id === id);
+  if (t) t.done = !t.done;
+  renderTasks();
+  saveTasks();
+}
+
+function removeTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  renderTasks();
+  saveTasks();
+}
+
+function renderTasks() {
+  const el = document.getElementById('task-list');
+  if (!tasks.length) {
+    el.innerHTML = '<span class="text-zinc-600 text-sm mono">No tasks yet.</span>';
+    return;
+  }
+  const colors = { deep:'border-cyan-900 text-cyan-500', meeting:'border-violet-900 text-violet-400', admin:'border-amber-900 text-amber-500', recovery:'border-emerald-900 text-emerald-500' };
+  el.innerHTML = tasks.map(t => `
+    <span class="task-pill ${colors[t.tier]||''} ${t.done?'done':''}" onclick="toggleTask(${t.id})">
+      ${t.done ? '✓' : '○'} ${t.text}
+      <span onclick="event.stopPropagation();removeTask(${t.id})" class="text-zinc-600 hover:text-zinc-400 ml-1">×</span>
+    </span>
+  `).join('');
+}
+
+function saveTasks() {
+  // Only keep today's tasks
+  const today = new Date().toISOString().slice(0,10);
+  localStorage.setItem('day_budget_tasks_' + today, JSON.stringify(tasks));
+}
+
+function loadTasks() {
+  const today = new Date().toISOString().slice(0,10);
+  try { tasks = JSON.parse(localStorage.getItem('day_budget_tasks_' + today) || '[]'); } catch(e) { tasks = []; }
+}
+
+// Init
+document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+// Restore saved bb
+const savedBB = localStorage.getItem('day_budget_bb');
+if (savedBB) document.getElementById('bb-slider').value = savedBB;
+
+loadTasks();
+renderTasks();
+update();
+
+document.getElementById('task-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Seam Map</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --surface: #18181c;
+    --border: #2a2a30;
+    --muted: #4a4a55;
+    --text: #d4d4dc;
+    --dim: #7a7a88;
+    --accent: #6b8cff;
+    --warm: #c8956c;
+    --cold: #4a7fa0;
+    --blur-color: #2a2a38;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Georgia', serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    max-width: 600px;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: normal;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  header p {
+    font-size: 0.85rem;
+    color: var(--dim);
+    line-height: 1.6;
+    font-style: italic;
+  }
+
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .week-nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    padding: 0.3rem 0.8rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-radius: 3px;
+    transition: all 0.2s;
+  }
+
+  .week-nav button:hover { border-color: var(--muted); color: var(--text); }
+
+  .week-label {
+    font-size: 0.85rem;
+    color: var(--dim);
+    min-width: 180px;
+    text-align: center;
+  }
+
+  .days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 2rem;
+  }
+
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 120px;
+    position: relative;
+  }
+
+  .day-card:hover { border-color: var(--muted); }
+
+  .day-card.distinct {
+    border-color: var(--accent);
+    background: #18182a;
+  }
+
+  .day-card.blurred {
+    border-color: var(--muted);
+    background: var(--blur-color);
+    opacity: 0.8;
+  }
+
+  .day-card.today {
+    border-color: var(--warm);
+  }
+
+  .day-name {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+  }
+
+  .day-date {
+    font-size: 1.2rem;
+    color: var(--text);
+    font-weight: normal;
+  }
+
+  .day-card.distinct .day-date { color: var(--accent); }
+  .day-card.blurred .day-date { color: var(--muted); }
+
+  .day-status {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: auto;
+    text-align: center;
+    min-height: 1.2em;
+  }
+
+  .day-card.distinct .day-status { color: var(--accent); }
+  .day-card.blurred .day-status { color: var(--muted); }
+
+  .status-buttons {
+    display: flex;
+    gap: 2px;
+    margin-top: auto;
+  }
+
+  .status-btn {
+    flex: 1;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.6rem;
+    padding: 0.2rem 0;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+
+  .status-btn:hover { color: var(--text); border-color: var(--muted); }
+  .status-btn.active-distinct { background: var(--accent); border-color: var(--accent); color: white; }
+  .status-btn.active-blurred { background: var(--muted); border-color: var(--muted); color: var(--bg); }
+
+  .note-area {
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 2rem;
+  }
+
+  .note-area h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    margin-bottom: 0.75rem;
+    font-weight: normal;
+  }
+
+  .note-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+  }
+
+  .note-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.72rem;
+    padding: 0.5rem;
+    resize: none;
+    border-radius: 4px;
+    height: 80px;
+    width: 100%;
+    transition: border-color 0.2s;
+    line-height: 1.4;
+  }
+
+  .note-input:focus {
+    outline: none;
+    border-color: var(--muted);
+  }
+
+  .note-input::placeholder { color: var(--muted); font-style: italic; }
+
+  .analysis {
+    width: 100%;
+    max-width: 700px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .analysis h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    margin-bottom: 1rem;
+    font-weight: normal;
+  }
+
+  .analysis-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+  }
+
+  .analysis-row:last-child { border-bottom: none; }
+  .analysis-label { color: var(--dim); }
+  .analysis-value { color: var(--text); }
+  .analysis-value.accent { color: var(--accent); }
+  .analysis-value.warm { color: var(--warm); }
+  .analysis-value.muted { color: var(--muted); }
+
+  .week-verdict {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.82rem;
+    color: var(--dim);
+    line-height: 1.6;
+    font-style: italic;
+  }
+
+  .carry-section {
+    width: 100%;
+    max-width: 700px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .carry-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+  }
+
+  .carry-box h4 {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    margin-bottom: 0.75rem;
+    font-weight: normal;
+  }
+
+  .carry-box.forward h4 { color: var(--accent); }
+  .carry-box.leave h4 { color: var(--muted); }
+
+  .carry-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.82rem;
+    padding: 0.4rem 0;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .carry-input:focus { border-color: var(--muted); }
+  .carry-input::placeholder { color: var(--muted); font-style: italic; }
+
+  footer {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-style: italic;
+    max-width: 500px;
+    line-height: 1.6;
+  }
+
+  .timeline-bar {
+    width: 100%;
+    max-width: 700px;
+    height: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 2rem;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .timeline-segment {
+    flex: 1;
+    transition: background 0.3s;
+  }
+
+  @media (max-width: 600px) {
+    .days-grid { grid-template-columns: repeat(7, 1fr); gap: 0.25rem; }
+    .note-grid { grid-template-columns: 1fr; }
+    .carry-section { grid-template-columns: 1fr; }
+    .day-card { min-height: 90px; padding: 0.5rem 0.3rem; }
+    .day-date { font-size: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Seam Map</h1>
+  <p>Michel Siffre spent six months in a cave and emerged thinking half as many days had passed.<br>
+  "It is like one long day," he said. "You forget the seams."<br><br>
+  Mark which days this week felt <em>distinct</em> and which <em>blurred</em>.</p>
+</header>
+
+<div class="week-nav">
+  <button onclick="changeWeek(-1)">← prev</button>
+  <div class="week-label" id="weekLabel"></div>
+  <button onclick="changeWeek(1)">next →</button>
+</div>
+
+<div class="timeline-bar" id="timelineBar">
+  <div class="timeline-segment" id="seg0"></div>
+  <div class="timeline-segment" id="seg1"></div>
+  <div class="timeline-segment" id="seg2"></div>
+  <div class="timeline-segment" id="seg3"></div>
+  <div class="timeline-segment" id="seg4"></div>
+  <div class="timeline-segment" id="seg5"></div>
+  <div class="timeline-segment" id="seg6"></div>
+</div>
+
+<div class="days-grid" id="daysGrid"></div>
+
+<div class="note-area">
+  <h3>What happened — one line per day</h3>
+  <div class="note-grid" id="noteGrid"></div>
+</div>
+
+<div class="analysis" id="analysis">
+  <h3>The seam reading</h3>
+  <div class="analysis-row">
+    <span class="analysis-label">Distinct days</span>
+    <span class="analysis-value accent" id="distinctCount">—</span>
+  </div>
+  <div class="analysis-row">
+    <span class="analysis-label">Blurred days</span>
+    <span class="analysis-value muted" id="blurredCount">—</span>
+  </div>
+  <div class="analysis-row">
+    <span class="analysis-label">Unmarked days</span>
+    <span class="analysis-value" id="unmarkedCount">—</span>
+  </div>
+  <div class="analysis-row">
+    <span class="analysis-label">Seam density</span>
+    <span class="analysis-value warm" id="seamDensity">—</span>
+  </div>
+  <div class="week-verdict" id="weekVerdict"></div>
+</div>
+
+<div class="carry-section">
+  <div class="carry-box forward">
+    <h4>→ Carry forward</h4>
+    <input class="carry-input" id="carry1" placeholder="one thing from this week..." type="text">
+    <input class="carry-input" id="carry2" placeholder="..." type="text" style="margin-top:0.5rem">
+  </div>
+  <div class="carry-box leave">
+    <h4>✕ Leave in the cave</h4>
+    <input class="carry-input" id="leave1" placeholder="one thing to surface without..." type="text">
+    <input class="carry-input" id="leave2" placeholder="..." type="text" style="margin-top:0.5rem">
+  </div>
+</div>
+
+<footer>
+  Siffre's surface team logged his calls when he woke and slept.<br>
+  The log was how they knew time was passing, even when he couldn't feel it.<br>
+  This is your log.
+</footer>
+
+<script>
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  let weekOffset = 0;
+  let data = JSON.parse(localStorage.getItem('seammap') || '{}');
+
+  function getWeekStart(offset) {
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((day + 6) % 7) + (offset * 7));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+
+  function weekKey(offset) {
+    const d = getWeekStart(offset);
+    return `${d.getFullYear()}-W${String(Math.ceil(d.getDate() / 7)).padStart(2,'0')}-${d.getMonth()}`;
+  }
+
+  function formatDate(d) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function isToday(date) {
+    const t = new Date();
+    return date.getDate() === t.getDate() &&
+           date.getMonth() === t.getMonth() &&
+           date.getFullYear() === t.getFullYear();
+  }
+
+  function isFuture(date) {
+    const t = new Date();
+    t.setHours(0,0,0,0);
+    return date > t;
+  }
+
+  function save() {
+    localStorage.setItem('seammap', JSON.stringify(data));
+  }
+
+  function getState(dayIndex) {
+    const wk = weekKey(weekOffset);
+    return (data[wk] && data[wk].days && data[wk].days[dayIndex]) || { status: null, note: '', carry: ['',''], leave: ['',''] };
+  }
+
+  function setDayStatus(dayIndex, status) {
+    const wk = weekKey(weekOffset);
+    if (!data[wk]) data[wk] = { days: {} };
+    if (!data[wk].days[dayIndex]) data[wk].days[dayIndex] = { status: null, note: '' };
+    data[wk].days[dayIndex].status = data[wk].days[dayIndex].status === status ? null : status;
+    save();
+    render();
+  }
+
+  function setDayNote(dayIndex, note) {
+    const wk = weekKey(weekOffset);
+    if (!data[wk]) data[wk] = { days: {} };
+    if (!data[wk].days[dayIndex]) data[wk].days[dayIndex] = { status: null, note: '' };
+    data[wk].days[dayIndex].note = note;
+    save();
+  }
+
+  function getCarryLeave() {
+    const wk = weekKey(weekOffset);
+    if (!data[wk]) return { carry: ['',''], leave: ['',''] };
+    return {
+      carry: data[wk].carry || ['',''],
+      leave: data[wk].leave || ['','']
+    };
+  }
+
+  function setCarryLeave(type, idx, val) {
+    const wk = weekKey(weekOffset);
+    if (!data[wk]) data[wk] = { days: {} };
+    if (!data[wk][type]) data[wk][type] = ['',''];
+    data[wk][type][idx] = val;
+    save();
+  }
+
+  function render() {
+    const wkStart = getWeekStart(weekOffset);
+    const wkEnd = new Date(wkStart);
+    wkEnd.setDate(wkEnd.getDate() + 6);
+
+    document.getElementById('weekLabel').textContent =
+      `${formatDate(wkStart)} – ${formatDate(wkEnd)}`;
+
+    const grid = document.getElementById('daysGrid');
+    const noteGrid = document.getElementById('noteGrid');
+    grid.innerHTML = '';
+    noteGrid.innerHTML = '';
+
+    let distinct = 0, blurred = 0, unmarked = 0;
+    const statuses = [];
+
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(wkStart);
+      date.setDate(date.getDate() + i);
+      const st = getState(i);
+      const future = isFuture(date);
+      const today = isToday(date);
+      const status = future ? null : (st.status || null);
+      statuses.push(status);
+
+      if (!future) {
+        if (status === 'distinct') distinct++;
+        else if (status === 'blurred') blurred++;
+        else unmarked++;
+      }
+
+      // Day card
+      const card = document.createElement('div');
+      card.className = 'day-card' +
+        (status === 'distinct' ? ' distinct' : '') +
+        (status === 'blurred' ? ' blurred' : '') +
+        (today ? ' today' : '');
+      if (future) card.style.opacity = '0.3';
+
+      card.innerHTML = `
+        <div class="day-name">${DAYS[i]}</div>
+        <div class="day-date">${date.getDate()}</div>
+        ${!future ? `<div class="status-buttons">
+          <button class="status-btn ${status==='distinct'?'active-distinct':''}" onclick="setDayStatus(${i},'distinct')">clear</button>
+          <button class="status-btn ${status==='blurred'?'active-blurred':''}" onclick="setDayStatus(${i},'blurred')">blur</button>
+        </div>` : ''}
+        <div class="day-status">${status === 'distinct' ? 'distinct' : status === 'blurred' ? 'blurred' : (future ? '' : '—')}</div>
+      `;
+      grid.appendChild(card);
+
+      // Note input
+      const textarea = document.createElement('textarea');
+      textarea.className = 'note-input';
+      textarea.placeholder = future ? '' : (today ? 'today...' : DAYS[i].toLowerCase() + '...');
+      textarea.value = st.note || '';
+      textarea.disabled = future;
+      if (future) textarea.style.opacity = '0.2';
+      textarea.addEventListener('input', (e) => setDayNote(i, e.target.value));
+      noteGrid.appendChild(textarea);
+
+      // Timeline segment
+      const seg = document.getElementById('seg' + i);
+      if (future) { seg.style.background = 'var(--bg)'; }
+      else if (status === 'distinct') { seg.style.background = 'var(--accent)'; }
+      else if (status === 'blurred') { seg.style.background = 'var(--muted)'; }
+      else { seg.style.background = 'var(--border)'; }
+    }
+
+    // Analysis
+    const total = distinct + blurred + unmarked;
+    const marked = distinct + blurred;
+    document.getElementById('distinctCount').textContent = distinct;
+    document.getElementById('blurredCount').textContent = blurred;
+    document.getElementById('unmarkedCount').textContent = unmarked;
+
+    let density = '—';
+    if (marked > 0) {
+      const ratio = distinct / marked;
+      if (ratio >= 0.7) density = 'high — most days left a mark';
+      else if (ratio >= 0.4) density = 'mixed — some seams held';
+      else if (marked >= 3) density = 'low — the week dissolved';
+      else density = 'insufficient data';
+    }
+    document.getElementById('seamDensity').textContent = density;
+
+    let verdict = '';
+    if (marked === 0) {
+      verdict = 'No days marked yet. The seam map is empty.';
+    } else if (distinct === 0 && blurred > 0) {
+      verdict = `All ${blurred} marked days blurred. Siffre would recognize this. The days dissolved into each other. Something in the environment was not providing the transitions.`;
+    } else if (blurred === 0 && distinct > 0) {
+      verdict = `All ${distinct} marked days were distinct. Either the week was unusually eventful, or the conditions were good for seam formation.`;
+    } else if (distinct > blurred) {
+      verdict = `More distinct than blurred (${distinct} vs ${blurred}). The week had texture. The seams held more often than they dissolved.`;
+    } else if (blurred > distinct) {
+      verdict = `More blurred than distinct (${blurred} vs ${distinct}). The week had a cave quality. The zeitgebers were weak, or absent, or wrong.`;
+    } else {
+      verdict = `Equal split. The week was half cave, half surface. Depending on which days blurred and which held, this may be significant.`;
+    }
+    document.getElementById('weekVerdict').textContent = verdict;
+
+    // Carry/leave
+    const cl = getCarryLeave();
+    document.getElementById('carry1').value = cl.carry[0] || '';
+    document.getElementById('carry2').value = cl.carry[1] || '';
+    document.getElementById('leave1').value = cl.leave[0] || '';
+    document.getElementById('leave2').value = cl.leave[1] || '';
+  }
+
+  function changeWeek(dir) {
+    weekOffset += dir;
+    if (weekOffset > 0) weekOffset = 0;
+    render();
+  }
+
+  // Carry/leave listeners
+  ['carry1','carry2'].forEach((id, i) => {
+    document.getElementById(id).addEventListener('input', e => setCarryLeave('carry', i, e.target.value));
+  });
+  ['leave1','leave2'].forEach((id, i) => {
+    document.getElementById(id).addEventListener('input', e => setCarryLeave('leave', i, e.target.value));
+  });
+
+  render();
+</script>
+</body>
+</html>
