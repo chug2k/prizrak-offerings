@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Murmuration | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#e2b04a;            /* amber — the last light over the Tatras */
+      --accent-deep:#c8923a;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); height:100%; }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 80%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none;
+      border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+
+    /* tactile buttons */
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    /* === ambient motion vocabulary (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 38s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 18s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* caption cross-fade */
+    @keyframes captionIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .caption-in{animation:captionIn 1.1s ease-out both}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* canvas cursor: a press is a summoning */
+    #sky{ display:block; touch-action:none; cursor:crosshair; }
+    #sky.pressing{ cursor:grabbing; }
+
+    .label{ color:var(--ink-dim); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.18em; }
+
+    #ghostLine, #idleLine, #nightWhisper { color: var(--ink-ghost); }
+
+    /* readout numerals settle in amber */
+    .num{ color:var(--accent); }
+
+    .seg{ display:inline-flex; border:1px solid var(--line); border-radius:0.5rem; overflow:hidden; }
+    .seg button{ padding:0.35rem 0.6rem; font-size:0.66rem; color:var(--ink-dim); transition:color .15s, background-color .15s; }
+    .seg button:hover{ color:var(--ink); }
+    .seg button.on{ color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker,.caption-in{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen grain overflow-hidden">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the dusk sky -->
+  <canvas id="sky" class="fixed inset-0 z-[1]"></canvas>
+
+  <!-- header, floating top-left -->
+  <header class="fixed top-0 left-0 z-[2] p-5 select-none pointer-events-none">
+    <div class="mono label mb-1 flicker">prízrak / instrument 27 — aviary</div>
+    <h1 id="appTitle" class="text-2xl font-semibold text-white h1-glow breathe cursor-default pointer-events-auto inline-block">The Murmuration</h1>
+    <p class="text-xs mt-1 max-w-[16rem]" style="color:var(--ink-dim)">A flock of jackdaws wheeling over the High Tatras at dusk. Press the sky to set a roost; hold the predator to scatter them. Mostly, you watch.</p>
+    <p id="caption" class="text-xs mt-3 max-w-[16rem] caption-in" style="color:var(--accent);min-height:1.2em">the birds gather.</p>
+  </header>
+
+  <!-- the bench of controls, floating bottom -->
+  <div class="fixed bottom-0 left-0 right-0 z-[2] p-3 sm:p-4 flex justify-center pointer-events-none">
+    <div class="glass rounded-2xl p-3 sm:p-4 w-full max-w-3xl pointer-events-auto">
+
+      <!-- transport row -->
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <button id="btnPause" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="space">⏸ pause</button>
+        <button id="btnClear" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="c — disperse and regather">↺ regather</button>
+        <button id="btnTrails" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="t">≈ trails</button>
+        <button id="btnReduce" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="r — calm the flock">◐ motion: full</button>
+
+        <div class="flex-1"></div>
+
+        <div class="seg mono" role="group" aria-label="tool">
+          <button id="toolRoost" class="on" title="press the sky to draw the flock home">⌖ roost</button>
+          <button id="toolRaptor" title="press the sky to send the bludička hunting">✦ raptor</button>
+        </div>
+        <div class="mono label hidden sm:block ml-1">birds <span id="countOut" class="num">0</span></div>
+      </div>
+
+      <!-- sliders row -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">cohesion</span>
+            <span id="cohOut" class="mono text-[11px] num">1.0</span>
+          </div>
+          <input type="range" id="cohesion" min="0" max="200" value="100" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">align</span>
+            <span id="aliOut" class="mono text-[11px] num">1.0</span>
+          </div>
+          <input type="range" id="align" min="0" max="200" value="100" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">separate</span>
+            <span id="sepOut" class="mono text-[11px] num">1.0</span>
+          </div>
+          <input type="range" id="separate" min="0" max="200" value="100" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">speed</span>
+            <span id="spdOut" class="mono text-[11px] num">1.0×</span>
+          </div>
+          <input type="range" id="speed" min="30" max="220" value="100" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <div class="flex justify-between mb-1">
+            <span class="mono label">flock</span>
+            <span id="flkOut" class="mono text-[11px] num">240</span>
+          </div>
+          <input type="range" id="flock" min="40" max="520" value="240" step="20" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+      </div>
+
+      <!-- hint line / status -->
+      <div class="mt-2 flex items-center justify-between gap-3">
+        <p id="hint" class="mono text-[10px]" style="color:var(--ink-ghost)">press &amp; hold the sky · the flock answers the tool you hold</p>
+        <p id="dusk" class="mono text-[10px] btn rounded px-2 py-0.5 cursor-pointer" style="border-color:var(--line)" title="let the night come faster">☾ hasten dusk</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- footer whispers (off-canvas, screen-reader / easter-egg lines) -->
+  <div class="fixed top-2 right-3 z-[2] text-right pointer-events-none">
+    <p id="nightWhisper" class="mono text-[10px]" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono text-[10px] mt-1" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono text-[10px] mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still watching.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    const KEY = 'murmuration-v1';
+    const canvas = document.getElementById('sky');
+    const ctx = canvas.getContext('2d', { alpha:false });
+
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // ---- settings (persisted) ----
+    const defaults = {
+      cohesion:100, align:100, separate:100, speed:100, flock:240,
+      trails:true, tool:'roost', reduced:reduceMQ.matches
+    };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object') cfg = Object.assign(cfg, s); } catch(e){}
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch(e){} }
+
+    // ---- world state ----
+    let W = 0, H = 0, DPR = 1;
+    let paused = false;
+    let dusk = 0;          // 0 = dusk, 1 = full night. creeps upward over minutes.
+    let duskHaste = 0;     // transient boost when "hasten dusk" pressed
+
+    // boid arrays (structure-of-arrays for cache friendliness)
+    let N = 0;
+    let px, py, vx, vy;        // Float32 position / velocity
+    let hueShift, trailX, trailY; // per-bird character + short trail ring buffer
+    const TRAIL_LEN = 7;
+
+    // attractors / predator (set by pointer)
+    let roost = null;          // {x,y, life} a place the flock is drawn toward
+    let raptor = null;         // {x,y,vx,vy, active} the bludička they flee
+
+    // ---- tuning ----
+    // perception radii (px). separation is tight, the others wide.
+    const R_SEP = 18, R_ALI = 42, R_COH = 60;
+    const R_SEP2 = R_SEP*R_SEP, R_ALI2 = R_ALI*R_ALI, R_COH2 = R_COH*R_COH;
+    const R_RAPTOR = 150, R_RAPTOR2 = R_RAPTOR*R_RAPTOR;
+
+    function cohW(){ return (cfg.cohesion/100) * 0.9; }
+    function aliW(){ return (cfg.align/100)    * 1.35; }
+    function sepW(){ return (cfg.separate/100) * 1.7; }
+    function maxSpeed(){ return (cfg.speed/100) * 3.0; }   // px per sim-tick
+    const MIN_SPEED_FRAC = 0.55;                            // birds never stall
+    const MAX_FORCE = 0.06;
+
+    // ---- spatial hash ----
+    let CELL = R_COH;          // cell size = largest perception radius
+    let cols = 0, rows = 0;
+    let cellHeads = null;      // Int32Array, head index per cell (-1 empty)
+    let cellNext = null;       // Int32Array, linked list next per bird
+
+    function buildHash(){
+      cols = Math.max(1, Math.ceil(W / CELL));
+      rows = Math.max(1, Math.ceil(H / CELL));
+      const nc = cols*rows;
+      if (!cellHeads || cellHeads.length !== nc) cellHeads = new Int32Array(nc);
+      cellHeads.fill(-1);
+      if (!cellNext || cellNext.length !== N) cellNext = new Int32Array(N);
+      for (let i=0;i<N;i++){
+        let cxx = (px[i] / CELL) | 0; let cyy = (py[i] / CELL) | 0;
+        if (cxx < 0) cxx = 0; else if (cxx >= cols) cxx = cols-1;
+        if (cyy < 0) cyy = 0; else if (cyy >= rows) cyy = rows-1;
+        const ci = cyy*cols + cxx;
+        cellNext[i] = cellHeads[ci];
+        cellHeads[ci] = i;
+      }
+    }
+
+    // ---- allocate the flock ----
+    function allocate(n){
+      N = n;
+      px = new Float32Array(n); py = new Float32Array(n);
+      vx = new Float32Array(n); vy = new Float32Array(n);
+      hueShift = new Float32Array(n);
+      trailX = new Float32Array(n*TRAIL_LEN);
+      trailY = new Float32Array(n*TRAIL_LEN);
+      for (let i=0;i<n;i++){
+        const a = Math.random()*Math.PI*2;
+        // born in a loose cloud near upper third (sky)
+        px[i] = W*0.5 + (Math.random()-0.5)*W*0.5;
+        py[i] = H*0.35 + (Math.random()-0.5)*H*0.3;
+        const sp = maxSpeed()*0.6;
+        vx[i] = Math.cos(a)*sp; vy[i] = Math.sin(a)*sp;
+        hueShift[i] = (Math.random()-0.5); // -0.5..0.5 character
+        for (let k=0;k<TRAIL_LEN;k++){ trailX[i*TRAIL_LEN+k]=px[i]; trailY[i*TRAIL_LEN+k]=py[i]; }
+      }
+      cellNext = null; // force realloc
+      updateCount();
+    }
+
+    function setFlockSize(n){
+      n = Math.max(40, Math.min(520, n|0));
+      if (n === N) return;
+      // preserve as much of the existing flock as possible for continuity
+      const oN=N, oPx=px,oPy=py,oVx=vx,oVy=vy,oHue=hueShift,oTx=trailX,oTy=trailY;
+      px = new Float32Array(n); py = new Float32Array(n);
+      vx = new Float32Array(n); vy = new Float32Array(n);
+      hueShift = new Float32Array(n);
+      trailX = new Float32Array(n*TRAIL_LEN); trailY = new Float32Array(n*TRAIL_LEN);
+      for (let i=0;i<n;i++){
+        if (i < oN){
+          px[i]=oPx[i]; py[i]=oPy[i]; vx[i]=oVx[i]; vy[i]=oVy[i]; hueShift[i]=oHue[i];
+          for (let k=0;k<TRAIL_LEN;k++){ trailX[i*TRAIL_LEN+k]=oTx[i*TRAIL_LEN+k]; trailY[i*TRAIL_LEN+k]=oTy[i*TRAIL_LEN+k]; }
+        } else {
+          const a = Math.random()*Math.PI*2;
+          // newcomers fly in from an edge — a flock joining
+          const edge = Math.random();
+          if (edge < 0.5){ px[i] = Math.random()<0.5 ? -10 : W+10; py[i] = Math.random()*H; }
+          else { px[i] = Math.random()*W; py[i] = Math.random()<0.5 ? -10 : H+10; }
+          const sp = maxSpeed()*0.7;
+          vx[i]=Math.cos(a)*sp; vy[i]=Math.sin(a)*sp; hueShift[i]=(Math.random()-0.5);
+          for (let k=0;k<TRAIL_LEN;k++){ trailX[i*TRAIL_LEN+k]=px[i]; trailY[i*TRAIL_LEN+k]=py[i]; }
+        }
+      }
+      N = n;
+      cellNext = null;
+      updateCount();
+    }
+
+    function updateCount(){ const el=document.getElementById('countOut'); if (el) el.textContent = N; }
+
+    // ---- sizing ----
+    function resize(){
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = Math.floor(W*DPR); canvas.height = Math.floor(H*DPR);
+      canvas.style.width = W+'px'; canvas.style.height = H+'px';
+      ctx.setTransform(DPR,0,0,DPR,0,0);
+      cellHeads = null; cellNext = null;
+      paintSky(true);
+    }
+    window.addEventListener('resize', resize);
+
+    // =====================================================================
+    //  FLOCKING — real boids, spatial-hash accelerated
+    // =====================================================================
+    function step(dt){
+      buildHash();
+      const cw=cohW(), aw=aliW(), sw=sepW();
+      const ms=maxSpeed(), ms2=ms*ms, minS=ms*MIN_SPEED_FRAC, minS2=minS*minS;
+
+      // a slow shared wander phase, so the whole flock breathes one direction
+      const t = performance.now()*0.00012;
+      const wanderGX = Math.cos(t)*0.012, wanderGY = Math.sin(t*0.8)*0.012;
+
+      for (let i=0;i<N;i++){
+        const xi=px[i], yi=py[i], vxi=vx[i], vyi=vy[i];
+
+        // accumulators
+        let cohX=0,cohY=0,cohN=0;   // center of mass
+        let aliX=0,aliY=0,aliN=0;   // avg velocity
+        let sepX=0,sepY=0;          // away from close neighbors
+
+        // visit the 3x3 cell neighborhood
+        let cxx=(xi/CELL)|0, cyy=(yi/CELL)|0;
+        if (cxx<0)cxx=0; else if (cxx>=cols)cxx=cols-1;
+        if (cyy<0)cyy=0; else if (cyy>=rows)cyy=rows-1;
+        const x0=cxx>0?cxx-1:0, x1=cxx<cols-1?cxx+1:cols-1;
+        const y0=cyy>0?cyy-1:0, y1=cyy<rows-1?cyy+1:rows-1;
+
+        for (let gy=y0; gy<=y1; gy++){
+          const base = gy*cols;
+          for (let gx=x0; gx<=x1; gx++){
+            let j = cellHeads[base+gx];
+            while (j !== -1){
+              if (j !== i){
+                const dx=px[j]-xi, dy=py[j]-yi;
+                const d2=dx*dx+dy*dy;
+                if (d2 < R_COH2){
+                  if (d2 < R_SEP2 && d2 > 0.0001){
+                    // separation weighted by closeness (1/d)
+                    const inv = 1/Math.sqrt(d2);
+                    sepX -= dx*inv; sepY -= dy*inv;
+                  }
+                  if (d2 < R_ALI2){ aliX+=vx[j]; aliY+=vy[j]; aliN++; }
+                  cohX+=px[j]; cohY+=py[j]; cohN++;
+                }
+              }
+              j = cellNext[j];
+            }
+          }
+        }
+
+        let ax=0, ay=0;
+
+        // COHESION — steer toward neighborhood center of mass
+        if (cohN>0){
+          let tx=cohX/cohN - xi, ty=cohY/cohN - yi;
+          const tl=Math.hypot(tx,ty);
+          if (tl>0.0001){ tx=tx/tl*ms - vxi; ty=ty/tl*ms - vyi;
+            const f=limit(tx,ty,MAX_FORCE); ax+=f[0]*cw; ay+=f[1]*cw; }
+        }
+        // ALIGNMENT — match neighborhood heading
+        if (aliN>0){
+          let tx=aliX/aliN, ty=aliY/aliN;
+          const tl=Math.hypot(tx,ty);
+          if (tl>0.0001){ tx=tx/tl*ms - vxi; ty=ty/tl*ms - vyi;
+            const f=limit(tx,ty,MAX_FORCE); ax+=f[0]*aw; ay+=f[1]*aw; }
+        }
+        // SEPARATION — keep personal space
+        if (sepX!==0 || sepY!==0){
+          const sl=Math.hypot(sepX,sepY);
+          let tx=sepX/sl*ms - vxi, ty=sepY/sl*ms - vyi;
+          const f=limit(tx,ty,MAX_FORCE*1.3); ax+=f[0]*sw; ay+=f[1]*sw;
+        }
+
+        // ROOST attractor — a gentle, long pull toward home
+        if (roost){
+          const dx=roost.x-xi, dy=roost.y-yi;
+          const d=Math.hypot(dx,dy);
+          if (d>0.5){
+            const pull = roost.life * 0.10 * Math.min(1, d/260);
+            ax += dx/d * pull; ay += dy/d * pull;
+          }
+        }
+
+        // RAPTOR / bludička — flee, hard and fast, scaled by proximity (panic)
+        if (raptor && raptor.active){
+          const dx=xi-raptor.x, dy=yi-raptor.y;
+          const d2=dx*dx+dy*dy;
+          if (d2 < R_RAPTOR2 && d2>0.0001){
+            const d=Math.sqrt(d2);
+            const fear = (1 - d/R_RAPTOR);          // 0..1
+            const mag = fear*fear * 0.9;            // sharply nonlinear panic
+            ax += dx/d * mag; ay += dy/d * mag;
+          }
+        }
+
+        // soft EDGE-AVOIDANCE — turn before the rim, never bounce
+        const margin = 90;
+        const turn = 0.05;
+        if (xi < margin) ax += (1 - xi/margin)*turn;
+        else if (xi > W-margin) ax -= (1 - (W-xi)/margin)*turn;
+        if (yi < margin) ay += (1 - yi/margin)*turn;
+        else if (yi > H-margin) ay -= (1 - (H-yi)/margin)*turn;
+
+        // gentle WANDER — the shared breath + a tiny private jitter
+        ax += wanderGX + (Math.random()-0.5)*0.018;
+        ay += wanderGY + (Math.random()-0.5)*0.018 - 0.004; // faint lift, birds favor the sky
+
+        // integrate
+        let nvx = vxi + ax*dt;
+        let nvy = vyi + ay*dt;
+        // clamp speed band
+        const sp2 = nvx*nvx+nvy*nvy;
+        if (sp2 > ms2){ const s=ms/Math.sqrt(sp2); nvx*=s; nvy*=s; }
+        else if (sp2 < minS2 && sp2 > 0.0001){ const s=minS/Math.sqrt(sp2); nvx*=s; nvy*=s; }
+        vx[i]=nvx; vy[i]=nvy;
+        let nx=xi+nvx*dt, ny=yi+nvy*dt;
+        // hard wrap as a last resort so nothing is ever lost
+        if (nx < -20) nx = W+20; else if (nx > W+20) nx = -20;
+        if (ny < -20) ny = H+20; else if (ny > H+20) ny = -20;
+        px[i]=nx; py[i]=ny;
+      }
+
+      // advance roost/raptor lifetimes & the predator's drift
+      if (roost){ roost.life = Math.min(1, roost.life + dt*0.08); }
+      if (raptor && raptor.active){
+        // the bludička drifts with a little inertia toward the pointer target
+        raptor.x += (raptor.tx - raptor.x)*0.12;
+        raptor.y += (raptor.ty - raptor.y)*0.12;
+      }
+
+      measureFlock();
+    }
+
+    function limit(x,y,m){
+      const l=Math.hypot(x,y);
+      if (l>m && l>0.0001){ const s=m/l; return [x*s,y*s]; }
+      return [x,y];
+    }
+
+    // =====================================================================
+    //  RENDER
+    // =====================================================================
+    // dusk sky: a slow gradient from amber horizon to deep indigo-black night
+    function skyStops(){
+      // dusk 0 -> warm; dusk 1 -> near-black night
+      const d = dusk;
+      // top of sky (zenith)
+      const topR = lerp(28, 6, d), topG = lerp(30, 7, d), topB = lerp(54, 14, d);
+      // horizon glow over the Tatras
+      const horR = lerp(214, 40, d), horG = lerp(120, 26, d), horB = lerp(70, 34, d);
+      return { top:`rgb(${topR|0},${topG|0},${topB|0})`, hor:`rgb(${horR|0},${horG|0},${horB|0})` };
+    }
+    function lerp(a,b,t){ return a+(b-a)*t; }
+
+    let skyCache = null, skyCacheKey = '';
+    function paintSky(force){
+      const s = skyStops();
+      const key = s.top+'|'+s.hor+'|'+W+'x'+H;
+      if (!force && key === skyCacheKey) {
+        if (skyCache){ ctx.drawImage(skyCache,0,0,W,H); return; }
+      }
+      skyCacheKey = key;
+      const g = ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0, s.top);
+      g.addColorStop(0.62, mix(s.top, s.hor, 0.55));
+      g.addColorStop(0.86, s.hor);
+      g.addColorStop(1, mix(s.hor, '#08070a', 0.6));
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,W,H);
+      drawMountains();
+      // cache to an offscreen canvas so we can cheaply repaint under trails
+      if (!skyCache){ skyCache = document.createElement('canvas'); }
+      if (skyCache.width!==W*DPR || skyCache.height!==H*DPR){ skyCache.width=W*DPR; skyCache.height=H*DPR; }
+      const sc = skyCache.getContext('2d');
+      sc.setTransform(DPR,0,0,DPR,0,0);
+      sc.drawImage(canvas, 0,0, W,H, 0,0, W,H);
+    }
+
+    function mix(c1,c2,t){
+      const a=parse(c1), b=parse(c2);
+      return `rgb(${(a[0]+(b[0]-a[0])*t)|0},${(a[1]+(b[1]-a[1])*t)|0},${(a[2]+(b[2]-a[2])*t)|0})`;
+    }
+    function parse(c){
+      if (c[0]==='#'){ const n=parseInt(c.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+      const m=c.match(/\d+/g); return [+m[0],+m[1],+m[2]];
+    }
+
+    // the Tatra ridgeline — a few layered silhouettes
+    let ridges = null;
+    function buildRidges(){
+      ridges = [];
+      const layers = [
+        { base:0.78, amp:0.10, n:7,  shade:'#0c0b10' },
+        { base:0.84, amp:0.13, n:5,  shade:'#080709' },
+        { base:0.90, amp:0.16, n:4,  shade:'#050406' }
+      ];
+      for (const L of layers){
+        const pts=[];
+        const seg = L.n;
+        for (let k=0;k<=seg;k++){
+          const xx = (k/seg)*W;
+          // jagged peaks via summed offsets, deterministic per layer
+          const r = Math.sin(k*12.9898 + L.base*78.233)*43758.5453;
+          const frac = r - Math.floor(r);
+          const yy = H*(L.base) - H*L.amp*frac;
+          pts.push([xx,yy]);
+        }
+        ridges.push({ pts, shade:L.shade });
+      }
+    }
+    function drawMountains(){
+      if (!ridges || ridges._w !== W) { buildRidges(); ridges._w = W; }
+      for (const R of ridges){
+        ctx.beginPath();
+        ctx.moveTo(0,H);
+        ctx.lineTo(R.pts[0][0], R.pts[0][1]);
+        for (let k=1;k<R.pts.length;k++){
+          const [x,y]=R.pts[k], [px0,py0]=R.pts[k-1];
+          // soft ridge — quadratic between peaks
+          const mx=(px0+x)/2;
+          ctx.quadraticCurveTo(px0, py0, mx, (py0+y)/2);
+          ctx.lineTo(x,y);
+        }
+        ctx.lineTo(W,H); ctx.closePath();
+        ctx.fillStyle = R.shade; ctx.fill();
+      }
+    }
+    // attach ridge marker so resize rebuilds
+    Object.defineProperty(buildRidges, '_w', {writable:true, value:0});
+
+    // stars fade in as night deepens
+    let stars = null;
+    function buildStars(){
+      stars = [];
+      const n = 90;
+      for (let i=0;i<n;i++){
+        stars.push({ x:Math.random()*W, y:Math.random()*H*0.7, r:Math.random()*1.1+0.2, tw:Math.random()*Math.PI*2 });
+      }
+    }
+
+    function render(now){
+      // base sky (cached) then trails veil
+      if (cfg.trails && !cfg.reduced){
+        // draw cached sky at low alpha to fade the previous birds into a trail
+        ctx.globalAlpha = 0.30;
+        if (skyCache) ctx.drawImage(skyCache, 0,0, W*DPR, H*DPR, 0,0, W,H);
+        else paintSky(true);
+        ctx.globalAlpha = 1;
+      } else {
+        if (skyCache) ctx.drawImage(skyCache, 0,0, W*DPR, H*DPR, 0,0, W,H);
+        else paintSky(true);
+      }
+
+      // stars (over the cached sky, under the birds)
+      if (stars && dusk > 0.25){
+        const sa = (dusk-0.25)/0.75;
+        for (let i=0;i<stars.length;i++){
+          const st=stars[i];
+          const tw = 0.55 + 0.45*Math.sin(now*0.001 + st.tw);
+          ctx.globalAlpha = sa*tw*0.9;
+          ctx.fillStyle = '#cdd2e6';
+          ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // the flock. birds are tiny chevrons oriented to velocity.
+      // ink darkens toward night; a faint amber rim catches the last light.
+      const inkV = lerp(40, 18, dusk)|0;
+      const baseInk = `rgb(${inkV+8},${inkV+4},${inkV})`;
+      const SCALE = 1;
+      ctx.lineWidth = 1;
+      for (let i=0;i<N;i++){
+        const x=px[i], y=py[i], dx=vx[i], dy=vy[i];
+        const sp=Math.hypot(dx,dy)||0.0001;
+        const ux=dx/sp, uy=dy/sp;            // heading
+        const nx=-uy, ny=ux;                 // wing normal
+        // size scales faintly with speed — fast birds look streaked
+        const len = 4.4 + sp*0.5;
+        const wing = 2.4;
+        // a panic tint: birds near the raptor flare amber
+        let fill = baseInk;
+        if (raptor && raptor.active){
+          const ddx=x-raptor.x, ddy=y-raptor.y; const dd2=ddx*ddx+ddy*ddy;
+          if (dd2 < R_RAPTOR2){
+            const f=1-Math.sqrt(dd2)/R_RAPTOR;
+            const rr=lerp(inkV+8,226,f)|0, gg=lerp(inkV+4,150,f)|0, bb=lerp(inkV,70,f)|0;
+            fill=`rgb(${rr},${gg},${bb})`;
+          }
+        }
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        ctx.moveTo(x+ux*len, y+uy*len);                        // nose
+        ctx.lineTo(x-ux*len*0.5 + nx*wing, y-uy*len*0.5 + ny*wing); // wing
+        ctx.lineTo(x-ux*len*0.2, y-uy*len*0.2);                // body notch
+        ctx.lineTo(x-ux*len*0.5 - nx*wing, y-uy*len*0.5 - ny*wing); // wing
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // roost marker — a soft ring breathing on the ground
+      if (roost){
+        const pr = 8 + Math.sin(now*0.004)*3;
+        const g = ctx.createRadialGradient(roost.x,roost.y,0,roost.x,roost.y,40);
+        g.addColorStop(0, `rgba(226,176,74,${0.28*roost.life})`);
+        g.addColorStop(1, 'rgba(226,176,74,0)');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(roost.x,roost.y,40,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle=`rgba(226,176,74,${0.5*roost.life})`; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.arc(roost.x,roost.y,pr,0,Math.PI*2); ctx.stroke();
+      }
+
+      // raptor — the bludička, a cold pale glint with a dark heart
+      if (raptor && raptor.active){
+        const g = ctx.createRadialGradient(raptor.x,raptor.y,0,raptor.x,raptor.y,26);
+        g.addColorStop(0,'rgba(220,228,255,0.9)');
+        g.addColorStop(0.4,'rgba(150,170,230,0.35)');
+        g.addColorStop(1,'rgba(150,170,230,0)');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(raptor.x,raptor.y,26,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='rgba(10,10,14,0.95)';
+        ctx.beginPath(); ctx.arc(raptor.x,raptor.y,3.4,0,Math.PI*2); ctx.fill();
+        // faint reach radius
+        ctx.strokeStyle='rgba(180,195,240,0.10)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.arc(raptor.x,raptor.y,R_RAPTOR,0,Math.PI*2); ctx.stroke();
+      }
+    }
+
+    // =====================================================================
+    //  FLOCK STATE MEASUREMENT  → captions + readouts
+    // =====================================================================
+    let order = 0;          // 0..1 polarization (alignment of headings)
+    let density = 0;        // rough cluster tightness
+    let measTick = 0;
+    function measureFlock(){
+      // only every few ticks; cheap aggregate stats
+      if ((measTick++ % 8) !== 0) return;
+      let sx=0, sy=0, mx=0, my=0;
+      for (let i=0;i<N;i++){
+        const sp=Math.hypot(vx[i],vy[i])||0.0001;
+        sx+=vx[i]/sp; sy+=vy[i]/sp;
+        mx+=px[i]; my+=py[i];
+      }
+      order = Math.hypot(sx,sy)/N;        // 1 = perfect formation, ~0 = chaos
+      mx/=N; my/=N;
+      // spread: mean distance from centroid (normalized)
+      let sp=0;
+      for (let i=0;i<N;i++){ sp+=Math.hypot(px[i]-mx, py[i]-my); }
+      sp/=N;
+      density = 1 - Math.min(1, sp/(Math.min(W,H)*0.42));
+      updateCaption();
+    }
+
+    // ---- captions: terse, wry, reactive ----
+    const capEl = document.getElementById('caption');
+    let lastCap = '', capHold = 0;
+    const CAP = {
+      panic: ['the bludička hunts. they break like glass.','panic moves faster than wings.','they flee what you summoned.','the flock tears open and reseals.'],
+      tight: ['they pour like one dark liquid.','a single mind, four hundred bodies.','the shape no one drew on purpose.','the birds know something you don\'t.'],
+      roosting:['the mountain pulls them home.','they spiral down to the roost.','dusk calls them in.','home is a place you pressed into the sky.'],
+      loose: ['scattered. searching. listening.','the formation forgets itself.','loose threads of birds.','they drift, untethered.'],
+      calm:  ['they wheel without urgency.','the sky holds them, lightly.','slow circles over the ridge.','nothing to flee from. for now.'],
+      night: ['the night swallows the ridge.','soon only the sound of wings.','darker. they fly by memory now.','the last light leaves the peaks.']
+    };
+    function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
+    function setCaption(txt){
+      if (txt === lastCap) return;
+      lastCap = txt;
+      capEl.textContent = txt;
+      capEl.classList.remove('caption-in'); void capEl.offsetWidth; capEl.classList.add('caption-in');
+    }
+    function updateCaption(){
+      if (capHold > 0){ capHold--; return; }
+      capHold = 7; // hold each caption a few measurement cycles (~several seconds)
+      let pool;
+      if (raptor && raptor.active) pool = CAP.panic;
+      else if (roost && roost.life > 0.5 && density > 0.45) pool = CAP.roosting;
+      else if (order > 0.82 && density > 0.4) pool = CAP.tight;
+      else if (dusk > 0.7 && Math.random() < 0.5) pool = CAP.night;
+      else if (order < 0.4) pool = CAP.loose;
+      else pool = CAP.calm;
+      setCaption(pick(pool));
+    }
+
+    // =====================================================================
+    //  LOOP
+    // =====================================================================
+    let last = performance.now();
+    let duskAccum = 0;
+    function frame(now){
+      let dt = (now-last)/1000; last = now;
+      if (dt > 0.05) dt = 0.05;
+
+      if (!paused){
+        // advance dusk slowly: full night in ~5 minutes of watching (+haste)
+        let dRate = 1/300;
+        if (duskHaste > 0){ dRate += duskHaste; duskHaste = Math.max(0, duskHaste - dt*0.02); }
+        dusk = Math.min(1, dusk + dt*dRate);
+        // repaint cached sky occasionally as dusk shifts (cheap, throttled)
+        duskAccum += dt;
+        if (duskAccum > 0.4){ duskAccum = 0; paintSky(false); }
+
+        const simSpeed = 60;
+        step(dt * simSpeed);
+
+        // roost & raptor decay when not held
+        if (roost && !roostHeld){ roost.life -= dt*0.25; if (roost.life <= 0) roost = null; }
+        if (raptor && !raptorHeld){ raptor.active=false; raptor=null; }
+      }
+
+      render(now);
+      requestAnimationFrame(frame);
+    }
+
+    // =====================================================================
+    //  INPUT — press & hold to place roost / raptor
+    // =====================================================================
+    let roostHeld = false, raptorHeld = false;
+    function pointFromEvent(e){
+      const rect = canvas.getBoundingClientRect();
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      return [p.clientX-rect.left, p.clientY-rect.top];
+    }
+    function onDown(e){
+      if (e.target !== canvas) return;
+      const [x,y]=pointFromEvent(e);
+      canvas.classList.add('pressing');
+      if (cfg.tool === 'raptor'){
+        raptor = { x, y, tx:x, ty:y, active:true };
+        raptorHeld = true;
+        capHold = 0; updateCaption();
+      } else {
+        roost = { x, y, life:0.15 };
+        roostHeld = true;
+      }
+      markFirstTouch();
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!roostHeld && !raptorHeld) return;
+      const [x,y]=pointFromEvent(e);
+      if (raptorHeld && raptor){ raptor.tx=x; raptor.ty=y; }
+      else if (roostHeld && roost){ roost.x=x; roost.y=y; }
+      e.preventDefault();
+    }
+    function onUp(){
+      canvas.classList.remove('pressing');
+      roostHeld = false; raptorHeld = false;
+      // roost lingers and fades (handled in loop); raptor vanishes — relief
+      capHold = 0;
+    }
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('touchstart', onDown, {passive:false});
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp);
+
+    // =====================================================================
+    //  UI WIRING
+    // =====================================================================
+    const els = {
+      coh:document.getElementById('cohesion'), ali:document.getElementById('align'),
+      sep:document.getElementById('separate'), spd:document.getElementById('speed'),
+      flk:document.getElementById('flock'),
+      cohO:document.getElementById('cohOut'), aliO:document.getElementById('aliOut'),
+      sepO:document.getElementById('sepOut'), spdO:document.getElementById('spdOut'),
+      flkO:document.getElementById('flkOut')
+    };
+
+    function syncUI(){
+      els.coh.value=cfg.cohesion; els.ali.value=cfg.align; els.sep.value=cfg.separate;
+      els.spd.value=cfg.speed; els.flk.value=cfg.flock;
+      els.cohO.textContent=(cfg.cohesion/100).toFixed(1);
+      els.aliO.textContent=(cfg.align/100).toFixed(1);
+      els.sepO.textContent=(cfg.separate/100).toFixed(1);
+      els.spdO.textContent=(cfg.speed/100).toFixed(1)+'×';
+      els.flkO.textContent=cfg.flock;
+      document.getElementById('btnTrails').classList.toggle('btn-on', cfg.trails && !cfg.reduced);
+      const rb=document.getElementById('btnReduce');
+      rb.classList.toggle('btn-on', cfg.reduced);
+      rb.textContent = cfg.reduced ? '◐ motion: calm' : '◐ motion: full';
+      document.getElementById('toolRoost').classList.toggle('on', cfg.tool==='roost');
+      document.getElementById('toolRaptor').classList.toggle('on', cfg.tool==='raptor');
+    }
+
+    els.coh.addEventListener('input', ()=>{ cfg.cohesion=+els.coh.value; els.cohO.textContent=(cfg.cohesion/100).toFixed(1); save(); });
+    els.ali.addEventListener('input', ()=>{ cfg.align=+els.ali.value; els.aliO.textContent=(cfg.align/100).toFixed(1); save(); });
+    els.sep.addEventListener('input', ()=>{ cfg.separate=+els.sep.value; els.sepO.textContent=(cfg.separate/100).toFixed(1); save(); });
+    els.spd.addEventListener('input', ()=>{ cfg.speed=+els.spd.value; els.spdO.textContent=(cfg.speed/100).toFixed(1)+'×'; save(); });
+    els.flk.addEventListener('input', ()=>{ cfg.flock=+els.flk.value; els.flkO.textContent=cfg.flock; save(); });
+    els.flk.addEventListener('change', ()=>{ setFlockSize(cfg.flock); });
+
+    const btnPause=document.getElementById('btnPause');
+    function togglePause(){ paused=!paused; btnPause.textContent=paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on', paused); }
+    btnPause.addEventListener('click', togglePause);
+
+    document.getElementById('btnClear').addEventListener('click', regather);
+    function regather(){
+      // disperse to the edges, then let boids pull them back into a flock
+      for (let i=0;i<N;i++){
+        const a=Math.random()*Math.PI*2; const sp=maxSpeed();
+        const edge=Math.random();
+        if (edge<0.5){ px[i]=Math.random()<0.5?-10:W+10; py[i]=Math.random()*H; }
+        else { px[i]=Math.random()*W; py[i]=Math.random()<0.5?-10:H+10; }
+        vx[i]=Math.cos(a)*sp; vy[i]=Math.sin(a)*sp;
+        for (let k=0;k<TRAIL_LEN;k++){ trailX[i*TRAIL_LEN+k]=px[i]; trailY[i*TRAIL_LEN+k]=py[i]; }
+      }
+      roost=null; raptor=null; roostHeld=false; raptorHeld=false;
+      capHold=0; setCaption('the flock disperses, then remembers itself.');
+      capHold=9;
+      paintSky(true);
+    }
+
+    document.getElementById('btnTrails').addEventListener('click', ()=>{
+      cfg.trails=!cfg.trails; syncUI(); save(); paintSky(true);
+    });
+    document.getElementById('btnReduce').addEventListener('click', ()=>{
+      cfg.reduced=!cfg.reduced; syncUI(); save(); paintSky(true);
+    });
+
+    document.getElementById('toolRoost').addEventListener('click', ()=>{ cfg.tool='roost'; syncUI(); save(); });
+    document.getElementById('toolRaptor').addEventListener('click', ()=>{ cfg.tool='raptor'; syncUI(); save(); });
+
+    document.getElementById('dusk').addEventListener('click', ()=>{
+      if (dusk >= 0.999){ dusk = 0; setCaption('dawn, briefly. the dusk begins again.'); capHold=9; }
+      else { duskHaste += 0.06; }
+      paintSky(true);
+    });
+
+    // ---- keyboard ----
+    window.addEventListener('keydown', (e)=>{
+      if (/INPUT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
+      const k=e.key.toLowerCase();
+      if (e.code==='Space'){ e.preventDefault(); togglePause(); }
+      else if (k==='c'){ regather(); }
+      else if (k==='t'){ cfg.trails=!cfg.trails; syncUI(); save(); paintSky(true); }
+      else if (k==='r'){ cfg.reduced=!cfg.reduced; syncUI(); save(); paintSky(true); }
+      else if (k==='1'){ cfg.tool='roost'; syncUI(); save(); }
+      else if (k==='2'){ cfg.tool='raptor'; syncUI(); save(); }
+    });
+
+    // ---- hint / first-touch ----
+    const hintEl=document.getElementById('hint');
+    const defaultHint=hintEl.textContent;
+    let touched=false;
+    function markFirstTouch(){ if (!touched){ touched=true; hintEl.textContent='space pauses · t trails · 1 roost · 2 raptor · c regathers'; } }
+
+    // =====================================================================
+    //  BOOT
+    // =====================================================================
+    resize();
+    allocate(cfg.flock);
+    buildStars();
+    syncUI();
+    requestAnimationFrame(frame);
+
+    // rebuild stars on resize too
+    window.addEventListener('resize', ()=>{ buildStars(); });
+
+    // ===== ambient embers (capped, reduced-motion-safe) =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const host=document.getElementById('embers');
+      for (let i=0;i<6;i++){
+        const e=document.createElement('div'); e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*18)+'s';
+        e.style.animationDuration=(15+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    })();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){
+      const h=new Date().getHours();
+      if (h>=0 && h<3){ const w=document.getElementById('nightWhisper'); if (w) w.style.display='block'; }
+    })();
+
+    // ===== easter egg: type "prizrak" to wake a watcher =====
+    (function(){
+      let buf='';
+      window.addEventListener('keydown', (ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=document.getElementById('ghostLine');
+          if (g){ g.style.display='block'; g.classList.add('flicker'); }
+          // a lone white crow joins — the watcher's bird, pale against the flock
+          if (N>0){ hueShift[(Math.random()*N)|0] = 9; } // sentinel marker (drawn pale)
+          watcherBird = true;
+          setCaption('a pale bird joins the flock. you did not summon it.');
+          capHold=12;
+        }
+      });
+    })();
+    let watcherBird = false;
+    // draw the watcher bird brightly if present (hook into render via flag)
+    const _render = render;
+    render = function(now){
+      _render(now);
+      if (watcherBird){
+        // find the marked bird and crown it
+        for (let i=0;i<N;i++){
+          if (hueShift[i] > 5){
+            ctx.fillStyle='rgba(240,242,250,0.95)';
+            const x=px[i],y=py[i],dx=vx[i],dy=vy[i],sp=Math.hypot(dx,dy)||0.0001;
+            const ux=dx/sp,uy=dy/sp,nx=-uy,ny=ux,len=5.6,wing=3.2;
+            ctx.beginPath();
+            ctx.moveTo(x+ux*len,y+uy*len);
+            ctx.lineTo(x-ux*len*0.5+nx*wing,y-uy*len*0.5+ny*wing);
+            ctx.lineTo(x-ux*len*0.2,y-uy*len*0.2);
+            ctx.lineTo(x-ux*len*0.5-nx*wing,y-uy*len*0.5-ny*wing);
+            ctx.closePath(); ctx.fill();
+            break;
+          }
+        }
+      }
+    };
+
+    // ===== easter egg: triple-click the title → one extra ember =====
+    (function(){
+      const t=document.getElementById('appTitle'); if (!t) return;
+      t.addEventListener('click', (ev)=>{
+        if (ev.detail===3 && !reduceMQ.matches){
+          const e=document.createElement('div'); e.className='ember';
+          e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='13s';
+          document.getElementById('embers').appendChild(e);
+          setTimeout(()=>e.remove(), 14000);
+        }
+      });
+    })();
+
+    // ===== easter egg: idle 60s → the watcher leans in =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const line=document.getElementById('idleLine'); let timer;
+      function arm(){
+        if (line) line.style.opacity='0';
+        clearTimeout(timer);
+        timer=setTimeout(()=>{
+          if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+            setTimeout(()=>{ if (line) line.style.opacity='0'; }, 6000); }
+        }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+      arm();
+    })();
+
+    // react to system reduced-motion changes
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change', (e)=>{ cfg.reduced=e.matches; syncUI(); save(); paintSky(true); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

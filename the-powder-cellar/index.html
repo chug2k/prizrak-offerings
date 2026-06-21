@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Powder Cellar | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#5fd0b0;            /* foxfire teal — the cellar's one living light */
+      --accent-deep:#3aa88c;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); height:100%; }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; overscroll-behavior:none; }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 84%, transparent);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line); color:var(--ink-dim); background:transparent;
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* element palette swatch */
+    .swatch{
+      transition:transform .1s, box-shadow .15s, border-color .15s, opacity .15s;
+      border:1px solid var(--line); position:relative; opacity:.82;
+    }
+    .swatch:hover{ opacity:1; transform:translateY(-1px); }
+    .swatch:active{ transform:translateY(0); }
+    .swatch.sel{ opacity:1; border-color:var(--swatch); box-shadow:0 0 0 1px var(--swatch), 0 0 14px -2px var(--swatch); }
+    .swatch .dot{ width:11px; height:11px; border-radius:2px; background:var(--swatch); box-shadow:0 0 7px -1px var(--swatch); flex:none; }
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+    .label{ color:var(--ink-dim); font-size:0.62rem; text-transform:uppercase; letter-spacing:0.18em; }
+    .num{ color:var(--accent); }
+
+    /* === ambient motion vocabulary (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    #cellar{ display:block; image-rendering:pixelated; image-rendering:crisp-edges; touch-action:none; cursor:crosshair; }
+    #cellar.erasing{ cursor:cell; }
+
+    /* the cave frame — a stone vignette around the sim */
+    .stoneframe{ box-shadow:inset 0 0 120px 30px #000, inset 0 0 0 1px var(--line); }
+
+    .seg{ user-select:none; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen grain overflow-hidden">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- header -->
+  <header class="fixed top-0 left-0 z-[4] p-4 sm:p-5 select-none pointer-events-none">
+    <div class="mono label mb-1 flicker">prízrak / instrument 27 — sediment</div>
+    <h1 id="appTitle" class="text-2xl font-semibold text-white h1-glow breathe cursor-default pointer-events-auto inline-block">The Powder Cellar</h1>
+    <p class="text-[11px] mt-1 max-w-[16rem] leading-relaxed" style="color:var(--ink-dim)">A cold Tatra cellar. Pour the elements in. Gravity and damp do the rest — let them find each other in the dark.</p>
+  </header>
+
+  <!-- the sim canvas, centered and framed -->
+  <main class="fixed inset-0 z-[1] flex items-center justify-center p-2 sm:p-4">
+    <div id="frame" class="relative stoneframe rounded-lg overflow-hidden">
+      <canvas id="cellar"></canvas>
+    </div>
+  </main>
+
+  <!-- the bench -->
+  <div class="fixed bottom-0 left-0 right-0 z-[4] p-2 sm:p-4 flex justify-center pointer-events-none">
+    <div class="glass rounded-2xl p-3 sm:p-4 w-full max-w-4xl pointer-events-auto">
+
+      <!-- palette -->
+      <div id="palette" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5 mb-3"></div>
+
+      <!-- transport + sliders -->
+      <div class="flex flex-col lg:flex-row lg:items-stretch gap-3">
+
+        <!-- transport buttons -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button id="btnPause" class="btn rounded-lg px-2.5 py-1.5 text-[11px] mono" title="space">⏸ pause</button>
+          <button id="btnErase" class="btn rounded-lg px-2.5 py-1.5 text-[11px] mono" title="e — toggle eraser">⌫ erase</button>
+          <button id="btnClear" class="btn rounded-lg px-2.5 py-1.5 text-[11px] mono" title="c — empty the cellar">↺ clear</button>
+          <button id="btnSeed" class="btn rounded-lg px-2.5 py-1.5 text-[11px] mono" title="s — seed the cellar">⁂ seed</button>
+        </div>
+
+        <div class="hidden lg:block w-px self-stretch" style="background:var(--line)"></div>
+
+        <!-- sliders -->
+        <div class="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+          <div>
+            <div class="flex justify-between mb-0.5">
+              <span class="mono label">brush</span><span id="brushOut" class="mono text-[10px] num">3</span>
+            </div>
+            <input type="range" id="brush" min="1" max="14" value="3" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between mb-0.5">
+              <span class="mono label">gravity</span><span id="gravOut" class="mono text-[10px] num">1.0×</span>
+            </div>
+            <input type="range" id="gravity" min="20" max="200" value="100" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+          </div>
+          <div class="col-span-2 sm:col-span-1">
+            <div class="flex justify-between mb-0.5">
+              <span class="mono label">cave temp</span><span id="tempOut" class="mono text-[10px] num">cold</span>
+            </div>
+            <input type="range" id="temp" min="0" max="100" value="22" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+          </div>
+        </div>
+      </div>
+
+      <!-- hint / readout -->
+      <div class="mt-2.5 flex items-center justify-between gap-3">
+        <p id="hint" class="mono text-[10px] leading-tight" style="color:var(--ink-ghost)">paint with the mouse · drop fire on oil · let foxfire find damp stone</p>
+        <div class="mono label hidden sm:flex items-center gap-3 flex-none">
+          <span><span id="fpsOut" class="num">60</span> fps</span>
+          <span>cells <span id="countOut" class="num">0</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- corner whispers -->
+  <div class="fixed top-2 right-3 z-[4] text-right pointer-events-none">
+    <p id="nightWhisper" class="mono text-[10px]" style="display:none;color:var(--ink-ghost)">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono text-[10px] mt-1" style="display:none;color:var(--ink-ghost)">you found the watcher.</p>
+    <p id="idleLine" class="mono text-[10px] mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease;color:var(--ink-ghost)">still here. the damp keeps its own time.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    const KEY = 'powder-cellar-v1';
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // ============================================================
+    // ELEMENTS — id ordering matters; 0 is always empty.
+    // Each has: name, label, a base color (rgb), and behavior flags.
+    // ============================================================
+    const EMPTY=0, WALL=1, SAND=2, WATER=3, STONE=4, SALT=5, OIL=6,
+          FIRE=7, EMBER=8, STEAM=9, SPORE=10, FOXFIRE=11, LICHEN=12, BRINE=13, ASH=14;
+
+    // color helpers store a base color + small per-cell variation packed in a tint byte
+    const ELEMENTS = {
+      [EMPTY]:  { name:'empty',   label:'erase',    sw:'#3a3530', col:[10,10,10] },
+      [WALL]:   { name:'wall',    label:'bedrock',  sw:'#4b4640', col:[40,38,34] },
+      [SAND]:   { name:'sand',    label:'sand',     sw:'#c9a86a', col:[176,146,86] },
+      [WATER]:  { name:'water',   label:'water',    sw:'#4a90d9', col:[58,118,176] },
+      [STONE]:  { name:'stone',   label:'mineral',  sw:'#8a8a92', col:[112,112,120] },
+      [SALT]:   { name:'salt',    label:'salt',     sw:'#dfe3ea', col:[206,210,218] },
+      [OIL]:    { name:'oil',     label:'oil',      sw:'#7a5fb0', col:[78,62,104] },
+      [FIRE]:   { name:'fire',    label:'fire',     sw:'#ff7a3c', col:[255,120,52] },
+      [EMBER]:  { name:'ember',   label:'ember',    sw:'#ff5a2c', col:[210,72,30] },
+      [STEAM]:  { name:'steam',   label:'steam',    sw:'#9fb6c4', col:[150,170,184] },
+      [SPORE]:  { name:'spore',   label:'foxspore', sw:'#7fe6c0', col:[110,200,170] },
+      [FOXFIRE]:{ name:'foxfire', label:'foxfire',  sw:'#5fd0b0', col:[95,208,176] },
+      [LICHEN]: { name:'lichen',  label:'lichen',   sw:'#86a45a', col:[110,140,72] },
+      [BRINE]:  { name:'brine',   label:'brine',    sw:'#5fb0c8', col:[70,140,168] },
+      [ASH]:    { name:'ash',     label:'ash',      sw:'#5a564f', col:[78,74,68] },
+    };
+    // the order shown in the palette
+    const PALETTE = [SAND, WATER, STONE, SALT, OIL, FIRE, SPORE, LICHEN, EMBER, STEAM, WALL, EMPTY];
+
+    // density: higher sinks below lower (used by liquids/gases for displacement)
+    const DENSITY = new Float32Array(16);
+    DENSITY[SAND]=9; DENSITY[STONE]=10; DENSITY[WALL]=20; DENSITY[SALT]=8.5;
+    DENSITY[WATER]=4; DENSITY[BRINE]=4.4; DENSITY[OIL]=3.2;
+    DENSITY[STEAM]=-2; DENSITY[SPORE]=-1.4; DENSITY[FIRE]=-3; DENSITY[ASH]=7;
+
+    const isLiquid = (t)=> t===WATER||t===OIL||t===BRINE;
+    const isPowder = (t)=> t===SAND||t===SALT||t===ASH;
+    const isGas    = (t)=> t===STEAM||t===SPORE;
+    const isStatic = (t)=> t===WALL||t===STONE||t===LICHEN||t===FOXFIRE;
+
+    // ============================================================
+    // GRID
+    // ============================================================
+    const cv = document.getElementById('cellar');
+    const frame = document.getElementById('frame');
+    const sctx = cv.getContext('2d', { alpha:false });
+
+    let GW = 0, GH = 0;            // grid dimensions (cells)
+    let SCALE = 5;                 // pixels per cell on screen
+    let grid, next;               // Uint8Array element ids
+    let tint;                     // Uint8Array per-cell brightness variation (0..255)
+    let life;                     // Uint8Array per-cell timer (fire/ember/steam lifespans, spread budgets)
+    let img, idata, ibuf32;       // offscreen image for fast blitting
+    let off, octx;                // offscreen canvas at grid resolution
+
+    // settings (persisted)
+    const defaults = { brush:3, gravity:100, temp:22, paused:false, erasing:false, sel:SAND };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s==='object') cfg = Object.assign(cfg, s.cfg||s); } catch(e){}
+    function save(){
+      try {
+        const snap = serializeGrid();
+        localStorage.setItem(KEY, JSON.stringify({ cfg, grid:snap, gw:GW, gh:GH }));
+      } catch(e){}
+    }
+    let saveTimer = null;
+    function saveSoon(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 1200); }
+
+    // run-length encode the grid so localStorage stays small
+    function serializeGrid(){
+      if (!grid) return null;
+      const out = [];
+      let i=0;
+      while(i<grid.length){
+        const v=grid[i]; let n=1;
+        while(i+n<grid.length && grid[i+n]===v && n<60000) n++;
+        out.push(v, n); i+=n;
+      }
+      return out;
+    }
+    function restoreGrid(snap){
+      if (!snap || !grid) return false;
+      let i=0;
+      for (let k=0;k<snap.length;k+=2){
+        const v=snap[k], n=snap[k+1];
+        for (let j=0;j<n && i<grid.length;j++,i++){
+          grid[i]=v;
+          if (v) { tint[i]= (Math.random()*255)|0; life[i]= initialLife(v); }
+        }
+      }
+      return i>0;
+    }
+
+    function initialLife(t){
+      if (t===FIRE) return 30 + (Math.random()*30|0);
+      if (t===EMBER) return 120 + (Math.random()*160|0);
+      if (t===STEAM) return 140 + (Math.random()*200|0);
+      if (t===FOXFIRE) return 200 + (Math.random()*200|0);
+      if (t===SPORE) return 240 + (Math.random()*120|0);
+      return 0;
+    }
+
+    // ============================================================
+    // SIZING
+    // ============================================================
+    function fitGrid(){
+      // available space inside the frame (leave room for header + bench)
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const maxW = Math.min(vw - 24, 1100);
+      const maxH = Math.min(vh - 250, 760);
+      // pick a scale that yields a generous grid (~150x100+)
+      SCALE = vw < 640 ? 4 : 5;
+      GW = Math.max(120, Math.floor(maxW / SCALE));
+      GH = Math.max(90,  Math.floor(maxH / SCALE));
+      // cap total cells for perf headroom
+      const CAP = 30000;
+      while (GW*GH > CAP){ if (GW>GH) GW--; else GH--; }
+
+      const pxW = GW*SCALE, pxH = GH*SCALE;
+      frame.style.width = pxW+'px';
+      frame.style.height = pxH+'px';
+      cv.width = pxW; cv.height = pxH;
+      cv.style.width = pxW+'px'; cv.style.height = pxH+'px';
+      sctx.imageSmoothingEnabled = false;
+
+      // offscreen at grid resolution
+      off = document.createElement('canvas');
+      off.width = GW; off.height = GH;
+      octx = off.getContext('2d');
+      img = octx.createImageData(GW, GH);
+      idata = img.data;
+      ibuf32 = new Uint32Array(idata.buffer);
+    }
+
+    function allocate(prev){
+      const old = grid, oldGW = prev? prev.gw:0, oldGH = prev? prev.gh:0;
+      grid = new Uint8Array(GW*GH);
+      next = new Uint8Array(GW*GH);
+      tint = new Uint8Array(GW*GH);
+      life = new Uint8Array(GW*GH);
+      // border walls (so things don't fall out)
+      // (kept implicit — bounds checks handle edges; bottom acts as floor)
+      if (prev && prev.grid){
+        // best-effort copy of old contents into new grid (top-left aligned)
+        const cw = Math.min(GW, oldGW), ch = Math.min(GH, oldGH);
+        for (let y=0;y<ch;y++){
+          for (let x=0;x<cw;x++){
+            const t = prev.grid[y*oldGW+x];
+            if (t){ const i=y*GW+x; grid[i]=t; tint[i]=(Math.random()*255)|0; life[i]=initialLife(t); }
+          }
+        }
+      }
+    }
+
+    // ============================================================
+    // SIM HELPERS
+    // ============================================================
+    const idx = (x,y)=> y*GW+x;
+    const inB = (x,y)=> x>=0 && x<GW && y>=0 && y<GH;
+
+    function swap(a,b){
+      const t=grid[b]; grid[b]=grid[a]; grid[a]=t;
+      const tt=tint[b]; tint[b]=tint[a]; tint[a]=tt;
+      const tl=life[b]; life[b]=life[a]; life[a]=tl;
+    }
+    function setCell(i,t){
+      grid[i]=t; tint[i]= t? (Math.random()*255|0):0; life[i]= initialLife(t);
+    }
+
+    // ============================================================
+    // THE SIMULATION STEP
+    // Bottom-up, alternating horizontal scan direction each frame
+    // to remove bias. gravityScale tweaks how aggressively things fall
+    // (probabilistically, to keep it cheap).
+    // ============================================================
+    let frameParity = 0;
+    let liveCount = 0;
+
+    function simulate(){
+      frameParity ^= 1;
+      const g = cfg.gravity/100;             // 0.2 .. 2.0
+      const fallChance = Math.min(1, 0.55 + g*0.35);
+      const tNorm = cfg.temp/100;            // 0 cold .. 1 hot
+      let count = 0;
+
+      // bottom row to top
+      for (let y=GH-1;y>=0;y--){
+        const ltr = (frameParity ^ (y&1)) === 0;
+        if (ltr){
+          for (let x=0;x<GW;x++) count += stepCell(x,y,fallChance,tNorm);
+        } else {
+          for (let x=GW-1;x>=0;x--) count += stepCell(x,y,fallChance,tNorm);
+        }
+      }
+      liveCount = count;
+    }
+
+    // returns 1 if the cell was non-empty (for live count)
+    function stepCell(x,y,fallChance,tNorm){
+      const i = idx(x,y);
+      const t = grid[i];
+      if (t===EMPTY) return 0;
+      if (t===WALL || t===STONE) return 1;
+
+      switch(t){
+        case SAND:  case SALT: case ASH: powderStep(x,y,i,t,fallChance); break;
+        case WATER: waterStep(x,y,i,t,tNorm); break;
+        case BRINE: waterStep(x,y,i,t,tNorm); break;
+        case OIL:   liquidStep(x,y,i,t); break;
+        case FIRE:  fireStep(x,y,i,tNorm); break;
+        case EMBER: emberStep(x,y,i,tNorm); break;
+        case STEAM: steamStep(x,y,i,tNorm); break;
+        case SPORE: sporeStep(x,y,i); break;
+        case FOXFIRE: foxfireStep(x,y,i); break;
+        case LICHEN: lichenStep(x,y,i); break;
+      }
+      return 1;
+    }
+
+    // ---- POWDERS: fall, pile, slide diagonally; sink through liquids ----
+    function powderStep(x,y,i,t,fallChance){
+      if (Math.random() > fallChance) return;
+      const below = inB(x,y+1) ? idx(x,y+1) : -1;
+      if (below<0) return; // floor
+      const bt = grid[below];
+      if (bt===EMPTY || (isLiquid(bt) && DENSITY[t]>DENSITY[bt]) || isGas(bt)){
+        swap(i,below); return;
+      }
+      // salt dissolves on contact with water -> becomes brine, water disappears
+      if (t===SALT){
+        for (const [dx,dy] of NB4){
+          const nx=x+dx, ny=y+dy;
+          if (!inB(nx,ny)) continue;
+          const ni=idx(nx,ny);
+          if (grid[ni]===WATER){
+            setCell(ni, BRINE); setCell(i, EMPTY); return;
+          }
+        }
+      }
+      // diagonal slide
+      const dir = Math.random()<0.5 ? 1 : -1;
+      for (const d of [dir,-dir]){
+        const nx=x+d, ny=y+1;
+        if (!inB(nx,ny)) continue;
+        const ni=idx(nx,ny);
+        const nt=grid[ni];
+        if (nt===EMPTY || (isLiquid(nt)&&DENSITY[t]>DENSITY[nt]) || isGas(nt)){ swap(i,ni); return; }
+      }
+    }
+
+    // ---- WATER / BRINE: fall, then spread to find level ----
+    function waterStep(x,y,i,t,tNorm){
+      // condense-from-steam handled in steamStep; here just flow
+      // hot cave near fire? evaporation handled by fire. flow:
+      const below = inB(x,y+1)?idx(x,y+1):-1;
+      if (below>=0){
+        const bt=grid[below];
+        if (bt===EMPTY){ swap(i,below); return; }
+        if (isGas(bt) || (isLiquid(bt) && DENSITY[t]>DENSITY[bt])){ swap(i,below); return; }
+      }
+      // diagonal down
+      const dir = Math.random()<0.5?1:-1;
+      for (const d of [dir,-dir]){
+        const nx=x+d, ny=y+1;
+        if (!inB(nx,ny)) continue;
+        const ni=idx(nx,ny); const nt=grid[ni];
+        if (nt===EMPTY || isGas(nt) || (isLiquid(nt)&&DENSITY[t]>DENSITY[nt])){ swap(i,ni); return; }
+      }
+      // horizontal spread (seek level) — look a few cells for an opening
+      const reach = 4;
+      for (const d of [dir,-dir]){
+        for (let s=1;s<=reach;s++){
+          const nx=x+d*s;
+          if (!inB(nx,y)) break;
+          const ni=idx(nx,y); const nt=grid[ni];
+          if (nt!==EMPTY && !isGas(nt)) break;
+          // prefer to flow where there's a drop
+          const downI = inB(nx,y+1)?idx(nx,y+1):-1;
+          if (downI>=0 && (grid[downI]===EMPTY || isGas(grid[downI]))){ swap(i,ni); return; }
+          if (s===1 && (nt===EMPTY||isGas(nt))){ swap(i,ni); return; }
+        }
+      }
+    }
+
+    // ---- OIL: like water but lighter (floats), here mostly same flow ----
+    function liquidStep(x,y,i,t){ waterStep(x,y,i,t,0); }
+
+    // ---- FIRE: rises a little, consumes flammables, dies; makes steam from water, ash from fuel ----
+    const FLAMMABLE = new Uint8Array(16);
+    FLAMMABLE[OIL]=1; FLAMMABLE[SPORE]=1; FLAMMABLE[LICHEN]=1;
+    function fireStep(x,y,i,tNorm){
+      let l = life[i];
+      // spread to neighbors
+      let spread=false;
+      for (const [dx,dy] of NB8){
+        const nx=x+dx, ny=y+dy;
+        if (!inB(nx,ny)) continue;
+        const ni=idx(nx,ny); const nt=grid[ni];
+        if (FLAMMABLE[nt]){
+          // oil + spore catch readily; lichen smoulders
+          if (Math.random() < (nt===OIL?0.6: nt===SPORE?0.5:0.18)){
+            // spore meeting fire becomes foxfire seed instead of plain burning
+            if (nt===SPORE && Math.random()<0.7){ setCell(ni, FOXFIRE); }
+            else { setCell(ni, FIRE); }
+            spread=true;
+          }
+        } else if (nt===WATER){
+          // water touching fire -> steam, fire snuffs
+          setCell(ni, STEAM); setCell(i, EMPTY); return;
+        } else if (nt===BRINE){
+          setCell(ni, STEAM); // brine boils, leaving salt behind sometimes
+          if (Math.random()<0.5) setCell(i, SALT); else setCell(i, EMPTY);
+          return;
+        }
+      }
+      // fire likes to climb
+      const up = inB(x,y-1)?idx(x,y-1):-1;
+      if (up>=0 && grid[up]===EMPTY && Math.random()<0.45){ swap(i,up); }
+      else {
+        // flicker sideways into empty
+        const d = Math.random()<0.5?1:-1;
+        const sx=x+d;
+        if (inB(sx,y) && grid[idx(sx,y)]===EMPTY && Math.random()<0.25) swap(i, idx(sx,y));
+      }
+      // burn down faster when cold cave saps it, slower when hot
+      l -= 1 + (Math.random()<(0.5-tNorm*0.4)?1:0);
+      if (l<=0){
+        // leaves an ember or ash or nothing
+        const r=Math.random();
+        if (r<0.18) setCell(i, EMBER);
+        else if (r<0.30) setCell(i, ASH);
+        else setCell(i, EMPTY);
+      } else life[i]=l;
+    }
+
+    // ---- EMBER: glowing, drifts down slowly, can reignite fuel, fades to ash ----
+    function emberStep(x,y,i,tNorm){
+      let l=life[i];
+      // reignite adjacent fuel occasionally
+      for (const [dx,dy] of NB4){
+        const nx=x+dx, ny=y+dy; if(!inB(nx,ny)) continue;
+        const ni=idx(nx,ny); const nt=grid[ni];
+        if (FLAMMABLE[nt] && Math.random()<0.10){ setCell(ni, FIRE); }
+        else if (nt===WATER && Math.random()<0.6){ setCell(i, ASH); return; }
+      }
+      // settle like a heavy powder
+      const below=inB(x,y+1)?idx(x,y+1):-1;
+      if (below>=0){
+        const bt=grid[below];
+        if (bt===EMPTY||isLiquid(bt)||isGas(bt)){ if(Math.random()<0.7){swap(i,below);} }
+        else {
+          const d=Math.random()<0.5?1:-1;
+          const nx=x+d;
+          if (inB(nx,y+1)){ const ni=idx(nx,y+1); if(grid[ni]===EMPTY){swap(i,ni);} }
+        }
+      }
+      l -= 1;
+      if (l<=0){ setCell(i, Math.random()<0.5?ASH:EMPTY); } else life[i]=l;
+    }
+
+    // ---- STEAM: rises, drifts, condenses back to water on cold stone / at top ----
+    function steamStep(x,y,i,tNorm){
+      let l=life[i];
+      // condense against cold solid (stone/wall) when cave is cold
+      const coldness = 1 - tNorm;
+      const up = inB(x,y-1)?idx(x,y-1):-1;
+      if (up<0 || (up>=0 && (grid[up]===STONE||grid[up]===WALL))){
+        if (Math.random() < 0.04 + coldness*0.06){ setCell(i, WATER); return; }
+      }
+      // touch cold stone sideways -> bead into water sometimes (dew on the cave wall)
+      for (const [dx,dy] of NB4){
+        const nx=x+dx, ny=y+dy; if(!inB(nx,ny)) continue;
+        const nt=grid[idx(nx,ny)];
+        if ((nt===STONE||nt===WALL) && Math.random() < 0.015 + coldness*0.03){ setCell(i, WATER); return; }
+      }
+      // rise
+      if (up>=0 && (grid[up]===EMPTY) ){ if(Math.random()<0.8){swap(i,up);} }
+      else {
+        const d=Math.random()<0.5?1:-1;
+        for (const dd of [d,-d]){
+          const nx=x+dd, ny=y-1;
+          if (inB(nx,ny) && grid[idx(nx,ny)]===EMPTY){ swap(i,idx(nx,ny)); break; }
+          const sx=x+dd;
+          if (inB(sx,y) && grid[idx(sx,y)]===EMPTY && Math.random()<0.4){ swap(i,idx(sx,y)); break; }
+        }
+      }
+      l -= 1;
+      if (l<=0){ setCell(i, Math.random()<0.55?WATER:EMPTY); } else life[i]=l;
+    }
+
+    // ---- SPORE (foxspore): drifts UPWARD lazily, very flammable, lands on damp stone to bloom ----
+    function sporeStep(x,y,i){
+      let l=life[i];
+      // bloom into foxfire if resting on/near damp stone (stone adjacent to water)
+      for (const [dx,dy] of NB4){
+        const nx=x+dx, ny=y+dy; if(!inB(nx,ny)) continue;
+        const nt=grid[idx(nx,ny)];
+        if ((nt===STONE||nt===LICHEN) && nearDamp(nx,ny) && Math.random()<0.05){
+          setCell(i, FOXFIRE); return;
+        }
+      }
+      // mostly rises, wanders
+      const r=Math.random();
+      let nx=x, ny=y;
+      if (r<0.5) ny=y-1;
+      else if (r<0.72) nx=x-1;
+      else if (r<0.94) nx=x+1;
+      else ny=y+1;
+      if (inB(nx,ny)){ const ni=idx(nx,ny); if(grid[ni]===EMPTY||isGas(grid[ni])) swap(i,ni); }
+      l -= 1;
+      if (l<=0){ setCell(i, EMPTY); } else life[i]=l;
+    }
+
+    function nearDamp(x,y){
+      for (const [dx,dy] of NB8){
+        const nx=x+dx, ny=y+dy; if(!inB(nx,ny)) continue;
+        const t=grid[idx(nx,ny)];
+        if (t===WATER||t===BRINE||t===LICHEN) return true;
+      }
+      return false;
+    }
+
+    // ---- FOXFIRE: living teal light. Spreads slowly across damp stone, glows, eventually fades ----
+    function foxfireStep(x,y,i){
+      let l=life[i];
+      // spread onto adjacent damp stone
+      if (Math.random()<0.10){
+        for (const [dx,dy] of NB8){
+          const nx=x+dx, ny=y+dy; if(!inB(nx,ny)) continue;
+          const ni=idx(nx,ny); const nt=grid[ni];
+          if ((nt===STONE) && nearDamp(nx,ny) && Math.random()<0.5){ setCell(ni, FOXFIRE); break; }
+          if (nt===SPORE){ setCell(ni, FOXFIRE); break; }
+          if (nt===LICHEN && Math.random()<0.3){ setCell(ni, FOXFIRE); break; }
+        }
+      }
+      // foxfire is cold light, but flammable vapors near it can ignite spores into more foxfire
+      l -= (Math.random()<0.4?1:0);
+      if (l<=0){
+        // dies back to stone if it had stone-host, else empty
+        setCell(i, Math.random()<0.6?STONE:EMPTY);
+      } else life[i]=l;
+    }
+
+    // ---- LICHEN: creeps slowly over wet stone, prefers damp; flammable ----
+    function lichenStep(x,y,i){
+      if (Math.random()<0.03){
+        for (const [dx,dy] of NB4){
+          const nx=x+dx, ny=y+dy; if(!inB(nx,ny)) continue;
+          const ni=idx(nx,ny); const nt=grid[ni];
+          if (nt===STONE && nearDamp(nx,ny) && Math.random()<0.5){ setCell(ni, LICHEN); break; }
+          // drink adjacent water slowly (keeps the wall damp)
+          if (nt===WATER && Math.random()<0.04){ setCell(ni, EMPTY); break; }
+        }
+      }
+    }
+
+    const NB4 = [[0,-1],[0,1],[-1,0],[1,0]];
+    const NB8 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+
+    // ============================================================
+    // RENDER — write directly to a 32-bit image buffer, scale up
+    // ============================================================
+    // precompute base colors as components
+    function shade(base, tintv, glow){
+      // tintv 0..255 -> small +/- variation; glow adds brightness for live elements
+      const v = ((tintv/255)-0.5)*0.28;
+      let r = base[0]*(1+v), g = base[1]*(1+v), b = base[2]*(1+v);
+      if (glow){ r+=glow[0]; g+=glow[1]; b+=glow[2]; }
+      r = r<0?0:r>255?255:r; g=g<0?0:g>255?255:g; b=b<0?0:b>255?255:b;
+      return (255<<24) | ((b|0)<<16) | ((g|0)<<8) | (r|0);
+    }
+
+    let pulse = 0;
+    function render(){
+      pulse += 0.06;
+      const fl = Math.sin(pulse);
+      // background of the cellar floor — near black with faint cool cast
+      const BG = (255<<24) | (12<<16) | (10<<8) | 10;
+      for (let i=0;i<grid.length;i++){
+        const t = grid[i];
+        if (t===EMPTY){ ibuf32[i]=BG; continue; }
+        const el = ELEMENTS[t];
+        let glow=null;
+        if (t===FIRE){
+          const f = 0.6+0.4*Math.sin(pulse*3+i);
+          glow=[60*f, -30, -60];
+        } else if (t===EMBER){
+          const lf = life[i]/255;
+          glow=[40*(0.5+0.5*fl), -20, -40];
+        } else if (t===FOXFIRE){
+          const f = 0.5+0.5*Math.sin(pulse*1.6 + (i%7));
+          glow=[ -20*f, 50*f, 30*f];
+        } else if (t===SPORE){
+          glow=[-10, 22*(0.5+0.5*fl), 14];
+        } else if (t===STEAM){
+          glow=[10,12,14];
+        } else if (t===LICHEN){
+          glow=[ -6, 10, -8];
+        }
+        ibuf32[i] = shade(el.col, tint[i], glow);
+      }
+      octx.putImageData(img,0,0);
+      sctx.drawImage(off, 0, 0, GW, GH, 0, 0, cv.width, cv.height);
+
+      // soft glow pass for living light (foxfire/fire) — cheap screen-blend bloom
+      if (!reduceMQ.matches) drawBloom();
+    }
+
+    // a very cheap bloom: redraw the offscreen scaled-up & blurred, screen-blended
+    function drawBloom(){
+      sctx.save();
+      sctx.globalCompositeOperation = 'lighter';
+      sctx.globalAlpha = 0.18;
+      sctx.filter = 'blur(3px)';
+      sctx.drawImage(off, 0,0,GW,GH, 0,0,cv.width,cv.height);
+      sctx.filter = 'none';
+      sctx.restore();
+    }
+
+    // ============================================================
+    // PAINTING
+    // ============================================================
+    let painting=false, lastPX=-1, lastPY=-1;
+
+    function eventCell(e){
+      const rect = cv.getBoundingClientRect();
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      const x = Math.floor((p.clientX - rect.left) / rect.width * GW);
+      const y = Math.floor((p.clientY - rect.top) / rect.height * GH);
+      return [x,y];
+    }
+
+    function paintAt(cx0,cy0){
+      const t = cfg.erasing ? EMPTY : cfg.sel;
+      const r = cfg.brush;
+      const r2 = r*r;
+      // gases/liquids/fire paint sparser so you don't dump a brick of fire
+      const sparse = (t===FIRE||t===STEAM||t===SPORE||t===WATER||t===OIL||t===BRINE);
+      for (let dy=-r;dy<=r;dy++){
+        for (let dx=-r;dx<=r;dx++){
+          if (dx*dx+dy*dy>r2) continue;
+          const x=cx0+dx, y=cy0+dy;
+          if (!inB(x,y)) continue;
+          const i=idx(x,y);
+          if (t===EMPTY){ setCell(i, EMPTY); continue; }
+          // don't overwrite solid bedrock unless erasing
+          if (grid[i]===WALL && t!==WALL) continue;
+          if (sparse && Math.random()>0.5) continue;
+          // only fill empties for fluids/gas so you can paint *into* scenes; solids overwrite
+          if ((isLiquid(t)||isGas(t)||t===FIRE) && grid[i]!==EMPTY && grid[i]!==t) continue;
+          setCell(i, t);
+        }
+      }
+    }
+
+    function strokeTo(x,y){
+      if (lastPX<0){ paintAt(x,y); lastPX=x; lastPY=y; return; }
+      // line between last and current so fast drags don't gap
+      const dx=x-lastPX, dy=y-lastPY;
+      const steps=Math.max(Math.abs(dx),Math.abs(dy));
+      for (let s=0;s<=steps;s++){
+        const t=steps?s/steps:0;
+        paintAt(Math.round(lastPX+dx*t), Math.round(lastPY+dy*t));
+      }
+      lastPX=x; lastPY=y;
+    }
+
+    function onDown(e){
+      painting=true; lastPX=-1; lastPY=-1;
+      const [x,y]=eventCell(e); strokeTo(x,y);
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!painting) return;
+      const [x,y]=eventCell(e); strokeTo(x,y);
+      e.preventDefault();
+    }
+    function onUp(){ if(painting){ painting=false; saveSoon(); } lastPX=-1; lastPY=-1; }
+
+    cv.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    cv.addEventListener('touchstart', onDown, {passive:false});
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp);
+
+    // ============================================================
+    // PRESETS — "seed the cellar"
+    // ============================================================
+    function fillRect(x0,y0,x1,y1,t,prob){
+      for (let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+        if (!inB(x,y)) continue;
+        if (prob!=null && Math.random()>prob) continue;
+        setCell(idx(x,y), t);
+      }
+    }
+
+    function seedCellar(){
+      clearGrid();
+      const W=GW, H=GH;
+      // bedrock floor & a couple of stone shelves (the cave architecture)
+      fillRect(0,H-3,W-1,H-1,WALL);
+      // left & right cave walls, irregular
+      for (let y=0;y<H;y++){
+        const lw = 2 + Math.round(2*Math.sin(y*0.18));
+        const rw = 2 + Math.round(2*Math.cos(y*0.15));
+        fillRect(0,y,lw,y,WALL);
+        fillRect(W-1-rw,y,W-1,y,WALL);
+      }
+      // a stone shelf with an overhang (catches drips)
+      const shY = Math.floor(H*0.46);
+      fillRect(Math.floor(W*0.10), shY, Math.floor(W*0.42), shY+2, STONE);
+      fillRect(Math.floor(W*0.55), Math.floor(H*0.32), Math.floor(W*0.86), Math.floor(H*0.32)+2, STONE);
+      // a mineral pillar
+      fillRect(Math.floor(W*0.66), Math.floor(H*0.34), Math.floor(W*0.69), H-4, STONE);
+
+      // a basin of water resting in the lower right
+      fillRect(Math.floor(W*0.50), H-12, Math.floor(W*0.62), H-4, WATER);
+      // a slick of oil floating in a small left pool
+      fillRect(Math.floor(W*0.14), H-9, Math.floor(W*0.24), H-4, WATER);
+      fillRect(Math.floor(W*0.14), H-10, Math.floor(W*0.24), H-10, OIL);
+
+      // sand drift along the floor
+      fillRect(Math.floor(W*0.28), H-7, Math.floor(W*0.46), H-4, SAND, 0.9);
+      // a pinch of salt on the upper shelf
+      fillRect(Math.floor(W*0.20), shY-2, Math.floor(W*0.30), shY-1, SALT, 0.8);
+
+      // damp lichen patch on the right shelf
+      fillRect(Math.floor(W*0.57), Math.floor(H*0.30), Math.floor(W*0.66), Math.floor(H*0.31), LICHEN, 0.7);
+      // a trickle keeping it damp
+      fillRect(Math.floor(W*0.60), Math.floor(H*0.31), Math.floor(W*0.61), H-12, WATER, 0.4);
+
+      // a drifting cloud of spores up high — they'll rise and seek the damp
+      fillRect(Math.floor(W*0.30), Math.floor(H*0.12), Math.floor(W*0.46), Math.floor(H*0.18), SPORE, 0.35);
+
+      // a lit candle stub: a couple of embers on the left shelf
+      fillRect(Math.floor(W*0.12), shY-1, Math.floor(W*0.13), shY-1, EMBER);
+
+      saveSoon();
+      flashHint('the cellar is seeded. drop fire on the oil and watch.');
+    }
+
+    function clearGrid(){
+      grid.fill(0); tint.fill(0); life.fill(0); liveCount=0;
+    }
+
+    // ============================================================
+    // UI WIRING
+    // ============================================================
+    // build palette
+    const paletteEl = document.getElementById('palette');
+    function buildPalette(){
+      paletteEl.innerHTML='';
+      for (const id of PALETTE){
+        const el = ELEMENTS[id];
+        const b = document.createElement('button');
+        b.className='swatch seg flex items-center gap-1.5 rounded-md px-2 py-1.5 mono text-[10px]';
+        b.style.setProperty('--swatch', el.sw);
+        b.dataset.id = id;
+        b.innerHTML = `<span class="dot"></span><span class="truncate" style="color:var(--ink-dim)">${el.label}</span>`;
+        b.addEventListener('click', ()=>{
+          cfg.sel = id;
+          if (id===EMPTY){ cfg.erasing=true; } else { cfg.erasing=false; }
+          syncPalette(); syncErase(); save();
+        });
+        paletteEl.appendChild(b);
+      }
+    }
+    function syncPalette(){
+      [...paletteEl.children].forEach(b=>{
+        const on = (+b.dataset.id===cfg.sel) && !(cfg.erasing && +b.dataset.id!==EMPTY);
+        b.classList.toggle('sel', on);
+        b.querySelector('span:last-child').style.color = on ? 'var(--ink)' : 'var(--ink-dim)';
+      });
+    }
+
+    const brushEl=document.getElementById('brush'), brushOut=document.getElementById('brushOut');
+    const gravEl=document.getElementById('gravity'), gravOut=document.getElementById('gravOut');
+    const tempEl=document.getElementById('temp'), tempOut=document.getElementById('tempOut');
+
+    function tempWord(v){ if(v<18) return 'frigid'; if(v<35) return 'cold'; if(v<55) return 'cool'; if(v<75) return 'warm'; return 'hot'; }
+
+    function syncSliders(){
+      brushEl.value=cfg.brush; brushOut.textContent=cfg.brush;
+      gravEl.value=cfg.gravity; gravOut.textContent=(cfg.gravity/100).toFixed(1)+'×';
+      tempEl.value=cfg.temp; tempOut.textContent=tempWord(cfg.temp);
+    }
+    brushEl.addEventListener('input',()=>{ cfg.brush=+brushEl.value; brushOut.textContent=cfg.brush; save(); });
+    gravEl.addEventListener('input',()=>{ cfg.gravity=+gravEl.value; gravOut.textContent=(cfg.gravity/100).toFixed(1)+'×'; save(); });
+    tempEl.addEventListener('input',()=>{ cfg.temp=+tempEl.value; tempOut.textContent=tempWord(cfg.temp); save(); });
+
+    const btnPause=document.getElementById('btnPause');
+    function togglePause(){ cfg.paused=!cfg.paused; btnPause.textContent=cfg.paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on',cfg.paused); save(); }
+    btnPause.addEventListener('click', togglePause);
+
+    const btnErase=document.getElementById('btnErase');
+    function syncErase(){ btnErase.classList.toggle('btn-on', cfg.erasing); cv.classList.toggle('erasing', cfg.erasing); btnErase.textContent = cfg.erasing?'⌫ erasing':'⌫ erase'; }
+    btnErase.addEventListener('click', ()=>{ cfg.erasing=!cfg.erasing; if(!cfg.erasing && cfg.sel===EMPTY) cfg.sel=SAND; syncErase(); syncPalette(); save(); });
+
+    document.getElementById('btnClear').addEventListener('click', ()=>{ clearGrid(); saveSoon(); flashHint('the cellar is empty. it waits.'); });
+    document.getElementById('btnSeed').addEventListener('click', seedCellar);
+
+    // keyboard transport + number keys for elements
+    const NUMKEYS = [SAND,WATER,STONE,SALT,OIL,FIRE,SPORE,LICHEN,EMBER];
+    window.addEventListener('keydown',(e)=>{
+      if (/INPUT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
+      const k=e.key.toLowerCase();
+      if (e.code==='Space'){ e.preventDefault(); togglePause(); }
+      else if (k==='c'){ clearGrid(); saveSoon(); }
+      else if (k==='s'){ seedCellar(); }
+      else if (k==='e'){ cfg.erasing=!cfg.erasing; if(!cfg.erasing && cfg.sel===EMPTY) cfg.sel=SAND; syncErase(); syncPalette(); save(); }
+      else if (k==='['){ cfg.brush=Math.max(1,cfg.brush-1); syncSliders(); save(); }
+      else if (k===']'){ cfg.brush=Math.min(14,cfg.brush+1); syncSliders(); save(); }
+      else if (/[1-9]/.test(k)){ const id=NUMKEYS[+k-1]; if(id!=null){ cfg.sel=id; cfg.erasing=false; syncPalette(); syncErase(); save(); } }
+    });
+
+    // ============================================================
+    // HINT helper
+    // ============================================================
+    const hintEl=document.getElementById('hint');
+    const defaultHint=hintEl.textContent;
+    let hintTimer=null;
+    function flashHint(msg){
+      hintEl.textContent=msg; hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer=setTimeout(()=>{ hintEl.classList.remove('flicker'); hintEl.textContent=defaultHint; }, 3200);
+    }
+
+    // ============================================================
+    // MAIN LOOP — fixed-ish timestep, decoupled fps readout
+    // ============================================================
+    const countOut=document.getElementById('countOut');
+    const fpsOut=document.getElementById('fpsOut');
+    let lastT=performance.now(), acc=0, fpsAcc=0, fpsFrames=0, fpsT=performance.now();
+    const STEP_MS = 1000/60;
+
+    function loop(now){
+      let dt = now-lastT; lastT=now;
+      if (dt>100) dt=100;
+      acc += dt;
+      let steps=0;
+      if (!cfg.paused){
+        while (acc>=STEP_MS && steps<3){ simulate(); acc-=STEP_MS; steps++; }
+      } else { acc=0; }
+      render();
+
+      // readouts
+      fpsFrames++; if (now-fpsT>=500){ const f=Math.round(fpsFrames*1000/(now-fpsT)); fpsOut.textContent=f; fpsFrames=0; fpsT=now; countOut.textContent=liveCount; }
+      requestAnimationFrame(loop);
+    }
+
+    // ============================================================
+    // BOOT
+    // ============================================================
+    let resizeTimer=null;
+    function rebuild(keepPrev){
+      const prev = keepPrev && grid ? { grid:grid.slice(), gw:GW, gh:GH } : null;
+      fitGrid();
+      allocate(prev);
+    }
+    window.addEventListener('resize', ()=>{
+      clearTimeout(resizeTimer);
+      resizeTimer=setTimeout(()=>{ rebuild(true); }, 200);
+    });
+
+    function boot(){
+      fitGrid();
+      allocate(null);
+      buildPalette();
+      syncSliders(); syncPalette(); syncErase();
+      btnPause.textContent=cfg.paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on',cfg.paused);
+
+      // restore saved canvas if grid dims match; else seed a fresh cellar
+      let restored=false;
+      try{
+        const s=JSON.parse(localStorage.getItem(KEY));
+        if (s && s.grid && s.gw===GW && s.gh===GH){ restored=restoreGrid(s.grid); }
+      }catch(e){}
+      if (!restored){ seedCellar(); }
+
+      requestAnimationFrame(loop);
+    }
+    boot();
+
+    // save on unload
+    window.addEventListener('beforeunload', save);
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); });
+
+    // ============================================================
+    // AMBIENCE — embers, night whisper, easter eggs (mirrors siblings)
+    // ============================================================
+    (function(){
+      if (reduceMQ.matches) return;
+      const host=document.getElementById('embers');
+      for (let i=0;i<6;i++){
+        const e=document.createElement('div'); e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*16)+'s';
+        e.style.animationDuration=(13+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    })();
+
+    (function(){
+      const h=new Date().getHours();
+      if (h>=0 && h<3){ const w=document.getElementById('nightWhisper'); if(w) w.style.display='block'; }
+    })();
+
+    // type "prizrak" -> a watcher seeds a single foxfire spark high on the cold wall
+    (function(){
+      let buf='';
+      window.addEventListener('keydown',(ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=document.getElementById('ghostLine'); if(g){ g.style.display='block'; g.classList.add('flicker'); }
+          // scatter a constellation of foxfire spores from the ceiling
+          for (let k=0;k<40;k++){
+            const x=2+Math.floor(Math.random()*(GW-4));
+            const y=2+Math.floor(Math.random()*Math.floor(GH*0.3));
+            const i=idx(x,y);
+            if (grid[i]===EMPTY) setCell(i, Math.random()<0.5?SPORE:FOXFIRE);
+          }
+          flashHint('the watcher breathes on the ceiling. foxfire wakes.');
+        }
+      });
+    })();
+
+    // triple-click the title -> one extra drifting ember
+    (function(){
+      const t=document.getElementById('appTitle'); if(!t) return;
+      t.addEventListener('click',(ev)=>{
+        if (ev.detail===3 && !reduceMQ.matches){
+          const e=document.createElement('div'); e.className='ember';
+          e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='12s';
+          document.getElementById('embers').appendChild(e);
+          setTimeout(()=>e.remove(),13000);
+        }
+      });
+    })();
+
+    // idle 60s -> the cellar leans in
+    (function(){
+      if (reduceMQ.matches) return;
+      const line=document.getElementById('idleLine'); let timer;
+      function arm(){
+        if (line) line.style.opacity='0';
+        clearTimeout(timer);
+        timer=setTimeout(()=>{
+          if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+            setTimeout(()=>{ if(line) line.style.opacity='0'; },6000); }
+        },60000);
+      }
+      ['mousemove','keydown','click','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev,arm,{passive:true}));
+      arm();
+    })();
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>
