@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Foley Room | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#8b5cf6;          /* the room's violet */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        .glass{
+            background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+            backdrop-filter:blur(12px);
+            border:1px solid var(--line);
+            box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+        }
+        .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+        input[type="range"]{ accent-color:var(--accent); }
+
+        button:focus-visible,
+        input:focus-visible{
+            outline:none;
+            border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+
+        /* === MOTION VOCABULARY (mirrored from the siblings) === */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .btn-lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s, color .15s; }
+        .btn-lift:hover{ transform:translateY(-2px); }
+        .btn-lift:active{ transform:translateY(1px); }
+
+        /* === THE RUNE (per-layer control) === */
+        .rune{
+            position:relative;
+            background:var(--bg-sunk);
+            border:1px solid var(--line);
+            transition:border-color .25s, box-shadow .25s, opacity .35s, transform .15s;
+        }
+        .rune[data-on="false"]{ opacity:.45; }
+        .rune[data-on="true"]{ border-color:color-mix(in srgb, var(--lyr,#8b5cf6) 45%, var(--line)); }
+        .rune:hover{ border-color:color-mix(in srgb, var(--lyr,#8b5cf6) 60%, var(--line)); }
+
+        /* the glyph disc pulses with its sound's amplitude via --pulse (0..1), set from JS */
+        .glyph{
+            width:46px;height:46px;border-radius:50%;
+            display:flex;align-items:center;justify-content:center;
+            border:1px solid color-mix(in srgb, var(--lyr,#8b5cf6) 50%, var(--line));
+            color:color-mix(in srgb, var(--lyr,#8b5cf6) 80%, var(--ink));
+            background:radial-gradient(circle at 50% 50%,
+                color-mix(in srgb, var(--lyr,#8b5cf6) calc(18% * var(--pulse,0) + 4%), transparent),
+                transparent 70%);
+            box-shadow:0 0 calc(2px + 22px * var(--pulse,0)) color-mix(in srgb, var(--lyr,#8b5cf6) 60%, transparent),
+                       inset 0 0 calc(14px * var(--pulse,0)) color-mix(in srgb, var(--lyr,#8b5cf6) 40%, transparent);
+            transition:box-shadow .08s linear, background .08s linear, color .25s;
+            will-change:box-shadow;
+        }
+        .rune[data-on="false"] .glyph{ box-shadow:none; }
+        .glyph svg{ width:22px;height:22px; }
+
+        .mood-pill{ background:var(--bg-sunk); border:1px solid var(--line); transition:border-color .15s, color .15s, box-shadow .15s, transform .12s; }
+        .mood-pill:active{ transform:translateY(1px); }
+        .mood-pill[data-active="true"]{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        /* the start curtain */
+        #curtain{ transition:opacity .6s ease, visibility .6s; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .glyph{transition:none!important}
+        }
+    </style>
+</head>
+<body class="text-zinc-300 antialiased min-h-screen flex items-center justify-center p-4 grain">
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <div class="relative z-[2] max-w-2xl w-full glass rounded-2xl p-6 sm:p-8">
+        <header class="mb-7 text-center">
+            <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-600 mb-3 flicker">PRÍZRAK / INSTRUMENT 21 — FOLEY</div>
+            <h1 id="title" class="text-3xl font-bold text-white mb-2 select-none cursor-default breathe" style="text-shadow:0 0 14px var(--glow)">The Foley Room</h1>
+            <p class="text-zinc-500 text-sm italic">A cave under the Tatras, rebuilt from oscillators. No recordings — every drip and bell is woken from silence. Mix it however the night wants.</p>
+        </header>
+
+        <!-- ===== START CURTAIN (audio only begins on this gesture) ===== -->
+        <div id="curtain" class="well rounded-xl p-8 text-center reveal">
+            <div class="mono text-[10px] uppercase tracking-[0.3em] text-zinc-600 mb-4">the room is sealed</div>
+            <p class="text-zinc-400 text-sm mb-6 max-w-sm mx-auto leading-relaxed">Sound is held behind the door. Nothing plays until you open it — the browser insists, and so does the ghost.</p>
+            <button id="enterBtn" class="btn-lift relative overflow-hidden text-white font-bold py-3 px-8 rounded-lg shadow-lg mono tracking-[0.2em] uppercase text-sm" style="background:var(--accent)">
+                Enter the room
+            </button>
+            <p class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-700 mt-5">headphones, low light, after midnight if you can</p>
+        </div>
+
+        <!-- ===== THE MIXER (hidden until entered) ===== -->
+        <div id="room" class="hidden space-y-6">
+
+            <!-- mood toggle -->
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">MOOD</div>
+                <div class="flex gap-2">
+                    <button data-mood="night" data-active="true" class="mood-pill btn-lift mono text-[10px] uppercase tracking-[0.2em] px-3 py-1.5 rounded-md">night</button>
+                    <button data-mood="deep" data-active="false" class="mood-pill btn-lift mono text-[10px] uppercase tracking-[0.2em] px-3 py-1.5 rounded-md">deep</button>
+                </div>
+            </div>
+
+            <!-- the layers -->
+            <div id="layers" class="space-y-3"></div>
+
+            <!-- master -->
+            <div class="well rounded-xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">MASTER</span>
+                    <span id="masterVal" class="mono text-[10px]" style="color:var(--accent)">70</span>
+                </div>
+                <input id="master" type="range" min="0" max="100" value="70" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+                <div class="flex items-center justify-between pt-1">
+                    <button id="silenceBtn" class="btn-lift mono text-[10px] uppercase tracking-[0.2em] text-zinc-500 hover:text-zinc-200 border border-zinc-800 hover:border-violet-500 rounded px-3 py-1">seal the room</button>
+                    <button id="saveBtn" class="btn-lift mono text-[10px] uppercase tracking-[0.2em] text-zinc-500 hover:text-zinc-200 border border-zinc-800 hover:border-violet-500 rounded px-3 py-1">save this mix</button>
+                </div>
+            </div>
+
+            <div id="saveNote" class="hidden text-center mono text-[10px] uppercase tracking-[0.2em]" style="color:var(--accent)"></div>
+        </div>
+
+        <footer class="mt-8 pt-4 border-t border-zinc-900 text-center">
+            <p id="footer-line" class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-700">none of it is real. all of it is here.</p>
+            <p id="ghost-watcher" class="mono text-[10px] tracking-[0.2em] mt-2 opacity-0 transition-opacity duration-700" style="color:var(--ink-ghost)"></p>
+        </footer>
+    </div>
+
+    <script>
+    /* =====================================================================
+       THE FOLEY ROOM — every layer is synthesized; no audio files.
+       AudioContext is created only inside the "Enter the room" gesture.
+       ===================================================================== */
+    const STORE_KEY = 'foley-room-v1';
+
+    // Layer definitions. color = its rune hue. Each builds a small audio graph
+    // rooted at a per-layer GainNode, and may register a per-frame "pulse"
+    // (0..1) used to drive the glyph glow.
+    const LAYERS = [
+        {
+            id:'drip', name:'Cave drips', hint:'water finding the floor, on no schedule',
+            color:'#a78bfa', vol:55, on:true,
+            glyph:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c0 0 5 6 5 10a5 5 0 0 1-10 0c0-4 5-10 5-10z"/></svg>'
+        },
+        {
+            id:'wind', name:'Low wind / drone', hint:'the mountain breathing through the shaft',
+            color:'#8b5cf6', vol:50, on:true,
+            glyph:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11a2.5 2.5 0 1 0-2.5-2.5"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h8a2 2 0 1 1-2 2"/></svg>'
+        },
+        {
+            id:'water', name:'Underground water', hint:'a river somewhere below, never seen',
+            color:'#7c6cf0', vol:40, on:false,
+            glyph:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0"/><path d="M3 13c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0"/><path d="M3 18c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0"/></svg>'
+        },
+        {
+            id:'bell', name:'Far Tatra bell', hint:'a chapel bell, occasional, across the valley',
+            color:'#b794f6', vol:45, on:false,
+            glyph:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>'
+        },
+        {
+            id:'fire', name:'Faint fire crackle', hint:'someone built a fire near the mouth of the cave',
+            color:'#9d7bf0', vol:35, on:false,
+            glyph:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3-1 4-1 6a2.5 2.5 0 0 0 5 0c0-1 0-1.5-.5-2.5C17 9 18 11 18 13.5a6 6 0 1 1-12 0C6 9 9 6 12 3z"/></svg>'
+        }
+    ];
+
+    let actx = null;            // AudioContext
+    let master = null;          // master GainNode -> destination
+    let noiseBuffer = null;     // shared pink-ish noise buffer
+    let mood = 'night';
+    let started = false;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // runtime state per layer: { gain, target (0..1 user vol), on, pulse, glyphEl, runeEl, ... }
+    const state = {};
+
+    /* ---------- noise generator (filtered noise is the backbone) ---------- */
+    function makeNoiseBuffer(ctx){
+        const len = ctx.sampleRate * 3;            // 3s loop
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        // pink-ish noise via simple filtering of white noise (Voss-ish)
+        let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+        for (let i=0;i<len;i++){
+            const white = Math.random()*2-1;
+            b0 = 0.99886*b0 + white*0.0555179;
+            b1 = 0.99332*b1 + white*0.0750759;
+            b2 = 0.96900*b2 + white*0.1538520;
+            b3 = 0.86650*b3 + white*0.3104856;
+            b4 = 0.55000*b4 + white*0.5329522;
+            b5 = -0.7616*b5 - white*0.0168980;
+            d[i] = (b0+b1+b2+b3+b4+b5+b6+white*0.5362)*0.11;
+            b6 = white*0.115926;
+        }
+        return buf;
+    }
+
+    function noiseSource(){
+        const s = actx.createBufferSource();
+        s.buffer = noiseBuffer;
+        s.loop = true;
+        return s;
+    }
+
+    /* ===================================================================
+       LAYER BUILDERS — each returns { out (GainNode), pulse() }
+       pulse() returns a 0..1 amplitude estimate for the glyph glow.
+       =================================================================== */
+
+    // 1) CAVE DRIPS — randomized timed pings: a short sine "plip" through a
+    //    bandpass, with a quick decay, scheduled at irregular intervals.
+    function buildDrip(){
+        const out = actx.createGain();
+        out.gain.value = 1;
+        let lastHit = 0;
+        let timer = null;
+
+        function drip(){
+            const now = actx.currentTime;
+            const osc = actx.createOscillator();
+            const bp = actx.createBiquadFilter();
+            const g = actx.createGain();
+            const baseF = 520 + Math.random()*900;     // each drip a different pitch
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(baseF*1.6, now);
+            osc.frequency.exponentialRampToValueAtTime(baseF, now+0.05);
+            bp.type = 'bandpass';
+            bp.frequency.value = baseF;
+            bp.Q.value = 6;
+            const peak = 0.6 + Math.random()*0.4;
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.exponentialRampToValueAtTime(peak, now+0.004);
+            g.gain.exponentialRampToValueAtTime(0.0001, now+0.28+Math.random()*0.2);
+            osc.connect(bp); bp.connect(g); g.connect(out);
+            osc.start(now);
+            osc.stop(now+0.6);
+            lastHit = performance.now();
+            // schedule next drip — irregular, mood-dependent
+            const base = mood==='deep' ? 2600 : 1500;
+            const next = base + Math.random()*base*1.6;
+            timer = setTimeout(drip, next);
+        }
+        timer = setTimeout(drip, 400 + Math.random()*1200);
+
+        return {
+            out,
+            pulse(){
+                const dt = performance.now() - lastHit;
+                return Math.max(0, 1 - dt/300);   // brief flash on each drip
+            },
+            stop(){ if (timer) clearTimeout(timer); }
+        };
+    }
+
+    // 2) LOW WIND / DRONE — filtered noise (lowpass, slowly sweeping) layered
+    //    with two detuned low oscillators for a tonal drone bed.
+    function buildWind(){
+        const out = actx.createGain();
+        const ns = noiseSource();
+        const lp = actx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 380;
+        lp.Q.value = 0.7;
+        const nGain = actx.createGain();
+        nGain.gain.value = 0.9;
+        ns.connect(lp); lp.connect(nGain); nGain.connect(out);
+
+        // slow LFO sweeping the lowpass = wind gusting
+        const lfo = actx.createOscillator();
+        const lfoG = actx.createGain();
+        lfo.frequency.value = 0.06;
+        lfoG.gain.value = 220;
+        lfo.connect(lfoG); lfoG.connect(lp.frequency);
+
+        // tonal drone: two low oscillators slightly detuned
+        const droneG = actx.createGain();
+        droneG.gain.value = 0.10;
+        const f0 = mood==='deep' ? 42 : 58;
+        [f0, f0*1.5, f0*2.01].forEach((f,i)=>{
+            const o = actx.createOscillator();
+            o.type = 'sine';
+            o.frequency.value = f;
+            o.detune.value = (i-1)*6;
+            o.connect(droneG); o.start();
+        });
+        droneG.connect(out);
+
+        ns.start(); lfo.start();
+
+        // amplitude tracker via an AnalyserNode (cheap RMS-ish)
+        const an = actx.createAnalyser();
+        an.fftSize = 32;
+        out.connect(an);
+        const data = new Uint8Array(an.frequencyBinCount);
+
+        return {
+            out,
+            pulse(){
+                an.getByteTimeDomainData(data);
+                let s=0; for (let i=0;i<data.length;i++){ const v=(data[i]-128)/128; s+=v*v; }
+                return Math.min(1, Math.sqrt(s/data.length)*4.5);
+            }
+        };
+    }
+
+    // 3) UNDERGROUND WATER — heavily lowpassed noise with a slow chorus-ish
+    //    wobble: distant, washing, never sharp.
+    function buildWater(){
+        const out = actx.createGain();
+        const ns = noiseSource();
+        const lp = actx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.5;
+        const hp = actx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.value = 160;
+        const g = actx.createGain(); g.gain.value = 0.8;
+        ns.connect(hp); hp.connect(lp); lp.connect(g); g.connect(out);
+
+        // wobble the cutoff to suggest a moving body of water
+        const lfo = actx.createOscillator();
+        const lfoG = actx.createGain();
+        lfo.frequency.value = 0.22; lfoG.gain.value = 300;
+        lfo.connect(lfoG); lfoG.connect(lp.frequency);
+
+        // a second slower amplitude swell
+        const lfo2 = actx.createOscillator();
+        const lfo2G = actx.createGain();
+        lfo2.frequency.value = 0.09; lfo2G.gain.value = 0.25;
+        const swell = actx.createGain(); swell.gain.value = 0.75;
+        g.disconnect(); g.connect(swell); swell.connect(out);
+        lfo2.connect(lfo2G); lfo2G.connect(swell.gain);
+
+        ns.start(); lfo.start(); lfo2.start();
+
+        const an = actx.createAnalyser(); an.fftSize=32; out.connect(an);
+        const data = new Uint8Array(an.frequencyBinCount);
+        return {
+            out,
+            pulse(){
+                an.getByteTimeDomainData(data);
+                let s=0; for (let i=0;i<data.length;i++){ const v=(data[i]-128)/128; s+=v*v; }
+                return Math.min(1, Math.sqrt(s/data.length)*5);
+            }
+        };
+    }
+
+    // 4) FAR TATRA BELL — occasional struck bell: a cluster of inharmonic
+    //    partials with long decay, run through a reverb-ish delay, played
+    //    rarely. Distant = lowpassed + quiet.
+    function buildBell(){
+        const out = actx.createGain();
+        // a simple feedback delay to fake distance/reverb tail
+        const delay = actx.createDelay(1.0);
+        delay.delayTime.value = 0.33;
+        const fb = actx.createGain(); fb.gain.value = 0.45;
+        const damp = actx.createBiquadFilter(); damp.type='lowpass'; damp.frequency.value=1400;
+        delay.connect(damp); damp.connect(fb); fb.connect(delay);
+        const wet = actx.createGain(); wet.gain.value = 0.6;
+        delay.connect(wet); wet.connect(out);
+
+        let lastHit = -9999;
+        let timer = null;
+
+        function strike(){
+            const now = actx.currentTime;
+            const fundamentals = mood==='deep' ? [196, 261.6] : [261.6, 329.6];
+            const f = fundamentals[Math.floor(Math.random()*fundamentals.length)];
+            const partials = [1, 2.02, 2.74, 3.0, 4.07, 5.43];
+            const bellG = actx.createGain();
+            bellG.gain.value = 0.5;
+            // distance: lowpass the whole strike
+            const dist = actx.createBiquadFilter(); dist.type='lowpass'; dist.frequency.value=2200;
+            bellG.connect(dist);
+            dist.connect(out);        // dry-ish
+            dist.connect(delay);      // into the tail
+            partials.forEach((mult,i)=>{
+                const o = actx.createOscillator();
+                const g = actx.createGain();
+                o.type='sine';
+                o.frequency.value = f*mult;
+                const amp = 0.4/(i+1);
+                const dec = 2.4 + (6-i)*0.5;
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.exponentialRampToValueAtTime(amp, now+0.01);
+                g.gain.exponentialRampToValueAtTime(0.0001, now+dec);
+                o.connect(g); g.connect(bellG);
+                o.start(now); o.stop(now+dec+0.2);
+            });
+            lastHit = performance.now();
+            const base = mood==='deep' ? 22000 : 14000;
+            timer = setTimeout(strike, base + Math.random()*base);   // rare
+        }
+        timer = setTimeout(strike, 3000 + Math.random()*6000);
+
+        return {
+            out,
+            pulse(){
+                const dt = performance.now() - lastHit;
+                return Math.max(0, Math.min(1, 1 - dt/2600));   // long fade matching tail
+            },
+            stop(){ if (timer) clearTimeout(timer); }
+        };
+    }
+
+    // 5) FAINT FIRE CRACKLE — a noise bed (the hiss) plus randomized tiny
+    //    bursts (the pops/snaps) of bandpassed noise.
+    function buildFire(){
+        const out = actx.createGain();
+        // hiss bed
+        const ns = noiseSource();
+        const hp = actx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1200;
+        const hissG = actx.createGain(); hissG.gain.value = 0.06;
+        ns.connect(hp); hp.connect(hissG); hissG.connect(out);
+        ns.start();
+
+        let lastPop = -9999;
+        let timer = null;
+        function pop(){
+            const now = actx.currentTime;
+            const src = noiseSource();
+            const bp = actx.createBiquadFilter();
+            bp.type='bandpass';
+            bp.frequency.value = 800 + Math.random()*2600;
+            bp.Q.value = 2 + Math.random()*4;
+            const g = actx.createGain();
+            const peak = 0.15 + Math.random()*0.5;
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.exponentialRampToValueAtTime(peak, now+0.003);
+            g.gain.exponentialRampToValueAtTime(0.0001, now+0.04+Math.random()*0.05);
+            src.connect(bp); bp.connect(g); g.connect(out);
+            src.start(now); src.stop(now+0.2);
+            lastPop = performance.now();
+            timer = setTimeout(pop, 90 + Math.random()*520);   // frequent, irregular
+        }
+        timer = setTimeout(pop, 200+Math.random()*400);
+
+        return {
+            out,
+            pulse(){
+                const dt = performance.now() - lastPop;
+                return Math.max(0.08, 1 - dt/180);    // crackle keeps a low simmer
+            },
+            stop(){ if (timer) clearTimeout(timer); }
+        };
+    }
+
+    const BUILDERS = { drip:buildDrip, wind:buildWind, water:buildWater, bell:buildBell, fire:buildFire };
+
+    /* ===================================================================
+       UI WIRING
+       =================================================================== */
+    function renderLayers(){
+        const host = document.getElementById('layers');
+        host.innerHTML = '';
+        LAYERS.forEach(L=>{
+            const s = state[L.id];
+            const row = document.createElement('div');
+            row.className = 'rune btn-lift rounded-xl p-3 sm:p-4 flex items-center gap-4';
+            row.setAttribute('data-on', s.on ? 'true':'false');
+            row.style.setProperty('--lyr', L.color);
+            row.innerHTML = `
+                <button class="glyph shrink-0 cursor-pointer" data-toggle="${L.id}" aria-label="toggle ${L.name}" style="--lyr:${L.color}">
+                    ${L.glyph}
+                </button>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-baseline justify-between gap-2">
+                        <span class="text-sm text-zinc-200 truncate">${L.name}</span>
+                        <span class="mono text-[10px] shrink-0" data-vol="${L.id}" style="color:${L.color}">${s.on ? s.target : 'off'}</span>
+                    </div>
+                    <div class="mono text-[10px] text-zinc-600 truncate mb-2">${L.hint}</div>
+                    <input type="range" min="0" max="100" value="${s.target}" data-slider="${L.id}" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+                </div>`;
+            host.appendChild(row);
+            s.runeEl = row;
+            s.glyphEl = row.querySelector('.glyph');
+            s.volEl = row.querySelector(`[data-vol="${L.id}"]`);
+        });
+
+        host.querySelectorAll('[data-toggle]').forEach(btn=>{
+            btn.addEventListener('click', ()=> toggleLayer(btn.getAttribute('data-toggle')));
+        });
+        host.querySelectorAll('[data-slider]').forEach(sl=>{
+            sl.addEventListener('input', ()=>{
+                const id = sl.getAttribute('data-slider');
+                setLayerVol(id, parseInt(sl.value));
+            });
+        });
+    }
+
+    function applyLayerGain(id){
+        const s = state[id];
+        if (!s.gain || !actx) return;
+        const v = s.on ? (s.target/100) : 0;
+        s.gain.gain.setTargetAtTime(v*v, actx.currentTime, 0.08);   // perceptual-ish curve, smoothed
+    }
+
+    function setLayerVol(id, v){
+        const s = state[id];
+        s.target = v;
+        if (s.volEl) s.volEl.textContent = s.on ? v : 'off';
+        applyLayerGain(id);
+    }
+
+    function toggleLayer(id){
+        const s = state[id];
+        s.on = !s.on;
+        s.runeEl.setAttribute('data-on', s.on ? 'true':'false');
+        if (s.volEl) s.volEl.textContent = s.on ? s.target : 'off';
+        applyLayerGain(id);
+    }
+
+    function buildLayer(id){
+        const s = state[id];
+        if (s.node) return;                 // already built
+        s.node = BUILDERS[id]();
+        s.gain = actx.createGain();
+        s.gain.gain.value = 0;
+        s.node.out.connect(s.gain);
+        s.gain.connect(master);
+        applyLayerGain(id);
+    }
+
+    /* ---------- mood ---------- */
+    function setMood(m){
+        mood = m;
+        document.querySelectorAll('[data-mood]').forEach(b=>{
+            b.setAttribute('data-active', b.getAttribute('data-mood')===m ? 'true':'false');
+        });
+        // rebuild tonal layers so the new mood's tuning takes hold
+        if (started){
+            ['wind','bell','water','fire','drip'].forEach(id=>{
+                const s = state[id];
+                if (s.node){
+                    if (s.node.stop) s.node.stop();
+                    try{ s.node.out.disconnect(); }catch(e){}
+                    s.node = null;
+                    s.gain && s.gain.disconnect && (function(){ try{ s.gain.disconnect(); }catch(e){} })();
+                    s.gain = null;
+                    buildLayer(id);
+                }
+            });
+        }
+        document.getElementById('footer-line').textContent = m==='deep'
+            ? 'further down than anyone has been.'
+            : 'none of it is real. all of it is here.';
+    }
+
+    /* ---------- master ---------- */
+    function setMaster(v){
+        document.getElementById('masterVal').textContent = v;
+        if (master && actx) master.gain.setTargetAtTime((v/100)*0.9, actx.currentTime, 0.05);
+    }
+
+    /* ===================================================================
+       START — the only place AudioContext is created (user gesture)
+       =================================================================== */
+    function enterRoom(){
+        if (started) return;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC){
+            document.getElementById('curtain').innerHTML =
+                '<p class="text-zinc-400 text-sm">This browser will not open the room — no Web Audio.</p>';
+            return;
+        }
+        actx = new AC();
+        if (actx.state === 'suspended') actx.resume();
+        noiseBuffer = makeNoiseBuffer(actx);
+
+        master = actx.createGain();
+        master.gain.value = 0;
+        master.connect(actx.destination);
+
+        // build every layer's graph; gains start at 0, fade in via applyLayerGain
+        LAYERS.forEach(L=> buildLayer(L.id));
+
+        started = true;
+
+        // reveal mixer, hide curtain
+        const curtain = document.getElementById('curtain');
+        curtain.style.opacity = '0';
+        curtain.style.visibility = 'hidden';
+        setTimeout(()=> curtain.classList.add('hidden'), 600);
+        const room = document.getElementById('room');
+        room.classList.remove('hidden');
+        room.classList.add('reveal');
+
+        setMaster(parseInt(document.getElementById('master').value));
+        startPulseLoop();
+    }
+
+    /* ===================================================================
+       PULSE LOOP — drives each glyph's --pulse from its sound amplitude
+       =================================================================== */
+    let rafId = null;
+    function startPulseLoop(){
+        if (reduceMotion){
+            // still indicate which layers are live, without the per-frame flicker
+            const tick = ()=>{
+                LAYERS.forEach(L=>{
+                    const s = state[L.id];
+                    if (!s.glyphEl) return;
+                    s.glyphEl.style.setProperty('--pulse', (s.on && s.target>0) ? 0.4 : 0);
+                });
+                rafId = setTimeout(tick, 250);
+            };
+            tick();
+            return;
+        }
+        const frame = ()=>{
+            LAYERS.forEach(L=>{
+                const s = state[L.id];
+                if (!s.glyphEl || !s.node) return;
+                let p = 0;
+                if (s.on && s.target>0){
+                    p = s.node.pulse ? s.node.pulse() : 0.3;
+                    p *= (s.target/100);                 // louder layers glow brighter
+                }
+                // smooth the displayed pulse a touch
+                s.disp = (s.disp||0)*0.6 + p*0.4;
+                s.glyphEl.style.setProperty('--pulse', s.disp.toFixed(3));
+            });
+            rafId = requestAnimationFrame(frame);
+        };
+        rafId = requestAnimationFrame(frame);
+    }
+
+    /* ===================================================================
+       PERSISTENCE — save / load the mix
+       =================================================================== */
+    function currentMix(){
+        const layers = {};
+        LAYERS.forEach(L=>{ layers[L.id] = { on: state[L.id].on, vol: state[L.id].target }; });
+        return { mood, master: parseInt(document.getElementById('master').value), layers };
+    }
+    function saveMix(){
+        try{ localStorage.setItem(STORE_KEY, JSON.stringify(currentMix())); }catch(e){}
+        const note = document.getElementById('saveNote');
+        note.textContent = 'mix sealed in the ledger. it will be here when you return.';
+        note.classList.remove('hidden');
+        note.classList.remove('flicker'); void note.offsetWidth; note.classList.add('flicker');
+        setTimeout(()=> note.classList.add('hidden'), 2600);
+    }
+    function loadMix(){
+        let saved = null;
+        try{ saved = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){}
+        // seed defaults first
+        LAYERS.forEach(L=>{ state[L.id] = { on:L.on, target:L.vol, node:null, gain:null }; });
+        if (saved){
+            if (saved.mood) mood = saved.mood;
+            if (saved.layers){
+                LAYERS.forEach(L=>{
+                    const sv = saved.layers[L.id];
+                    if (sv){ state[L.id].on = !!sv.on; state[L.id].target = clampInt(sv.vol,0,100,L.vol); }
+                });
+            }
+            const m = document.getElementById('master');
+            if (typeof saved.master==='number') m.value = clampInt(saved.master,0,100,70);
+        }
+        // reflect mood + master in UI
+        document.querySelectorAll('[data-mood]').forEach(b=>{
+            b.setAttribute('data-active', b.getAttribute('data-mood')===mood ? 'true':'false');
+        });
+        document.getElementById('masterVal').textContent = document.getElementById('master').value;
+    }
+    function clampInt(v,min,max,fallback){
+        v = parseInt(v); if (isNaN(v)) return fallback;
+        return Math.max(min, Math.min(max, v));
+    }
+
+    /* ---------- seal the room (fade all to silence, keep state) ---------- */
+    function sealRoom(){
+        if (!started) return;
+        LAYERS.forEach(L=>{
+            const s = state[L.id];
+            s.on = false;
+            s.runeEl && s.runeEl.setAttribute('data-on','false');
+            s.volEl && (s.volEl.textContent = 'off');
+            applyLayerGain(L.id);
+        });
+    }
+
+    /* ===================================================================
+       BOOT
+       =================================================================== */
+    loadMix();
+    renderLayers();
+
+    document.getElementById('enterBtn').addEventListener('click', enterRoom);
+    document.getElementById('master').addEventListener('input', e=> setMaster(parseInt(e.target.value)));
+    document.getElementById('saveBtn').addEventListener('click', saveMix);
+    document.getElementById('silenceBtn').addEventListener('click', sealRoom);
+    document.querySelectorAll('[data-mood]').forEach(b=>{
+        b.addEventListener('click', ()=> setMood(b.getAttribute('data-mood')));
+    });
+
+    /* ===== ambient embers (capped, reduced-motion-safe) ===== */
+    (function(){
+        if (reduceMotion) return;
+        const host = document.getElementById('embers');
+        const N = 7;
+        for (let i=0;i<N;i++){
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (6 + Math.random()*88) + '%';
+            e.style.animationDelay = (Math.random()*14) + 's';
+            e.style.animationDuration = (12 + Math.random()*8) + 's';
+            host.appendChild(e);
+        }
+    })();
+
+    /* ===== night-hours footer whisper (00:00–03:00 local) ===== */
+    (function(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3){
+            document.getElementById('footer-line').textContent = 'the mountain does not sleep. neither does the room.';
+        }
+    })();
+
+    /* ===== easter egg: type "prizrak" → wake a watcher ===== */
+    (function(){
+        let buf = '';
+        window.addEventListener('keydown', (ev)=>{
+            if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+            if (ev.key.length !== 1) return;
+            buf = (buf + ev.key.toLowerCase()).slice(-7);
+            if (buf === 'prizrak'){
+                const g = document.getElementById('ghost-watcher');
+                g.textContent = 'a watcher hums along, just below hearing.';
+                g.style.opacity = '1';
+                // if the room is open, the ghost adds one slow toll
+                if (started && state.bell && state.bell.node){
+                    if (!state.bell.on) toggleLayer('bell');
+                }
+                g.classList.add('flicker');
+            }
+        });
+    })();
+
+    /* ===== easter egg: triple-click the title → one extra ember ===== */
+    (function(){
+        const title = document.getElementById('title');
+        if (!title) return;
+        title.addEventListener('click', (ev)=>{
+            if (ev.detail === 3){
+                if (reduceMotion) return;
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (40 + Math.random()*20) + '%';
+                e.style.animationDuration = '11s';
+                document.getElementById('embers').appendChild(e);
+                setTimeout(()=>e.remove(), 11000);
+            }
+        });
+    })();
+
+    /* ===== easter egg: idle 60s → the watcher leans in ===== */
+    (function(){
+        let timer;
+        const g = document.getElementById('ghost-watcher');
+        const arm = ()=>{
+            clearTimeout(timer);
+            timer = setTimeout(()=>{
+                if (!g.textContent){
+                    g.textContent = 'still here. still listening.';
+                    g.style.opacity = '1';
+                    setTimeout(()=>{ if (g.textContent==='still here. still listening.'){ g.style.opacity='0'; } }, 6000);
+                }
+            }, 60000);
+        };
+        ['mousemove','keydown','click','scroll','touchstart'].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+        arm();
+    })();
+
+    /* ===== keep audio honest if the tab is hidden a long time ===== */
+    document.addEventListener('visibilitychange', ()=>{
+        if (!actx) return;
+        if (document.visibilityState === 'visible' && actx.state === 'suspended') actx.resume();
+    });
+    </script>
+
+    <script src="/shared/star-widget.js"></script>
+</body>
+</html>

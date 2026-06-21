@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Orrery | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#818cf8;            /* indigo — the ghost's clockwork heaven */
+      --accent-deep:#6366f1;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); height:100%; }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 80%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none;
+      border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+
+    /* tactile buttons */
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    /* === ambient motion vocabulary (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* canvas cursor: a fling is a reach */
+    #sky{ display:block; touch-action:none; cursor:crosshair; }
+    #sky.grabbing{ cursor:grabbing; }
+
+    .label{ color:var(--ink-dim); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.18em; }
+
+    #ghostLine, #idleLine, #nightWhisper { color: var(--ink-ghost); }
+
+    /* readout numerals settle in indigo */
+    .num{ color:var(--accent); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen grain overflow-hidden">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the heaven itself -->
+  <canvas id="sky" class="fixed inset-0 z-[1]"></canvas>
+
+  <!-- header, floating top-left -->
+  <header class="fixed top-0 left-0 z-[2] p-5 select-none pointer-events-none">
+    <div class="mono label mb-1 flicker">prízrak / instrument 21 — celestial</div>
+    <h1 id="appTitle" class="text-2xl font-semibold text-white h1-glow breathe cursor-default pointer-events-auto inline-block">The Orrery</h1>
+    <p class="text-xs mt-1 max-w-[15rem]" style="color:var(--ink-dim)">A small clockwork heaven. Drag from the dark to fling a world; let it fall toward the light.</p>
+  </header>
+
+  <!-- the bench of controls, floating bottom -->
+  <div class="fixed bottom-0 left-0 right-0 z-[2] p-3 sm:p-4 flex justify-center pointer-events-none">
+    <div class="glass rounded-2xl p-3 sm:p-4 w-full max-w-3xl pointer-events-auto">
+
+      <!-- transport row -->
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <button id="btnPause" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="space">⏸ pause</button>
+        <button id="btnClear" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="c">↺ clear</button>
+        <button id="btnMoon" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="m — add a moon to the last world">☾ add moon</button>
+        <button id="btnCollide" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="impacts: merge or bounce">⊙ merge on impact</button>
+        <button id="btnReduce" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="r — calm the machine">◐ motion: full</button>
+        <div class="flex-1"></div>
+        <div class="mono label hidden sm:block">bodies <span id="countOut" class="num">0</span></div>
+      </div>
+
+      <!-- sliders row -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5">
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">gravity</span>
+            <span id="gravOut" class="mono text-[11px] num">1.0×</span>
+          </div>
+          <input type="range" id="gravity" min="0" max="250" value="100" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">trail</span>
+            <span id="trailOut" class="mono text-[11px] num">long</span>
+          </div>
+          <input type="range" id="trail" min="0" max="100" value="62" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">sun mass</span>
+            <span id="sunOut" class="mono text-[11px] num">1.0×</span>
+          </div>
+          <input type="range" id="sunmass" min="20" max="320" value="100" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+      </div>
+
+      <!-- hint line / status -->
+      <div class="mt-2 flex items-center justify-between gap-3">
+        <p id="hint" class="mono text-[10px]" style="color:var(--ink-ghost)">click-drag anywhere · the longer the pull, the faster the throw</p>
+        <p id="seed" class="mono text-[10px] btn rounded px-2 py-0.5 cursor-pointer" style="border-color:var(--line)" title="cast a handful of worlds">⁂ seed system</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- footer whispers (off-canvas, screen-reader / easter-egg lines) -->
+  <div class="fixed top-2 right-3 z-[2] text-right pointer-events-none">
+    <p id="nightWhisper" class="mono text-[10px]" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono text-[10px] mt-1" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono text-[10px] mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still watching.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    const KEY = 'orrery-v1';
+    const canvas = document.getElementById('sky');
+    const ctx = canvas.getContext('2d', { alpha:false });
+
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // ---- settings (persisted) ----
+    const defaults = { gravity:100, trail:62, sunmass:100, merge:true, reduced:reduceMQ.matches };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object') cfg = Object.assign(cfg, s); } catch(e){}
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch(e){} }
+
+    // ---- world state ----
+    let W = 0, H = 0, DPR = 1;
+    let cx = 0, cy = 0;            // sun center (pixels)
+    let bodies = [];              // {x,y,vx,vy,m,r,hue,trail:[],alive}
+    let sun = null;               // {x,y,m,r}
+    let paused = false;
+    let lastBody = null;
+
+    // softened Newtonian gravity. G is tuned so default feels alive.
+    const BASE_G = 28;
+    const SOFT = 14;              // softening length (px) — kills singularities
+    const SUB = 3;                // integration substeps per frame for stability
+
+    function gravityScale(){ return cfg.gravity / 100; }      // 0 .. 2.5
+    function sunMassScale(){ return cfg.sunmass / 100; }      // 0.2 .. 3.2
+    // trail slider 0..100 -> persistence alpha of the fade veil (more = longer trail)
+    function fadeAlpha(){
+      // 0 -> 0.5 (short), 100 -> 0.03 (very long). reduced motion clears fully.
+      if (cfg.reduced) return 1;
+      const t = cfg.trail / 100;
+      return 0.42 - t * 0.39; // 0.42 .. 0.03
+    }
+    function trailMax(){ return cfg.reduced ? 0 : Math.round(10 + (cfg.trail/100)*90); }
+
+    function massToRadius(m){ return Math.max(2.2, Math.cbrt(m) * 2.3); }
+
+    function makeSun(){
+      const m = 900 * sunMassScale();
+      sun = { x:cx, y:cy, m:m, r: Math.max(9, Math.cbrt(m)*1.6) };
+    }
+
+    function spawnBody(x, y, vx, vy, m, hue){
+      m = m || (6 + Math.random()*10);
+      const b = {
+        x, y, vx, vy, m,
+        r: massToRadius(m),
+        hue: (hue==null ? (215 + Math.random()*55) : hue), // indigo-blue family
+        trail: [],
+        alive: true
+      };
+      bodies.push(b);
+      lastBody = b;
+      if (bodies.length > 220) { bodies.splice(0, bodies.length - 220); } // cap
+      updateCount();
+      return b;
+    }
+
+    function updateCount(){ const el = document.getElementById('countOut'); if (el) el.textContent = bodies.length; }
+
+    // ---- sizing ----
+    function resize(){
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      cx = W/2; cy = H/2;
+      if (sun){ sun.x = cx; sun.y = cy; } else { makeSun(); }
+      // hard clear on resize
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0,0,W,H);
+    }
+    window.addEventListener('resize', resize);
+
+    // ---- physics (velocity-Verlet flavored semi-implicit, softened) ----
+    function accelAt(x, y, exclude){
+      let ax = 0, ay = 0;
+      // sun pull
+      const G = BASE_G * gravityScale();
+      let dx = sun.x - x, dy = sun.y - y;
+      let d2 = dx*dx + dy*dy + SOFT*SOFT;
+      let inv = 1 / (d2 * Math.sqrt(d2));
+      ax += G * sun.m * dx * inv;
+      ay += G * sun.m * dy * inv;
+      // body-body (kept light; only meaningful for moons / clusters)
+      for (let j=0;j<bodies.length;j++){
+        const o = bodies[j];
+        if (o === exclude || !o.alive) continue;
+        dx = o.x - x; dy = o.y - y;
+        d2 = dx*dx + dy*dy + SOFT*SOFT;
+        inv = 1 / (d2 * Math.sqrt(d2));
+        ax += G * o.m * dx * inv;
+        ay += G * o.m * dy * inv;
+      }
+      return [ax, ay];
+    }
+
+    function step(dt){
+      const sub = dt / SUB;
+      for (let s=0;s<SUB;s++){
+        // integrate (semi-implicit Euler with softened accel — stable + cheap)
+        for (let i=0;i<bodies.length;i++){
+          const b = bodies[i];
+          if (!b.alive) continue;
+          const a = accelAt(b.x, b.y, b);
+          b.vx += a[0] * sub;
+          b.vy += a[1] * sub;
+          b.x  += b.vx * sub;
+          b.y  += b.vy * sub;
+        }
+        handleSunImpact();
+        handleBodyImpacts();
+      }
+      cull();
+      recordTrails();
+    }
+
+    function handleSunImpact(){
+      for (let i=0;i<bodies.length;i++){
+        const b = bodies[i];
+        if (!b.alive) continue;
+        const dx = b.x - sun.x, dy = b.y - sun.y;
+        if (dx*dx + dy*dy < (sun.r + b.r)*(sun.r + b.r) * 0.7){
+          b.alive = false; b.fade = 1; // consumed by the light
+          flash(sun.x, sun.y, b.r);
+        }
+      }
+    }
+
+    function handleBodyImpacts(){
+      for (let i=0;i<bodies.length;i++){
+        const a = bodies[i];
+        if (!a.alive) continue;
+        for (let j=i+1;j<bodies.length;j++){
+          const b = bodies[j];
+          if (!b.alive) continue;
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const rr = (a.r + b.r);
+          const d2 = dx*dx + dy*dy;
+          if (d2 >= rr*rr) continue;
+          const d = Math.sqrt(d2) || 0.0001;
+
+          if (cfg.merge){
+            // perfectly inelastic: conserve momentum, sum mass
+            const M = a.m + b.m;
+            const big = a.m >= b.m ? a : b;
+            big.vx = (a.vx*a.m + b.vx*b.m) / M;
+            big.vy = (a.vy*a.m + b.vy*b.m) / M;
+            big.x = (a.x*a.m + b.x*b.m) / M;
+            big.y = (a.y*a.m + b.y*b.m) / M;
+            big.m = M; big.r = massToRadius(M);
+            const small = (big === a) ? b : a;
+            small.alive = false;
+            flash((a.x+b.x)/2,(a.y+b.y)/2, small.r*0.8);
+            if (small === lastBody) lastBody = big;
+          } else {
+            // elastic collision (equal restitution), resolve overlap
+            const nx = dx/d, ny = dy/d;
+            const overlap = rr - d;
+            const ta = b.m/(a.m+b.m), tb = a.m/(a.m+b.m);
+            a.x -= nx*overlap*ta; a.y -= ny*overlap*ta;
+            b.x += nx*overlap*tb; b.y += ny*overlap*tb;
+            const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
+            const vn = rvx*nx + rvy*ny;
+            if (vn < 0){
+              const e = 0.94;
+              const imp = -(1+e)*vn / (1/a.m + 1/b.m);
+              a.vx -= imp*nx/a.m; a.vy -= imp*ny/a.m;
+              b.vx += imp*nx/b.m; b.vy += imp*ny/b.m;
+            }
+          }
+        }
+      }
+    }
+
+    function cull(){
+      let changed = false;
+      // remove dead + bodies flung absurdly far (clean escape)
+      const margin = Math.max(W, H) * 3.0;
+      for (let i=bodies.length-1;i>=0;i--){
+        const b = bodies[i];
+        const far = (b.x < cx-margin || b.x > cx+margin || b.y < cy-margin || b.y > cy+margin);
+        if (!b.alive || far){ bodies.splice(i,1); changed = true; if (b===lastBody) lastBody=null; }
+      }
+      if (changed){ if (!lastBody && bodies.length) lastBody = bodies[bodies.length-1]; updateCount(); }
+    }
+
+    function recordTrails(){
+      const max = trailMax();
+      for (let i=0;i<bodies.length;i++){
+        const b = bodies[i];
+        if (max <= 0){ b.trail.length = 0; continue; }
+        b.trail.push(b.x, b.y);
+        const cap = max*2;
+        if (b.trail.length > cap) b.trail.splice(0, b.trail.length - cap);
+      }
+    }
+
+    // ---- impact flashes (cheap, fade in place) ----
+    let flashes = [];
+    function flash(x,y,r){ if (cfg.reduced) return; flashes.push({x,y,r:Math.max(3,r),life:1}); }
+
+    // ---- render ----
+    function render(){
+      // fade veil for trails (instead of full clear)
+      const fa = fadeAlpha();
+      if (fa >= 1){
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0,0,W,H);
+      } else {
+        ctx.fillStyle = 'rgba(10,10,10,' + fa + ')';
+        ctx.fillRect(0,0,W,H);
+      }
+
+      // faint center crosshair grid feel — the clockwork frame
+      drawSun();
+
+      // trails
+      if (!cfg.reduced){
+        ctx.lineCap = 'round';
+        for (let i=0;i<bodies.length;i++){
+          const b = bodies[i];
+          const t = b.trail;
+          if (t.length < 4) continue;
+          ctx.beginPath();
+          ctx.moveTo(t[0], t[1]);
+          for (let k=2;k<t.length;k+=2) ctx.lineTo(t[k], t[k+1]);
+          ctx.strokeStyle = 'hsla(' + b.hue + ',70%,68%,0.16)';
+          ctx.lineWidth = Math.max(1, b.r*0.5);
+          ctx.stroke();
+        }
+      }
+
+      // bodies
+      for (let i=0;i<bodies.length;i++){
+        const b = bodies[i];
+        const grad = ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r*3.2);
+        grad.addColorStop(0, 'hsla(' + b.hue + ',85%,82%,0.95)');
+        grad.addColorStop(0.4, 'hsla(' + b.hue + ',80%,66%,0.55)');
+        grad.addColorStop(1, 'hsla(' + b.hue + ',80%,60%,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(b.x,b.y,b.r*3.2,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'hsla(' + b.hue + ',90%,90%,0.98)';
+        ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+      }
+
+      // flashes
+      for (let i=flashes.length-1;i>=0;i--){
+        const f = flashes[i];
+        const rr = f.r * (1 + (1-f.life)*4);
+        const g = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,rr);
+        g.addColorStop(0,'hsla(45,100%,85%,'+(f.life*0.5)+')');
+        g.addColorStop(1,'hsla(45,100%,70%,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(f.x,f.y,rr,0,Math.PI*2); ctx.fill();
+        f.life -= 0.06;
+        if (f.life <= 0) flashes.splice(i,1);
+      }
+
+      // the aiming vector while dragging
+      if (drag.active){
+        const x0 = drag.sx, y0 = drag.sy, x1 = drag.cxp, y1 = drag.cyp;
+        ctx.strokeStyle = 'rgba(129,140,248,0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5,5]);
+        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        ctx.setLineDash([]);
+        // ghost of the world to be born
+        const pm = dragMass();
+        const pr = massToRadius(pm);
+        ctx.fillStyle = 'rgba(165,180,252,0.85)';
+        ctx.beginPath(); ctx.arc(x0,y0,pr,0,Math.PI*2); ctx.fill();
+        // arrowhead at start (direction of throw is away from drag)
+        const ang = Math.atan2(y0-y1, x0-x1);
+        ctx.fillStyle = 'rgba(129,140,248,0.7)';
+        ctx.beginPath();
+        ctx.moveTo(x0,y0);
+        ctx.lineTo(x0 - Math.cos(ang-0.4)*10, y0 - Math.sin(ang-0.4)*10);
+        ctx.lineTo(x0 - Math.cos(ang+0.4)*10, y0 - Math.sin(ang+0.4)*10);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    function drawSun(){
+      // corona
+      const cr = sun.r;
+      const g = ctx.createRadialGradient(sun.x,sun.y,0,sun.x,sun.y,cr*5);
+      g.addColorStop(0,'rgba(255,238,200,0.95)');
+      g.addColorStop(0.18,'rgba(255,224,170,0.6)');
+      g.addColorStop(0.5,'rgba(129,140,248,0.10)');
+      g.addColorStop(1,'rgba(129,140,248,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(sun.x,sun.y,cr*5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,247,224,0.98)';
+      ctx.beginPath(); ctx.arc(sun.x,sun.y,cr,0,Math.PI*2); ctx.fill();
+    }
+
+    // ---- loop ----
+    let last = performance.now();
+    function frame(now){
+      let dt = (now - last) / 1000;
+      last = now;
+      if (dt > 0.05) dt = 0.05;           // clamp big gaps (tab switch)
+      const speed = 60;                    // sim units
+      if (!paused) step(dt * speed);
+      render();
+      requestAnimationFrame(frame);
+    }
+
+    // ---- input: click-drag to fling ----
+    const drag = { active:false, sx:0, sy:0, cxp:0, cyp:0 };
+    function dragVec(){ return [drag.sx - drag.cxp, drag.sy - drag.cyp]; } // throw away from pull
+    function dragMass(){ return 6 + Math.min(22, Math.hypot(drag.sx-drag.cxp, drag.sy-drag.cyp)/14); }
+
+    function pointFromEvent(e){
+      const rect = canvas.getBoundingClientRect();
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      return [p.clientX - rect.left, p.clientY - rect.top];
+    }
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      const [x,y] = pointFromEvent(e);
+      drag.active = true; drag.sx = x; drag.sy = y; drag.cxp = x; drag.cyp = y;
+      canvas.classList.add('grabbing');
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!drag.active) return;
+      const [x,y] = pointFromEvent(e);
+      drag.cxp = x; drag.cyp = y;
+      e.preventDefault();
+    }
+    function onUp(e){
+      if (!drag.active) return;
+      drag.active = false;
+      canvas.classList.remove('grabbing');
+      const [vx0, vy0] = dragVec();
+      const speed = 1.6; // throw gain
+      const m = dragMass();
+      // a flick with ~no pull becomes a gentle drop; clamp tiny jitter
+      spawnBody(drag.sx, drag.sy, vx0*speed, vy0*speed, m);
+      markFirstThrow();
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('touchstart', onDown, {passive:false});
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp);
+
+    // ---- "add a moon to the last world" ----
+    function addMoon(){
+      if (!lastBody || !lastBody.alive){
+        flashHint('no world to orbit. fling one first.');
+        return;
+      }
+      const host = lastBody;
+      const off = host.r + 14 + Math.random()*10;
+      const ang = Math.random()*Math.PI*2;
+      const mx = host.x + Math.cos(ang)*off;
+      const my = host.y + Math.sin(ang)*off;
+      // circular orbital speed about the host: v = sqrt(G * m / r)
+      const G = BASE_G * gravityScale();
+      const vmag = Math.sqrt(Math.max(0.001, G * host.m / off));
+      // perpendicular to radius
+      const px = -Math.sin(ang), py = Math.cos(ang);
+      const moon = spawnBody(mx, my, host.vx + px*vmag, host.vy + py*vmag, 2 + Math.random()*2, 45);
+      moon.hue = 48; // a pale gold moon against the indigo
+      lastBody = host; // keep host as "last world"
+    }
+
+    // ---- seed a tidy system (a handful of stable-ish orbits) ----
+    function seedSystem(){
+      const n = 5 + Math.floor(Math.random()*3);
+      const G = BASE_G * gravityScale();
+      for (let i=0;i<n;i++){
+        const r = 70 + i*46 + Math.random()*20;
+        const ang = Math.random()*Math.PI*2;
+        const x = cx + Math.cos(ang)*r;
+        const y = cy + Math.sin(ang)*r;
+        const vmag = Math.sqrt(Math.max(0.01, G * sun.m / r)) * (0.96 + Math.random()*0.08);
+        const dir = Math.random() < 0.85 ? 1 : -1; // mostly co-rotating
+        const px = -Math.sin(ang)*dir, py = Math.cos(ang)*dir;
+        spawnBody(x, y, px*vmag, py*vmag, 5 + Math.random()*9);
+      }
+      markFirstThrow();
+    }
+
+    // ---- UI wiring ----
+    const gEl = document.getElementById('gravity');
+    const tEl = document.getElementById('trail');
+    const sEl = document.getElementById('sunmass');
+    const gOut = document.getElementById('gravOut');
+    const tOut = document.getElementById('trailOut');
+    const sOut = document.getElementById('sunOut');
+
+    function trailWord(v){ if (v<15) return 'short'; if (v<45) return 'medium'; if (v<78) return 'long'; return 'eternal'; }
+
+    function syncUI(){
+      gEl.value = cfg.gravity; tEl.value = cfg.trail; sEl.value = cfg.sunmass;
+      gOut.textContent = (cfg.gravity/100).toFixed(1) + '×';
+      tOut.textContent = trailWord(cfg.trail);
+      sOut.textContent = (cfg.sunmass/100).toFixed(1) + '×';
+      document.getElementById('btnCollide').classList.toggle('btn-on', cfg.merge);
+      document.getElementById('btnCollide').textContent = cfg.merge ? '⊙ merge on impact' : '⊙ elastic bounce';
+      const rb = document.getElementById('btnReduce');
+      rb.classList.toggle('btn-on', cfg.reduced);
+      rb.textContent = cfg.reduced ? '◐ motion: calm' : '◐ motion: full';
+    }
+
+    gEl.addEventListener('input', ()=>{ cfg.gravity = +gEl.value; gOut.textContent = (cfg.gravity/100).toFixed(1)+'×'; save(); });
+    tEl.addEventListener('input', ()=>{ cfg.trail = +tEl.value; tOut.textContent = trailWord(cfg.trail); save(); });
+    sEl.addEventListener('input', ()=>{ cfg.sunmass = +sEl.value; sOut.textContent = (cfg.sunmass/100).toFixed(1)+'×'; makeSun(); save(); });
+
+    const btnPause = document.getElementById('btnPause');
+    btnPause.addEventListener('click', togglePause);
+    function togglePause(){
+      paused = !paused;
+      btnPause.textContent = paused ? '▶ resume' : '⏸ pause';
+      btnPause.classList.toggle('btn-on', paused);
+    }
+
+    document.getElementById('btnClear').addEventListener('click', ()=>{
+      bodies = []; flashes = []; lastBody = null; updateCount();
+      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,W,H);
+    });
+    document.getElementById('btnMoon').addEventListener('click', addMoon);
+    document.getElementById('btnCollide').addEventListener('click', ()=>{ cfg.merge = !cfg.merge; syncUI(); save(); });
+    document.getElementById('btnReduce').addEventListener('click', ()=>{
+      cfg.reduced = !cfg.reduced; syncUI(); save();
+      if (cfg.reduced){ for (const b of bodies) b.trail.length = 0; }
+    });
+    document.getElementById('seed').addEventListener('click', seedSystem);
+
+    // ---- keyboard transport ----
+    window.addEventListener('keydown', (e)=>{
+      if (/INPUT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
+      const k = e.key.toLowerCase();
+      if (e.code === 'Space'){ e.preventDefault(); togglePause(); }
+      else if (k === 'c'){ bodies=[]; flashes=[]; lastBody=null; updateCount(); ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,W,H); }
+      else if (k === 'm'){ addMoon(); }
+      else if (k === 'r'){ cfg.reduced = !cfg.reduced; syncUI(); save(); if (cfg.reduced){ for (const b of bodies) b.trail.length=0; } }
+    });
+
+    // ---- hint helpers ----
+    const hintEl = document.getElementById('hint');
+    const defaultHint = hintEl.textContent;
+    let hintTimer = null, thrown = false;
+    function flashHint(msg){
+      hintEl.textContent = msg;
+      hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(()=>{ hintEl.classList.remove('flicker'); hintEl.textContent = thrown ? 'space pauses · m grows a moon · c clears the sky' : defaultHint; }, 2200);
+    }
+    function markFirstThrow(){ if (!thrown){ thrown = true; hintEl.textContent = 'space pauses · m grows a moon · c clears the sky'; } }
+
+    // ---- boot ----
+    resize();
+    syncUI();
+    requestAnimationFrame(frame);
+
+    // gently populate so the first frame isn't empty (respect reduced: still fine, just fewer trails)
+    setTimeout(seedSystem, 250);
+
+    // ===== ambient embers (capped, reduced-motion-safe) =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const host = document.getElementById('embers');
+      for (let i=0;i<6;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random()*88) + '%';
+        e.style.animationDelay = (Math.random()*16) + 's';
+        e.style.animationDuration = (13 + Math.random()*9) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3){
+        const w = document.getElementById('nightWhisper'); if (w) w.style.display='block';
+      }
+    })();
+
+    // ===== easter egg: type "prizrak" to wake a watcher =====
+    (function(){
+      let buf = '';
+      window.addEventListener('keydown', (ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length !== 1) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak'){
+          const g = document.getElementById('ghostLine');
+          if (g){ g.style.display='block'; g.classList.add('flicker'); }
+          // the watcher casts a dim companion star into a wide, patient orbit
+          if (sun){
+            const r = Math.min(W,H)*0.42;
+            const ang = Math.random()*Math.PI*2;
+            const G = BASE_G * gravityScale();
+            const vmag = Math.sqrt(Math.max(0.01, G*sun.m/r));
+            const px=-Math.sin(ang), py=Math.cos(ang);
+            const watcher = spawnBody(cx+Math.cos(ang)*r, cy+Math.sin(ang)*r, px*vmag, py*vmag, 14, 285);
+            watcher.hue = 285; // violet — the watcher's color
+          }
+          flashHint('a watcher joins the orbit.');
+        }
+      });
+    })();
+
+    // ===== easter egg: triple-click the title → one extra ember =====
+    (function(){
+      const t = document.getElementById('appTitle');
+      if (!t) return;
+      t.addEventListener('click', (ev)=>{
+        if (ev.detail === 3 && !reduceMQ.matches){
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random()*20) + '%';
+          e.style.animationDuration = '12s';
+          document.getElementById('embers').appendChild(e);
+          setTimeout(()=>e.remove(), 13000);
+        }
+      });
+    })();
+
+    // ===== easter egg: idle 60s → the watcher leans in =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const line = document.getElementById('idleLine');
+      let timer;
+      function arm(){
+        if (line){ line.style.opacity='0'; }
+        clearTimeout(timer);
+        timer = setTimeout(()=>{
+          if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+            setTimeout(()=>{ if (line) line.style.opacity='0'; }, 6000); }
+        }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+      arm();
+    })();
+
+    // react to system reduced-motion changes
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change', (e)=>{ cfg.reduced = e.matches; syncUI(); save(); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

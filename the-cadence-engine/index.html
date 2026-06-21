@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Cadence Engine | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#fb7185;            /* rose — the pulse */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); }
+    body{ color:var(--ink); }
+
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .label{ color:var(--ink-dim); font-size:.7rem; text-transform:uppercase; letter-spacing:.18em; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .card{ background:var(--bg-raised); border:1px solid var(--line); transition:border-color .18s, box-shadow .18s; }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, select:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    /* tactile buttons */
+    .btn-primary{ background:var(--accent); color:#0a0a0a; font-weight:600;
+      transition:filter .15s, transform .12s, box-shadow .15s; box-shadow:0 0 18px -6px var(--glow); }
+    .btn-primary:hover{ filter:brightness(1.12); box-shadow:0 0 24px -4px var(--glow); }
+    .btn-primary:active{ transform:translateY(1px); }
+    .btn-ghost{ background:transparent; border:1px solid var(--line); color:var(--ink-dim);
+      transition:border-color .15s, color .15s, transform .12s, box-shadow .15s; }
+    .btn-ghost:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn-ghost:active{ transform:translateY(1px); }
+
+    .step-btn{ transition:transform .1s, box-shadow .15s; }
+    .step-btn:hover{ transform:scale(1.18); }
+    .step-btn:active{ transform:scale(.92); }
+
+    select{ background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink); }
+
+    /* === MOTION VOCABULARY (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.88;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* a steady pulse on the title dot — the heartbeat, synced to the transport when playing */
+    @keyframes heartbeat{0%,100%{transform:scale(1);opacity:.55}8%{transform:scale(1.55);opacity:1}22%{transform:scale(1);opacity:.55}}
+    .heart{animation:heartbeat var(--beat,1s) ease-in-out infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    #ghostLine, #idleLine, #nightWhisper{ color:var(--ink-ghost); }
+
+    /* the ring SVG: smooth playhead + step flashes handled in JS via attributes */
+    .ring-wrap svg{ display:block; }
+    .step-dot{ transition:fill .12s ease, r .12s ease, stroke .12s ease; cursor:pointer; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.heart{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .heart{opacity:.8!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="relative max-w-5xl mx-auto" style="z-index:2">
+
+    <!-- Header / transport -->
+    <header class="glass rounded-2xl p-5 sm:p-6 mb-6">
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-4 justify-between">
+        <div class="min-w-0">
+          <div class="mono label mb-2 flicker">prízrak / instrument 21 — cadence</div>
+          <h1 id="appTitle" class="text-2xl sm:text-3xl font-bold text-white h1-glow select-none cursor-default flex items-center gap-3">
+            <span id="heartDot" class="inline-block w-3 h-3 rounded-full heart" style="background:var(--accent);box-shadow:0 0 10px var(--glow)"></span>
+            The Cadence Engine
+          </h1>
+          <p class="text-sm mt-1" style="color:var(--ink-dim)">Euclidean pulses, spread as evenly as the dark allows. Give the tracks different lengths and the pattern drifts, then finds itself again. The ghost keeps time.</p>
+        </div>
+
+        <div class="flex items-center gap-3 sm:gap-4">
+          <!-- BPM -->
+          <div class="text-center">
+            <div class="label mono mb-1">tempo</div>
+            <div class="flex items-center gap-2">
+              <button id="bpmDown" class="btn-ghost mono w-8 h-8 rounded-lg text-lg leading-none" aria-label="slower">−</button>
+              <div class="w-20">
+                <div id="bpmVal" class="mono text-2xl font-bold text-white tabular-nums leading-none">120</div>
+                <div class="label mono mt-0.5">bpm</div>
+              </div>
+              <button id="bpmUp" class="btn-ghost mono w-8 h-8 rounded-lg text-lg leading-none" aria-label="faster">+</button>
+            </div>
+          </div>
+
+          <!-- transport -->
+          <button id="playBtn" class="btn-primary mono uppercase tracking-[0.18em] text-sm px-6 py-3 rounded-xl flex items-center gap-2">
+            <span id="playIcon">▶</span><span id="playLabel">start</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- global step bar (master clock readout) -->
+      <div class="mt-5 flex items-center gap-3">
+        <div class="label mono shrink-0">swing</div>
+        <input id="swing" type="range" min="0" max="60" value="0" class="w-32 h-1.5 rounded-lg appearance-none cursor-pointer" style="background:var(--line)">
+        <div id="swingVal" class="label mono w-10 tabular-nums">0%</div>
+        <div class="flex-1"></div>
+        <button id="muteAll" class="btn-ghost mono text-[11px] uppercase tracking-[0.16em] px-3 py-1.5 rounded-lg">mute all</button>
+      </div>
+    </header>
+
+    <!-- Tracks -->
+    <main id="tracks" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></main>
+
+    <!-- Patterns / persistence -->
+    <section class="glass rounded-2xl p-5 sm:p-6 mt-6">
+      <div class="flex flex-wrap items-center gap-3 justify-between">
+        <div>
+          <div class="label mono">saved cadences</div>
+          <p class="text-xs mt-1" style="color:var(--ink-ghost)">the ghost writes them to this machine's memory, nowhere else.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="patName" type="text" placeholder="name this cadence…" class="well rounded-lg px-3 py-2 text-sm mono w-44" style="color:var(--ink)">
+          <button id="saveBtn" class="btn-primary mono uppercase tracking-[0.16em] text-xs px-4 py-2 rounded-lg">save</button>
+        </div>
+      </div>
+      <div id="patList" class="mt-4 flex flex-wrap gap-2"></div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button id="randomBtn" class="btn-ghost mono text-[11px] uppercase tracking-[0.16em] px-3 py-1.5 rounded-lg">summon a random cadence</button>
+        <button id="clearBtn" class="btn-ghost mono text-[11px] uppercase tracking-[0.16em] px-3 py-1.5 rounded-lg">silence everything</button>
+      </div>
+    </section>
+
+    <!-- Footer whisper -->
+    <div class="mt-8 text-center">
+      <p class="mono text-xs" style="color:var(--ink-ghost)">k pulses over n steps, spread by an old algorithm. the heartbeat is borrowed.</p>
+      <p id="nightWhisper" class="mono text-xs mt-1" style="display:none">the mountain does not sleep. it keeps a slower time.</p>
+      <p id="ghostLine" class="mono text-xs mt-1" style="display:none">you found the watcher. it has been counting along.</p>
+      <p id="idleLine" class="mono text-xs mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still keeping time.</p>
+    </div>
+
+  </div>
+
+  <script>
+  /* ============================================================
+     THE CADENCE ENGINE
+     Euclidean (Bjorklund) rhythm sequencer with polymeter,
+     WebAudio synthesis (no samples), lookahead scheduling.
+  ============================================================ */
+
+  const STORE_KEY = 'cadence-engine-v1';
+
+  /* ---------- Bjorklund / Euclidean algorithm ----------
+     Distribute k pulses as evenly as possible across n steps.
+     Returns an array of n booleans. Classic recursive bucket method. */
+  function euclid(k, n){
+    n = Math.max(1, Math.floor(n));
+    k = Math.max(0, Math.min(Math.floor(k), n));
+    if (k === 0) return new Array(n).fill(false);
+    if (k === n) return new Array(n).fill(true);
+
+    // Build with the Bjorklund pairing process.
+    let groups = [];
+    for (let i = 0; i < k; i++) groups.push([true]);
+    let remainders = [];
+    for (let i = 0; i < n - k; i++) remainders.push([false]);
+
+    while (remainders.length > 1){
+      const count = Math.min(groups.length, remainders.length);
+      const newGroups = [];
+      for (let i = 0; i < count; i++){
+        newGroups.push(groups[i].concat(remainders[i]));
+      }
+      let newRemainders = [];
+      if (groups.length > remainders.length){
+        newRemainders = groups.slice(count);
+      } else {
+        newRemainders = remainders.slice(count);
+      }
+      groups = newGroups;
+      remainders = newRemainders;
+    }
+    const flat = [];
+    groups.forEach(g => g.forEach(v => flat.push(v)));
+    remainders.forEach(g => g.forEach(v => flat.push(v)));
+    // rotate so a pulse lands on step 0 (conventional, downbeat-aligned)
+    const first = flat.indexOf(true);
+    if (first > 0){
+      return flat.slice(first).concat(flat.slice(0, first));
+    }
+    return flat;
+  }
+
+  /* ---------- Track definitions (timbre via synthesis) ---------- */
+  const VOICES = {
+    kick:  { label:'KICK',  synth:kick  },
+    click: { label:'CLICK', synth:click },
+    bell:  { label:'BELL',  synth:bell  },
+    drip:  { label:'DRIP',  synth:drip  },
+    hat:   { label:'HAT',   synth:hat   },
+  };
+
+  function defaultTracks(){
+    return [
+      { id:'kick',  k:4, n:16, rot:0, mute:false, gain:0.95 },
+      { id:'click', k:3, n:8,  rot:0, mute:false, gain:0.55 },
+      { id:'bell',  k:5, n:12, rot:0, mute:false, gain:0.4  },
+      { id:'drip',  k:2, n:7,  rot:0, mute:false, gain:0.5  },
+      { id:'hat',   k:7, n:16, rot:2, mute:false, gain:0.32 },
+    ];
+  }
+
+  let state = {
+    bpm: 120,
+    swing: 0,
+    muteAll: false,
+    tracks: defaultTracks(),
+  };
+
+  // derived: cached euclidean patterns per track
+  function patternFor(t){ return rotate(euclid(t.k, t.n), t.rot); }
+  function rotate(arr, r){
+    const n = arr.length; if (!n) return arr;
+    r = ((r % n) + n) % n;
+    return arr.slice(n - r).concat(arr.slice(0, n - r));
+  }
+
+  /* ============================================================
+     WEB AUDIO — synthesis voices (oscillators + noise + envelopes)
+  ============================================================ */
+  let ctx = null, masterGain = null, noiseBuffer = null;
+
+  function ensureAudio(){
+    if (ctx) return ctx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 0.85;
+    masterGain.connect(ctx.destination);
+    // a gentle limiter-ish soft compressor so stacked hits don't clip
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -10; comp.knee.value = 18; comp.ratio.value = 4;
+    comp.attack.value = 0.003; comp.release.value = 0.18;
+    masterGain.disconnect();
+    masterGain.connect(comp);
+    comp.connect(ctx.destination);
+    // build one second of white noise to reuse
+    const len = ctx.sampleRate;
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return ctx;
+  }
+
+  function noiseSource(){
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer;
+    src.loop = true;
+    return src;
+  }
+
+  function kick(time, gain){
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, time);
+    o.frequency.exponentialRampToValueAtTime(46, time + 0.12);
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.exponentialRampToValueAtTime(gain, time + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.42);
+    o.connect(g); g.connect(masterGain);
+    o.start(time); o.stop(time + 0.45);
+  }
+
+  function click(time, gain){
+    // tight noise burst through a bandpass — a rim/click
+    const src = noiseSource();
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 2100; bp.Q.value = 6;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.exponentialRampToValueAtTime(gain, time + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
+    src.connect(bp); bp.connect(g); g.connect(masterGain);
+    src.start(time); src.stop(time + 0.07);
+  }
+
+  function bell(time, gain){
+    // a small inharmonic cluster — FM-ish metallic shimmer
+    const freqs = [523.25, 784, 1046.5, 1318.5];
+    const out = ctx.createGain();
+    out.gain.value = 1;
+    out.connect(masterGain);
+    freqs.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = i % 2 ? 'triangle' : 'sine';
+      o.frequency.value = f * (1 + (i*0.0007));
+      const peak = gain * (1 - i*0.18);
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), time + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.9 - i*0.12);
+      o.connect(g); g.connect(out);
+      o.start(time); o.stop(time + 0.95);
+    });
+  }
+
+  function drip(time, gain){
+    // a quick falling sine blip — a water drop / blop
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(880, time);
+    o.frequency.exponentialRampToValueAtTime(180, time + 0.09);
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.exponentialRampToValueAtTime(gain, time + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.18);
+    o.connect(g); g.connect(masterGain);
+    o.start(time); o.stop(time + 0.2);
+  }
+
+  function hat(time, gain){
+    // high-passed noise — closed hat
+    const src = noiseSource();
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 7000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.exponentialRampToValueAtTime(gain, time + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+    src.connect(hp); hp.connect(g); g.connect(masterGain);
+    src.start(time); src.stop(time + 0.06);
+  }
+
+  /* ============================================================
+     SCHEDULER — lookahead clock (Chris Wilson pattern)
+     A 16th note is the base grid unit; each track advances its own
+     step counter modulo n, giving true polymeter.
+  ============================================================ */
+  let playing = false;
+  let lookahead = 25;       // ms between scheduler ticks
+  let scheduleAhead = 0.1;  // seconds to schedule audio ahead
+  let timerId = null;
+  let nextStepTime = 0;     // audio-clock time of the next 16th
+  let stepIndex = 0;        // global 16th counter (for swing)
+  let trackSteps = [];      // per-track current step index
+  // visual flash queue: {trackIdx, stepIdx, time}
+  let flashQueue = [];
+
+  function secondsPer16th(){
+    return (60 / state.bpm) / 4;
+  }
+
+  function resetCounters(){
+    stepIndex = 0;
+    trackSteps = state.tracks.map(() => 0);
+  }
+
+  function scheduler(){
+    while (nextStepTime < ctx.currentTime + scheduleAhead){
+      scheduleStep(nextStepTime);
+      advanceStep();
+    }
+    timerId = setTimeout(scheduler, lookahead);
+  }
+
+  function scheduleStep(time){
+    // swing: delay odd 16ths
+    const isOdd = (stepIndex % 2) === 1;
+    const swingDelay = isOdd ? (state.swing/100) * secondsPer16th() * 0.66 : 0;
+    const t = time + swingDelay;
+
+    state.tracks.forEach((track, ti) => {
+      const pat = patternFor(track);
+      const local = trackSteps[ti] % pat.length;
+      const hit = pat[local];
+      if (hit && !track.mute && !state.muteAll){
+        VOICES[track.id].synth(t, track.gain);
+      }
+      if (hit){
+        flashQueue.push({ ti, step: local, time: t });
+      }
+    });
+  }
+
+  function advanceStep(){
+    nextStepTime += secondsPer16th();
+    stepIndex++;
+    for (let i = 0; i < trackSteps.length; i++){
+      trackSteps[i] = (trackSteps[i] + 1) % patternFor(state.tracks[i]).length;
+    }
+  }
+
+  function startTransport(){
+    ensureAudio();
+    if (ctx.state === 'suspended') ctx.resume();
+    playing = true;
+    resetCounters();
+    flashQueue = [];
+    nextStepTime = ctx.currentTime + 0.06;
+    scheduler();
+    requestAnimationFrame(visualLoop);
+    syncHeartbeat();
+    setPlayUI(true);
+  }
+
+  function stopTransport(){
+    playing = false;
+    if (timerId) clearTimeout(timerId);
+    timerId = null;
+    flashQueue = [];
+    // clear playheads
+    state.tracks.forEach((_, ti) => updatePlayhead(ti, -1));
+    setPlayUI(false);
+    document.documentElement.style.setProperty('--beat', '1s');
+  }
+
+  function setPlayUI(on){
+    document.getElementById('playIcon').textContent = on ? '◼' : '▶';
+    document.getElementById('playLabel').textContent = on ? 'stop' : 'start';
+    const dot = document.getElementById('heartDot');
+    dot.style.opacity = on ? '1' : '';
+  }
+
+  function syncHeartbeat(){
+    // tie the title's heartbeat to the quarter note
+    const beat = 60 / state.bpm;
+    document.documentElement.style.setProperty('--beat', beat + 's');
+  }
+
+  /* ---------- visual loop: playhead + flashes ---------- */
+  function visualLoop(){
+    if (!playing) return;
+    const now = ctx.currentTime;
+
+    // process flashes that have come due
+    flashQueue = flashQueue.filter(f => {
+      if (f.time <= now + 0.02){
+        flashStep(f.ti, f.step);
+        return false;
+      }
+      return true;
+    });
+
+    // estimate each track's current playhead position (fractional)
+    const sps = secondsPer16th();
+    state.tracks.forEach((track, ti) => {
+      const pat = patternFor(track);
+      // global elapsed 16ths since start, approximated from audio clock
+      // current local step = trackSteps progresses; for smooth sweep we compute
+      // from nextStepTime: time until next step boundary
+      const timeToNext = nextStepTime - now; // seconds until upcoming step
+      const frac = 1 - Math.min(1, Math.max(0, timeToNext / sps));
+      // the upcoming step is trackSteps[ti]; the current playing one is prev
+      const cur = ((trackSteps[ti] - 1) % pat.length + pat.length) % pat.length;
+      const headPos = (cur + frac) % pat.length;
+      updatePlayhead(ti, headPos);
+    });
+
+    requestAnimationFrame(visualLoop);
+  }
+
+  /* ============================================================
+     RENDERING — rings of n steps, glowing pulses, sweeping head
+  ============================================================ */
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const RING_R = 58;
+  const DOT_R = 5.5;
+  const VIEW = 150;
+
+  function buildTrackCard(track, ti){
+    const wrap = document.createElement('div');
+    wrap.className = 'card rounded-2xl p-4 reveal';
+    wrap.dataset.ti = ti;
+
+    wrap.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <div class="mono font-bold tracking-[0.12em]" style="color:var(--ink)">${VOICES[track.id].label}</div>
+        <button data-act="mute" class="btn-ghost mono text-[10px] uppercase tracking-[0.14em] px-2 py-1 rounded">${track.mute ? 'muted' : 'live'}</button>
+      </div>
+
+      <div class="ring-wrap relative mx-auto" style="width:170px;height:170px">
+        <svg viewBox="0 0 ${VIEW} ${VIEW}" class="w-full h-full">
+          <circle cx="${VIEW/2}" cy="${VIEW/2}" r="${RING_R}" fill="none" stroke="var(--line-soft)" stroke-width="1.5"></circle>
+          <line data-head class="head" x1="${VIEW/2}" y1="${VIEW/2}" x2="${VIEW/2}" y2="${VIEW/2 - RING_R + 8}" stroke="var(--accent)" stroke-width="1.25" opacity="0" stroke-linecap="round"></line>
+          <g data-dots></g>
+          <text data-readout x="${VIEW/2}" y="${VIEW/2 + 4}" text-anchor="middle" class="mono" font-size="13" fill="var(--ink)" style="font-weight:700">${track.k}/${track.n}</text>
+          <text x="${VIEW/2}" y="${VIEW/2 + 18}" text-anchor="middle" class="mono" font-size="7" fill="var(--ink-ghost)" style="letter-spacing:.12em">PULSES / STEPS</text>
+        </svg>
+      </div>
+
+      <div class="mt-3 space-y-3">
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="label mono">pulses · k</span>
+            <span data-kval class="mono text-xs" style="color:var(--accent)">${track.k}</span>
+          </div>
+          <input data-k type="range" min="0" max="${track.n}" value="${track.k}" class="w-full h-1.5 rounded-lg appearance-none cursor-pointer" style="background:var(--line)">
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="label mono">steps · n</span>
+            <span data-nval class="mono text-xs" style="color:var(--ink-dim)">${track.n}</span>
+          </div>
+          <input data-n type="range" min="2" max="24" value="${track.n}" class="w-full h-1.5 rounded-lg appearance-none cursor-pointer" style="background:var(--line)">
+        </div>
+        <div class="flex items-center gap-3">
+          <button data-act="rotL" class="btn-ghost mono text-xs w-8 h-7 rounded" aria-label="rotate left">↺</button>
+          <div class="flex-1">
+            <div class="flex justify-between items-center mb-1">
+              <span class="label mono">gain</span>
+              <span data-gval class="mono text-[10px]" style="color:var(--ink-ghost)">${Math.round(track.gain*100)}</span>
+            </div>
+            <input data-g type="range" min="0" max="100" value="${Math.round(track.gain*100)}" class="w-full h-1.5 rounded-lg appearance-none cursor-pointer" style="background:var(--line)">
+          </div>
+          <button data-act="rotR" class="btn-ghost mono text-xs w-8 h-7 rounded" aria-label="rotate right">↻</button>
+        </div>
+      </div>
+    `;
+
+    // wire controls
+    const kEl = wrap.querySelector('[data-k]');
+    const nEl = wrap.querySelector('[data-n]');
+    const gEl = wrap.querySelector('[data-g]');
+
+    kEl.addEventListener('input', () => {
+      track.k = Math.min(parseInt(kEl.value), track.n);
+      wrap.querySelector('[data-kval]').textContent = track.k;
+      redrawDots(wrap, track);
+      updateReadout(wrap, track);
+      persist();
+    });
+    nEl.addEventListener('input', () => {
+      track.n = parseInt(nEl.value);
+      // keep k in range and update the k slider's max
+      if (track.k > track.n) track.k = track.n;
+      kEl.max = track.n;
+      kEl.value = track.k;
+      wrap.querySelector('[data-kval]').textContent = track.k;
+      wrap.querySelector('[data-nval]').textContent = track.n;
+      // restart this track's local counter cleanly so n change is graceful
+      if (playing) trackSteps[ti] = trackSteps[ti] % track.n;
+      redrawDots(wrap, track);
+      updateReadout(wrap, track);
+      persist();
+    });
+    gEl.addEventListener('input', () => {
+      track.gain = parseInt(gEl.value)/100;
+      wrap.querySelector('[data-gval]').textContent = Math.round(track.gain*100);
+      persist();
+    });
+
+    wrap.querySelector('[data-act="mute"]').addEventListener('click', (e) => {
+      track.mute = !track.mute;
+      e.target.textContent = track.mute ? 'muted' : 'live';
+      e.target.style.color = track.mute ? 'var(--ink-ghost)' : '';
+      redrawDots(wrap, track);
+      persist();
+    });
+    wrap.querySelector('[data-act="rotL"]').addEventListener('click', () => {
+      track.rot = (track.rot - 1);
+      redrawDots(wrap, track); persist();
+    });
+    wrap.querySelector('[data-act="rotR"]').addEventListener('click', () => {
+      track.rot = (track.rot + 1);
+      redrawDots(wrap, track); persist();
+    });
+
+    redrawDots(wrap, track);
+    return wrap;
+  }
+
+  function dotPosition(i, n){
+    // step 0 at top (12 o'clock), clockwise
+    const ang = (-Math.PI/2) + (i / n) * Math.PI * 2;
+    return {
+      x: VIEW/2 + Math.cos(ang) * RING_R,
+      y: VIEW/2 + Math.sin(ang) * RING_R,
+    };
+  }
+
+  function redrawDots(wrap, track){
+    const g = wrap.querySelector('[data-dots]');
+    const pat = patternFor(track);
+    const n = pat.length;
+    g.innerHTML = '';
+    for (let i = 0; i < n; i++){
+      const p = dotPosition(i, n);
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('cx', p.x.toFixed(2));
+      c.setAttribute('cy', p.y.toFixed(2));
+      c.setAttribute('r', pat[i] ? DOT_R : 2.4);
+      c.setAttribute('class', 'step-dot');
+      c.dataset.step = i;
+      const active = pat[i];
+      const dim = track.mute || state.muteAll;
+      c.setAttribute('fill', active ? (dim ? 'var(--ink-ghost)' : 'var(--accent)') : 'var(--line)');
+      c.setAttribute('stroke', active && !dim ? 'var(--glow)' : 'transparent');
+      c.setAttribute('stroke-width', active ? '1.5' : '0');
+      if (active && !dim) c.setAttribute('filter', 'drop-shadow(0 0 3px var(--glow))');
+      // click a dot to toggle: nudges k by adding/removing the nearest pulse
+      c.addEventListener('click', () => toggleStep(track, i, wrap));
+      g.appendChild(c);
+    }
+  }
+
+  // Clicking a step toggles it on/off by adjusting k (euclidean stays euclidean,
+  // but we let the user feel they're sculpting — increment/decrement k and rotate
+  // so the clicked step changes state when possible).
+  function toggleStep(track, i, wrap){
+    const pat = patternFor(track);
+    if (pat[i]){
+      if (track.k > 0) track.k--;
+    } else {
+      if (track.k < track.n) track.k++;
+    }
+    wrap.querySelector('[data-k]').value = track.k;
+    wrap.querySelector('[data-kval]').textContent = track.k;
+    redrawDots(wrap, track);
+    updateReadout(wrap, track);
+    persist();
+  }
+
+  function updateReadout(wrap, track){
+    wrap.querySelector('[data-readout]').textContent = `${track.k}/${track.n}`;
+  }
+
+  function flashStep(ti, stepIdx){
+    const wrap = document.querySelector(`[data-ti="${ti}"]`);
+    if (!wrap) return;
+    const dot = wrap.querySelector(`[data-dots] circle[data-step="${stepIdx}"]`);
+    if (!dot) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    dot.setAttribute('r', String(DOT_R + 3));
+    dot.setAttribute('fill', '#ffffff');
+    if (reduce){
+      setTimeout(() => redrawDotState(dot, ti, stepIdx), 90);
+    } else {
+      setTimeout(() => redrawDotState(dot, ti, stepIdx), 130);
+    }
+  }
+
+  function redrawDotState(dot, ti, stepIdx){
+    const track = state.tracks[ti];
+    if (!track) return;
+    const pat = patternFor(track);
+    const active = pat[stepIdx % pat.length];
+    const dim = track.mute || state.muteAll;
+    dot.setAttribute('r', active ? DOT_R : 2.4);
+    dot.setAttribute('fill', active ? (dim ? 'var(--ink-ghost)' : 'var(--accent)') : 'var(--line)');
+  }
+
+  function updatePlayhead(ti, pos){
+    const wrap = document.querySelector(`[data-ti="${ti}"]`);
+    if (!wrap) return;
+    const head = wrap.querySelector('[data-head]');
+    if (!head) return;
+    if (pos < 0){ head.setAttribute('opacity', '0'); return; }
+    const track = state.tracks[ti];
+    const n = patternFor(track).length;
+    const ang = (-Math.PI/2) + (pos / n) * Math.PI * 2;
+    const x2 = VIEW/2 + Math.cos(ang) * (RING_R - 4);
+    const y2 = VIEW/2 + Math.sin(ang) * (RING_R - 4);
+    head.setAttribute('x2', x2.toFixed(2));
+    head.setAttribute('y2', y2.toFixed(2));
+    head.setAttribute('opacity', '0.85');
+  }
+
+  function renderTracks(){
+    const host = document.getElementById('tracks');
+    host.innerHTML = '';
+    state.tracks.forEach((t, ti) => host.appendChild(buildTrackCard(t, ti)));
+  }
+
+  /* ============================================================
+     TRANSPORT CONTROLS
+  ============================================================ */
+  document.getElementById('playBtn').addEventListener('click', () => {
+    if (playing) stopTransport();
+    else startTransport();
+  });
+
+  function setBpm(v){
+    state.bpm = Math.max(40, Math.min(240, v));
+    document.getElementById('bpmVal').textContent = state.bpm;
+    if (playing) syncHeartbeat();
+    persist();
+  }
+  document.getElementById('bpmUp').addEventListener('click', () => setBpm(state.bpm + (event.shiftKey?10:1)));
+  document.getElementById('bpmDown').addEventListener('click', () => setBpm(state.bpm - (event.shiftKey?10:1)));
+
+  const swingEl = document.getElementById('swing');
+  swingEl.addEventListener('input', () => {
+    state.swing = parseInt(swingEl.value);
+    document.getElementById('swingVal').textContent = state.swing + '%';
+    persist();
+  });
+
+  document.getElementById('muteAll').addEventListener('click', (e) => {
+    state.muteAll = !state.muteAll;
+    e.target.textContent = state.muteAll ? 'unmute all' : 'mute all';
+    e.target.style.color = state.muteAll ? 'var(--accent)' : '';
+    // refresh dot dimming
+    state.tracks.forEach((t, ti) => {
+      const wrap = document.querySelector(`[data-ti="${ti}"]`);
+      if (wrap) redrawDots(wrap, t);
+    });
+    persist();
+  });
+
+  /* ============================================================
+     PERSISTENCE — localStorage
+  ============================================================ */
+  function persist(){
+    try {
+      const data = readStore();
+      data.current = { bpm:state.bpm, swing:state.swing, muteAll:state.muteAll, tracks:state.tracks };
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    } catch(e){}
+  }
+  function readStore(){
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return { current:null, saved:[] };
+      const d = JSON.parse(raw);
+      if (!d.saved) d.saved = [];
+      return d;
+    } catch(e){ return { current:null, saved:[] }; }
+  }
+  function loadCurrent(){
+    const d = readStore();
+    if (d.current && Array.isArray(d.current.tracks) && d.current.tracks.length){
+      state.bpm = d.current.bpm ?? 120;
+      state.swing = d.current.swing ?? 0;
+      state.muteAll = !!d.current.muteAll;
+      // merge to guard against shape drift
+      state.tracks = d.current.tracks.map(t => ({
+        id: VOICES[t.id] ? t.id : 'kick',
+        k: Math.max(0, t.k|0),
+        n: Math.max(2, Math.min(24, t.n|0 || 8)),
+        rot: t.rot|0,
+        mute: !!t.mute,
+        gain: typeof t.gain === 'number' ? t.gain : 0.6,
+      }));
+    }
+  }
+
+  function saveNamed(name){
+    const d = readStore();
+    const snap = {
+      name: name || ('cadence ' + (d.saved.length+1)),
+      ts: Date.now(),
+      bpm: state.bpm, swing: state.swing,
+      tracks: JSON.parse(JSON.stringify(state.tracks)),
+    };
+    d.saved.unshift(snap);
+    d.saved = d.saved.slice(0, 12);
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch(e){}
+    renderSaved();
+  }
+
+  function renderSaved(){
+    const d = readStore();
+    const host = document.getElementById('patList');
+    host.innerHTML = '';
+    if (!d.saved.length){
+      host.innerHTML = `<span class="mono text-xs" style="color:var(--ink-ghost)">nothing saved yet. the ghost is listening for a pattern worth keeping.</span>`;
+      return;
+    }
+    d.saved.forEach((s, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'well rounded-lg px-3 py-2 flex items-center gap-3';
+      const date = new Date(s.ts);
+      const stamp = date.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' ' +
+                    date.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+      chip.innerHTML = `
+        <button data-load class="mono text-xs text-left" style="color:var(--ink)">
+          <span style="color:var(--accent)">▸</span> ${escapeHtml(s.name)}
+          <span class="block label mono mt-0.5">${s.bpm}bpm · ${stamp}</span>
+        </button>
+        <button data-del class="mono text-[10px]" style="color:var(--ink-ghost)" aria-label="delete">✕</button>
+      `;
+      chip.querySelector('[data-load]').addEventListener('click', () => loadSaved(idx));
+      chip.querySelector('[data-del]').addEventListener('click', () => delSaved(idx));
+      host.appendChild(chip);
+    });
+  }
+
+  function loadSaved(idx){
+    const d = readStore();
+    const s = d.saved[idx];
+    if (!s) return;
+    state.bpm = s.bpm; state.swing = s.swing ?? state.swing;
+    state.muteAll = false;
+    state.tracks = JSON.parse(JSON.stringify(s.tracks));
+    document.getElementById('bpmVal').textContent = state.bpm;
+    swingEl.value = state.swing;
+    document.getElementById('swingVal').textContent = state.swing + '%';
+    document.getElementById('muteAll').textContent = 'mute all';
+    document.getElementById('muteAll').style.color = '';
+    renderTracks();
+    if (playing){ resetCounters(); }
+    if (playing) syncHeartbeat();
+    persist();
+  }
+
+  function delSaved(idx){
+    const d = readStore();
+    d.saved.splice(idx, 1);
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch(e){}
+    renderSaved();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', () => {
+    const inp = document.getElementById('patName');
+    saveNamed(inp.value.trim());
+    inp.value = '';
+    const btn = document.getElementById('saveBtn');
+    const orig = btn.textContent;
+    btn.textContent = 'kept';
+    setTimeout(() => btn.textContent = orig, 1000);
+  });
+  document.getElementById('patName').addEventListener('keydown', e => {
+    if (e.key === 'Enter'){ document.getElementById('saveBtn').click(); }
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    state.tracks.forEach(t => { t.k = 0; });
+    renderTracks();
+    persist();
+  });
+
+  document.getElementById('randomBtn').addEventListener('click', () => {
+    const ns = [7,8,9,11,12,13,16];
+    state.tracks.forEach(t => {
+      t.n = ns[Math.floor(Math.random()*ns.length)];
+      t.k = Math.max(1, Math.floor(Math.random() * (t.n * 0.6)) + 1);
+      if (t.k > t.n) t.k = t.n;
+      t.rot = Math.floor(Math.random()*t.n);
+      t.mute = false;
+    });
+    state.muteAll = false;
+    document.getElementById('muteAll').textContent = 'mute all';
+    document.getElementById('muteAll').style.color = '';
+    renderTracks();
+    if (playing) resetCounters();
+    persist();
+  });
+
+  /* ============================================================
+     KEYBOARD: spacebar = transport
+  ============================================================ */
+  window.addEventListener('keydown', (e) => {
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.code === 'Space'){
+      e.preventDefault();
+      playing ? stopTransport() : startTransport();
+    }
+  });
+
+  /* ============================================================
+     INIT
+  ============================================================ */
+  loadCurrent();
+  renderTracks();
+  renderSaved();
+  document.getElementById('bpmVal').textContent = state.bpm;
+  swingEl.value = state.swing;
+  document.getElementById('swingVal').textContent = state.swing + '%';
+  if (state.muteAll){
+    document.getElementById('muteAll').textContent = 'unmute all';
+    document.getElementById('muteAll').style.color = 'var(--accent)';
+  }
+
+  /* ===== Atmosphere: drifting embers ===== */
+  (function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const host = document.getElementById('embers');
+    const N = 7;
+    for (let i = 0; i < N; i++){
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (Math.random()*100) + 'vw';
+      e.style.animationDelay = (Math.random()*14) + 's';
+      e.style.animationDuration = (12 + Math.random()*8) + 's';
+      host.appendChild(e);
+    }
+  })();
+
+  /* ===== Easter egg: type "prizrak" wakes a watcher ===== */
+  (function watcher(){
+    let buf = '';
+    const ghost = document.getElementById('ghostLine');
+    window.addEventListener('keydown', (ev) => {
+      if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+      if (ev.key && ev.key.length === 1){
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak' && ghost){
+          ghost.style.display = 'block';
+          ghost.classList.add('flicker');
+          // a small phantom voice — one bell, if audio is awake
+          if (ctx && ctx.state === 'running') bell(ctx.currentTime + 0.01, 0.35);
+        }
+      }
+    });
+  })();
+
+  /* ===== Easter egg: triple-click the title spawns one extra ember ===== */
+  (function titleSpark(){
+    const t = document.getElementById('appTitle');
+    if (!t) return;
+    t.addEventListener('click', (ev) => {
+      if (ev.detail === 3){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (40 + Math.random()*20) + 'vw';
+        e.style.animationDuration = '11s';
+        document.getElementById('embers').appendChild(e);
+        setTimeout(() => e.remove(), 12000);
+      }
+    });
+  })();
+
+  /* ===== Easter egg: 00:00–03:00 local, the mountain whispers ===== */
+  (function nightWatch(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3){
+      const w = document.getElementById('nightWhisper');
+      if (w) w.style.display = 'block';
+    }
+  })();
+
+  /* ===== Easter egg: idle 60s → the watcher leans in ===== */
+  (function idleWatch(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const line = document.getElementById('idleLine');
+    let timer;
+    function arm(){
+      if (line){ line.style.opacity = '0'; setTimeout(() => { if (line) line.style.display = 'none'; }, 1200); }
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (line){ line.style.display = 'block'; requestAnimationFrame(() => { line.style.opacity = '1'; }); }
+      }, 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, arm, {passive:true}));
+    arm();
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>
