@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Loom | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#5eead4;            /* teal — the thread the ghost pulls through the dark */
+      --accent-deep:#2dd4bf;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); height:100%; }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 80%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none;
+      border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+
+    /* tactile buttons */
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    /* === ambient motion vocabulary (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    #loom{ display:block; }
+
+    .label{ color:var(--ink-dim); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.18em; }
+
+    #ghostLine, #idleLine, #nightWhisper { color: var(--ink-ghost); }
+    .num{ color:var(--accent); }
+
+    /* mode chips */
+    .chip{
+      transition:transform .12s, border-color .15s, color .15s, background-color .15s, box-shadow .15s;
+      border:1px solid var(--line); color:var(--ink-dim);
+    }
+    .chip:hover{ border-color:var(--accent); color:var(--ink); }
+    .chip:active{ transform:translateY(1px); }
+    .chip-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); background:color-mix(in srgb, var(--accent) 8%, transparent); }
+
+    /* the big start veil */
+    #veil{ transition:opacity .9s ease; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      #veil{ transition:none!important }
+    }
+  </style>
+</head>
+<body class="min-h-screen grain overflow-hidden">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the weave itself -->
+  <canvas id="loom" class="fixed inset-0 z-[1]"></canvas>
+
+  <!-- header, floating top-left -->
+  <header class="fixed top-0 left-0 z-[2] p-5 select-none pointer-events-none">
+    <div class="mono label mb-1 flicker">prízrak / instrument 27 — generative</div>
+    <h1 id="appTitle" class="text-2xl font-semibold text-white h1-glow breathe cursor-default pointer-events-auto inline-block">The Loom</h1>
+    <p class="text-xs mt-1 max-w-[16rem]" style="color:var(--ink-dim)">A small machine that weaves a sound it will never weave again. Set it running. Pull the threads. Leave it.</p>
+  </header>
+
+  <!-- seed readout, top-right -->
+  <div class="fixed top-0 right-0 z-[2] p-5 text-right pointer-events-none select-none">
+    <div class="mono label mb-1">thread / seed</div>
+    <div id="seedOut" class="mono text-sm num pointer-events-auto cursor-pointer" title="click to re-seed the weave">········</div>
+    <div class="mono label mt-3">woven</div>
+    <div id="elapsedOut" class="mono text-sm" style="color:var(--ink)">00:00</div>
+    <p id="nightWhisper" class="mono text-[10px] mt-3" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono text-[10px] mt-1" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono text-[10px] mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still weaving.</p>
+  </div>
+
+  <!-- the start veil — audio must begin on a gesture -->
+  <div id="veil" class="fixed inset-0 z-[4] flex items-center justify-center">
+    <div class="absolute inset-0" style="background:radial-gradient(80% 80% at 50% 45%, rgba(10,10,10,.55), rgba(10,10,10,.92))"></div>
+    <button id="btnWeave" class="relative z-[1] btn glass rounded-2xl px-10 py-6 text-center group">
+      <div class="mono label mb-2 group-hover:text-white transition-colors">the loom is still</div>
+      <div class="text-2xl font-semibold text-white h1-glow breathe">weave ⟿</div>
+      <div class="mono text-[10px] mt-3" style="color:var(--ink-ghost)">sound begins on your touch · headphones, or quiet room</div>
+    </button>
+  </div>
+
+  <!-- the bench of controls, floating bottom -->
+  <div class="fixed bottom-0 left-0 right-0 z-[2] p-3 sm:p-4 flex justify-center pointer-events-none">
+    <div class="glass rounded-2xl p-3 sm:p-4 w-full max-w-3xl pointer-events-auto">
+
+      <!-- transport row -->
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <button id="btnStill" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="space">▣ still the loom</button>
+        <button id="btnReseed" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="n — a wholly new thread">⁂ new thread</button>
+        <button id="btnReduce" class="btn rounded-lg px-3 py-1.5 text-xs mono" title="r — calm the visuals">◐ motion: full</button>
+        <div class="flex-1"></div>
+        <!-- mode chips -->
+        <div class="flex flex-wrap gap-1.5" id="modeRow">
+          <button class="chip rounded-md px-2 py-1 text-[10px] mono" data-mode="aeolian">aeolian</button>
+          <button class="chip rounded-md px-2 py-1 text-[10px] mono" data-mode="dorian">dorian</button>
+          <button class="chip rounded-md px-2 py-1 text-[10px] mono" data-mode="phrygian">phrygian</button>
+          <button class="chip rounded-md px-2 py-1 text-[10px] mono" data-mode="pentatonic">pentatonic</button>
+          <button class="chip rounded-md px-2 py-1 text-[10px] mono" data-mode="japanese">in-sen</button>
+        </div>
+      </div>
+
+      <!-- sliders row -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">density</span>
+            <span id="densOut" class="mono text-[11px] num">·</span>
+          </div>
+          <input type="range" id="density" min="0" max="100" value="42" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">brightness</span>
+            <span id="brightOut" class="mono text-[11px] num">·</span>
+          </div>
+          <input type="range" id="brightness" min="0" max="100" value="48" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">stillness</span>
+            <span id="tempoOut" class="mono text-[11px] num">·</span>
+          </div>
+          <input type="range" id="tempo" min="0" max="100" value="50" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">drone</span>
+            <span id="droneOut" class="mono text-[11px] num">·</span>
+          </div>
+          <input type="range" id="drone" min="0" max="100" value="58" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">tension</span>
+            <span id="tensionOut" class="mono text-[11px] num">·</span>
+          </div>
+          <input type="range" id="tension" min="0" max="100" value="22" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">space</span>
+            <span id="reverbOut" class="mono text-[11px] num">·</span>
+          </div>
+          <input type="range" id="reverb" min="0" max="100" value="62" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+      </div>
+
+      <!-- hint line / status -->
+      <div class="mt-2 flex items-center justify-between gap-3">
+        <p id="hint" class="mono text-[10px]" style="color:var(--ink-ghost)">it drifts on its own · the threads remember where they have been</p>
+        <p id="driftLine" class="mono text-[10px]" style="color:var(--ink-ghost)">— drifting —</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    const KEY = 'the-loom-v1';
+    const canvas = document.getElementById('loom');
+    const ctx = canvas.getContext('2d', { alpha:false });
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // ====================================================================
+    // settings (persisted)
+    // ====================================================================
+    const defaults = {
+      density:42, brightness:48, tempo:50, drone:58, tension:22, reverb:62,
+      mode:'aeolian', reduced:reduceMQ.matches, seed:null
+    };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object') cfg = Object.assign(cfg, s); } catch(e){}
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch(e){} }
+
+    // ====================================================================
+    // seeded PRNG — mulberry32, so a seed reproduces the same "character"
+    // (the walk still wanders forever; the seed sets the loom's hand)
+    // ====================================================================
+    function hashSeed(str){
+      let h = 1779033703 ^ str.length;
+      for (let i=0;i<str.length;i++){
+        h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+        h = (h << 13) | (h >>> 19);
+      }
+      return (h >>> 0);
+    }
+    function mulberry32(a){
+      return function(){
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function newSeedString(){
+      // a short, glyphic seed — the ghost names its thread
+      const glyphs = 'abcdef0123456789';
+      let s = '';
+      for (let i=0;i<8;i++) s += glyphs[Math.floor(Math.random()*glyphs.length)];
+      return s;
+    }
+    let rng = mulberry32(0); // (re)assigned in setSeed
+    function rand(){ return rng(); }
+    function randInt(n){ return Math.floor(rng()*n); }
+    function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
+
+    // ====================================================================
+    // musical material
+    // ====================================================================
+    // scale degrees as semitone offsets from tonic (one octave)
+    const MODES = {
+      aeolian:    [0,2,3,5,7,8,10],      // natural minor — the haunted default
+      dorian:     [0,2,3,5,7,9,10],      // minor with a lifted 6th — wistful
+      phrygian:   [0,1,3,5,7,8,10],      // that lowered 2nd — dread
+      pentatonic: [0,3,5,7,10],          // minor pentatonic — open, ancient
+      japanese:   [0,1,5,7,8]            // in-sen — sparse, eastern, cold
+    };
+    const MODE_LABEL = {
+      aeolian:'aeolian', dorian:'dorian', phrygian:'phrygian',
+      pentatonic:'pentatonic', japanese:'in-sen'
+    };
+
+    // we transpose around a slowly drifting tonic (root MIDI note)
+    const A4 = 440;
+    function midiToFreq(m){ return A4 * Math.pow(2, (m - 69) / 12); }
+
+    // build the full available pitch set across several octaves for a mode+tonic
+    function scalePitches(modeArr, tonic, octaves, lowOct){
+      const out = [];
+      for (let o=0;o<octaves;o++){
+        for (let k=0;k<modeArr.length;k++){
+          out.push(tonic + (lowOct+o)*12 + modeArr[k]);
+        }
+      }
+      return out;
+    }
+
+    // ====================================================================
+    // audio engine
+    // ====================================================================
+    let actx = null;
+    let master = null, masterGain = null;
+    let revBus = null, dryBus = null, revGain = null, dryGain = null;
+    let convolver = null;
+    // the slow feedback "space" (a soft tail layered with convolution body)
+    let started = false;
+
+    // voices held for visuals + drone control
+    let droneVoices = [];   // {osc, gain, filter, baseFreq}
+    let elapsedStart = 0;
+
+    // visual pulse events — the canvas reads these
+    const pulses = []; // {voice, t, freq, vel, pan}
+
+    function buildImpulse(seconds, decay){
+      const rate = actx.sampleRate;
+      const len = Math.max(1, Math.floor(rate * seconds));
+      const buf = actx.createBuffer(2, len, rate);
+      for (let ch=0; ch<2; ch++){
+        const data = buf.getChannelData(ch);
+        for (let i=0;i<len;i++){
+          // exponentially-decaying noise — a cold stone room
+          const t = i/len;
+          data[i] = (Math.random()*2-1) * Math.pow(1-t, decay);
+        }
+      }
+      return buf;
+    }
+
+    function initAudio(){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      actx = new AC();
+
+      master = actx.createGain();
+      master.gain.value = 0.0;
+      masterGain = master;
+
+      // a soft limiter to keep the texture from ever stabbing
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -18; comp.knee.value = 24;
+      comp.ratio.value = 4; comp.attack.value = 0.02; comp.release.value = 0.3;
+
+      // reverb send architecture: dry + convolution wet
+      dryBus = actx.createGain(); dryBus.gain.value = 1.0;
+      revBus = actx.createGain(); revBus.gain.value = 1.0;
+      convolver = actx.createConvolver();
+      convolver.buffer = buildImpulse(4.2, 3.0);
+
+      revGain = actx.createGain(); revGain.gain.value = 0.6;
+      dryGain = actx.createGain(); dryGain.gain.value = 0.9;
+
+      // a gentle high-cut on the wet so the space stays dark
+      const revTone = actx.createBiquadFilter();
+      revTone.type = 'lowpass'; revTone.frequency.value = 2600;
+
+      dryBus.connect(dryGain).connect(comp);
+      revBus.connect(convolver).connect(revTone).connect(revGain).connect(comp);
+      comp.connect(master).connect(actx.destination);
+
+      buildDrone();
+      // fade in
+      const now = actx.currentTime;
+      master.gain.cancelScheduledValues(now);
+      master.gain.setValueAtTime(0.0, now);
+      master.gain.linearRampToValueAtTime(0.85, now + 4.0);
+    }
+
+    function sendVoice(node){
+      // every voice goes to both buses (parallel dry/wet)
+      node.connect(dryBus);
+      node.connect(revBus);
+    }
+
+    // ---- the drone: a stack of detuned low oscillators on the tonic ----
+    let tonic = 45; // MIDI A2-ish, drifts over time
+    function buildDrone(){
+      // tear down any existing
+      for (const v of droneVoices){ try{ v.osc.stop(); }catch(e){} try{ v.osc2 && v.osc2.stop(); }catch(e){} }
+      droneVoices = [];
+      const root = midiToFreq(tonic);
+      const partials = [
+        {mult:1.0,  detune:-4, gain:0.22, type:'sine'},
+        {mult:1.0,  detune:+5, gain:0.18, type:'sine'},
+        {mult:2.0,  detune:0,  gain:0.07, type:'sine'},
+        {mult:1.5,  detune:+3, gain:0.05, type:'triangle'} // a soft fifth above
+      ];
+      for (const p of partials){
+        const osc = actx.createOscillator();
+        osc.type = p.type;
+        osc.frequency.value = root * p.mult;
+        osc.detune.value = p.detune;
+        const f = actx.createBiquadFilter();
+        f.type = 'lowpass'; f.frequency.value = 600; f.Q.value = 0.6;
+        const g = actx.createGain(); g.gain.value = 0;
+        osc.connect(f).connect(g);
+        sendVoice(g);
+        osc.start();
+        droneVoices.push({osc, filter:f, gain:g, baseGain:p.gain, mult:p.mult, detune:p.detune});
+      }
+      applyDrone();
+    }
+
+    function applyDrone(){
+      if (!actx) return;
+      const depth = cfg.drone/100;            // 0..1
+      const bright = cfg.brightness/100;
+      const now = actx.currentTime;
+      for (const v of droneVoices){
+        const target = v.baseGain * (0.15 + depth*0.95);
+        v.gain.gain.cancelScheduledValues(now);
+        v.gain.gain.setTargetAtTime(target, now, 0.8);
+        // brightness opens the drone's filter a little
+        const cut = 360 + bright*900 + depth*260;
+        v.filter.frequency.setTargetAtTime(cut, now, 0.8);
+      }
+    }
+
+    function retuneDrone(){
+      if (!actx) return;
+      const root = midiToFreq(tonic);
+      const now = actx.currentTime;
+      for (const v of droneVoices){
+        v.osc.frequency.cancelScheduledValues(now);
+        v.osc.frequency.setTargetAtTime(root * v.mult, now, 6.0); // glide slowly
+      }
+    }
+
+    // ---- a single plucked / bowed melodic note ----
+    function playNote(freq, dur, vel, voiceIndex, pan){
+      if (!actx) return;
+      const now = actx.currentTime;
+      const bright = cfg.brightness/100;
+
+      const osc = actx.createOscillator();
+      // brighter = more triangle/saw character; darker = sine
+      osc.type = bright > 0.62 ? 'triangle' : 'sine';
+      osc.frequency.value = freq;
+      // a touch of detune drift for a living, slightly out-of-true feel
+      osc.detune.value = (rand()*2-1) * (3 + cfg.tension/100*9);
+
+      const filter = actx.createBiquadFilter();
+      filter.type = 'lowpass';
+      const cutoff = 700 + bright*4200 + vel*1400;
+      filter.frequency.value = cutoff;
+      filter.Q.value = 1.2 + (cfg.tension/100)*3;
+
+      const g = actx.createGain();
+      g.gain.value = 0;
+
+      const panner = actx.createStereoPanner ? actx.createStereoPanner() : null;
+      osc.connect(filter).connect(g);
+      if (panner){ panner.pan.value = pan; g.connect(panner); sendVoice(panner); }
+      else { sendVoice(g); }
+
+      // soft attack, long bell-like release — a struck thread
+      const peak = 0.13 * vel;
+      const atk = 0.02 + (1-vel)*0.06;
+      const rel = dur;
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(peak, now + atk);
+      g.gain.setTargetAtTime(0.0001, now + atk + dur*0.18, rel*0.5);
+
+      osc.start(now);
+      osc.stop(now + atk + dur + 0.4);
+
+      // schedule the visual pulse to land with the audio
+      schedulePulse(voiceIndex, now, freq, vel, pan);
+
+      osc.onended = () => { try{ osc.disconnect(); filter.disconnect(); g.disconnect(); panner&&panner.disconnect(); }catch(e){} };
+    }
+
+    // ---- a sparse high bell tone (struck overtone) ----
+    function playBell(freq, vel, pan){
+      if (!actx) return;
+      const now = actx.currentTime;
+      const partials = [1, 2.01, 3.03, 4.7];
+      const out = actx.createGain(); out.gain.value = 1;
+      const panner = actx.createStereoPanner ? actx.createStereoPanner() : null;
+      if (panner){ panner.pan.value = pan; out.connect(panner); sendVoice(panner); }
+      else { sendVoice(out); }
+      partials.forEach((mult, i) => {
+        const osc = actx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = freq * mult;
+        const g = actx.createGain();
+        const amp = (0.06 * vel) / (i+1);
+        const dur = 2.6 / (i*0.5+1);
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(amp, now + 0.006);
+        g.gain.setTargetAtTime(0.0001, now + 0.02, dur*0.4);
+        osc.connect(g).connect(out);
+        osc.start(now); osc.stop(now + dur + 0.5);
+        osc.onended = () => { try{ osc.disconnect(); g.disconnect(); }catch(e){} };
+      });
+      schedulePulse(2, now, freq, vel*1.2, pan);
+      setTimeout(()=>{ try{ out.disconnect(); panner&&panner.disconnect(); }catch(e){} }, 4000);
+    }
+
+    function applyReverb(){
+      if (!actx) return;
+      const wet = cfg.reverb/100;
+      const now = actx.currentTime;
+      revGain.gain.setTargetAtTime(0.15 + wet*0.85, now, 0.5);
+      dryGain.gain.setTargetAtTime(1.0 - wet*0.35, now, 0.5);
+    }
+
+    // ====================================================================
+    // the generative weave — a weighted random walk over scale degrees
+    // with a Markov-ish bias toward stepwise motion + slow drift of
+    // tonic, density, and register. it genuinely never repeats.
+    // ====================================================================
+    let walkIndex = 0;       // index into the active pitch set
+    let pitchSet = [];
+    let modeArr = MODES.aeolian;
+    let beatCount = 0;
+    let lastDriftBeat = 0;
+    let phraseClock = 0;     // for arc-shaped phrasing
+    let driftMsg = '';
+
+    function rebuildPitchSet(){
+      modeArr = MODES[cfg.mode] || MODES.aeolian;
+      pitchSet = scalePitches(modeArr, tonic % 12 + 0, 4, Math.floor(tonic/12));
+      // clamp walk index
+      if (walkIndex >= pitchSet.length) walkIndex = Math.floor(pitchSet.length/2);
+    }
+
+    // step interval in seconds derived from "stillness" slider (inverted tempo)
+    function stepInterval(){
+      // stillness 0 -> ~0.4s busy ; stillness 100 -> ~2.4s glacial
+      const s = cfg.tempo/100;
+      return 0.42 + s*2.0;
+    }
+
+    // probability that a given step actually sounds (vs a rest) from density
+    function noteProbability(){
+      return 0.18 + (cfg.density/100)*0.74; // 0.18..0.92
+    }
+
+    // the walk: pick the next scale index. mostly small steps, sometimes leap.
+    function nextWalk(){
+      const tension = cfg.tension/100;
+      const r = rand();
+      let move;
+      if (r < 0.52 - tension*0.18){ move = (rand()<0.5?-1:1); }            // step
+      else if (r < 0.78){ move = (rand()<0.5?-2:2); }                       // third
+      else if (r < 0.90 + tension*0.05){ move = pick([-3,3,4,-4]); }        // leap
+      else { move = 0; }                                                    // repeat a tone
+      // tension pulls the line upward and wider (rising unease)
+      if (tension > 0.5 && rand() < tension-0.4) move += (rand()<0.6?1:2);
+      walkIndex += move;
+      // reflect at the edges so the line breathes within register
+      const lo = 1, hi = pitchSet.length-2;
+      if (walkIndex < lo) walkIndex = lo + (lo - walkIndex);
+      if (walkIndex > hi) walkIndex = hi - (walkIndex - hi);
+      walkIndex = Math.max(0, Math.min(pitchSet.length-1, walkIndex));
+      return pitchSet[walkIndex];
+    }
+
+    // slow drift: every so often, nudge the tonic to a neighbouring scale
+    // member, re-tune the drone, and let the brightness/register wander.
+    function maybeDrift(){
+      if (beatCount - lastDriftBeat < 24 + randInt(20)) return;
+      lastDriftBeat = beatCount;
+      const r = rand();
+      if (r < 0.5){
+        // shift tonic by a mode interval (modal interchange feel)
+        const shift = pick([-2,-2,3,5,-5,2]);
+        tonic = Math.max(33, Math.min(57, tonic + shift));
+        rebuildPitchSet();
+        retuneDrone();
+        driftMsg = '— the key has wandered —';
+      } else if (r < 0.78){
+        // register breath: move the walk centre up or down an octave-ish
+        walkIndex = Math.max(0, Math.min(pitchSet.length-1, walkIndex + (rand()<0.5?-modeArr.length:modeArr.length)));
+        driftMsg = '— the line has risen —';
+      } else {
+        driftMsg = '— drifting —';
+      }
+      flashDrift();
+    }
+
+    // ====================================================================
+    // the scheduler — WebAudio lookahead (Chris Wilson pattern)
+    // ====================================================================
+    let nextNoteTime = 0;
+    const LOOKAHEAD = 0.1;     // seconds of audio scheduled ahead
+    const TIMER_MS = 25;       // wall-clock polling interval
+    let schedTimer = null;
+    let bellCountdown = 0;
+
+    function scheduler(){
+      if (!actx) return;
+      while (nextNoteTime < actx.currentTime + LOOKAHEAD){
+        weaveStep(nextNoteTime);
+        nextNoteTime += stepInterval();
+      }
+    }
+
+    function weaveStep(when){
+      beatCount++;
+      maybeDrift();
+
+      // arc-shaped phrasing: velocity swells and ebbs across a phrase
+      phraseClock += 1;
+      const arc = 0.55 + 0.45*Math.sin(phraseClock*0.18);
+
+      // does the main line sound this step?
+      if (rand() < noteProbability()){
+        const midi = nextWalk();
+        const freq = midiToFreq(midi);
+        const vel = (0.4 + rand()*0.6) * arc;
+        const dur = stepInterval()*(1.2 + rand()*2.4);
+        // pan follows pitch height a little — high notes drift right
+        const pan = Math.max(-0.85, Math.min(0.85, ((midi - tonic) / 24) * 0.7 + (rand()*0.3-0.15)));
+        // schedule relative to `when` by deferring via setValueAtTime inside playNote-now;
+        // since playNote uses currentTime, fold the small offset into a timeout-free schedule:
+        scheduleNote(when, freq, dur, vel, 0, pan);
+      }
+
+      // sparse bell tones — rarer, higher, ringing
+      bellCountdown--;
+      const bellChance = 0.04 + (cfg.density/100)*0.10;
+      if (bellCountdown <= 0 && rand() < bellChance){
+        bellCountdown = 4 + randInt(8);
+        // a high scale member, 1-2 octaves up
+        const hi = pitchSet[Math.min(pitchSet.length-1, walkIndex + modeArr.length + randInt(modeArr.length))];
+        const bf = midiToFreq(hi + 12);
+        const pan = (rand()*1.6-0.8);
+        scheduleBell(when, bf, (0.5+rand()*0.5), pan);
+      }
+    }
+
+    // because our note functions use actx.currentTime, we precisely defer
+    // scheduling using a tiny per-event timer keyed off the audio clock.
+    function scheduleNote(when, freq, dur, vel, voiceIndex, pan){
+      const delay = Math.max(0, (when - actx.currentTime) * 1000);
+      setTimeout(()=>{ if (started) playNote(freq, dur, vel, voiceIndex===0?0:1, pan); }, delay);
+    }
+    function scheduleBell(when, freq, vel, pan){
+      const delay = Math.max(0, (when - actx.currentTime) * 1000);
+      setTimeout(()=>{ if (started) playBell(freq, vel, pan); }, delay);
+    }
+
+    // ====================================================================
+    // start / stop
+    // ====================================================================
+    function setSeed(seedStr, isNew){
+      cfg.seed = seedStr;
+      rng = mulberry32(hashSeed(seedStr));
+      // seed sets the loom's initial hand: tonic, register, walk centre
+      tonic = 38 + randInt(14);          // ~D2..D3 region
+      rebuildPitchSet();
+      walkIndex = Math.floor(pitchSet.length*0.45) + randInt(4);
+      beatCount = 0; lastDriftBeat = 0; phraseClock = randInt(20);
+      bellCountdown = 3 + randInt(6);
+      document.getElementById('seedOut').textContent = seedStr;
+      if (isNew) save();
+      if (actx && started){ retuneDrone(); }
+    }
+
+    function startLoom(){
+      if (started) return;
+      if (!actx) initAudio();
+      if (actx.state === 'suspended') actx.resume();
+      // ensure drone matches current seed/tonic
+      retuneDrone();
+      applyDrone(); applyReverb();
+      started = true;
+      elapsedStart = performance.now();
+      nextNoteTime = actx.currentTime + 0.18;
+      clearInterval(schedTimer);
+      schedTimer = setInterval(scheduler, TIMER_MS);
+      hideVeil();
+      const b = document.getElementById('btnStill');
+      b.classList.add('btn-on');
+      flashHint('the loom is weaving · pull any thread to steer it');
+    }
+
+    function stopLoom(){
+      if (!started) return;
+      started = false;
+      clearInterval(schedTimer); schedTimer = null;
+      if (actx){
+        const now = actx.currentTime;
+        master.gain.cancelScheduledValues(now);
+        master.gain.setTargetAtTime(0.0001, now, 0.6);
+      }
+      const b = document.getElementById('btnStill');
+      b.classList.remove('btn-on');
+      showVeil('the loom is still');
+    }
+
+    // ====================================================================
+    // veil
+    // ====================================================================
+    const veil = document.getElementById('veil');
+    function hideVeil(){ veil.style.opacity = '0'; veil.style.pointerEvents='none'; setTimeout(()=>{ if(started) veil.style.display='none'; }, 950); }
+    function showVeil(msg){
+      veil.style.display='flex'; veil.style.pointerEvents='auto';
+      requestAnimationFrame(()=>{ veil.style.opacity='1'; });
+      const lab = veil.querySelector('.label'); if (lab && msg) lab.textContent = msg;
+    }
+
+    // ====================================================================
+    // visuals — glowing threads, one strand per voice family
+    // ====================================================================
+    let W=0, H=0, DPR=1;
+    // three voice "looms": 0 = melodic line, 1 = lower counter-line, 2 = bells/drone shimmer
+    const VOICES = 3;
+    const VOICE_COLOR = ['180,90%,70%','165,80%,58%','48,95%,72%']; // teal, deep teal, gold bell
+    const strands = []; // each: array of {x, y, life}
+    function resize(){
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = Math.floor(W*DPR); canvas.height = Math.floor(H*DPR);
+      canvas.style.width = W+'px'; canvas.style.height = H+'px';
+      ctx.setTransform(DPR,0,0,DPR,0,0);
+      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,W,H);
+    }
+    window.addEventListener('resize', resize);
+
+    // pulse ring events, drawn as expanding glows when a note sounds
+    function schedulePulse(voice, when, freq, vel, pan){
+      const delay = Math.max(0, (when - (actx?actx.currentTime:0)) * 1000);
+      setTimeout(()=>{
+        // map freq -> vertical position (log), pan -> horizontal
+        const f = Math.max(40, Math.min(4000, freq));
+        const yNorm = 1 - (Math.log2(f/55) / Math.log2(4000/55));
+        const y = 0.12*H + yNorm*0.76*H;
+        const x = 0.5*W + pan*0.42*W;
+        pulses.push({ voice, x, y, vel, life:1, r:4 });
+      }, delay);
+    }
+
+    // continuous "thread" — a horizontal weave that advances and bends to
+    // the latest note position; reduced-motion shows a calm static version.
+    const threadHeads = [];
+    for (let v=0; v<VOICES; v++) threadHeads.push({ x: 0, y: 0.5, points: [] });
+
+    let lastVisTime = performance.now();
+    function renderVisuals(now){
+      const dt = Math.min(0.05, (now - lastVisTime)/1000);
+      lastVisTime = now;
+
+      if (cfg.reduced){
+        // calm: solid bg + static suggestion of threads + gentle pulse dots
+        ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,W,H);
+        drawStaticWeave();
+        // draw pulses as still dots that fade quickly
+        for (let i=pulses.length-1;i>=0;i--){
+          const p = pulses[i];
+          ctx.fillStyle = 'hsla('+VOICE_COLOR[p.voice]+','+(p.life*0.5)+')';
+          ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+          p.life -= dt*1.6; if (p.life<=0) pulses.splice(i,1);
+        }
+        requestAnimationFrame(renderVisuals);
+        return;
+      }
+
+      // fade veil for trails (the weave leaves ghosts)
+      ctx.fillStyle = 'rgba(10,10,10,0.07)';
+      ctx.fillRect(0,0,W,H);
+
+      // advance thread heads horizontally; they scroll right, wrap left
+      const speed = (24 + (100-cfg.tempo)*0.7) * dt; // busier when less still
+      for (let v=0; v<VOICES; v++){
+        const th = threadHeads[v];
+        th.x += speed;
+        if (th.x > W){ th.x = 0; th.points.length = 0; }
+        // baseline y per voice
+        const baseY = [0.34, 0.62, 0.2][v]*H;
+        // find most recent pulse for this voice to bend toward
+        let targetY = baseY;
+        for (let i=pulses.length-1;i>=0;i--){ if (pulses[i].voice===v){ targetY = pulses[i].y; break; } }
+        // ease the head toward target
+        th.y = th.y===0 ? targetY : th.y + (targetY - th.y)*0.06;
+        // sine shimmer
+        const wob = Math.sin((th.x*0.012) + v*2 + now*0.0006) * (6 + cfg.tension*0.12);
+        th.points.push({ x: th.x, y: th.y + wob });
+        if (th.points.length > 520) th.points.shift();
+
+        // draw the strand
+        const col = VOICE_COLOR[v];
+        ctx.lineWidth = (v===2?1.0:1.6);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for (let i=0;i<th.points.length;i++){
+          const pt = th.points[i];
+          if (i===0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.strokeStyle = 'hsla('+col+',0.22)';
+        ctx.stroke();
+        // bright head
+        const head = th.points[th.points.length-1];
+        if (head){
+          const g = ctx.createRadialGradient(head.x,head.y,0,head.x,head.y,10);
+          g.addColorStop(0,'hsla('+col+',0.9)');
+          g.addColorStop(1,'hsla('+col+',0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(head.x, head.y, 10, 0, Math.PI*2); ctx.fill();
+        }
+      }
+
+      // pulses bloom where notes land
+      for (let i=pulses.length-1;i>=0;i--){
+        const p = pulses[i];
+        const col = VOICE_COLOR[p.voice];
+        const rr = p.r + (1-p.life)* (40 + p.vel*60);
+        const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,rr);
+        g.addColorStop(0,'hsla('+col+','+(p.life*0.55*p.vel+0.05)+')');
+        g.addColorStop(0.5,'hsla('+col+','+(p.life*0.18)+')');
+        g.addColorStop(1,'hsla('+col+',0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x,p.y,rr,0,Math.PI*2); ctx.fill();
+        // a crisp core dot
+        ctx.fillStyle = 'hsla('+col+','+(p.life*0.9)+')';
+        ctx.beginPath(); ctx.arc(p.x,p.y,1.6,0,Math.PI*2); ctx.fill();
+        p.life -= dt*0.9;
+        if (p.life<=0) pulses.splice(i,1);
+      }
+
+      requestAnimationFrame(renderVisuals);
+    }
+
+    function drawStaticWeave(){
+      // a quiet lattice for reduced-motion: faint horizontal threads
+      for (let v=0; v<VOICES; v++){
+        const y = [0.34,0.62,0.2][v]*H;
+        ctx.strokeStyle = 'hsla('+VOICE_COLOR[v]+',0.16)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+      }
+    }
+
+    // ====================================================================
+    // UI wiring
+    // ====================================================================
+    const sliders = {
+      density:  {el:document.getElementById('density'),  out:document.getElementById('densOut'),  word:densWord,  on:applyDensity},
+      brightness:{el:document.getElementById('brightness'),out:document.getElementById('brightOut'),word:brightWord,on:applyBright},
+      tempo:    {el:document.getElementById('tempo'),    out:document.getElementById('tempoOut'),  word:tempoWord, on:()=>{}},
+      drone:    {el:document.getElementById('drone'),    out:document.getElementById('droneOut'),  word:pctWord,   on:applyDrone},
+      tension:  {el:document.getElementById('tension'),  out:document.getElementById('tensionOut'),word:tensionWord,on:()=>{}},
+      reverb:   {el:document.getElementById('reverb'),   out:document.getElementById('reverbOut'), word:spaceWord, on:applyReverb}
+    };
+    function densWord(v){ return v<20?'sparse':v<50?'open':v<80?'woven':'dense'; }
+    function brightWord(v){ return v<25?'dark':v<50?'dusk':v<78?'lit':'glass'; }
+    function tempoWord(v){ return v<20?'flowing':v<50?'slow':v<80?'still':'glacial'; }
+    function tensionWord(v){ return v<15?'calm':v<45?'unease':v<75?'taut':'dread'; }
+    function spaceWord(v){ return v<20?'close':v<50?'room':v<80?'hall':'cavern'; }
+    function pctWord(v){ return v<20?'faint':v<50?'low':v<80?'deep':'vast'; }
+
+    function applyDensity(){ /* picked up live by scheduler */ }
+    function applyBright(){ applyDrone(); }
+
+    function syncUI(){
+      for (const k in sliders){
+        const s = sliders[k];
+        s.el.value = cfg[k];
+        s.out.textContent = s.word(cfg[k]);
+      }
+      // mode chips
+      document.querySelectorAll('#modeRow .chip').forEach(c=>{
+        c.classList.toggle('chip-on', c.dataset.mode === cfg.mode);
+      });
+      const rb = document.getElementById('btnReduce');
+      rb.classList.toggle('btn-on', cfg.reduced);
+      rb.textContent = cfg.reduced ? '◐ motion: calm' : '◐ motion: full';
+    }
+
+    for (const k in sliders){
+      const s = sliders[k];
+      s.el.addEventListener('input', ()=>{
+        cfg[k] = +s.el.value;
+        s.out.textContent = s.word(cfg[k]);
+        s.on();
+        save();
+      });
+    }
+
+    document.querySelectorAll('#modeRow .chip').forEach(c=>{
+      c.addEventListener('click', ()=>{
+        cfg.mode = c.dataset.mode;
+        rebuildPitchSet();
+        syncUI(); save();
+        flashHint('mode → '+MODE_LABEL[cfg.mode]+' · the threads shift colour');
+      });
+    });
+
+    document.getElementById('btnStill').addEventListener('click', ()=>{ started ? stopLoom() : startLoom(); });
+    document.getElementById('btnWeave').addEventListener('click', startLoom);
+
+    document.getElementById('btnReseed').addEventListener('click', ()=>{
+      const s = newSeedString();
+      setSeed(s, true);
+      flashHint('a new thread · '+s);
+    });
+    document.getElementById('seedOut').addEventListener('click', ()=>{
+      const s = newSeedString();
+      setSeed(s, true);
+      flashHint('re-seeded · '+s);
+    });
+
+    document.getElementById('btnReduce').addEventListener('click', ()=>{
+      cfg.reduced = !cfg.reduced; syncUI(); save();
+      // hard clear so the switch is clean
+      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,W,H);
+    });
+
+    // keyboard transport
+    window.addEventListener('keydown', (e)=>{
+      if (/INPUT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
+      const k = e.key.toLowerCase();
+      if (e.code === 'Space'){ e.preventDefault(); started ? stopLoom() : startLoom(); }
+      else if (k === 'n'){ const s=newSeedString(); setSeed(s,true); flashHint('a new thread · '+s); }
+      else if (k === 'r'){ cfg.reduced = !cfg.reduced; syncUI(); save(); ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,W,H); }
+    });
+
+    // ---- hint helpers ----
+    const hintEl = document.getElementById('hint');
+    const defaultHint = hintEl.textContent;
+    let hintTimer = null;
+    function flashHint(msg){
+      hintEl.textContent = msg;
+      hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(()=>{ hintEl.classList.remove('flicker'); hintEl.textContent = defaultHint; }, 2600);
+    }
+
+    const driftEl = document.getElementById('driftLine');
+    let driftTimer = null;
+    function flashDrift(){
+      if (!driftMsg) return;
+      driftEl.textContent = driftMsg;
+      driftEl.style.color = 'var(--accent)';
+      clearTimeout(driftTimer);
+      driftTimer = setTimeout(()=>{ driftEl.style.color = 'var(--ink-ghost)'; driftEl.textContent = '— drifting —'; }, 4200);
+    }
+
+    // ---- elapsed clock ----
+    setInterval(()=>{
+      const el = document.getElementById('elapsedOut');
+      if (!started){ return; }
+      const secs = Math.floor((performance.now() - elapsedStart)/1000);
+      const m = String(Math.floor(secs/60)).padStart(2,'0');
+      const s = String(secs%60).padStart(2,'0');
+      el.textContent = m+':'+s;
+    }, 1000);
+
+    // ====================================================================
+    // boot
+    // ====================================================================
+    resize();
+    // seed: restore persisted, else mint a new one
+    setSeed(cfg.seed || newSeedString(), false);
+    syncUI();
+    requestAnimationFrame(renderVisuals);
+
+    // ===== ambient embers (capped, reduced-motion-safe) =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const host = document.getElementById('embers');
+      for (let i=0;i<6;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random()*88) + '%';
+        e.style.animationDelay = (Math.random()*16) + 's';
+        e.style.animationDuration = (14 + Math.random()*9) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3){
+        const w = document.getElementById('nightWhisper'); if (w) w.style.display='block';
+      }
+    })();
+
+    // ===== easter egg: type "prizrak" to wake a watcher =====
+    (function(){
+      let buf = '';
+      window.addEventListener('keydown', (ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length !== 1) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak'){
+          const g = document.getElementById('ghostLine');
+          if (g){ g.style.display='block'; g.classList.add('flicker'); }
+          // the watcher adds a fourth, fifth, octave — a sudden open chord
+          if (started && actx){
+            const root = midiToFreq(tonic);
+            [1, 1.5, 2, 3].forEach((mult, i)=>{
+              setTimeout(()=> playBell(root*mult*2, 0.7, (i-1.5)*0.4), i*180);
+            });
+          }
+          flashHint('a watcher leans into the weave.');
+        }
+      });
+    })();
+
+    // ===== easter egg: triple-click the title → one extra ember =====
+    (function(){
+      const t = document.getElementById('appTitle');
+      if (!t) return;
+      t.addEventListener('click', (ev)=>{
+        if (ev.detail === 3 && !reduceMQ.matches){
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random()*20) + '%';
+          e.style.animationDuration = '12s';
+          document.getElementById('embers').appendChild(e);
+          setTimeout(()=>e.remove(), 13000);
+        }
+      });
+    })();
+
+    // ===== easter egg: idle 60s → the watcher leans in =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const line = document.getElementById('idleLine');
+      let timer;
+      function arm(){
+        if (line){ line.style.opacity='0'; }
+        clearTimeout(timer);
+        timer = setTimeout(()=>{
+          if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+            setTimeout(()=>{ if (line) line.style.opacity='0'; }, 6000); }
+        }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+      arm();
+    })();
+
+    // react to system reduced-motion changes
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change', (e)=>{ cfg.reduced = e.matches; syncUI(); save(); ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,W,H); });
+    }
+
+    // suspend audio when tab hidden, resume on return (kindness to the ears)
+    document.addEventListener('visibilitychange', ()=>{
+      if (!actx) return;
+      if (document.hidden && actx.state==='running'){ actx.suspend(); }
+      else if (!document.hidden && started && actx.state==='suspended'){ actx.resume(); }
+    });
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

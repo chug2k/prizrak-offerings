@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Reaction Pool | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#08090b;
+      --bg-raised:#101216;
+      --bg-sunk:#0a0c10;
+      --line:#23272e;
+      --line-soft:#181b20;
+      --ink:#cdd4d8;
+      --ink-dim:#727a82;
+      --ink-ghost:#343b42;
+      --accent:#34d6c8;            /* cave-pool teal — the mineral's faint phosphorescence */
+      --accent-deep:#1f9c92;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); height:100%; }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 82%, transparent);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+      outline:none;
+      border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+
+    select{
+      background:var(--bg-sunk); color:var(--ink); border:1px solid var(--line);
+      font-family:'JetBrains Mono', ui-monospace, monospace;
+    }
+    select option{ background:#0a0c10; color:var(--ink); }
+
+    /* tactile buttons */
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 50%, transparent);
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* preset chips */
+    .chip{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line); color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 40%, transparent);
+    }
+    .chip:hover{ border-color:var(--accent-deep); color:var(--ink); }
+    .chip:active{ transform:translateY(1px); }
+    .chip-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .h1-glow{ text-shadow:0 0 16px var(--glow); }
+    .num{ color:var(--accent); }
+    .label{ color:var(--ink-dim); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.18em; }
+
+    /* === ambient motion vocabulary (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.09}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 36s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:.45}100%{transform:translateY(-90vh) translateX(12px);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 18s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 20px var(--glow)}}
+    .breathe{animation:breathe 5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6.5s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.028;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* the pool surface */
+    #pool{ display:block; touch-action:none; cursor:crosshair; image-rendering:auto; }
+    #pool.erasing{ cursor:cell; }
+
+    /* a soft vignette to push the pool into the dark */
+    .vignette{position:fixed;inset:0;pointer-events:none;z-index:2;
+      box-shadow:inset 0 0 200px 40px rgba(0,0,0,0.75), inset 0 0 60px 0 rgba(0,0,0,0.4);}
+
+    #ghostLine, #idleLine, #nightWhisper { color: var(--ink-ghost); }
+
+    /* scrollable control column on short screens */
+    .bench{ max-height:min(86vh, 760px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+    .bench::-webkit-scrollbar{ width:8px; }
+    .bench::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+    .bench::-webkit-scrollbar-track{ background:transparent; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen grain overflow-hidden">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the pool itself -->
+  <canvas id="pool" class="fixed inset-0 z-[1]"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- header, floating top-left -->
+  <header class="fixed top-0 left-0 z-[4] p-5 select-none pointer-events-none max-w-[19rem]">
+    <div class="mono label mb-1 flicker">prízrak / instrument 27 — mineral</div>
+    <h1 id="appTitle" class="text-2xl font-semibold text-white h1-glow breathe cursor-default pointer-events-auto inline-block">The Reaction Pool</h1>
+    <p class="text-xs mt-1" style="color:var(--ink-dim)">A still pool in the dark, ready to grow. Paint a seed; the chemistry does the rest. Watch what blooms.</p>
+  </header>
+
+  <!-- the bench of controls, floating right -->
+  <div class="fixed top-0 right-0 bottom-0 z-[4] p-3 sm:p-4 flex items-center pointer-events-none">
+    <div class="glass rounded-2xl p-3 sm:p-4 w-[20rem] max-w-[88vw] pointer-events-auto bench">
+
+      <!-- transport row -->
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <button id="btnPause" class="btn rounded-lg px-2.5 py-1.5 text-xs mono" title="space">⏸ pause</button>
+        <button id="btnReset" class="btn rounded-lg px-2.5 py-1.5 text-xs mono" title="r — still the pool">↺ still</button>
+        <button id="btnSeed" class="btn rounded-lg px-2.5 py-1.5 text-xs mono" title="s — scatter a few seeds">⁂ scatter</button>
+        <button id="btnSnap" class="btn rounded-lg px-2.5 py-1.5 text-xs mono" title="p — keep the still">⤓ keep</button>
+      </div>
+
+      <!-- regime presets -->
+      <div class="mb-3">
+        <div class="label mb-1.5">regime</div>
+        <div id="presets" class="grid grid-cols-3 gap-1.5"></div>
+        <p id="presetNote" class="mono text-[10px] mt-1.5 leading-snug" style="color:var(--ink-ghost)">choose a chemistry, then paint into the dark.</p>
+      </div>
+
+      <!-- chemistry sliders -->
+      <div class="space-y-2.5 mb-3">
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">feed&nbsp;·&nbsp;f</span>
+            <span id="feedOut" class="mono text-[11px] num">0.0367</span>
+          </div>
+          <input type="range" id="feed" min="0" max="100" value="40" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">kill&nbsp;·&nbsp;k</span>
+            <span id="killOut" class="mono text-[11px] num">0.0649</span>
+          </div>
+          <input type="range" id="kill" min="0" max="100" value="50" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">diffuse&nbsp;·&nbsp;u</span>
+            <span id="duOut" class="mono text-[11px] num">0.16</span>
+          </div>
+          <input type="range" id="du" min="0" max="100" value="80" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">diffuse&nbsp;·&nbsp;v</span>
+            <span id="dvOut" class="mono text-[11px] num">0.08</span>
+          </div>
+          <input type="range" id="dv" min="0" max="100" value="40" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+      </div>
+
+      <!-- brush -->
+      <div class="space-y-2.5 mb-3 pt-3" style="border-top:1px solid var(--line-soft)">
+        <div>
+          <div class="flex justify-between mb-1">
+            <span class="mono label">brush</span>
+            <span id="brushOut" class="mono text-[11px] num">14</span>
+          </div>
+          <input type="range" id="brush" min="3" max="48" value="14" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="btnPaint" class="btn btn-on rounded-lg px-2.5 py-1.5 text-xs mono flex-1" title="paint seeds (v chemical)">✦ seed</button>
+          <button id="btnErase" class="btn rounded-lg px-2.5 py-1.5 text-xs mono flex-1" title="erase back to still pool">○ erase</button>
+        </div>
+      </div>
+
+      <!-- render -->
+      <div class="space-y-2.5 pt-3" style="border-top:1px solid var(--line-soft)">
+        <div>
+          <div class="label mb-1.5">colormap</div>
+          <select id="palette" class="w-full rounded-lg px-2 py-1.5 text-xs mono cursor-pointer"></select>
+        </div>
+        <div class="flex items-center justify-between gap-2">
+          <button id="btnSpeed" class="btn rounded-lg px-2.5 py-1.5 text-xs mono flex-1" title="iterations per frame">↯ flow: brisk</button>
+          <button id="btnReduce" class="btn rounded-lg px-2.5 py-1.5 text-xs mono flex-1" title="calm the ambient motion">◐ motion: full</button>
+        </div>
+      </div>
+
+      <!-- hint line / status -->
+      <div class="mt-3 pt-3" style="border-top:1px solid var(--line-soft)">
+        <p id="hint" class="mono text-[10px] leading-snug" style="color:var(--ink-ghost)">click-drag on the pool to paint a seed · it takes a moment to wake</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- footer whispers (off-canvas, screen-reader / easter-egg lines) -->
+  <div class="fixed bottom-3 left-4 z-[4] pointer-events-none">
+    <p id="nightWhisper" class="mono text-[10px]" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono text-[10px] mt-1" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono text-[10px] mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still watching the water.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    const KEY = 'reaction-pool-v1';
+    const canvas = document.getElementById('pool');
+    const ctx = canvas.getContext('2d', { alpha:false });
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // ---- simulation grid (fixed; the canvas scales up to fill the screen) ----
+    const GW = 220, GH = 150;          // sim resolution — alien Turing patterns at ~33k cells
+    const N = GW * GH;
+
+    // double-buffered chemical concentrations (typed arrays)
+    let U  = new Float32Array(N);
+    let V  = new Float32Array(N);
+    let U2 = new Float32Array(N);
+    let V2 = new Float32Array(N);
+
+    // the offscreen image we paint to, then blit (scaled) onto the visible canvas
+    const img = ctx.createImageData(GW, GH);
+    const imgData = img.data;
+    const buf = document.createElement('canvas');
+    buf.width = GW; buf.height = GH;
+    const bctx = buf.getContext('2d');
+
+    // ---- regimes: feed/kill/Du/Dv produce dramatically different worlds ----
+    // values are classic Gray-Scott coordinates; sliders map onto a band around these.
+    const PRESETS = [
+      { id:'coral',       name:'coral',       f:0.0545, k:0.0620, du:0.16, dv:0.08, note:'slow branching reefs that never stop reaching outward.' },
+      { id:'mitosis',     name:'mitosis',     f:0.0367, k:0.0649, du:0.16, dv:0.08, note:'cells that bud, split, and divide — the pool breeds.' },
+      { id:'fingerprints',name:'fingerprints',f:0.0545, k:0.0470, du:0.19, dv:0.08, note:'looping ridges and whorls, like a print pressed in stone.' },
+      { id:'worms',       name:'worms',       f:0.0580, k:0.0630, du:0.16, dv:0.08, note:'restless crawling filaments that wander and braid.' },
+      { id:'bubbles',     name:'bubbles',     f:0.0980, k:0.0570, du:0.16, dv:0.08, note:'a froth of negative cells — holes opening in light.' },
+      { id:'spirals',     name:'spirals',     f:0.0180, k:0.0510, du:0.16, dv:0.08, note:'excitable medium — slow rotating spiral waves.' },
+      { id:'maze',        name:'maze',        f:0.0290, k:0.0570, du:0.16, dv:0.08, note:'labyrinth corridors that wall themselves in.' },
+      { id:'holes',       name:'holes',       f:0.0390, k:0.0580, du:0.16, dv:0.08, note:'pocked stone — pits eating into a solid field.' },
+      { id:'flux',        name:'unstable',    f:0.0260, k:0.0510, du:0.16, dv:0.08, note:'chaotic, self-replacing turbulence. never settles.' }
+    ];
+
+    // ---- colormaps: cold cave tones, glowing (lut of 256 rgb) ----
+    // each is a list of [stop(0..1), r,g,b]; we interpolate into a 256 LUT.
+    const PALETTES = {
+      'phosphor': { name:'phosphor',  stops:[[0,4,6,9],[0.35,8,28,34],[0.6,18,86,92],[0.82,52,214,200],[1,196,255,244]] },
+      'amethyst': { name:'amethyst',  stops:[[0,5,4,10],[0.35,28,16,52],[0.62,92,52,168],[0.85,168,120,246],[1,234,222,255]] },
+      'glacier':  { name:'glacier',   stops:[[0,3,7,12],[0.4,10,34,60],[0.65,30,96,150],[0.85,96,176,232],[1,220,242,255]] },
+      'ember':    { name:'ember',     stops:[[0,8,4,4],[0.35,46,14,8],[0.6,140,46,18],[0.82,230,128,40],[1,255,232,176]] },
+      'sulfur':   { name:'sulfur',    stops:[[0,6,7,4],[0.4,24,32,10],[0.64,92,112,22],[0.85,196,206,64],[1,248,250,196]] },
+      'mono':     { name:'bone',      stops:[[0,5,6,8],[0.5,40,44,50],[0.78,120,128,138],[1,232,236,242]] },
+      'malachite':{ name:'malachite', stops:[[0,3,8,6],[0.36,8,40,28],[0.62,22,118,80],[0.84,86,210,150],[1,214,255,228]] }
+    };
+    function buildLUT(stops){
+      const lut = new Uint8Array(256*3);
+      for (let i=0;i<256;i++){
+        const t = i/255;
+        let a = stops[0], b = stops[stops.length-1];
+        for (let s=0;s<stops.length-1;s++){
+          if (t >= stops[s][0] && t <= stops[s+1][0]){ a = stops[s]; b = stops[s+1]; break; }
+        }
+        const span = (b[0]-a[0]) || 1;
+        let f = (t - a[0]) / span; if (f<0) f=0; if (f>1) f=1;
+        // smootherstep for a softer, more luminous ramp
+        f = f*f*f*(f*(f*6-15)+10);
+        lut[i*3]   = Math.round(a[1] + (b[1]-a[1])*f);
+        lut[i*3+1] = Math.round(a[2] + (b[2]-a[2])*f);
+        lut[i*3+2] = Math.round(a[3] + (b[3]-a[3])*f);
+      }
+      return lut;
+    }
+    const LUTS = {};
+    for (const k in PALETTES) LUTS[k] = buildLUT(PALETTES[k].stops);
+
+    // ---- settings (persisted) ----
+    const defaults = {
+      feed:40, kill:50, du:80, dv:40,        // slider positions 0..100
+      brush:14, palette:'phosphor', preset:'mitosis',
+      speed:8, paintMode:'seed', reduced:reduceMQ.matches
+    };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object') cfg = Object.assign(cfg, s); } catch(e){}
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch(e){} }
+
+    // slider 0..100 -> real chemistry parameters (bands tuned to keep patterns alive)
+    function feedVal(){ return 0.010 + (cfg.feed/100) * 0.090; }   // 0.010 .. 0.100
+    function killVal(){ return 0.045 + (cfg.kill/100) * 0.025; }   // 0.045 .. 0.070
+    function duVal(){   return 0.10  + (cfg.du/100)   * 0.16;  }   // 0.10  .. 0.26
+    function dvVal(){   return 0.04  + (cfg.dv/100)   * 0.10;  }   // 0.04  .. 0.14
+
+    function paramsToSliders(p){
+      // invert the bands above for presets
+      cfg.feed = clamp01((p.f - 0.010)/0.090)*100;
+      cfg.kill = clamp01((p.k - 0.045)/0.025)*100;
+      cfg.du   = clamp01((p.du- 0.10 )/0.16 )*100;
+      cfg.dv   = clamp01((p.dv- 0.04 )/0.10 )*100;
+    }
+    function clamp01(x){ return x<0?0:x>1?1:x; }
+
+    let paused = false;
+    let DPR = 1, W = 0, H = 0;
+
+    // ---- seeding ----
+    function stillPool(){
+      // U everywhere = 1 (substrate full), V = 0 (no reactant). a perfectly still pool.
+      U.fill(1); V.fill(0); U2.fill(1); V2.fill(0);
+    }
+
+    function seedBlob(gx, gy, radius, strength){
+      const r2 = radius*radius;
+      const r = Math.ceil(radius);
+      for (let dy=-r; dy<=r; dy++){
+        for (let dx=-r; dx<=r; dx++){
+          const d2 = dx*dx + dy*dy;
+          if (d2 > r2) continue;
+          let x = gx+dx, y = gy+dy;
+          if (x<0||x>=GW||y<0||y>=GH) continue;
+          const idx = y*GW + x;
+          const falloff = strength * (1 - d2/r2);
+          V[idx] = Math.min(1, V[idx] + falloff);
+          U[idx] = Math.max(0, U[idx] - falloff*0.6);
+        }
+      }
+    }
+    function eraseBlob(gx, gy, radius){
+      const r2 = radius*radius;
+      const r = Math.ceil(radius);
+      for (let dy=-r; dy<=r; dy++){
+        for (let dx=-r; dx<=r; dx++){
+          const d2 = dx*dx + dy*dy;
+          if (d2 > r2) continue;
+          let x = gx+dx, y = gy+dy;
+          if (x<0||x>=GW||y<0||y>=GH) continue;
+          const idx = y*GW + x;
+          V[idx] = 0; U[idx] = 1;
+        }
+      }
+    }
+    function scatterSeeds(n){
+      n = n || (5 + Math.floor(Math.random()*5));
+      for (let i=0;i<n;i++){
+        const gx = 20 + Math.random()*(GW-40);
+        const gy = 16 + Math.random()*(GH-32);
+        seedBlob(Math.round(gx), Math.round(gy), 3+Math.random()*4, 0.85);
+      }
+    }
+
+    // ---- the Gray-Scott step (the heart). 5-point Laplacian, toroidal wrap. ----
+    function step(){
+      const f = feedVal(), k = killVal(), Du = duVal(), Dv = dvVal();
+      const su = U, sv = V, du = U2, dv = V2;
+      for (let y=0; y<GH; y++){
+        const yU = (y===0     ? GH-1 : y-1) * GW;
+        const yD = (y===GH-1  ? 0    : y+1) * GW;
+        const yC = y*GW;
+        for (let x=0; x<GW; x++){
+          const xL = (x===0    ? GW-1 : x-1);
+          const xR = (x===GW-1 ? 0    : x+1);
+          const c  = yC + x;
+          const u = su[c], v = sv[c];
+
+          // Laplacian (weighted: orthogonal 0.2, diagonal 0.05, center -1)
+          const lu =
+              0.2  * (su[yC+xL] + su[yC+xR] + su[yU+x] + su[yD+x])
+            + 0.05 * (su[yU+xL] + su[yU+xR] + su[yD+xL] + su[yD+xR])
+            -        u;
+          const lv =
+              0.2  * (sv[yC+xL] + sv[yC+xR] + sv[yU+x] + sv[yD+x])
+            + 0.05 * (sv[yU+xL] + sv[yU+xR] + sv[yD+xL] + sv[yD+xR])
+            -        v;
+
+          const uvv = u * v * v;
+          let nu = u + (Du*lu - uvv + f*(1-u));
+          let nv = v + (Dv*lv + uvv - (k+f)*v);
+          // clamp to keep the integration honest
+          du[c] = nu < 0 ? 0 : nu > 1 ? 1 : nu;
+          dv[c] = nv < 0 ? 0 : nv > 1 ? 1 : nv;
+        }
+      }
+      // swap buffers
+      let t = U; U = U2; U2 = t;
+      t = V; V = V2; V2 = t;
+    }
+
+    // ---- render: map V (and a touch of gradient) through the LUT, glow via blit scaling ----
+    function render(){
+      const lut = LUTS[cfg.palette] || LUTS.phosphor;
+      const d = imgData;
+      // map V through a gentle contrast curve so faint growth still glows
+      for (let i=0; i<N; i++){
+        let v = V[i];
+        // emphasize structure: v tends to live in 0..0.45 — stretch it
+        let t = v * 2.6;
+        if (t > 1) t = 1;
+        t = t < 0 ? 0 : t;
+        // a soft gamma lift for luminous low end
+        t = Math.sqrt(t);
+        const li = (t*255)|0;
+        const o = i*4, l = li*3;
+        d[o]   = lut[l];
+        d[o+1] = lut[l+1];
+        d[o+2] = lut[l+2];
+        d[o+3] = 255;
+      }
+      bctx.putImageData(img, 0, 0);
+      // blit scaled, with smoothing on for a wet, glowing surface
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(buf, 0, 0, GW, GH, 0, 0, W, H);
+
+      // a faint additive bloom pass: redraw the bright structure slightly blurred & screened
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.28;
+      ctx.drawImage(buf, 0, 0, GW, GH, -2, -2, W+4, H+4);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+
+      // brush ghost ring
+      if (hover.on && !drag.active){
+        const px = hover.x, py = hover.y;
+        const pr = cfg.brush * (W/GW);
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI*2);
+        ctx.strokeStyle = cfg.paintMode==='erase' ? 'rgba(220,120,120,0.45)' : 'rgba(52,214,200,0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
+    // ---- sizing: canvas fills the screen; sim grid is fixed and scaled up ----
+    function resize(){
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width  = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width  = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      render();
+    }
+    window.addEventListener('resize', resize);
+
+    // ---- main loop ----
+    function frame(){
+      if (!paused){
+        const iters = cfg.speed;
+        for (let s=0; s<iters; s++) step();
+      }
+      render();
+      requestAnimationFrame(frame);
+    }
+
+    // ---- pointer -> grid mapping & painting ----
+    const drag = { active:false };
+    const hover = { on:false, x:0, y:0 };
+    let lastGX = null, lastGY = null;
+
+    function gridFromEvent(e){
+      const rect = canvas.getBoundingClientRect();
+      const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      const px = p.clientX - rect.left, py = p.clientY - rect.top;
+      hover.x = px; hover.y = py; hover.on = true;
+      const gx = Math.round(px / W * GW);
+      const gy = Math.round(py / H * GH);
+      return [gx, gy, px, py];
+    }
+
+    function paintAt(gx, gy){
+      const r = cfg.brush * (GW / W); // brush is in screen px-ish; scale to grid
+      const radius = Math.max(2, cfg.brush * 0.5);
+      if (cfg.paintMode === 'erase') eraseBlob(gx, gy, radius);
+      else seedBlob(gx, gy, radius, 0.9);
+    }
+
+    // interpolate along a drag so fast strokes stay continuous
+    function strokeTo(gx, gy){
+      if (lastGX === null){ paintAt(gx, gy); lastGX=gx; lastGY=gy; return; }
+      const dx = gx-lastGX, dy = gy-lastGY;
+      const dist = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.floor(dist / 2));
+      for (let i=1;i<=steps;i++){
+        paintAt(Math.round(lastGX + dx*i/steps), Math.round(lastGY + dy*i/steps));
+      }
+      lastGX = gx; lastGY = gy;
+    }
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      const [gx,gy] = gridFromEvent(e);
+      drag.active = true; lastGX = null;
+      canvas.classList.toggle('erasing', cfg.paintMode==='erase');
+      strokeTo(gx, gy);
+      markFirstSeed();
+      e.preventDefault();
+    }
+    function onMove(e){
+      const [gx,gy] = gridFromEvent(e);
+      if (!drag.active) return;
+      strokeTo(gx, gy);
+      e.preventDefault();
+    }
+    function onUp(){ drag.active = false; lastGX = null; canvas.classList.remove('erasing'); }
+    function onLeave(){ hover.on = false; }
+
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('mouseleave', onLeave);
+    canvas.addEventListener('touchstart', onDown, {passive:false});
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp);
+
+    // ---- UI wiring ----
+    const el = id => document.getElementById(id);
+    const feedEl=el('feed'), killEl=el('kill'), duEl=el('du'), dvEl=el('dv'), brushEl=el('brush');
+    const feedOut=el('feedOut'), killOut=el('killOut'), duOut=el('duOut'), dvOut=el('dvOut'), brushOut=el('brushOut');
+    const palEl=el('palette'), presetNote=el('presetNote');
+
+    function syncReadouts(){
+      feedOut.textContent = feedVal().toFixed(4);
+      killOut.textContent = killVal().toFixed(4);
+      duOut.textContent   = duVal().toFixed(3);
+      dvOut.textContent   = dvVal().toFixed(3);
+      brushOut.textContent = cfg.brush;
+    }
+    function syncSliders(){
+      feedEl.value=cfg.feed; killEl.value=cfg.kill; duEl.value=cfg.du; dvEl.value=cfg.dv; brushEl.value=cfg.brush;
+    }
+
+    // preset chips
+    const presetsHost = el('presets');
+    PRESETS.forEach(p=>{
+      const b = document.createElement('button');
+      b.className = 'chip rounded-md px-1.5 py-1 text-[10px] mono';
+      b.textContent = p.name;
+      b.dataset.id = p.id;
+      b.addEventListener('click', ()=>applyPreset(p, true));
+      presetsHost.appendChild(b);
+    });
+    function highlightPreset(){
+      [...presetsHost.children].forEach(c=>c.classList.toggle('chip-on', c.dataset.id===cfg.preset));
+    }
+    function applyPreset(p, reseed){
+      cfg.preset = p.id;
+      paramsToSliders(p);
+      syncSliders(); syncReadouts(); highlightPreset(); save();
+      presetNote.textContent = p.note;
+      presetNote.classList.remove('flicker'); void presetNote.offsetWidth; presetNote.classList.add('flicker');
+      if (reseed){
+        stillPool();
+        // a generous central seed so each regime reveals itself immediately
+        seedBlob(GW>>1, GH>>1, 12, 0.95);
+        scatterSeeds(4);
+      }
+    }
+    function presetById(id){ return PRESETS.find(p=>p.id===id) || PRESETS[1]; }
+
+    // palette select
+    for (const k in PALETTES){
+      const o = document.createElement('option');
+      o.value = k; o.textContent = PALETTES[k].name;
+      palEl.appendChild(o);
+    }
+    palEl.value = cfg.palette;
+    palEl.addEventListener('change', ()=>{ cfg.palette = palEl.value; save(); });
+
+    feedEl.addEventListener('input', ()=>{ cfg.feed=+feedEl.value; cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    killEl.addEventListener('input', ()=>{ cfg.kill=+killEl.value; cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    duEl.addEventListener('input',   ()=>{ cfg.du=+duEl.value;   cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    dvEl.addEventListener('input',   ()=>{ cfg.dv=+dvEl.value;   cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    brushEl.addEventListener('input',()=>{ cfg.brush=+brushEl.value; brushOut.textContent=cfg.brush; save(); });
+
+    // paint / erase toggle
+    const btnPaint=el('btnPaint'), btnErase=el('btnErase');
+    function syncPaintMode(){
+      const seed = cfg.paintMode==='seed';
+      btnPaint.classList.toggle('btn-on', seed);
+      btnErase.classList.toggle('btn-on', !seed);
+    }
+    btnPaint.addEventListener('click', ()=>{ cfg.paintMode='seed'; syncPaintMode(); save(); });
+    btnErase.addEventListener('click', ()=>{ cfg.paintMode='erase'; syncPaintMode(); save(); });
+
+    // transport
+    const btnPause=el('btnPause');
+    function togglePause(){ paused=!paused; btnPause.textContent = paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on', paused); }
+    btnPause.addEventListener('click', togglePause);
+    el('btnReset').addEventListener('click', ()=>{ stillPool(); flashHint('the pool is still again.'); });
+    el('btnSeed').addEventListener('click', ()=>{ scatterSeeds(); markFirstSeed(); });
+    el('btnSnap').addEventListener('click', saveStill);
+
+    // flow speed (iterations per frame)
+    const SPEEDS = [ {n:'languid', v:4}, {n:'brisk', v:8}, {n:'rushing', v:14} ];
+    const btnSpeed=el('btnSpeed');
+    function speedIndex(){ let i = SPEEDS.findIndex(s=>s.v===cfg.speed); return i<0?1:i; }
+    function syncSpeed(){ btnSpeed.textContent = '↯ flow: ' + SPEEDS[speedIndex()].n; }
+    btnSpeed.addEventListener('click', ()=>{ const i=(speedIndex()+1)%SPEEDS.length; cfg.speed=SPEEDS[i].v; syncSpeed(); save(); });
+
+    // motion calm
+    const btnReduce=el('btnReduce');
+    function syncReduce(){ btnReduce.classList.toggle('btn-on', cfg.reduced); btnReduce.textContent = cfg.reduced?'◐ motion: calm':'◐ motion: full'; document.body.classList.toggle('reduced-amb', cfg.reduced); }
+    btnReduce.addEventListener('click', ()=>{ cfg.reduced=!cfg.reduced; applyReduce(); syncReduce(); save(); });
+    function applyReduce(){
+      const host = el('embers');
+      if (cfg.reduced){ host.innerHTML=''; document.querySelector('.fog').style.animation='none'; }
+      else { document.querySelector('.fog').style.animation=''; buildEmbers(); }
+    }
+
+    // keyboard
+    window.addEventListener('keydown', (e)=>{
+      if (/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'')) return;
+      const k = e.key.toLowerCase();
+      if (e.code==='Space'){ e.preventDefault(); togglePause(); }
+      else if (k==='r'){ stillPool(); flashHint('the pool is still again.'); }
+      else if (k==='s'){ scatterSeeds(); markFirstSeed(); }
+      else if (k==='p'){ saveStill(); }
+      else if (k==='e'){ cfg.paintMode = cfg.paintMode==='erase'?'seed':'erase'; syncPaintMode(); save(); }
+      else if (k==='['){ cfg.brush=Math.max(3,cfg.brush-2); brushEl.value=cfg.brush; brushOut.textContent=cfg.brush; save(); }
+      else if (k===']'){ cfg.brush=Math.min(48,cfg.brush+2); brushEl.value=cfg.brush; brushOut.textContent=cfg.brush; save(); }
+    });
+
+    // save a still (PNG) of the current pool
+    function saveStill(){
+      try{
+        const out = document.createElement('canvas');
+        out.width = GW*4; out.height = GH*4;
+        const octx = out.getContext('2d');
+        octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality='high';
+        octx.fillStyle = '#08090b'; octx.fillRect(0,0,out.width,out.height);
+        octx.drawImage(buf, 0,0,GW,GH, 0,0,out.width,out.height);
+        const a = document.createElement('a');
+        a.download = 'reaction-pool-' + Date.now() + '.png';
+        a.href = out.toDataURL('image/png');
+        a.click();
+        flashHint('a still was kept.');
+      }catch(err){ flashHint('could not keep the still.'); }
+    }
+
+    // hint helpers
+    const hintEl = el('hint');
+    const defaultHint = hintEl.textContent;
+    let hintTimer=null, seeded=false;
+    function flashHint(msg){
+      hintEl.textContent = msg; hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(()=>{ hintEl.classList.remove('flicker'); hintEl.textContent = seeded ? 'space stills time · e toggles erase · [ ] resize the brush · p keeps a still' : defaultHint; }, 2600);
+    }
+    function markFirstSeed(){ if (!seeded){ seeded=true; hintEl.textContent='space stills time · e toggles erase · [ ] resize the brush · p keeps a still'; } }
+
+    // ---- boot ----
+    function syncAll(){ syncSliders(); syncReadouts(); syncPaintMode(); syncSpeed(); syncReduce(); highlightPreset(); }
+
+    stillPool();
+    resize();
+    palEl.value = cfg.palette;
+    // restore preset (or custom params already in cfg)
+    if (cfg.preset && cfg.preset !== 'custom'){ paramsToSliders(presetById(cfg.preset)); }
+    syncAll();
+
+    // wake the pool with the current regime so the first frame already lives
+    (function firstBloom(){
+      const p = (cfg.preset && cfg.preset!=='custom') ? presetById(cfg.preset) : presetById('mitosis');
+      presetNote.textContent = p.note;
+      seedBlob(GW>>1, GH>>1, 12, 0.95);
+      scatterSeeds(5);
+    })();
+
+    requestAnimationFrame(frame);
+
+    // ===== ambient embers (capped, reduced-motion-safe) =====
+    function buildEmbers(){
+      if (reduceMQ.matches || cfg.reduced) return;
+      const host = el('embers'); host.innerHTML='';
+      for (let i=0;i<6;i++){
+        const e = document.createElement('div');
+        e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*18)+'s';
+        e.style.animationDuration=(15+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    }
+    buildEmbers();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){
+      const h = new Date().getHours();
+      if (h>=0 && h<3){ const w=el('nightWhisper'); if (w) w.style.display='block'; }
+    })();
+
+    // ===== easter egg: type "prizrak" to wake a watcher =====
+    (function(){
+      let bufk='';
+      window.addEventListener('keydown',(ev)=>{
+        if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        bufk=(bufk+ev.key.toLowerCase()).slice(-7);
+        if (bufk==='prizrak'){
+          const g=el('ghostLine'); if (g){ g.style.display='block'; g.classList.add('flicker'); }
+          // the watcher presses a single deliberate seed and sets the pool spiraling
+          applyPreset(presetById('spirals'), false);
+          stillPool();
+          // an off-center asymmetric seed births a rotating spiral
+          seedBlob(GW>>1, GH>>1, 10, 0.95);
+          for (let y=GH>>1; y<GH; y++) for (let x=GW>>1; x<(GW>>1)+14; x++){ if (x<GW){ V[y*GW+x]=0; U[y*GW+x]=1; } }
+          flashHint('the watcher stirs the water. a spiral wakes.');
+        }
+      });
+    })();
+
+    // ===== easter egg: triple-click the title → one extra ember + a seed bloom =====
+    (function(){
+      const t = el('appTitle'); if (!t) return;
+      t.addEventListener('click',(ev)=>{
+        if (ev.detail===3){
+          seedBlob(20+Math.floor(Math.random()*(GW-40)), 16+Math.floor(Math.random()*(GH-32)), 6, 0.9);
+          if (!reduceMQ.matches && !cfg.reduced){
+            const e=document.createElement('div'); e.className='ember';
+            e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='13s';
+            el('embers').appendChild(e); setTimeout(()=>e.remove(),13000);
+          }
+        }
+      });
+    })();
+
+    // ===== easter egg: idle 60s → the watcher leans in =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const line=el('idleLine'); let timer;
+      function arm(){
+        if (line) line.style.opacity='0';
+        clearTimeout(timer);
+        timer=setTimeout(()=>{
+          if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+            setTimeout(()=>{ if (line) line.style.opacity='0'; },6000); }
+        },60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev,arm,{passive:true}));
+      arm();
+    })();
+
+    // react to system reduced-motion changes
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change',(e)=>{ cfg.reduced=e.matches; applyReduce(); syncReduce(); save(); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>
