@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Constellation | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#08090c;
+      --bg-raised:#101218;
+      --bg-sunk:#0b0d12;
+      --line:#23262f;
+      --line-soft:#191b22;
+      --ink:#cfd6e2;
+      --ink-dim:#727a8a;
+      --ink-ghost:#363c49;
+      --accent:#56b6ff;          /* sky-blue, the lead */
+      --accent-deep:#2b7fd1;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); }
+    body{ color:var(--ink); font-family:system-ui, sans-serif; overscroll-behavior:none; }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 88%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="text"]{ background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink); }
+    input[type="text"]::placeholder{ color:var(--ink-ghost); }
+    input:focus-visible, button:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .btn-lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s, color .15s; }
+    .btn-lift:hover{ transform:translateY(-1px); }
+    .btn-lift:active{ transform:translateY(1px); }
+
+    .chip{ background:var(--bg-sunk); border:1px solid var(--line); transition:border-color .15s, color .15s, transform .12s, background-color .15s; }
+    .chip:hover{ border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); color:var(--ink); }
+    .chip:active{ transform:translateY(1px); }
+    .chip.on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* the sky itself */
+    #sky{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+    #sky.dragging{ cursor:grabbing; }
+    .sky-wrap{
+      position:relative; border:1px solid var(--line); border-radius:14px; overflow:hidden;
+      background:
+        radial-gradient(120% 90% at 50% -10%, rgba(86,182,255,0.06), transparent 60%),
+        radial-gradient(80% 60% at 80% 110%, rgba(43,127,209,0.05), transparent 60%),
+        linear-gradient(180deg, #0a0c12 0%, #070809 100%);
+      box-shadow:inset 0 0 0 1px var(--line-soft), inset 0 40px 120px -60px rgba(86,182,255,0.10);
+    }
+
+    /* === MOTION VOCABULARY (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.05}50%{opacity:.10}100%{transform:translateX(5%);opacity:.05}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 34s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.88;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+    .caption-glow{ box-shadow:0 0 0 1px var(--line), 0 0 26px -10px var(--glow); }
+
+    #ghostLine, #idleLine, #nightWhisper{ color:var(--ink-ghost); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen grain antialiased">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="relative z-[2] max-w-6xl mx-auto px-4 py-8 lg:py-10">
+
+    <!-- Header -->
+    <header class="mb-6">
+      <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-600 mb-2 flicker">PRÍZRAK / INSTRUMENT 21 — ORBIT</div>
+      <h1 id="appTitle" class="text-3xl font-bold text-white h1-glow select-none cursor-default breathe inline-block">The Constellation</h1>
+      <p class="text-sm mt-2 max-w-2xl" style="color:var(--ink-dim)">
+        Map the people in your orbit as a star-map. The brighter the star, the more it weighs on you. Place them close to the center if they are close — then mind which ones have gone cold.
+      </p>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-5">
+
+      <!-- Control panel -->
+      <aside class="glass rounded-2xl p-5 space-y-5 h-max lg:sticky lg:top-6">
+
+        <!-- Add a star -->
+        <div>
+          <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">ADD A STAR</div>
+          <form id="addForm" class="space-y-2" autocomplete="off">
+            <input id="nameInput" type="text" maxlength="40" class="w-full rounded-lg px-3 py-2 text-sm mono transition-colors" placeholder="name">
+            <input id="roleInput" type="text" maxlength="20" class="w-full rounded-lg px-3 py-2 text-sm mono transition-colors" placeholder="role (one word, optional)">
+            <button type="submit" class="btn-lift w-full text-[#06121e] font-bold py-2 rounded-lg mono text-xs uppercase tracking-[0.2em]" style="background:var(--accent);box-shadow:0 0 18px -6px var(--glow)">
+              cast into the sky
+            </button>
+          </form>
+        </div>
+
+        <!-- Selected star inspector -->
+        <div id="inspector" class="hidden well rounded-xl p-4 space-y-3 reveal">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div id="inspName" class="text-white font-semibold text-sm break-words"></div>
+              <div id="inspRole" class="mono text-[10px] uppercase tracking-[0.2em]" style="color:var(--ink-dim)"></div>
+            </div>
+            <button id="delStar" class="btn-lift mono text-[10px] uppercase tracking-[0.15em] text-zinc-600 hover:text-rose-400 border border-zinc-800 hover:border-rose-500/50 rounded px-2 py-1">remove</button>
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">WEIGHT</span>
+              <span id="weightVal" class="mono text-[10px]" style="color:var(--accent)">3</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="weightDown" class="chip btn-lift w-8 h-8 rounded-lg mono text-base leading-none" style="color:var(--ink-dim)">−</button>
+              <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background:var(--line)">
+                <div id="weightBar" class="h-full rounded-full" style="width:50%;background:var(--accent);box-shadow:0 0 8px var(--glow);transition:width .2s"></div>
+              </div>
+              <button id="weightUp" class="chip btn-lift w-8 h-8 rounded-lg mono text-base leading-none" style="color:var(--ink-dim)">+</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">WARMTH</span>
+              <span id="warmthVal" class="mono text-[10px]" style="color:var(--ink-dim)">warm</span>
+            </div>
+            <div class="flex gap-1.5" id="warmthChips">
+              <button data-w="warm" class="chip btn-lift flex-1 rounded-lg py-1 mono text-[10px] uppercase tracking-[0.12em]">warm</button>
+              <button data-w="cooling" class="chip btn-lift flex-1 rounded-lg py-1 mono text-[10px] uppercase tracking-[0.12em]">cooling</button>
+              <button data-w="cold" class="chip btn-lift flex-1 rounded-lg py-1 mono text-[10px] uppercase tracking-[0.12em]">cold</button>
+            </div>
+          </div>
+
+          <p class="mono text-[10px] leading-relaxed" style="color:var(--ink-ghost)">drag the star to set its distance. click another to draw a line between them.</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="space-y-2">
+          <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">THE SKY</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="pullToggle" class="chip btn-lift rounded-lg py-2 mono text-[10px] uppercase tracking-[0.12em]">gravity: off</button>
+            <button id="linkMode" class="chip btn-lift rounded-lg py-2 mono text-[10px] uppercase tracking-[0.12em]">link: click</button>
+            <button id="exportBtn" class="chip btn-lift rounded-lg py-2 mono text-[10px] uppercase tracking-[0.12em]">export png</button>
+            <button id="clearBtn" class="chip btn-lift rounded-lg py-2 mono text-[10px] uppercase tracking-[0.12em] hover:!border-rose-500/40">burn it down</button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="well rounded-xl p-3 space-y-1.5">
+          <div class="mono text-[10px] uppercase tracking-[0.2em] text-zinc-600 mb-1">FIELD NOTES</div>
+          <div class="flex items-center gap-2 text-[11px]" style="color:var(--ink-dim)"><span class="inline-block w-2 h-2 rounded-full" style="background:#56b6ff;box-shadow:0 0 8px #56b6ff"></span> warm — recently in orbit</div>
+          <div class="flex items-center gap-2 text-[11px]" style="color:var(--ink-dim)"><span class="inline-block w-2 h-2 rounded-full" style="background:#7d8aa3;box-shadow:0 0 6px #7d8aa3"></span> cooling — drifting out</div>
+          <div class="flex items-center gap-2 text-[11px]" style="color:var(--ink-dim)"><span class="inline-block w-2 h-2 rounded-full" style="background:#454d5e"></span> cold — gone dark</div>
+          <div class="text-[10px] mono pt-1" style="color:var(--ink-ghost)">size = weight · distance from center = closeness</div>
+        </div>
+      </aside>
+
+      <!-- Canvas + caption -->
+      <main class="space-y-3">
+        <div class="sky-wrap" style="aspect-ratio:16/11">
+          <canvas id="sky"></canvas>
+        </div>
+
+        <div id="caption" class="caption-glow well rounded-xl px-4 py-3 mono text-[11px] leading-relaxed min-h-[44px] flex items-center" style="color:var(--ink-dim)">
+          <span id="captionText">an empty sky. cast a star to begin.</span>
+        </div>
+
+        <div class="flex items-center justify-between mono text-[10px] uppercase tracking-[0.2em]" style="color:var(--ink-ghost)">
+          <span id="statLine">0 stars · 0 lines</span>
+          <span>the ghost saves what you place. it does not forget.</span>
+        </div>
+      </main>
+    </div>
+
+    <!-- Footer whisper -->
+    <div class="mt-10 text-center">
+      <p class="mono text-[10px] tracking-[0.2em]" style="color:var(--ink-ghost)">a constellation is just distance you agreed to call a shape.</p>
+      <p id="nightWhisper" class="mono text-[10px] tracking-[0.2em] mt-1" style="display:none">the mountain does not sleep.</p>
+      <p id="ghostLine" class="mono text-[10px] tracking-[0.2em] mt-1" style="display:none">you found the watcher.</p>
+      <p id="idleLine" class="mono text-[10px] tracking-[0.2em] mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still watching.</p>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    "use strict";
+
+    const STORE_KEY = "constellation-v1";
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const canvas = document.getElementById('sky');
+    const ctx = canvas.getContext('2d');
+    const wrap = canvas.parentElement;
+
+    // ----- state -----
+    // stars: {id, name, role, x, y, weight(1..5), warmth:'warm'|'cooling'|'cold'}
+    // coords stored normalized 0..1 so the layout survives resize.
+    let stars = [];
+    let links = [];            // [idA, idB]
+    let selectedId = null;
+    let pendingLinkId = null;  // first star clicked when forming a link
+    let gravity = false;       // gentle pull toward center for unplaced stars
+    let nextId = 1;
+
+    let W = 0, H = 0, DPR = 1;  // canvas pixel dims via DPR
+    const CENTER = { x: 0.5, y: 0.5 };
+
+    // pointer / drag
+    let dragId = null, dragMoved = false, downId = null;
+    let downPos = null;
+
+    const WARMTH = {
+      warm:    { core:'#bfe3ff', mid:'#56b6ff', dim:'#2b7fd1', line:'rgba(86,182,255,0.55)' },
+      cooling: { core:'#c5cde0', mid:'#7d8aa3', dim:'#4a5468', line:'rgba(125,138,163,0.40)' },
+      cold:    { core:'#6b7488', mid:'#454d5e', dim:'#2c3240', line:'rgba(69,77,94,0.30)' }
+    };
+
+    // ----- persistence -----
+    function save(){
+      try{
+        localStorage.setItem(STORE_KEY, JSON.stringify({ stars, links, gravity, nextId }));
+      }catch(e){}
+    }
+    function load(){
+      try{
+        const raw = localStorage.getItem(STORE_KEY);
+        if(!raw) return;
+        const d = JSON.parse(raw);
+        if(Array.isArray(d.stars)) stars = d.stars;
+        if(Array.isArray(d.links)) links = d.links;
+        gravity = !!d.gravity;
+        nextId = d.nextId || (stars.reduce((m,s)=>Math.max(m,s.id),0) + 1);
+      }catch(e){}
+    }
+
+    // ----- geometry -----
+    function resize(){
+      const r = wrap.getBoundingClientRect();
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = r.width; H = r.height;
+      canvas.width = Math.round(W * DPR);
+      canvas.height = Math.round(H * DPR);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    const px = (s) => ({ x: s.x * W, y: s.y * H });
+    function starRadius(s){
+      const base = 4 + (s.weight - 1) * 3.2;           // 4..16.8
+      return base;
+    }
+    function findStar(id){ return stars.find(s => s.id === id); }
+    function hitStar(mx, my){
+      // topmost (last drawn) first
+      for(let i = stars.length - 1; i >= 0; i--){
+        const s = stars[i]; const p = px(s);
+        const rr = Math.max(starRadius(s) + 8, 14);
+        if((mx - p.x)**2 + (my - p.y)**2 <= rr*rr) return s;
+      }
+      return null;
+    }
+
+    // ----- rendering -----
+    let twinkle = 0;
+    function draw(){
+      ctx.clearRect(0, 0, W, H);
+      const cx = CENTER.x * W, cy = CENTER.y * H;
+
+      // faint background dust stars (deterministic, decorative)
+      drawDust(cx, cy);
+
+      // closeness rings around center
+      ctx.save();
+      ctx.strokeStyle = 'rgba(86,182,255,0.06)';
+      ctx.lineWidth = 1;
+      for(let i = 1; i <= 3; i++){
+        ctx.beginPath();
+        ctx.arc(cx, cy, (Math.min(W, H) * 0.16) * i, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // links
+      ctx.lineCap = 'round';
+      for(const [a, b] of links){
+        const sa = findStar(a), sb = findStar(b);
+        if(!sa || !sb) continue;
+        const pa = px(sa), pb = px(sb);
+        const cold = sa.warmth === 'cold' || sb.warmth === 'cold';
+        const wk = (sa.warmth === 'cold' && sb.warmth === 'cold');
+        const grad = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
+        grad.addColorStop(0, WARMTH[sa.warmth].line);
+        grad.addColorStop(1, WARMTH[sb.warmth].line);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = wk ? 0.7 : (cold ? 1 : 1.4);
+        if(cold) ctx.setLineDash([3, 5]); else ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // pending-link tether to cursor handled by lastPointer
+      if(pendingLinkId != null && lastPointer){
+        const sp = findStar(pendingLinkId);
+        if(sp){
+          const p = px(sp);
+          ctx.strokeStyle = 'rgba(86,182,255,0.5)';
+          ctx.lineWidth = 1.2; ctx.setLineDash([2, 4]);
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(lastPointer.x, lastPointer.y); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
+      // center "you" star
+      drawYou(cx, cy);
+
+      // people stars
+      for(const s of stars) drawStar(s);
+
+      twinkle += 0.04;
+    }
+
+    function drawDust(cx, cy){
+      // a quiet sprinkle that never moves (seeded by index)
+      ctx.save();
+      for(let i = 0; i < 70; i++){
+        const a = (i * 2.399963); // golden angle
+        const r = (i / 70);
+        const dx = (Math.sin(a*1.7) * 0.5 + 0.5) * W;
+        const dy = (Math.cos(a*1.3) * 0.5 + 0.5) * H;
+        const tw = reduceMotion ? 0.5 : (0.35 + 0.25 * Math.sin(twinkle + i));
+        ctx.globalAlpha = 0.10 * tw;
+        ctx.fillStyle = '#9fb4d4';
+        ctx.beginPath(); ctx.arc(dx, dy, r < 0.5 ? 0.7 : 1.1, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawYou(cx, cy){
+      const pulse = reduceMotion ? 0 : Math.sin(twinkle * 0.8) * 1.5;
+      const r = 7 + pulse;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 4.2);
+      g.addColorStop(0, 'rgba(191,227,255,0.95)');
+      g.addColorStop(0.25, 'rgba(86,182,255,0.55)');
+      g.addColorStop(1, 'rgba(86,182,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(cx, cy, r * 4.2, 0, Math.PI*2); ctx.fill();
+
+      ctx.fillStyle = '#eaf4ff';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+
+      ctx.fillStyle = 'rgba(159,180,212,0.85)';
+      ctx.font = "600 10px 'JetBrains Mono', monospace";
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('YOU', cx, cy + r + 6);
+    }
+
+    function drawStar(s){
+      const p = px(s);
+      const r = starRadius(s);
+      const c = WARMTH[s.warmth];
+      const sel = s.id === selectedId;
+      const pend = s.id === pendingLinkId;
+      const tw = reduceMotion ? 1 : (0.85 + 0.15 * Math.sin(twinkle + s.id * 1.3));
+
+      // glow halo
+      const haloR = r * (s.warmth === 'cold' ? 1.8 : 3.0);
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, haloR);
+      g.addColorStop(0, c.mid);
+      g.addColorStop(0.5, withAlpha(c.mid, s.warmth === 'cold' ? 0.18 : 0.40 * tw));
+      g.addColorStop(1, withAlpha(c.mid, 0));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x, p.y, haloR, 0, Math.PI*2); ctx.fill();
+
+      // core
+      ctx.fillStyle = c.core;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
+
+      // selection / pending ring
+      if(sel || pend){
+        ctx.strokeStyle = pend ? '#bfe3ff' : c.mid;
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash(pend ? [3,3] : []);
+        ctx.beginPath(); ctx.arc(p.x, p.y, r + 6, 0, Math.PI*2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // label
+      ctx.fillStyle = s.warmth === 'cold' ? 'rgba(150,160,180,0.6)' : 'rgba(207,214,226,0.92)';
+      ctx.font = "500 11px 'JetBrains Mono', monospace";
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(s.name, p.x, p.y + r + 4);
+      if(s.role){
+        ctx.fillStyle = 'rgba(114,122,138,0.8)';
+        ctx.font = "400 9px 'JetBrains Mono', monospace";
+        ctx.fillText(s.role.toLowerCase(), p.x, p.y + r + 17);
+      }
+    }
+
+    function withAlpha(hex, a){
+      const n = parseInt(hex.slice(1), 16);
+      return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+    }
+
+    // ----- animation loop -----
+    function tick(){
+      if(gravity) applyGravity();
+      draw();
+      raf = requestAnimationFrame(tick);
+    }
+    let raf = null;
+
+    function applyGravity(){
+      // gentle pull toward center for stars far out and not being dragged
+      let moved = false;
+      for(const s of stars){
+        if(s.id === dragId) continue;
+        const dx = CENTER.x - s.x, dy = CENTER.y - s.y;
+        const dist = Math.hypot(dx, dy);
+        if(dist < 0.12) continue; // close enough; let it rest near center
+        const pull = 0.0016; // very gentle
+        s.x += dx * pull;
+        s.y += dy * pull;
+        moved = true;
+      }
+      if(moved) gravitySaveDebounced();
+    }
+    let gravSaveT = null;
+    function gravitySaveDebounced(){
+      clearTimeout(gravSaveT);
+      gravSaveT = setTimeout(save, 600);
+    }
+
+    // ----- interaction -----
+    let lastPointer = null;
+
+    function toLocal(e){
+      const r = canvas.getBoundingClientRect();
+      const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+      return { x: cx, y: cy };
+    }
+
+    function onDown(e){
+      const p = toLocal(e);
+      lastPointer = p;
+      const s = hitStar(p.x, p.y);
+      downId = s ? s.id : null;
+      downPos = p;
+      dragMoved = false;
+      if(s){
+        dragId = s.id;
+        canvas.classList.add('dragging');
+        // bring to top for drawing order
+        stars = stars.filter(x => x.id !== s.id).concat(s);
+      }
+      e.preventDefault();
+    }
+
+    function onMove(e){
+      const p = toLocal(e);
+      lastPointer = p;
+      if(dragId != null){
+        const s = findStar(dragId);
+        if(s){
+          if(downPos && (Math.abs(p.x - downPos.x) > 3 || Math.abs(p.y - downPos.y) > 3)) dragMoved = true;
+          s.x = Math.min(0.985, Math.max(0.015, p.x / W));
+          s.y = Math.min(0.97, Math.max(0.02, p.y / H));
+        }
+      }
+    }
+
+    function onUp(e){
+      const wasDrag = dragMoved;
+      const releasedOn = downId;
+      if(dragId != null){
+        canvas.classList.remove('dragging');
+        save();
+      }
+      dragId = null;
+
+      // A click (no drag): selection / linking logic
+      if(!wasDrag){
+        if(releasedOn != null){
+          if(pendingLinkId != null && pendingLinkId !== releasedOn){
+            toggleLink(pendingLinkId, releasedOn);
+            pendingLinkId = null;
+            selectStar(releasedOn);
+          } else if(pendingLinkId === releasedOn){
+            // clicked same star again — cancel pending link, keep selected
+            pendingLinkId = null;
+            selectStar(releasedOn);
+          } else {
+            // start a link from this star AND select it
+            selectStar(releasedOn);
+            pendingLinkId = releasedOn;
+            caption(`linking from ${findStar(releasedOn).name.toLowerCase()} — click another star to draw the line, or empty sky to cancel.`);
+          }
+        } else {
+          // clicked empty space — clear pending link + selection
+          pendingLinkId = null;
+          selectStar(null);
+        }
+      }
+      downId = null; downPos = null;
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', (e)=>{ if(dragId!=null || pendingLinkId!=null) onMove(e); else { lastPointer = withinCanvas(e); } });
+    window.addEventListener('mouseup', (e)=>{ if(dragId!=null || downId!=null) onUp(e); });
+    canvas.addEventListener('mousemove', onMove);
+
+    canvas.addEventListener('touchstart', onDown, {passive:false});
+    canvas.addEventListener('touchmove', (e)=>{ onMove(e); e.preventDefault(); }, {passive:false});
+    canvas.addEventListener('touchend', (e)=>{ onUp(e); }, {passive:false});
+
+    function withinCanvas(e){
+      const r = canvas.getBoundingClientRect();
+      if(e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return null;
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    function toggleLink(a, b){
+      const idx = links.findIndex(l => (l[0]===a && l[1]===b) || (l[0]===b && l[1]===a));
+      if(idx >= 0){
+        links.splice(idx, 1);
+        caption('a line cut. some distances are kinder unmarked.');
+      } else {
+        links.push([a, b]);
+        const sa = findStar(a), sb = findStar(b);
+        if(sa && sb && sa.warmth === 'cold' && sb.warmth === 'cold'){
+          caption('two cold stars, joined. a line drawn in memory of warmth.');
+        } else {
+          caption(`${findStar(a).name.toLowerCase()} and ${findStar(b).name.toLowerCase()}, bound.`);
+        }
+      }
+      save();
+      updateStats();
+    }
+
+    // ----- inspector / selection -----
+    const inspector = document.getElementById('inspector');
+    const inspName = document.getElementById('inspName');
+    const inspRole = document.getElementById('inspRole');
+    const weightVal = document.getElementById('weightVal');
+    const weightBar = document.getElementById('weightBar');
+    const warmthVal = document.getElementById('warmthVal');
+
+    function selectStar(id){
+      selectedId = id;
+      if(id == null){ inspector.classList.add('hidden'); return; }
+      const s = findStar(id);
+      if(!s){ inspector.classList.add('hidden'); selectedId = null; return; }
+      inspName.textContent = s.name;
+      inspRole.textContent = s.role ? s.role.toLowerCase() : '— no role —';
+      weightVal.textContent = s.weight;
+      weightBar.style.width = ((s.weight - 1) / 4 * 100) + '%';
+      warmthVal.textContent = s.warmth;
+      warmthVal.style.color = s.warmth === 'cold' ? 'var(--ink-ghost)' : s.warmth === 'cooling' ? 'var(--ink-dim)' : 'var(--accent)';
+      document.querySelectorAll('#warmthChips [data-w]').forEach(c => c.classList.toggle('on', c.dataset.w === s.warmth));
+      inspector.classList.remove('hidden');
+      inspector.classList.remove('reveal'); void inspector.offsetWidth; inspector.classList.add('reveal');
+    }
+
+    document.getElementById('weightUp').onclick = ()=> changeWeight(1);
+    document.getElementById('weightDown').onclick = ()=> changeWeight(-1);
+    function changeWeight(d){
+      const s = findStar(selectedId); if(!s) return;
+      s.weight = Math.min(5, Math.max(1, s.weight + d));
+      selectStar(s.id); save();
+    }
+
+    document.querySelectorAll('#warmthChips [data-w]').forEach(c=>{
+      c.onclick = ()=>{
+        const s = findStar(selectedId); if(!s) return;
+        s.warmth = c.dataset.w; selectStar(s.id); save();
+        if(s.warmth === 'cold') caption(`${s.name.toLowerCase()} marked cold. the light keeps arriving long after the source goes out.`);
+      };
+    });
+
+    document.getElementById('delStar').onclick = ()=>{
+      if(selectedId == null) return;
+      const s = findStar(selectedId);
+      stars = stars.filter(x => x.id !== selectedId);
+      links = links.filter(l => l[0] !== selectedId && l[1] !== selectedId);
+      if(pendingLinkId === selectedId) pendingLinkId = null;
+      selectStar(null);
+      save(); updateStats();
+      caption(s ? `${s.name.toLowerCase()} removed from the sky. one fewer light to account for.` : 'a star removed.');
+    };
+
+    // ----- add a star -----
+    document.getElementById('addForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const nameEl = document.getElementById('nameInput');
+      const roleEl = document.getElementById('roleInput');
+      const name = nameEl.value.trim();
+      if(!name){ nameEl.focus(); flicker(nameEl); return; }
+      const role = roleEl.value.trim().split(/\s+/)[0] || '';
+      // place on a ring around center, slightly random, avoiding exact center
+      const ang = Math.random() * Math.PI * 2;
+      const rad = 0.20 + Math.random() * 0.22;
+      const star = {
+        id: nextId++,
+        name: name.slice(0, 40),
+        role: role.slice(0, 20),
+        x: Math.min(0.97, Math.max(0.03, 0.5 + Math.cos(ang) * rad)),
+        y: Math.min(0.95, Math.max(0.05, 0.5 + Math.sin(ang) * rad * (H/W < 1 ? 1 : (W/H)) )),
+        weight: 3,
+        warmth: 'warm'
+      };
+      // clamp y properly to canvas ratio
+      star.y = Math.min(0.95, Math.max(0.05, 0.5 + Math.sin(ang) * rad));
+      stars.push(star);
+      nameEl.value = ''; roleEl.value = ''; nameEl.focus();
+      selectStar(star.id);
+      save(); updateStats();
+      caption(captionForNew(star, stars.length));
+    });
+
+    function flicker(el){
+      el.classList.add('flicker');
+      setTimeout(()=> el.classList.remove('flicker'), 900);
+    }
+
+    // ----- captions (terse Prízrak voice) -----
+    const captionEl = document.getElementById('captionText');
+    let captionLock = 0;
+    function caption(txt){
+      captionEl.textContent = txt;
+      captionLock = Date.now();
+    }
+    function captionForNew(star, n){
+      if(n === 1) return `${star.name.toLowerCase()} — your first star. the sky is no longer empty.`;
+      if(n === 5) return 'five lights now. a sky starts to look like a claim.';
+      const opts = [
+        `${star.name.toLowerCase()} cast into the sky. drag it close, or let it drift.`,
+        `a new light: ${star.name.toLowerCase()}. weight it. place it. mean it.`,
+        `${star.name.toLowerCase()} added. the orbit widens.`
+      ];
+      return opts[n % opts.length];
+    }
+
+    // periodic ambient observation about the layout
+    function observe(){
+      if(Date.now() - captionLock < 8000) return; // don't trample a fresh message
+      if(!stars.length) return;
+      const cold = stars.filter(s => s.warmth === 'cold');
+      const close = stars.filter(s => Math.hypot(s.x - 0.5, s.y - 0.5) < 0.17);
+      const coldClose = close.filter(s => s.warmth === 'cold');
+      const far = stars.filter(s => Math.hypot(s.x - 0.5, s.y - 0.5) > 0.40);
+      const heavy = stars.filter(s => s.weight >= 4);
+      const lonely = stars.filter(s => !links.some(l => l[0]===s.id || l[1]===s.id));
+
+      const lines = [];
+      if(coldClose.length) lines.push('some stars you placed close are already cold.');
+      if(heavy.filter(s => far.includes(s)).length) lines.push('a heavy star, kept far out. weight without proximity is just gravity you ignore.');
+      if(lonely.length && stars.length > 2) lines.push(`${lonely.length} star${lonely.length>1?'s':''} drawn to no one. islands, then.`);
+      if(cold.length && cold.length === stars.length) lines.push('an entire sky gone cold. you are mapping an absence.');
+      if(close.length === 0 && stars.length > 1) lines.push('nothing placed close. you keep the whole sky at arm’s length.');
+      if(!lines.length) return;
+      caption(lines[Math.floor(Math.random() * lines.length)]);
+    }
+    setInterval(observe, 9000);
+
+    // ----- stats -----
+    function updateStats(){
+      document.getElementById('statLine').textContent = `${stars.length} star${stars.length!==1?'s':''} · ${links.length} line${links.length!==1?'s':''}`;
+    }
+
+    // ----- controls -----
+    const pullToggle = document.getElementById('pullToggle');
+    function renderGravity(){
+      pullToggle.textContent = 'gravity: ' + (gravity ? 'on' : 'off');
+      pullToggle.classList.toggle('on', gravity);
+    }
+    pullToggle.onclick = ()=>{
+      gravity = !gravity; renderGravity(); save();
+      caption(gravity ? 'gravity on. unplaced stars drift toward the center, slowly, the way people do.' : 'gravity off. nothing moves unless you move it.');
+    };
+
+    document.getElementById('linkMode').onclick = ()=>{
+      caption('to link: click one star, then another. click the same line again to cut it.');
+    };
+
+    document.getElementById('clearBtn').onclick = ()=>{
+      if(!stars.length){ caption('already empty. nothing to burn.'); return; }
+      const btn = document.getElementById('clearBtn');
+      if(btn.dataset.armed !== '1'){
+        btn.dataset.armed = '1';
+        btn.textContent = 'sure?';
+        btn.classList.add('on');
+        setTimeout(()=>{ if(btn.dataset.armed==='1'){ btn.dataset.armed='0'; btn.textContent='burn it down'; btn.classList.remove('on'); } }, 2600);
+        return;
+      }
+      btn.dataset.armed = '0'; btn.textContent = 'burn it down'; btn.classList.remove('on');
+      stars = []; links = []; pendingLinkId = null; selectStar(null);
+      save(); updateStats();
+      caption('the sky, wiped clean. every light you mapped, gone. begin again.');
+    };
+
+    // ----- export PNG -----
+    document.getElementById('exportBtn').onclick = ()=>{
+      // render an offscreen high-res frame with a solid background
+      const scale = 2;
+      const off = document.createElement('canvas');
+      off.width = W * scale; off.height = H * scale;
+      const o = off.getContext('2d');
+      o.scale(scale, scale);
+      // solid sky bg
+      const bg = o.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#0a0c12'); bg.addColorStop(1, '#070809');
+      o.fillStyle = bg; o.fillRect(0, 0, W, H);
+      // re-run the same draw routine onto offscreen ctx
+      const prevCtx = ctxProxy.target;
+      ctxProxy.target = o;
+      const wasReduce = reduceMotion;
+      drawStatic();
+      ctxProxy.target = prevCtx;
+
+      // signature
+      o.fillStyle = 'rgba(114,122,138,0.6)';
+      o.font = "10px 'JetBrains Mono', monospace";
+      o.textAlign = 'right'; o.textBaseline = 'bottom';
+      o.fillText('the constellation · prízrak', W - 10, H - 8);
+
+      off.toBlob((blob)=>{
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'constellation-' + new Date().toISOString().slice(0,10) + '.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=> URL.revokeObjectURL(url), 1000);
+      }, 'image/png');
+      caption('the sky, fixed to an image. take it with you.');
+    };
+
+    // A tiny ctx proxy so draw routines can target either the live or offscreen ctx.
+    const ctxProxy = { target: ctx };
+
+    // Static draw (no twinkle pulse) used for export — reuses the live drawing helpers
+    // by temporarily pointing them at the export context.
+    function drawStatic(){
+      const realCtx = ctx;
+      // swap module-level ctx usage by drawing manually with ctxProxy.target
+      const c2 = ctxProxy.target;
+      const cx = CENTER.x * W, cy = CENTER.y * H;
+
+      // rings
+      c2.save();
+      c2.strokeStyle = 'rgba(86,182,255,0.06)'; c2.lineWidth = 1;
+      for(let i = 1; i <= 3; i++){ c2.beginPath(); c2.arc(cx, cy, (Math.min(W,H)*0.16)*i, 0, Math.PI*2); c2.stroke(); }
+      c2.restore();
+
+      // dust
+      c2.save();
+      for(let i=0;i<70;i++){
+        const a=(i*2.399963); const r=(i/70);
+        const dx=(Math.sin(a*1.7)*0.5+0.5)*W; const dy=(Math.cos(a*1.3)*0.5+0.5)*H;
+        c2.globalAlpha=0.10*0.5; c2.fillStyle='#9fb4d4';
+        c2.beginPath(); c2.arc(dx,dy,r<0.5?0.7:1.1,0,Math.PI*2); c2.fill();
+      }
+      c2.restore(); c2.globalAlpha = 1;
+
+      // links
+      c2.lineCap='round';
+      for(const [a,b] of links){
+        const sa=findStar(a), sb=findStar(b); if(!sa||!sb) continue;
+        const pa=px(sa), pb=px(sb);
+        const cold = sa.warmth==='cold'||sb.warmth==='cold';
+        const wk = (sa.warmth==='cold'&&sb.warmth==='cold');
+        const grad=c2.createLinearGradient(pa.x,pa.y,pb.x,pb.y);
+        grad.addColorStop(0,WARMTH[sa.warmth].line); grad.addColorStop(1,WARMTH[sb.warmth].line);
+        c2.strokeStyle=grad; c2.lineWidth= wk?0.7:(cold?1:1.4);
+        if(cold) c2.setLineDash([3,5]); else c2.setLineDash([]);
+        c2.beginPath(); c2.moveTo(pa.x,pa.y); c2.lineTo(pb.x,pb.y); c2.stroke();
+      }
+      c2.setLineDash([]);
+
+      // you
+      const g=c2.createRadialGradient(cx,cy,0,cx,cy,7*4.2);
+      g.addColorStop(0,'rgba(191,227,255,0.95)'); g.addColorStop(0.25,'rgba(86,182,255,0.55)'); g.addColorStop(1,'rgba(86,182,255,0)');
+      c2.fillStyle=g; c2.beginPath(); c2.arc(cx,cy,7*4.2,0,Math.PI*2); c2.fill();
+      c2.fillStyle='#eaf4ff'; c2.beginPath(); c2.arc(cx,cy,7,0,Math.PI*2); c2.fill();
+      c2.fillStyle='rgba(159,180,212,0.85)'; c2.font="600 10px 'JetBrains Mono', monospace";
+      c2.textAlign='center'; c2.textBaseline='top'; c2.fillText('YOU',cx,cy+13);
+
+      // stars
+      for(const s of stars){
+        const p=px(s); const r=starRadius(s); const cc=WARMTH[s.warmth];
+        const haloR=r*(s.warmth==='cold'?1.8:3.0);
+        const gg=c2.createRadialGradient(p.x,p.y,0,p.x,p.y,haloR);
+        gg.addColorStop(0,cc.mid); gg.addColorStop(0.5,withAlpha(cc.mid,s.warmth==='cold'?0.18:0.40)); gg.addColorStop(1,withAlpha(cc.mid,0));
+        c2.fillStyle=gg; c2.beginPath(); c2.arc(p.x,p.y,haloR,0,Math.PI*2); c2.fill();
+        c2.fillStyle=cc.core; c2.beginPath(); c2.arc(p.x,p.y,r,0,Math.PI*2); c2.fill();
+        c2.fillStyle = s.warmth==='cold' ? 'rgba(150,160,180,0.6)' : 'rgba(207,214,226,0.92)';
+        c2.font="500 11px 'JetBrains Mono', monospace"; c2.textAlign='center'; c2.textBaseline='top';
+        c2.fillText(s.name,p.x,p.y+r+4);
+        if(s.role){ c2.fillStyle='rgba(114,122,138,0.8)'; c2.font="400 9px 'JetBrains Mono', monospace"; c2.fillText(s.role.toLowerCase(),p.x,p.y+r+17); }
+      }
+    }
+
+    // ----- init -----
+    function init(){
+      load();
+      resize();
+      renderGravity();
+      updateStats();
+      if(stars.length){
+        caption(`${stars.length} star${stars.length!==1?'s':''} recovered from the dark. the sky remembers.`);
+      }
+      tick();
+    }
+
+    let resizeT = null;
+    window.addEventListener('resize', ()=>{
+      clearTimeout(resizeT);
+      resizeT = setTimeout(resize, 120);
+    });
+
+    init();
+
+    // ================= ambient / easter eggs (mirrors the siblings) =================
+
+    /* drifting embers */
+    (function spawnEmbers(){
+      if(reduceMotion) return;
+      const host = document.getElementById('embers');
+      const N = 6;
+      for(let i=0;i<N;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100) + 'vw';
+        e.style.animationDelay = (Math.random()*16) + 's';
+        e.style.animationDuration = (13 + Math.random()*8) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    /* type "prizrak" → the watcher + a shooting star */
+    (function watcher(){
+      let buf = '';
+      const ghost = document.getElementById('ghostLine');
+      window.addEventListener('keydown', (ev)=>{
+        if(ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if(ev.key && ev.key.length === 1){
+          buf = (buf + ev.key.toLowerCase()).slice(-7);
+          if(buf === 'prizrak'){
+            ghost.style.display = 'block';
+            ghost.classList.add('flicker');
+            caption('a watcher leans in. it has been counting your stars all along.');
+            shootingStar();
+          }
+        }
+      });
+    })();
+
+    /* a one-off shooting star streak across the canvas */
+    function shootingStar(){
+      if(reduceMotion) return;
+      const start = { x: Math.random()*W*0.4, y: Math.random()*H*0.3 };
+      const end = { x: start.x + W*0.5, y: start.y + H*0.4 };
+      const t0 = performance.now();
+      const DUR = 700;
+      (function streak(now){
+        const k = Math.min(1, (now - t0)/DUR);
+        // drawn on top of the next frame
+        const x = start.x + (end.x-start.x)*k;
+        const y = start.y + (end.y-start.y)*k;
+        ctx.save();
+        const grad = ctx.createLinearGradient(x - 40, y - 30, x, y);
+        grad.addColorStop(0, 'rgba(191,227,255,0)');
+        grad.addColorStop(1, 'rgba(191,227,255,0.9)');
+        ctx.strokeStyle = grad; ctx.lineWidth = 1.6; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(x-40, y-30); ctx.lineTo(x, y); ctx.stroke();
+        ctx.restore();
+        if(k < 1) requestAnimationFrame(streak);
+      })(t0);
+    }
+
+    /* triple-click the title → one extra ember */
+    (function titleSpark(){
+      const t = document.getElementById('appTitle');
+      if(!t) return;
+      t.addEventListener('click', (ev)=>{
+        if(ev.detail === 3){
+          if(reduceMotion) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random()*20) + 'vw';
+          e.style.animationDuration = '12s';
+          document.getElementById('embers').appendChild(e);
+          setTimeout(()=> e.remove(), 13000);
+        }
+      });
+    })();
+
+    /* 00:00–03:00 local → the mountain whispers */
+    (function nightWatch(){
+      const h = new Date().getHours();
+      if(h >= 0 && h < 3){
+        const w = document.getElementById('nightWhisper');
+        if(w) w.style.display = 'block';
+      }
+    })();
+
+    /* idle 60s → the watcher leans in */
+    (function idleWatch(){
+      if(reduceMotion) return;
+      const line = document.getElementById('idleLine');
+      let timer;
+      function arm(){
+        if(line){ line.style.opacity='0'; setTimeout(()=>{ if(line) line.style.display='none'; }, 1200); }
+        clearTimeout(timer);
+        timer = setTimeout(()=>{
+          if(line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; }); }
+        }, 60000);
+      }
+      ['mousemove','keydown','click','touchstart'].forEach(ev=> window.addEventListener(ev, arm, {passive:true}));
+      arm();
+    })();
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

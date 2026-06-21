@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Sigil Forge | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#10b981;          /* emerald — the forge-light */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        .glass{
+            background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+            backdrop-filter:blur(12px);
+            border:1px solid var(--line);
+            box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+        }
+        .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+        input[type="text"]{ color:var(--ink); }
+        input::placeholder{ color:var(--ink-ghost); }
+
+        input:focus-visible,
+        button:focus-visible{
+            outline:none;
+            border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+
+        /* the forge stone — where the sigil burns in */
+        .forge-stone{
+            background:
+                radial-gradient(120% 120% at 50% 0%, #0f1311 0%, var(--bg-sunk) 55%, #080808 100%);
+            border:1px solid var(--line);
+            box-shadow:inset 0 0 60px -20px #000, 0 0 0 1px var(--line-soft);
+        }
+        .forge-lit{ box-shadow:inset 0 0 60px -20px #000, 0 0 0 1px var(--line), 0 0 42px -10px var(--glow); }
+
+        /* === MOTION VOCABULARY (mirrored from the siblings) === */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* tactile hover/press on action buttons */
+        .btn-lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s, filter .15s; }
+        .btn-lift:hover{ transform:translateY(-2px); }
+        .btn-lift:active{ transform:translateY(1px); }
+
+        .true-name{ letter-spacing:.18em; text-shadow:0 0 14px var(--glow); }
+
+        .chip{ background:var(--bg-sunk); border:1px solid var(--line); transition:border-color .15s, transform .12s, box-shadow .15s; }
+        .chip:hover{ border-color:var(--accent); transform:translateY(-2px); box-shadow:0 0 18px -8px var(--glow); }
+        .chip:active{ transform:translateY(0); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
+    </style>
+</head>
+<body class="text-zinc-300 antialiased min-h-screen flex items-center justify-center p-4 grain">
+    <!-- ambient layers (decorative, behind everything) -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <div class="relative z-[2] max-w-2xl w-full glass rounded-2xl p-8">
+        <header class="mb-7 text-center">
+            <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-600 mb-3 flicker">PRÍZRAK / FORGE 09 — INSCRIPTION</div>
+            <h1 id="title" class="text-3xl font-bold text-white mb-2 select-none cursor-default breathe" style="text-shadow:0 0 14px var(--glow)">The Sigil Forge</h1>
+            <p class="text-zinc-500 text-sm italic">Give the forge a word, a name, an intention. It hammers the same seed into the same mark, every time. Nothing here is random.</p>
+        </header>
+
+        <div class="space-y-5">
+            <div>
+                <label for="seed" class="block mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">THE SEED / WORD OR INTENTION</label>
+                <div class="flex gap-3">
+                    <input id="seed" type="text" maxlength="120" autocomplete="off" spellcheck="false"
+                        class="flex-1 well rounded-lg px-4 py-3 mono text-zinc-200 transition-colors"
+                        placeholder="e.g. unbroken, the long winter, Tatra, my name">
+                    <button id="forgeBtn" class="btn-lift relative overflow-hidden text-black font-bold px-5 rounded-lg border border-transparent shadow-lg whitespace-nowrap"
+                        style="background:var(--accent)">
+                        <span class="relative z-10 mono tracking-[0.18em] uppercase text-sm">Forge</span>
+                    </button>
+                </div>
+                <p id="hint" class="hidden mono text-[10px] uppercase tracking-[0.2em] text-zinc-600 mt-2"></p>
+            </div>
+
+            <!-- the forge stone -->
+            <div id="stone" class="forge-stone rounded-2xl p-6 flex flex-col items-center transition-shadow duration-500">
+                <canvas id="sigil" width="640" height="640" class="w-full max-w-[340px] aspect-square block"></canvas>
+
+                <div id="plate" class="hidden w-full mt-5 text-center reveal">
+                    <div class="mono text-[10px] uppercase tracking-[0.3em] text-zinc-600 mb-1">FORGED TRUE NAME</div>
+                    <div id="trueName" class="text-2xl font-bold text-white true-name mono breathe"></div>
+                    <div id="seedEcho" class="mono text-[11px] tracking-[0.15em] text-zinc-600 mt-2 italic"></div>
+                </div>
+
+                <div id="emptyHint" class="mono text-[11px] tracking-[0.18em] text-zinc-700 mt-4 text-center">
+                    the stone is cold. feed it a word.
+                </div>
+            </div>
+
+            <!-- actions, hidden until a sigil exists -->
+            <div id="actions" class="hidden grid grid-cols-2 gap-3 reveal">
+                <button id="downloadBtn" class="btn-lift well rounded-lg py-2.5 mono text-[11px] uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-100 hover:border-emerald-500">
+                    ⤓ download sigil (png)
+                </button>
+                <button id="copyNameBtn" class="btn-lift well rounded-lg py-2.5 mono text-[11px] uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-100 hover:border-emerald-500">
+                    copy the true name
+                </button>
+            </div>
+
+            <!-- gallery -->
+            <div id="gallery" class="hidden pt-3 border-t border-zinc-900 reveal">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">RECENTLY FORGED</h3>
+                    <button id="clearGallery" class="mono text-[10px] uppercase tracking-[0.2em] text-zinc-700 hover:text-zinc-400 transition-colors">empty the rack</button>
+                </div>
+                <div id="galleryGrid" class="grid grid-cols-4 sm:grid-cols-6 gap-2"></div>
+            </div>
+        </div>
+
+        <footer class="mt-7 pt-4 border-t border-zinc-900 text-center">
+            <p id="footer-line" class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-700">a mark is only a promise the iron remembers.</p>
+            <p id="ghost-watcher" class="mono text-[10px] tracking-[0.2em] mt-2 opacity-0 transition-opacity duration-700" style="color:var(--ink-ghost)"></p>
+        </footer>
+    </div>
+
+    <script>
+        const STORE_KEY = 'sigil-forge-v1';
+        const ACCENT = '#10b981';
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const canvas = document.getElementById('sigil');
+        const ctx = canvas.getContext('2d');
+        const seedInput = document.getElementById('seed');
+
+        let currentSeed = '';
+        let currentName = '';
+        let drawTimer = null;
+
+        /* ===================== deterministic PRNG ===================== */
+        // FNV-1a 32-bit hash → seeds a mulberry32 PRNG. No Math.random in geometry.
+        function fnv1a(str){
+            let h = 0x811c9dc5;
+            for (let i = 0; i < str.length; i++){
+                h ^= str.charCodeAt(i);
+                h = Math.imul(h, 0x01000193);
+            }
+            return h >>> 0;
+        }
+        function mulberry32(a){
+            return function(){
+                a |= 0; a = (a + 0x6D2B79F5) | 0;
+                let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        /* ===================== the forged true name ===================== */
+        // Built deterministically from the seed: rune-ish syllables stitched by the PRNG.
+        const ONSETS = ['Vr','Kh','Thr','Dr','Mor','Zel','Vy','Tor','Kra','Nyx','Sva','Gol','Ulm','Veth','Skar','Lho','Drav','Yzh'];
+        const MEDIALS = ['v','l','r','th','n','d','z','s','k','m'];   // softer interior consonants
+        const NUCLEI = ['a','o','y','ae','u','i','e','ó','ou'];
+        const CODAS  = ['k','th','n','rr','sk','x','ld','m','st','l',''];
+        const TITLES = ['the Unhewn','of the Cold Pass','who Counts the Pines','the Late Frost','of Nine Stones','the Hollow Bell','who Walks the Ridgeline','the Unanswered','of the Black Tarn','the Long Watch','who Keeps the Wick','the Twice-Named'];
+
+        function forgeName(seed){
+            const rng = mulberry32(fnv1a('name::' + seed));
+            const syllables = 2 + Math.floor(rng() * 2); // 2–3 syllables → short rune-name
+            // first syllable: full onset + nucleus
+            let name = ONSETS[Math.floor(rng() * ONSETS.length)] + NUCLEI[Math.floor(rng() * NUCLEI.length)];
+            // interior syllables: a single soft medial + nucleus (keeps it pronounceable, terse)
+            for (let i = 1; i < syllables; i++){
+                name += MEDIALS[Math.floor(rng() * MEDIALS.length)] + NUCLEI[Math.floor(rng() * NUCLEI.length)];
+            }
+            // one final coda, sometimes
+            name += CODAS[Math.floor(rng() * CODAS.length)];
+            const title = TITLES[Math.floor(rng() * TITLES.length)];
+            return name + ', ' + title;
+        }
+
+        /* ===================== geometry from the seed ===================== */
+        // Everything below is a pure function of the seed via the PRNG.
+        function forgeSigil(seed, progress){
+            const W = canvas.width, H = canvas.height;
+            const cx = W / 2, cy = H / 2;
+            const R = W * 0.36;                 // working radius
+            const p = (progress === undefined) ? 1 : Math.max(0, Math.min(1, progress));
+
+            const rng = mulberry32(fnv1a('glyph::' + seed));
+            const hash = fnv1a(seed);
+
+            ctx.clearRect(0, 0, W, H);
+
+            // subtle vignette wash so the canvas reads on the stone
+            const wash = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 1.5);
+            wash.addColorStop(0, 'rgba(16,185,129,0.05)');
+            wash.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = wash;
+            ctx.fillRect(0, 0, W, H);
+
+            // ---- node placement: characters → points on the ring ----
+            const chars = seed.length ? seed : ' ';
+            const nodeCount = Math.max(3, Math.min(11, chars.length));
+            const angleJitter = rng() * Math.PI * 2;        // overall rotation, seeded
+            const nodes = [];
+            for (let i = 0; i < nodeCount; i++){
+                const code = chars.charCodeAt(i % chars.length);
+                // angle derived from char code + index, so it's tied to the actual text
+                const a = angleJitter + (i / nodeCount) * Math.PI * 2 + (code % 23) * 0.0317;
+                const rr = R * (0.62 + rng() * 0.34);       // ring radius wobble
+                nodes.push({ x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr, a });
+            }
+
+            // ---- containing ring(s) ----
+            ctx.save();
+            ctx.globalAlpha = 0.9 * easeRing(p);
+            ctx.strokeStyle = 'rgba(16,185,129,0.55)';
+            ctx.lineWidth = W * 0.006;
+            ctx.beginPath(); ctx.arc(cx, cy, R * 1.06, 0, Math.PI * 2 * easeRing(p)); ctx.stroke();
+            if (hash & 1){
+                ctx.globalAlpha = 0.4 * easeRing(p);
+                ctx.lineWidth = W * 0.003;
+                ctx.beginPath(); ctx.arc(cx, cy, R * 1.14, 0, Math.PI * 2 * easeRing(p)); ctx.stroke();
+            }
+            // tick marks around the ring (a count derived from hash)
+            const ticks = 12 + (hash % 13);
+            ctx.globalAlpha = 0.5 * easeRing(p);
+            ctx.lineWidth = W * 0.004;
+            for (let i = 0; i < ticks; i++){
+                const a = (i / ticks) * Math.PI * 2 + angleJitter;
+                const r1 = R * 1.18, r2 = R * (1.21 + (i % 3 === 0 ? 0.04 : 0));
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+                ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // ---- the main path: connect nodes in a seeded traversal order ----
+            const order = seededOrder(nodeCount, rng);
+            // how much of the path to draw (the "forging" reveal)
+            const pathReveal = easePath(p);
+            ctx.save();
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.shadowColor = 'rgba(16,185,129,0.8)';
+            ctx.shadowBlur = W * 0.02 * pathReveal;
+            ctx.strokeStyle = '#34d399';
+            ctx.lineWidth = W * 0.009;
+
+            const segTotal = order.length;            // closed loop length
+            const segShown = pathReveal * segTotal;
+            for (let s = 0; s < segTotal; s++){
+                const from = nodes[order[s % order.length]];
+                const to   = nodes[order[(s + 1) % order.length]];
+                const segP = Math.max(0, Math.min(1, segShown - s));
+                if (segP <= 0) break;
+                ctx.beginPath();
+                ctx.moveTo(from.x, from.y);
+                ctx.lineTo(from.x + (to.x - from.x) * segP, from.y + (to.y - from.y) * segP);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // ---- embellishment: seeded chords across the interior ----
+            const chords = 2 + (hash % 4);
+            ctx.save();
+            ctx.globalAlpha = 0.45 * easePath(p);
+            ctx.strokeStyle = 'rgba(52,211,153,0.5)';
+            ctx.lineWidth = W * 0.004;
+            for (let i = 0; i < chords; i++){
+                const a = nodes[Math.floor(rng() * nodeCount)];
+                const b = nodes[Math.floor(rng() * nodeCount)];
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+            ctx.restore();
+
+            // ---- nodes: glyph terminals (rings, dots, arcs) ----
+            const nodeP = easeNodes(p);
+            nodes.forEach((n, i) => {
+                if (nodeP <= 0) return;
+                const code = chars.charCodeAt(i % chars.length);
+                const kind = (code + i) % 3;
+                ctx.save();
+                ctx.shadowColor = 'rgba(16,185,129,0.9)';
+                ctx.shadowBlur = W * 0.018 * nodeP;
+                ctx.strokeStyle = '#6ee7b7';
+                ctx.fillStyle = '#6ee7b7';
+                ctx.lineWidth = W * 0.006;
+                const rad = W * (0.012 + (code % 5) * 0.004) * nodeP;
+                if (kind === 0){                     // filled node
+                    ctx.beginPath(); ctx.arc(n.x, n.y, rad, 0, Math.PI * 2); ctx.fill();
+                } else if (kind === 1){              // hollow ring
+                    ctx.beginPath(); ctx.arc(n.x, n.y, rad * 1.3, 0, Math.PI * 2); ctx.stroke();
+                } else {                             // arc / crescent tick
+                    const a0 = n.a, a1 = n.a + Math.PI * (0.9 + (code % 7) * 0.07);
+                    ctx.beginPath(); ctx.arc(n.x, n.y, rad * 1.5, a0, a1); ctx.stroke();
+                }
+                ctx.restore();
+            });
+
+            // ---- the core mark at center: a small seeded rune ----
+            if (nodeP > 0){
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(angleJitter * 0.5);
+                ctx.shadowColor = 'rgba(16,185,129,0.9)';
+                ctx.shadowBlur = W * 0.025 * nodeP;
+                ctx.strokeStyle = '#a7f3d0';
+                ctx.lineWidth = W * 0.007;
+                const spokes = 3 + (hash % 4);
+                const cr = R * 0.16 * nodeP;
+                for (let i = 0; i < spokes; i++){
+                    const a = (i / spokes) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(Math.cos(a) * cr, Math.sin(a) * cr);
+                    ctx.stroke();
+                }
+                ctx.beginPath(); ctx.arc(0, 0, cr * 0.5, 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // easing helpers so layers reveal in sequence during the forging animation
+        function easeRing(p){ return clamp01(p / 0.35); }
+        function easePath(p){ return clamp01((p - 0.2) / 0.6); }
+        function easeNodes(p){ return clamp01((p - 0.7) / 0.3); }
+        function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+        // a deterministic, non-repeating traversal order of node indices
+        function seededOrder(n, rng){
+            const idx = Array.from({length:n}, (_, i) => i);
+            for (let i = n - 1; i > 0; i--){
+                const j = Math.floor(rng() * (i + 1));
+                [idx[i], idx[j]] = [idx[j], idx[i]];
+            }
+            return idx;
+        }
+
+        /* ===================== forging flow ===================== */
+        function forge(seedRaw){
+            const seed = (seedRaw || '').trim();
+            if (!seed){
+                flashHint('the forge takes a word, not silence.');
+                return;
+            }
+            currentSeed = seed;
+            currentName = forgeName(seed);
+
+            document.getElementById('emptyHint').classList.add('hidden');
+            document.getElementById('stone').classList.add('forge-lit');
+
+            // reveal panels
+            ['plate','actions','gallery'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+
+            // true name + seed echo
+            document.getElementById('trueName').textContent = currentName.split(',')[0];
+            document.getElementById('seedEcho').textContent = '“' + seed + '”  →  ' + currentName.split(',').slice(1).join(',').trim();
+
+            // retrigger reveal on plate
+            const plate = document.getElementById('plate');
+            plate.classList.remove('reveal'); void plate.offsetWidth; plate.classList.add('reveal');
+
+            // animate the forging (or draw instantly under reduced motion)
+            if (drawTimer){ cancelAnimationFrame(drawTimer); drawTimer = null; }
+            if (reduceMotion){
+                forgeSigil(seed, 1);
+            } else {
+                const start = performance.now();
+                const dur = 1100;
+                const step = (now) => {
+                    const t = Math.min(1, (now - start) / dur);
+                    // easeOutCubic for a settling feel
+                    const eased = 1 - Math.pow(1 - t, 3);
+                    forgeSigil(seed, eased);
+                    if (t < 1){ drawTimer = requestAnimationFrame(step); }
+                    else { drawTimer = null; }
+                };
+                drawTimer = requestAnimationFrame(step);
+            }
+
+            saveToGallery(seed);
+            flashHint('struck. the iron holds “' + currentName.split(',')[0] + '”.');
+        }
+
+        function flashHint(msg){
+            const hint = document.getElementById('hint');
+            hint.textContent = msg;
+            hint.classList.remove('hidden','flicker');
+            void hint.offsetWidth; hint.classList.add('flicker');
+            setTimeout(() => hint.classList.remove('flicker'), 1400);
+        }
+
+        /* ===================== gallery / localStorage ===================== */
+        function readGallery(){
+            try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+            catch(e){ return []; }
+        }
+        function writeGallery(arr){
+            try { localStorage.setItem(STORE_KEY, JSON.stringify(arr.slice(0, 18))); } catch(e){}
+        }
+        function saveToGallery(seed){
+            let g = readGallery();
+            g = g.filter(item => item.seed !== seed);        // de-dupe, move to front
+            g.unshift({ seed, t: Date.now() });
+            writeGallery(g);
+            renderGallery();
+        }
+        function renderGallery(){
+            const g = readGallery();
+            const wrap = document.getElementById('gallery');
+            const grid = document.getElementById('galleryGrid');
+            if (!g.length){ wrap.classList.add('hidden'); return; }
+            wrap.classList.remove('hidden');
+            grid.innerHTML = '';
+            g.forEach(item => {
+                const cell = document.createElement('button');
+                cell.className = 'chip rounded-lg p-1.5 flex items-center justify-center aspect-square';
+                cell.title = item.seed + ' — re-forge';
+                cell.setAttribute('aria-label', 'Re-forge ' + item.seed);
+                const thumb = document.createElement('canvas');
+                thumb.width = 120; thumb.height = 120;
+                thumb.className = 'w-full h-full';
+                cell.appendChild(thumb);
+                renderThumb(thumb, item.seed);
+                cell.addEventListener('click', () => {
+                    seedInput.value = item.seed;
+                    forge(item.seed);
+                    document.getElementById('stone').scrollIntoView({behavior:'smooth', block:'center'});
+                });
+                grid.appendChild(cell);
+            });
+        }
+        // small static render for thumbnails (re-uses the same deterministic geometry)
+        function renderThumb(thumbCanvas, seed){
+            const tctx = thumbCanvas.getContext('2d');
+            // temporarily borrow the main draw by scaling: render to an offscreen at canvas size, then downscale
+            const off = document.createElement('canvas');
+            off.width = canvas.width; off.height = canvas.height;
+            const realCanvas = canvas, realCtx = ctx;
+            // draw into offscreen by swapping references is messy; instead replicate via a scaled draw
+            drawSigilTo(off.getContext('2d'), off.width, seed, 1);
+            tctx.clearRect(0,0,thumbCanvas.width,thumbCanvas.height);
+            tctx.drawImage(off, 0, 0, thumbCanvas.width, thumbCanvas.height);
+        }
+
+        // A standalone draw fn that targets an arbitrary context (used for thumbnails + main).
+        // The main canvas uses forgeSigil for animation; this mirrors its geometry for static targets.
+        function drawSigilTo(c, W, seed, progress){
+            const H = W, cx = W/2, cy = H/2, R = W*0.36;
+            const p = progress === undefined ? 1 : progress;
+            const rng = mulberry32(fnv1a('glyph::' + seed));
+            const hash = fnv1a(seed);
+            c.clearRect(0,0,W,H);
+            const chars = seed.length ? seed : ' ';
+            const nodeCount = Math.max(3, Math.min(11, chars.length));
+            const angleJitter = rng() * Math.PI * 2;
+            const nodes = [];
+            for (let i=0;i<nodeCount;i++){
+                const code = chars.charCodeAt(i % chars.length);
+                const a = angleJitter + (i/nodeCount)*Math.PI*2 + (code%23)*0.0317;
+                const rr = R*(0.62 + rng()*0.34);
+                nodes.push({x:cx+Math.cos(a)*rr, y:cy+Math.sin(a)*rr, a});
+            }
+            c.strokeStyle='rgba(16,185,129,0.55)'; c.lineWidth=W*0.006;
+            c.beginPath(); c.arc(cx,cy,R*1.06,0,Math.PI*2); c.stroke();
+            const order = seededOrder(nodeCount, rng);
+            c.lineJoin='round'; c.lineCap='round'; c.strokeStyle='#34d399'; c.lineWidth=W*0.011;
+            c.beginPath();
+            for (let s=0;s<order.length;s++){
+                const n = nodes[order[s]];
+                if (s===0) c.moveTo(n.x,n.y); else c.lineTo(n.x,n.y);
+            }
+            c.closePath(); c.stroke();
+            c.fillStyle='#6ee7b7';
+            nodes.forEach((n,i)=>{
+                const code = chars.charCodeAt(i % chars.length);
+                c.beginPath(); c.arc(n.x,n.y,W*(0.012+(code%5)*0.004),0,Math.PI*2); c.fill();
+            });
+            // core
+            c.strokeStyle='#a7f3d0'; c.lineWidth=W*0.008;
+            const spokes = 3 + (hash%4); const cr = R*0.16;
+            for (let i=0;i<spokes;i++){
+                const a=(i/spokes)*Math.PI*2;
+                c.beginPath(); c.moveTo(cx,cy); c.lineTo(cx+Math.cos(a)*cr, cy+Math.sin(a)*cr); c.stroke();
+            }
+        }
+
+        /* ===================== download ===================== */
+        function downloadSigil(){
+            if (!currentSeed) return;
+            // compose a clean export: dark plate + sigil + the true name, all deterministic
+            const ex = document.createElement('canvas');
+            const S = 1024;
+            ex.width = S; ex.height = S + 180;
+            const ectx = ex.getContext('2d');
+            // background
+            ectx.fillStyle = '#0a0a0a';
+            ectx.fillRect(0, 0, ex.width, ex.height);
+            const grad = ectx.createRadialGradient(S/2, S*0.42, S*0.1, S/2, S*0.42, S*0.8);
+            grad.addColorStop(0, 'rgba(16,185,129,0.07)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ectx.fillStyle = grad;
+            ectx.fillRect(0, 0, ex.width, ex.height);
+            // sigil
+            ectx.save();
+            ectx.translate(0, 40);
+            drawSigilTo(ectx, S, currentSeed, 1);
+            ectx.restore();
+            // true name + seed
+            ectx.textAlign = 'center';
+            ectx.fillStyle = '#e7faf3';
+            ectx.font = '600 46px "JetBrains Mono", monospace';
+            ectx.shadowColor = 'rgba(16,185,129,0.6)'; ectx.shadowBlur = 18;
+            ectx.fillText(currentName.split(',')[0], S/2, S + 30);
+            ectx.shadowBlur = 0;
+            ectx.fillStyle = '#7a7570';
+            ectx.font = '400 22px "JetBrains Mono", monospace';
+            ectx.fillText('“' + currentSeed + '”  ·  forged by Prízrak', S/2, S + 78);
+            ectx.fillStyle = '#3a3530';
+            ectx.font = '400 18px "JetBrains Mono", monospace';
+            ectx.fillText(currentName.split(',').slice(1).join(',').trim().toUpperCase(), S/2, S + 118);
+
+            const safe = currentSeed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'sigil';
+            const link = document.createElement('a');
+            link.download = 'sigil-' + safe + '.png';
+            link.href = ex.toDataURL('image/png');
+            link.click();
+            pulseBtn(document.getElementById('downloadBtn'), '⤓ pulled from the fire');
+        }
+
+        function copyName(){
+            if (!currentName) return;
+            const text = currentName;
+            const done = () => pulseBtn(document.getElementById('copyNameBtn'), 'name copied to the ledger');
+            if (navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(text).then(done).catch(done);
+            } else { done(); }
+        }
+
+        function pulseBtn(btn, msg){
+            const orig = btn.textContent;
+            btn.textContent = msg;
+            btn.style.color = ACCENT;
+            btn.style.borderColor = ACCENT;
+            setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1300);
+        }
+
+        /* ===================== wiring ===================== */
+        document.getElementById('forgeBtn').addEventListener('click', () => forge(seedInput.value));
+        seedInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') forge(seedInput.value); });
+        document.getElementById('downloadBtn').addEventListener('click', downloadSigil);
+        document.getElementById('copyNameBtn').addEventListener('click', copyName);
+        document.getElementById('clearGallery').addEventListener('click', () => {
+            try { localStorage.removeItem(STORE_KEY); } catch(e){}
+            renderGallery();
+        });
+
+        // restore gallery (and the most recent sigil) on load
+        (function init(){
+            renderGallery();
+            const g = readGallery();
+            if (g.length){
+                // re-forge the most recent so the stone isn't cold on return, but draw instantly
+                const last = g[0].seed;
+                seedInput.value = last;
+                currentSeed = last;
+                currentName = forgeName(last);
+                document.getElementById('emptyHint').classList.add('hidden');
+                document.getElementById('stone').classList.add('forge-lit');
+                ['plate','actions','gallery'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+                document.getElementById('trueName').textContent = currentName.split(',')[0];
+                document.getElementById('seedEcho').textContent = '“' + last + '”  →  ' + currentName.split(',').slice(1).join(',').trim();
+                forgeSigil(last, 1);
+            } else {
+                // cold stone: faint placeholder ring so the canvas isn't blank
+                forgeSigil('prízrak', 0.0);
+            }
+        })();
+
+        /* ===== ambient embers (capped, reduced-motion-safe) ===== */
+        (function(){
+            if (reduceMotion) return;
+            const host = document.getElementById('embers');
+            const N = 7;
+            for (let i = 0; i < N; i++){
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (6 + Math.random() * 88) + '%';
+                e.style.animationDelay = (Math.random() * 14) + 's';
+                e.style.animationDuration = (12 + Math.random() * 8) + 's';
+                host.appendChild(e);
+            }
+        })();
+
+        /* ===== night-hours footer whisper (00:00–03:00 local) ===== */
+        (function(){
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3){
+                document.getElementById('footer-line').textContent = 'the forge runs hottest while the valley sleeps.';
+            }
+        })();
+
+        /* ===== easter egg: type "prizrak" → wake a watcher ===== */
+        (function(){
+            let buf = '';
+            window.addEventListener('keydown', (ev) => {
+                if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+                if (ev.key.length !== 1) return;
+                buf = (buf + ev.key.toLowerCase()).slice(-7);
+                if (buf === 'prizrak'){
+                    const g = document.getElementById('ghost-watcher');
+                    g.textContent = 'the smith looks up from the anvil. you found the watcher.';
+                    g.style.opacity = '1';
+                    g.classList.add('flicker');
+                }
+            });
+        })();
+
+        /* ===== easter egg: triple-click the title → one extra ember ===== */
+        (function(){
+            const title = document.getElementById('title');
+            if (!title) return;
+            title.addEventListener('click', (ev) => {
+                if (ev.detail === 3){
+                    if (reduceMotion) return;
+                    const e = document.createElement('div');
+                    e.className = 'ember';
+                    e.style.left = (40 + Math.random() * 20) + '%';
+                    e.style.animationDuration = '11s';
+                    document.getElementById('embers').appendChild(e);
+                    setTimeout(() => e.remove(), 11000);
+                }
+            });
+        })();
+
+        /* ===== easter egg: idle 60s → the watcher leans in ===== */
+        (function(){
+            let timer;
+            const g = document.getElementById('ghost-watcher');
+            const arm = () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    if (!g.textContent){
+                        g.textContent = 'the coals are still warm. still watching.';
+                        g.style.opacity = '1';
+                        setTimeout(() => { if (g.textContent === 'the coals are still warm. still watching.'){ g.style.opacity = '0'; } }, 6000);
+                    }
+                }, 60000);
+            };
+            ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, arm, {passive:true}));
+            arm();
+        })();
+    </script>
+
+    <script src="/shared/star-widget.js"></script>
+</body>
+</html>

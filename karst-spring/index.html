@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Karst Spring | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#08090b;
+      --bg-raised:#101216;
+      --bg-sunk:#0a0c0f;
+      --line:#1f242b;
+      --line-soft:#161a20;
+      --ink:#c9d2d8;
+      --ink-dim:#6c7780;
+      --ink-ghost:#2c343b;
+      --accent:#22d3ee;            /* cyan — the spring's lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{
+      -webkit-appearance:none; appearance:none;
+      height:2px; background:var(--line); border-radius:2px; cursor:pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none; appearance:none;
+      width:13px; height:13px; border-radius:50%;
+      background:var(--accent); box-shadow:0 0 8px var(--glow);
+      transition:transform .12s, box-shadow .15s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover{ transform:scale(1.18); box-shadow:0 0 14px var(--glow); }
+    input[type="range"]::-moz-range-thumb{
+      width:13px; height:13px; border:none; border-radius:50%;
+      background:var(--accent); box-shadow:0 0 8px var(--glow); cursor:pointer;
+    }
+    input[type="range"]:focus-visible{ outline:none; }
+    input[type="range"]:focus-visible::-webkit-slider-thumb{ box-shadow:0 0 0 3px var(--glow); }
+
+    button:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .btn-ghost{ background:transparent; border:1px solid var(--line); color:var(--ink-dim);
+      transition:border-color .15s, color .15s, transform .12s, box-shadow .15s; }
+    .btn-ghost:hover{ border-color:var(--accent); color:var(--ink); box-shadow:0 0 18px -8px var(--glow); }
+    .btn-ghost:active{ transform:translateY(1px); }
+
+    .canvas-shell{
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), inset 0 0 60px -20px #000, 0 0 60px -30px var(--glow);
+      background:var(--bg-sunk);
+    }
+    #spring{ display:block; width:100%; height:auto; cursor:crosshair; touch-action:none; }
+
+    .label{ color:var(--ink-dim); font-size:.62rem; text-transform:uppercase; letter-spacing:.18em; }
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    /* ===== motion vocabulary ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.05}50%{opacity:.09}100%{transform:translateX(5%);opacity:.05}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 34s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.45}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.86;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .caption-swap{transition:opacity .6s ease}
+
+    #ghost-watcher,#idle-line{color:var(--ink-ghost)}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 grain antialiased">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <main class="relative z-[2] w-full max-w-3xl glass rounded-2xl p-6 sm:p-8">
+
+    <header class="mb-6">
+      <div class="mono label mb-2 flicker">prízrak / offerings — instrument 27 — accretion</div>
+      <h1 id="title" class="text-2xl sm:text-3xl font-bold text-white h1-glow select-none cursor-default breathe">The Karst Spring</h1>
+      <p class="text-sm mt-1 italic" style="color:var(--ink-dim)">Water and mineral negotiate stone. Nothing here is graded. It simply continues, with or without you.</p>
+    </header>
+
+    <!-- the cave -->
+    <div class="canvas-shell rounded-xl overflow-hidden relative">
+      <canvas id="spring" width="900" height="500" aria-label="A generative cave spring that grows stalactites and flowstone over time."></canvas>
+      <div class="absolute left-3 bottom-3 pointer-events-none">
+        <span id="caption" class="caption-swap mono text-[11px] tracking-[0.05em]" style="color:var(--accent);text-shadow:0 0 12px var(--glow)">the stone is patient</span>
+      </div>
+      <div class="absolute right-3 top-3 pointer-events-none mono text-[10px] tracking-[0.18em]" style="color:var(--ink-ghost)">
+        <span id="age-readout">age 0</span>
+      </div>
+    </div>
+
+    <!-- hint -->
+    <p class="mono text-[10px] tracking-[0.1em] mt-3" style="color:var(--ink-ghost)">
+      click the ceiling to plant a drip · drag across the floor to carve a channel
+    </p>
+
+    <!-- controls -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-5">
+      <div>
+        <div class="flex justify-between mb-2">
+          <label for="flow" class="mono label">flow rate</label>
+          <span id="flow-val" class="mono text-[10px]" style="color:var(--accent)">—</span>
+        </div>
+        <input id="flow" type="range" min="0" max="100" value="42" class="w-full">
+      </div>
+      <div>
+        <div class="flex justify-between mb-2">
+          <label for="mineral" class="mono label">mineral saturation</label>
+          <span id="mineral-val" class="mono text-[10px]" style="color:var(--accent)">—</span>
+        </div>
+        <input id="mineral" type="range" min="0" max="100" value="55" class="w-full">
+      </div>
+      <div>
+        <div class="flex justify-between mb-2">
+          <label for="temp" class="mono label">temperature</label>
+          <span id="temp-val" class="mono text-[10px]" style="color:var(--accent)">—</span>
+        </div>
+        <input id="temp" type="range" min="0" max="100" value="38" class="w-full">
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mt-6">
+      <button id="seed-btn" class="btn-ghost mono text-[10px] uppercase tracking-[0.2em] rounded-lg px-4 py-2">new spring</button>
+      <button id="pause-btn" class="btn-ghost mono text-[10px] uppercase tracking-[0.2em] rounded-lg px-4 py-2">pause</button>
+      <button id="forget-btn" class="btn-ghost mono text-[10px] uppercase tracking-[0.2em] rounded-lg px-4 py-2">let it forget</button>
+      <span id="seed-readout" class="mono text-[10px] tracking-[0.12em] ml-auto" style="color:var(--ink-ghost)"></span>
+    </div>
+
+    <footer class="mt-7 pt-4 border-t" style="border-color:var(--line-soft)">
+      <p class="mono text-[10px] tracking-[0.18em]" style="color:var(--ink-ghost)">the spring remembers between visits. <span id="memory-note"></span></p>
+      <p id="night-whisper" class="mono text-[10px] tracking-[0.18em] mt-1" style="display:none;color:var(--ink-ghost)">the mountain does not sleep.</p>
+      <p id="ghost-watcher" class="mono text-[10px] tracking-[0.2em] mt-1" style="display:none">you found the watcher.</p>
+      <p id="idle-line" class="mono text-[10px] tracking-[0.2em] mt-1" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still listening to the drip.</p>
+    </footer>
+
+  </main>
+
+  <script>
+  "use strict";
+  (function(){
+    const STORE_KEY = 'karst-spring-v1';
+    const canvas = document.getElementById('spring');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ---------- seeded PRNG (mulberry32) ---------- */
+    function makeRng(seed){
+      let a = seed >>> 0;
+      return function(){
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function newSeed(){ return (Math.random() * 4294967296) >>> 0; }
+
+    /* ---------- simulation state ---------- */
+    const params = { flow: 42, mineral: 55, temp: 38 };
+    let seed = newSeed();
+    let rng = makeRng(seed);
+    let age = 0;                 // ticks of evolution (the spring's memory of time)
+    let paused = false;
+
+    // drip sources hang from the ceiling. each grows a stalactite + feeds a stalagmite.
+    let sources = [];           // {x, ceilY, len, rate, phase, floorTip, wobble}
+    let drops = [];             // falling water {x,y,vy,r,life}
+    let ripples = [];           // floor impact rings {x,y,r,max,a}
+    let channels = [];          // carved floor channels {x, depth}  (indexed columns)
+    let flowstone = [];         // ceiling-edge mineral curtain heights, per column
+    let pool = [];              // floor water level per column
+
+    const COLS = 180;
+    const colW = W / COLS;
+
+    function colAt(x){ return Math.max(0, Math.min(COLS - 1, Math.floor(x / colW))); }
+
+    /* ---------- palette drift ---------- */
+    // slowly drifting cool cave palette around cyan, biased by temperature.
+    function palette(){
+      const t = age * 0.0006;
+      const warm = (params.temp - 50) / 50;             // -1..1
+      const baseHue = 188 + Math.sin(t) * 10 + warm * 14; // cyan core, drifts toward teal/green
+      return {
+        water: `hsl(${baseHue}, ${62 + Math.sin(t*1.3)*8}%, ${52 + warm*6}%)`,
+        waterDim: `hsla(${baseHue}, 55%, 46%, 0.5)`,
+        stone: `hsl(${baseHue - 150}, 8%, ${12 + Math.sin(t*0.7)*2}%)`,
+        stoneLit: `hsl(${baseHue}, 22%, 30%)`,
+        mineral: `hsl(${baseHue + 4}, ${30 + params.mineral*0.2}%, ${40 + params.mineral*0.12}%)`,
+        glowHue: baseHue
+      };
+    }
+
+    /* ---------- build the cave from the seed ---------- */
+    function ceilingProfile(x){
+      // jagged limestone ceiling height (distance from top)
+      const r = makeRng(seed ^ 0x9e3779b1);
+      // deterministic layered noise via seed-stable sampling
+      return 40
+        + Math.sin(x * 0.011 + (seed % 100)) * 18
+        + Math.sin(x * 0.037 + (seed % 50)) * 9
+        + Math.sin(x * 0.003) * 14;
+    }
+    function floorProfile(x){
+      return H - (46
+        + Math.sin(x * 0.009 + (seed % 77)) * 16
+        + Math.sin(x * 0.031 + (seed % 33)) * 7);
+    }
+
+    function spawnSource(x, ceilY){
+      sources.push({
+        x: x,
+        ceilY: ceilY,
+        len: 0,                       // stalactite length grown so far
+        floorTip: 0,                  // stalagmite height grown from floor
+        rate: 0.4 + rng() * 0.8,      // intrinsic drip eagerness
+        phase: rng() * 6.28,
+        wobble: 0.6 + rng() * 0.9
+      });
+    }
+
+    function seedSources(){
+      sources = [];
+      const n = 3 + Math.floor(rng() * 4);
+      for (let i = 0; i < n; i++){
+        const x = 60 + rng() * (W - 120);
+        spawnSource(x, ceilingProfile(x));
+      }
+    }
+
+    function freshState(newSeedVal){
+      seed = (newSeedVal === undefined) ? newSeed() : (newSeedVal >>> 0);
+      rng = makeRng(seed);
+      age = 0;
+      drops = []; ripples = [];
+      channels = new Array(COLS).fill(0);
+      flowstone = new Array(COLS).fill(0);
+      pool = new Array(COLS).fill(0);
+      seedSources();
+      updateSeedReadout();
+    }
+
+    /* ---------- persistence ---------- */
+    function save(){
+      try{
+        const data = {
+          v: 1, seed, age,
+          params: { ...params },
+          sources: sources.map(s => ({ x:s.x, ceilY:s.ceilY, len:s.len, floorTip:s.floorTip, rate:s.rate, phase:s.phase, wobble:s.wobble })),
+          channels, flowstone,
+          ts: Date.now()
+        };
+        localStorage.setItem(STORE_KEY, JSON.stringify(data));
+      }catch(e){}
+    }
+    function load(){
+      try{
+        const raw = localStorage.getItem(STORE_KEY);
+        if (!raw) return false;
+        const d = JSON.parse(raw);
+        if (!d || typeof d.seed !== 'number') return false;
+        seed = d.seed >>> 0;
+        rng = makeRng(seed ^ (d.age | 0)); // continue the stream, roughly
+        age = d.age || 0;
+        if (d.params){ params.flow = d.params.flow ?? 42; params.mineral = d.params.mineral ?? 55; params.temp = d.params.temp ?? 38; }
+        sources = Array.isArray(d.sources) && d.sources.length ? d.sources : [];
+        channels = (Array.isArray(d.channels) && d.channels.length === COLS) ? d.channels : new Array(COLS).fill(0);
+        flowstone = (Array.isArray(d.flowstone) && d.flowstone.length === COLS) ? d.flowstone : new Array(COLS).fill(0);
+        pool = new Array(COLS).fill(0);
+        drops = []; ripples = [];
+        if (!sources.length) seedSources();
+        // memory note: how long since the last visit
+        const gap = Date.now() - (d.ts || Date.now());
+        const days = gap / 86400000;
+        const note = document.getElementById('memory-note');
+        if (days > 1) note.textContent = `it dripped on without you for ${Math.floor(days)} day${Math.floor(days)===1?'':'s'}.`;
+        else if (gap > 3600000) note.textContent = `it kept dripping while you were gone.`;
+        else note.textContent = `you were only briefly away.`;
+        return true;
+      }catch(e){ return false; }
+    }
+
+    /* ---------- evolution step ---------- */
+    function step(){
+      age++;
+
+      const flow = params.flow / 100;       // 0..1
+      const mineral = params.mineral / 100;  // 0..1
+      const temp = params.temp / 100;        // 0..1 (cold -> faster mineral lock, warm -> dissolves)
+
+      // accretion: cold + high mineral = stone grows; warm dissolves it slightly.
+      const accretion = (0.012 + mineral * 0.05) * (1.2 - temp);
+
+      for (const s of sources){
+        // stalactite grows from ceiling, fed by mineral left behind by each drip
+        s.len += accretion * (0.5 + flow * 0.5);
+        // stalagmite grows up from the floor where drops land
+        s.floorTip += accretion * (0.35 + flow * 0.45);
+
+        const fx = floorProfile(s.x);
+        const ceilingMax = (fx - s.ceilY) * 0.62;
+        if (s.len > ceilingMax) s.len = ceilingMax;     // can't reach the floor outright
+        if (s.floorTip > (fx - s.ceilY) * 0.5) s.floorTip = (fx - s.ceilY) * 0.5;
+
+        // mineral curtain (flowstone) bleeds outward from each source along the ceiling
+        const c = colAt(s.x);
+        const spread = 5 + Math.floor(mineral * 7);
+        for (let k = -spread; k <= spread; k++){
+          const cc = c + k;
+          if (cc < 0 || cc >= COLS) continue;
+          const fall = 1 - Math.abs(k) / (spread + 1);
+          flowstone[cc] += accretion * fall * 0.5;
+        }
+
+        // spawn drops based on flow + source eagerness
+        const dripChance = flow * s.rate * 0.06;
+        if (!paused && rng() < dripChance && drops.length < 220){
+          drops.push({
+            x: s.x + (Math.sin(age * 0.05 + s.phase) * s.wobble),
+            y: s.ceilY + s.len,
+            vy: 0.4 + flow * 0.6,
+            r: 1.6 + mineral * 1.4,
+            life: 0
+          });
+        }
+      }
+
+      // advance drops
+      for (let i = drops.length - 1; i >= 0; i--){
+        const d = drops[i];
+        d.vy += 0.06 + temp * 0.04;       // gravity, warmer water falls a touch faster
+        d.y += d.vy;
+        d.life++;
+        const floorY = floorProfile(d.x) - (channels[colAt(d.x)] * 1.0);
+        if (d.y >= floorY){
+          // impact: ripple + a little flowstone where it lands + pool fill
+          ripples.push({ x: d.x, y: floorY, r: 1, max: 10 + mineral * 16, a: 0.5 });
+          const c = colAt(d.x);
+          pool[c] = Math.min(8, pool[c] + 0.6);
+          // a landed drop leaves mineral on the floor too (stalagmite base broadening)
+          if (rng() < 0.4) flowstone[c] += 0.04 * mineral;
+          drops.splice(i, 1);
+        } else if (d.life > 600){
+          drops.splice(i, 1);
+        }
+      }
+
+      // ripples fade
+      for (let i = ripples.length - 1; i >= 0; i--){
+        const r = ripples[i];
+        r.r += 0.6; r.a -= 0.012;
+        if (r.r > r.max || r.a <= 0) ripples.splice(i, 1);
+      }
+
+      // pool slowly drains/levels (water finds the channels)
+      for (let c = 0; c < COLS; c++){
+        pool[c] *= 0.985;
+        // channels slowly silt back up if mineral is high and flow is low (the spring heals carving)
+        if (channels[c] > 0){
+          channels[c] -= (mineral * 0.004) * (1 - flow * 0.7);
+          if (channels[c] < 0) channels[c] = 0;
+        }
+      }
+    }
+
+    /* ---------- render ---------- */
+    function draw(){
+      const P = palette();
+      document.documentElement.style.setProperty('--accent', P.water);
+      document.documentElement.style.setProperty('--glow', `hsla(${P.glowHue},70%,55%,0.55)`);
+
+      // background gradient — deep cave
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#06070a');
+      bg.addColorStop(0.5, P.stone);
+      bg.addColorStop(1, '#04050700');
+      ctx.fillStyle = '#070809';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // ambient light shaft from a source area (slow drift)
+      const shaftX = W * (0.35 + 0.3 * Math.sin(age * 0.0004));
+      const g = ctx.createRadialGradient(shaftX, 0, 0, shaftX, H * 0.4, W * 0.5);
+      g.addColorStop(0, `hsla(${P.glowHue},70%,55%,0.05)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      // ---- ceiling stone ----
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      for (let x = 0; x <= W; x += 6){
+        ctx.lineTo(x, ceilingProfile(x));
+      }
+      ctx.lineTo(W, 0);
+      ctx.closePath();
+      const ceilGrad = ctx.createLinearGradient(0, 0, 0, 120);
+      ceilGrad.addColorStop(0, '#0c0f13');
+      ceilGrad.addColorStop(1, P.stone);
+      ctx.fillStyle = ceilGrad;
+      ctx.fill();
+
+      // ---- flowstone curtain (mineral bleed under ceiling) ----
+      ctx.beginPath();
+      ctx.moveTo(0, ceilingProfile(0));
+      for (let c = 0; c < COLS; c++){
+        const x = c * colW + colW / 2;
+        ctx.lineTo(x, ceilingProfile(x) + flowstone[c]);
+      }
+      ctx.lineTo(W, ceilingProfile(W));
+      ctx.lineTo(W, 0); ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fillStyle = P.mineral;
+      ctx.globalAlpha = 0.55;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // ---- floor stone ----
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 6){
+        const c = colAt(x);
+        ctx.lineTo(x, floorProfile(x) - channels[c]);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      const floorGrad = ctx.createLinearGradient(0, H - 120, 0, H);
+      floorGrad.addColorStop(0, P.stone);
+      floorGrad.addColorStop(1, '#0a0d10');
+      ctx.fillStyle = floorGrad;
+      ctx.fill();
+
+      // ---- pooled water on the floor ----
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      for (let c = 0; c < COLS; c++){
+        const x = c * colW + colW / 2;
+        const fy = floorProfile(x) - channels[c];
+        ctx.lineTo(x, fy - pool[c]);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fillStyle = P.waterDim;
+      ctx.globalAlpha = 0.6;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // ---- stalactites + stalagmites per source ----
+      for (const s of sources){
+        const fx = floorProfile(s.x);
+        // stalactite (hangs from ceiling)
+        ctx.beginPath();
+        const tipW = 2 + (params.mineral / 100) * 3;
+        ctx.moveTo(s.x - tipW, s.ceilY);
+        ctx.lineTo(s.x + tipW, s.ceilY);
+        ctx.lineTo(s.x, s.ceilY + s.len);
+        ctx.closePath();
+        const stGrad = ctx.createLinearGradient(0, s.ceilY, 0, s.ceilY + s.len);
+        stGrad.addColorStop(0, P.mineral);
+        stGrad.addColorStop(1, P.stoneLit);
+        ctx.fillStyle = stGrad;
+        ctx.fill();
+        // wet sheen on the tip
+        ctx.fillStyle = `hsla(${P.glowHue},80%,70%,0.5)`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.ceilY + s.len, 1.4, 0, 6.28);
+        ctx.fill();
+
+        // stalagmite (grows from floor toward it)
+        if (s.floorTip > 0.5){
+          const baseW = 3 + (params.mineral / 100) * 4;
+          ctx.beginPath();
+          ctx.moveTo(s.x - baseW, fx);
+          ctx.lineTo(s.x + baseW, fx);
+          ctx.lineTo(s.x, fx - s.floorTip);
+          ctx.closePath();
+          const sgGrad = ctx.createLinearGradient(0, fx - s.floorTip, 0, fx);
+          sgGrad.addColorStop(0, P.stoneLit);
+          sgGrad.addColorStop(1, P.mineral);
+          ctx.fillStyle = sgGrad;
+          ctx.fill();
+        }
+      }
+
+      // ---- falling drops ----
+      for (const d of drops){
+        ctx.beginPath();
+        // teardrop-ish: a small ellipse with a trailing point
+        ctx.fillStyle = P.water;
+        ctx.globalAlpha = 0.85;
+        ctx.ellipse(d.x, d.y, d.r * 0.8, d.r * 1.5, 0, 0, 6.28);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      // ---- floor ripples ----
+      for (const r of ripples){
+        ctx.beginPath();
+        ctx.strokeStyle = `hsla(${P.glowHue},75%,60%,${Math.max(0, r.a)})`;
+        ctx.lineWidth = 1;
+        ctx.ellipse(r.x, r.y, r.r, r.r * 0.32, 0, 0, 6.28);
+        ctx.stroke();
+      }
+
+      // subtle vignette
+      const vig = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, W*0.7);
+      vig.addColorStop(0, 'transparent');
+      vig.addColorStop(1, 'rgba(0,0,0,0.45)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    /* ---------- captions (state -> terse Prízrak line) ---------- */
+    const captionEl = document.getElementById('caption');
+    let lastCaption = '';
+    function pickCaption(){
+      const flow = params.flow, min = params.mineral, temp = params.temp;
+      const totalStone = sources.reduce((a, s) => a + s.len + s.floorTip, 0);
+      const dripCount = drops.length;
+
+      let pool = ['the stone is patient'];
+      if (flow > 82 && min > 60) pool = ['the spring is overfed', 'too much, too fast — it floods'];
+      else if (flow < 10) pool = ['almost dry', 'the drip has nearly stopped', 'a long silence between drops'];
+      else if (min > 78) pool = ['it lays down stone with appetite', 'mineral wins this century'];
+      else if (min < 12) pool = ['clear water, leaves nothing behind', 'it passes through without a trace'];
+      else if (temp > 80) pool = ['warm — it gives back what it built', 'the heat undoes the patient work'];
+      else if (temp < 12) pool = ['cold locks it in place', 'frozen patience'];
+      else if (totalStone > 320) pool = ['old work, slow work', 'centuries are stacked here', 'the cave has been busy'];
+      else if (dripCount > 90) pool = ['a hundred small clocks, all dripping', 'the ceiling weeps'];
+      else if (totalStone < 30) pool = ['nothing yet, only beginning', 'bare stone, fresh water'];
+      else pool = ['the stone is patient', 'drop by drop', 'it keeps its own time', 'water remembers the way down'];
+
+      // seed/age stable-ish choice so it doesn't flicker every frame
+      const idx = (age >> 6) % pool.length;
+      return pool[idx];
+    }
+    function refreshCaption(){
+      const c = pickCaption();
+      if (c !== lastCaption){
+        lastCaption = c;
+        captionEl.style.opacity = '0';
+        setTimeout(() => { captionEl.textContent = c; captionEl.style.opacity = '1'; }, reduce ? 0 : 300);
+      }
+    }
+
+    /* ---------- main loop ---------- */
+    let last = 0, acc = 0;
+    const TICK = 1000 / 60;
+    let saveTimer = 0;
+
+    function frame(now){
+      requestAnimationFrame(frame);
+      if (!last) last = now;
+      const dt = Math.min(80, now - last);
+      last = now;
+
+      if (!paused){
+        acc += dt;
+        // run a few sim steps; clamp so background tabs don't explode
+        let steps = 0;
+        while (acc >= TICK && steps < 4){ step(); acc -= TICK; steps++; }
+      }
+      draw();
+
+      // periodic ui + persistence
+      saveTimer += dt;
+      if (saveTimer > 2500){
+        saveTimer = 0;
+        refreshCaption();
+        document.getElementById('age-readout').textContent = 'age ' + Math.floor(age / 60);
+        if (!paused) save();
+      }
+    }
+
+    /* ---------- reduced-motion still fallback ---------- */
+    function renderStill(){
+      // evolve a fixed number of steps once, then draw a single frame (no animation)
+      for (let i = 0; i < 1400; i++) step();
+      draw();
+      refreshCaption();
+      document.getElementById('age-readout').textContent = 'age ' + Math.floor(age / 60);
+      save();
+    }
+
+    /* ---------- input: click ceiling = new drip, drag floor = carve ---------- */
+    function canvasPos(ev){
+      const rect = canvas.getBoundingClientRect();
+      const px = (ev.clientX - rect.left) * (W / rect.width);
+      const py = (ev.clientY - rect.top) * (H / rect.height);
+      return { x: Math.max(0, Math.min(W, px)), y: Math.max(0, Math.min(H, py)) };
+    }
+
+    let dragging = false;
+    let movedWhileDown = false;
+
+    function perturb(p){
+      // upper third => plant a drip source on the ceiling near that x
+      if (p.y < H * 0.42 && sources.length < 12){
+        spawnSource(p.x, ceilingProfile(p.x));
+        // a little splash of fresh drops
+        for (let i = 0; i < 3; i++){
+          drops.push({ x: p.x + (rng()-0.5)*8, y: ceilingProfile(p.x) + 6, vy: 0.5, r: 2, life: 0 });
+        }
+        if (reduce) renderStill();
+      }
+    }
+
+    function carve(p){
+      // lower portion => carve a channel into the floor
+      if (p.y > H * 0.5){
+        const c = colAt(p.x);
+        for (let k = -3; k <= 3; k++){
+          const cc = c + k;
+          if (cc < 0 || cc >= COLS) continue;
+          const fall = 1 - Math.abs(k) / 4;
+          channels[cc] = Math.min(38, channels[cc] + 1.4 * fall);
+        }
+      }
+    }
+
+    canvas.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      dragging = true; movedWhileDown = false;
+      const p = canvasPos(ev);
+      // remember where we pressed; decide on up vs drag
+      canvas.setPointerCapture?.(ev.pointerId);
+      carve(p); // immediate carve if in floor region
+    });
+    canvas.addEventListener('pointermove', (ev) => {
+      if (!dragging) return;
+      movedWhileDown = true;
+      carve(canvasPos(ev));
+      if (reduce){ /* defer heavy re-render to pointerup for stills */ }
+    });
+    canvas.addEventListener('pointerup', (ev) => {
+      const p = canvasPos(ev);
+      if (!movedWhileDown) perturb(p);   // a clean click plants a drip
+      else if (reduce) renderStill();    // a drag in still mode -> redraw once
+      dragging = false;
+      save();
+    });
+    canvas.addEventListener('pointercancel', () => { dragging = false; });
+
+    /* ---------- sliders ---------- */
+    function bindSlider(id, key, fmt){
+      const el = document.getElementById(id);
+      const out = document.getElementById(id + '-val');
+      el.value = params[key];
+      const render = () => { out.textContent = fmt(params[key]); };
+      render();
+      el.addEventListener('input', () => {
+        params[key] = parseInt(el.value, 10);
+        render();
+        if (reduce) renderStill();
+        save();
+      });
+    }
+    const pct = v => v + '%';
+    const tempFmt = v => v < 25 ? 'cold' : v < 55 ? 'cool' : v < 80 ? 'warm' : 'hot';
+
+    /* ---------- buttons ---------- */
+    function updateSeedReadout(){
+      document.getElementById('seed-readout').textContent = 'seed ' + seed.toString(16).padStart(8, '0');
+    }
+    document.getElementById('seed-btn').addEventListener('click', () => {
+      freshState();
+      document.getElementById('memory-note').textContent = 'a new spring, no history yet.';
+      if (reduce) renderStill(); else { refreshCaption(); }
+      save();
+    });
+    document.getElementById('pause-btn').addEventListener('click', (e) => {
+      paused = !paused;
+      e.currentTarget.textContent = paused ? 'resume' : 'pause';
+      if (paused) save();
+    });
+    document.getElementById('forget-btn').addEventListener('click', () => {
+      try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+      freshState();
+      document.getElementById('memory-note').textContent = 'the spring forgot everything. it begins again.';
+      if (reduce) renderStill(); else refreshCaption();
+    });
+
+    /* ---------- boot ---------- */
+    const restored = load();
+    if (!restored){
+      freshState();
+      document.getElementById('memory-note').textContent = 'first visit. the stone is bare.';
+    }
+    updateSeedReadout();
+    bindSlider('flow', 'flow', pct);
+    bindSlider('mineral', 'mineral', pct);
+    bindSlider('temp', 'temp', tempFmt);
+    refreshCaption();
+
+    if (reduce){
+      renderStill();
+    } else {
+      requestAnimationFrame(frame);
+    }
+
+    // save on the way out, too
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+
+    /* =========================================================
+       ambient atmosphere + easter eggs (mirrors the siblings)
+       ========================================================= */
+
+    /* drifting embers */
+    (function spawnEmbers(){
+      if (reduce) return;
+      const host = document.getElementById('embers');
+      const N = 7;
+      for (let i = 0; i < N; i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random() * 88) + 'vw';
+        e.style.animationDelay = (Math.random() * 16) + 's';
+        e.style.animationDuration = (13 + Math.random() * 9) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    /* type "prizrak" to wake the watcher */
+    (function watcher(){
+      let buf = '';
+      const ghost = document.getElementById('ghost-watcher');
+      window.addEventListener('keydown', (ev) => {
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (ev.key && ev.key.length === 1){
+          buf = (buf + ev.key.toLowerCase()).slice(-7);
+          if (buf === 'prizrak' && ghost){
+            ghost.style.display = 'block';
+            ghost.classList.add('flicker');
+          }
+        }
+      });
+    })();
+
+    /* triple-click the title -> one extra ember + an unbidden drip */
+    (function titleSpark(){
+      const t = document.getElementById('title');
+      if (!t) return;
+      t.addEventListener('click', (ev) => {
+        if (ev.detail === 3){
+          // a drip the user never asked for
+          if (sources.length){
+            const s = sources[Math.floor(Math.random() * sources.length)];
+            drops.push({ x: s.x, y: s.ceilY + s.len, vy: 0.6, r: 2.2, life: 0 });
+          }
+          if (reduce) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random() * 20) + 'vw';
+          e.style.animationDuration = '12s';
+          document.getElementById('embers').appendChild(e);
+          setTimeout(() => e.remove(), 12000);
+        }
+      });
+    })();
+
+    /* 00:00–03:00 local -> the mountain whispers */
+    (function nightWatch(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3){
+        const w = document.getElementById('night-whisper');
+        if (w) w.style.display = 'block';
+      }
+    })();
+
+    /* idle 60s -> the watcher leans in */
+    (function idleWatch(){
+      if (reduce) return;
+      const line = document.getElementById('idle-line');
+      let timer;
+      function arm(){
+        if (line){ line.style.opacity = '0'; setTimeout(() => { if (line) line.style.display = 'none'; }, 1200); }
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (line){ line.style.display = 'block'; requestAnimationFrame(() => { line.style.opacity = '1'; }); }
+        }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart','pointerdown'].forEach(ev => window.addEventListener(ev, arm, { passive:true }));
+      arm();
+    })();
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

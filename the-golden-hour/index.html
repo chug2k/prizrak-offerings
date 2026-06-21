@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Golden Hour | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#f59e0b;            /* the light leaving — amber */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+
+      /* band palette for the arc */
+      --night:#0d1326;
+      --blue:#1e3a5f;
+      --golden:#c2730c;
+      --day:#3a4255;
+    }
+
+    html,body{ background:var(--bg); }
+    body{ font-family:'Inter', sans-serif; color:var(--ink); }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .card{ background:var(--bg-raised); border:1px solid var(--line); transition:border-color .18s, box-shadow .18s; }
+    .card:hover{ border-color:color-mix(in srgb, var(--accent) 30%, var(--line)); }
+
+    .input-field{
+      background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink);
+      transition:border-color .18s, box-shadow .18s;
+    }
+    .input-field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    .input-field::placeholder{ color:var(--ink-ghost); }
+    input[type="date"]{ color-scheme:dark; }
+
+    .preset{ background:var(--bg-sunk); border:1px solid var(--line); transition:border-color .15s, color .15s, transform .12s, box-shadow .15s; }
+    .preset:hover{ border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); color:var(--ink); }
+    .preset:active{ transform:translateY(1px); }
+    .preset.on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .btn-primary{ background:var(--accent); color:#0a0a0a; font-weight:600; transition:filter .15s, transform .12s, box-shadow .15s; box-shadow:0 0 18px -6px var(--glow); }
+    .btn-primary:hover{ filter:brightness(1.12); box-shadow:0 0 24px -4px var(--glow); transform:translateY(-1px); }
+    .btn-primary:active{ transform:translateY(1px); }
+    .btn-primary:focus-visible{ outline:none; box-shadow:0 0 0 2px var(--glow); }
+
+    .label{ color:var(--ink-dim); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.18em; }
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    /* a value cell glows softly */
+    .stat{ background:var(--bg-sunk); border:1px solid var(--line); transition:border-color .18s; }
+    .stat:hover{ border-color:color-mix(in srgb, var(--accent) 28%, var(--line)); }
+
+    /* === MOTION VOCABULARY (mirrors the siblings) === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    @keyframes nowpulse{0%,100%{opacity:.55}50%{opacity:1}}
+    .now-pulse{animation:nowpulse 2.4s ease-in-out infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.now-pulse{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker,.now-pulse{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="relative z-[2] w-full max-w-5xl glass rounded-2xl p-6 md:p-8">
+
+    <!-- Header -->
+    <header class="mb-7">
+      <div class="mono label mb-2 flicker">prízrak / instrument 17 — heliograph</div>
+      <h1 id="title" class="text-2xl md:text-3xl font-semibold text-white h1-glow select-none cursor-default breathe">The Golden Hour</h1>
+      <p class="text-sm mt-1 max-w-2xl" style="color:var(--ink-dim)">Where a date and a place meet the sun. Sunrise, the blue hours, the gold, and the long fall into night — computed cold, no judgment. The ghost only watches the light leave.</p>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+
+      <!-- LEFT: controls -->
+      <div class="space-y-5">
+        <div class="card rounded-xl p-5 space-y-4">
+          <div>
+            <div class="label mb-2">Date</div>
+            <input id="date" type="date" class="input-field w-full rounded-lg px-3 py-2 text-sm mono">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="label mb-2">Latitude</div>
+              <input id="lat" type="number" step="0.0001" min="-90" max="90" class="input-field w-full rounded-lg px-3 py-2 text-sm mono" placeholder="10.8200">
+            </div>
+            <div>
+              <div class="label mb-2">Longitude</div>
+              <input id="lon" type="number" step="0.0001" min="-180" max="180" class="input-field w-full rounded-lg px-3 py-2 text-sm mono" placeholder="106.6300">
+            </div>
+          </div>
+          <div>
+            <div class="label mb-2">UTC offset (hours)</div>
+            <input id="tz" type="number" step="0.25" min="-14" max="14" class="input-field w-full rounded-lg px-3 py-2 text-sm mono" placeholder="7">
+            <p class="mono text-[10px] mt-1.5" style="color:var(--ink-ghost)">all times shown in this offset. defaults to your device.</p>
+          </div>
+          <button id="compute" class="btn-primary w-full py-2.5 rounded-lg text-sm mono tracking-[0.15em] uppercase">Read the Light</button>
+        </div>
+
+        <div class="card rounded-xl p-5">
+          <div class="label mb-3">Quick presets</div>
+          <div class="grid grid-cols-1 gap-2">
+            <button class="preset rounded-lg px-3 py-2 text-left text-sm mono" data-lat="10.82" data-lon="106.63" data-tz="7">
+              Saigon <span class="text-[10px]" style="color:var(--ink-ghost)">10.82, 106.63 · UTC+7</span>
+            </button>
+            <button class="preset rounded-lg px-3 py-2 text-left text-sm mono" data-lat="13.7563" data-lon="100.5018" data-tz="7">
+              Bangkok <span class="text-[10px]" style="color:var(--ink-ghost)">13.76, 100.50 · UTC+7</span>
+            </button>
+            <button class="preset rounded-lg px-3 py-2 text-left text-sm mono" data-lat="49.17" data-lon="20.08" data-tz="1">
+              The High Tatras <span class="text-[10px]" style="color:var(--ink-ghost)">49.17, 20.08 · UTC+1</span>
+            </button>
+          </div>
+          <p id="presetNote" class="mono text-[10px] mt-3" style="color:var(--ink-ghost)">the Tatras run on standard time; nudge the offset for summer light.</p>
+        </div>
+      </div>
+
+      <!-- RIGHT: output -->
+      <div class="space-y-5">
+
+        <!-- The arc -->
+        <div class="card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="label">The day, as a band of light</div>
+            <div id="dayHeader" class="mono text-[11px]" style="color:var(--ink-dim)"></div>
+          </div>
+          <div id="arcWrap" class="relative">
+            <svg id="arc" viewBox="0 0 900 132" class="w-full" style="height:auto" preserveAspectRatio="none" role="img" aria-label="timeline of the day's light"></svg>
+            <div id="arcAxis" class="relative mt-1 h-4"></div>
+          </div>
+          <!-- legend -->
+          <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 mono text-[10px]" style="color:var(--ink-dim)">
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:var(--night)"></span>night</span>
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:var(--blue)"></span>blue hour</span>
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:var(--golden)"></span>golden hour</span>
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:var(--day)"></span>daylight</span>
+          </div>
+        </div>
+
+        <!-- The numbers -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="stats"></div>
+
+        <!-- Twilight + golden detail + moon -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="card rounded-xl p-5">
+            <div class="label mb-3">The thresholds</div>
+            <div id="thresholds" class="space-y-2 text-sm"></div>
+          </div>
+          <div class="card rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="label">The moon tonight</div>
+              <div id="moonPct" class="mono text-[11px]" style="color:var(--accent)"></div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div id="moonGlyph" class="shrink-0"></div>
+              <div>
+                <div id="moonPhase" class="text-base font-medium text-white"></div>
+                <div id="moonAge" class="mono text-[11px] mt-1" style="color:var(--ink-dim)"></div>
+                <div id="moonNote" class="mono text-[11px] mt-2 leading-relaxed" style="color:var(--ink-ghost)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="warning" class="hidden card rounded-xl p-4 mono text-[11px]" style="color:var(--ink-dim); border-color:color-mix(in srgb, var(--accent) 30%, var(--line))"></div>
+      </div>
+    </div>
+
+    <!-- Footer whisper -->
+    <footer class="mt-8 pt-4 border-t border-zinc-900 text-center">
+      <p id="footerLine" class="mono text-[10px] uppercase tracking-[0.25em]" style="color:var(--ink-ghost)">computed client-side. the ghost phones no one.</p>
+      <p id="ghostLine" class="mono text-[10px] tracking-[0.2em] mt-2 opacity-0 transition-opacity duration-700" style="color:var(--ink-ghost)"></p>
+    </footer>
+  </div>
+
+  <script>
+  'use strict';
+
+  /* ================================================================
+     ASTRONOMY — pure, client-side.
+     Sun: NOAA solar-position algorithm (the spreadsheet formulae).
+     Moon: standard mean-phase / illuminated-fraction calculation.
+     ================================================================ */
+
+  const RAD = Math.PI / 180, DEG = 180 / Math.PI;
+
+  // Julian day from a Date's UTC components (calendar date at 00:00 UTC + frac)
+  function toJulian(y, m, d){
+    if (m <= 2){ y -= 1; m += 12; }
+    const A = Math.floor(y / 100);
+    const B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+  }
+
+  // NOAA pieces. `t` = Julian centuries since J2000.
+  function noaaSolar(t){
+    const geomMeanLong = (280.46646 + t * (36000.76983 + t * 0.0003032)) % 360; // deg
+    const L0 = (geomMeanLong < 0 ? geomMeanLong + 360 : geomMeanLong);
+    const M = 357.52911 + t * (35999.05029 - 0.0001537 * t); // deg
+    const e = 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
+    const Mrad = M * RAD;
+    const C = Math.sin(Mrad) * (1.914602 - t * (0.004817 + 0.000014 * t))
+            + Math.sin(2 * Mrad) * (0.019993 - 0.000101 * t)
+            + Math.sin(3 * Mrad) * 0.000289;
+    const trueLong = L0 + C;            // deg
+    const omega = 125.04 - 1934.136 * t;
+    const lambda = trueLong - 0.00569 - 0.00478 * Math.sin(omega * RAD); // apparent long, deg
+    // obliquity
+    const seconds = 21.448 - t * (46.8150 + t * (0.00059 - t * 0.001813));
+    let e0 = 23 + (26 + (seconds / 60)) / 60;
+    const obliqCorr = e0 + 0.00256 * Math.cos(omega * RAD); // deg
+    const decl = Math.asin(Math.sin(obliqCorr * RAD) * Math.sin(lambda * RAD)) * DEG; // deg
+    // equation of time (minutes)
+    const y = Math.tan((obliqCorr / 2) * RAD) ** 2;
+    const eot = 4 * DEG * (
+        y * Math.sin(2 * L0 * RAD)
+      - 2 * e * Math.sin(Mrad)
+      + 4 * e * y * Math.sin(Mrad) * Math.cos(2 * L0 * RAD)
+      - 0.5 * y * y * Math.sin(4 * L0 * RAD)
+      - 1.25 * e * e * Math.sin(2 * Mrad)
+    ); // minutes
+    return { decl, eot };
+  }
+
+  // Hour-angle (deg) for a given altitude angle below/above horizon.
+  // zenith in degrees (90.833 = sunrise/sunset w/ refraction, 96 = civil, etc.)
+  function hourAngle(zenithDeg, latDeg, declDeg){
+    const cosH = (Math.cos(zenithDeg * RAD) / (Math.cos(latDeg * RAD) * Math.cos(declDeg * RAD)))
+               - Math.tan(latDeg * RAD) * Math.tan(declDeg * RAD);
+    if (cosH > 1) return { ha: null, state: 'always-below' };   // sun never rises to this angle
+    if (cosH < -1) return { ha: null, state: 'always-above' };  // sun never sinks to this angle
+    return { ha: Math.acos(cosH) * DEG, state: 'ok' };
+  }
+
+  // Returns local-clock minutes-from-midnight for the event at the given zenith.
+  // which: 'rise' or 'set'. Solves with one NOAA refinement pass for accuracy.
+  function eventMinutes(jdDate, lonDeg, latDeg, tzHours, zenithDeg, which){
+    // first estimate at solar noon for this calendar day
+    const tNoon = (jdDate + 0.5 - 2451545.0) / 36525.0;
+    let sun = noaaSolar(tNoon);
+    let ha = hourAngle(zenithDeg, latDeg, sun.decl);
+    if (ha.state !== 'ok') return { minutes: null, state: ha.state };
+
+    // NOAA: solar-noon (minutes, UTC) then offset by hour angle
+    const computeAt = (decl, eot) => {
+      const solarNoonUTC = 720 - 4 * lonDeg - eot; // minutes UTC at local solar noon
+      const h = hourAngle(zenithDeg, latDeg, decl);
+      if (h.state !== 'ok') return { minutes: null, state: h.state };
+      const delta = 4 * h.ha; // minutes
+      const utcMin = which === 'rise' ? (solarNoonUTC - delta) : (solarNoonUTC + delta);
+      return { minutes: utcMin, state: 'ok' };
+    };
+
+    let first = computeAt(sun.decl, sun.eot);
+    if (first.state !== 'ok') return first;
+    // refine: re-evaluate the sun at the event's own fractional time
+    const tEvt = (jdDate + first.minutes / 1440 - 2451545.0) / 36525.0;
+    sun = noaaSolar(tEvt);
+    let refined = computeAt(sun.decl, sun.eot);
+    if (refined.state !== 'ok') refined = first;
+    // shift to requested timezone, normalize to 0..1440
+    let local = refined.minutes + tzHours * 60;
+    return { minutes: local, state: 'ok' };
+  }
+
+  function solarNoonMinutes(jdDate, lonDeg, tzHours){
+    const tNoon = (jdDate + 0.5 - 2451545.0) / 36525.0;
+    const sun = noaaSolar(tNoon);
+    const solarNoonUTC = 720 - 4 * lonDeg - sun.eot;
+    return solarNoonUTC + tzHours * 60;
+  }
+
+  // ---- Moon: illuminated fraction + phase from a robust mean-elongation model
+  function moonInfo(date){
+    // days since known new moon (2000-01-06 18:14 UTC), synodic month 29.530588853
+    const synodic = 29.530588853;
+    const knownNew = Date.UTC(2000, 0, 6, 18, 14, 0) / 86400000; // in days
+    const now = date.getTime() / 86400000;
+    let age = (now - knownNew) % synodic;
+    if (age < 0) age += synodic;
+    const phaseFrac = age / synodic;                 // 0..1 (0 = new)
+    // illuminated fraction via phase angle
+    const illum = (1 - Math.cos(2 * Math.PI * phaseFrac)) / 2;
+    let name, glyphFill;
+    const waxing = phaseFrac < 0.5;
+    if (phaseFrac < 0.0206 || phaseFrac > 0.9794) name = 'New Moon';
+    else if (phaseFrac < 0.2294) name = 'Waxing Crescent';
+    else if (phaseFrac < 0.2706) name = 'First Quarter';
+    else if (phaseFrac < 0.4794) name = 'Waxing Gibbous';
+    else if (phaseFrac < 0.5206) name = 'Full Moon';
+    else if (phaseFrac < 0.7294) name = 'Waning Gibbous';
+    else if (phaseFrac < 0.7706) name = 'Last Quarter';
+    else name = 'Waning Crescent';
+    return { age, phaseFrac, illum, name, waxing };
+  }
+
+  /* ================================================================
+     FORMATTING + RENDER
+     ================================================================ */
+
+  const $ = id => document.getElementById(id);
+  const STORE = 'golden-hour-v1';
+
+  function fmtTime(minFromMidnight){
+    if (minFromMidnight === null || minFromMidnight === undefined) return '—';
+    // wrap into the visible day for labeling but keep day-offset note via caller
+    let m = minFromMidnight;
+    let dayTag = '';
+    if (m < 0){ m += 1440; dayTag = ' −1d'; }
+    else if (m >= 1440){ m -= 1440; dayTag = ' +1d'; }
+    m = Math.round(m);
+    const hh = Math.floor(m / 60) % 24;
+    const mm = m % 60;
+    const h12 = ((hh + 11) % 12) + 1;
+    const ap = hh < 12 ? 'AM' : 'PM';
+    return `${h12}:${String(mm).padStart(2,'0')} ${ap}${dayTag}`;
+  }
+
+  function fmtDur(mins){
+    if (mins === null || mins === undefined || !isFinite(mins)) return '—';
+    const m = Math.round(mins);
+    const h = Math.floor(m / 60), r = m % 60;
+    return `${h}h ${String(r).padStart(2,'0')}m`;
+  }
+
+  // Zeniths (degrees from vertical). Sun-center geometry per NOAA.
+  const Z = {
+    sunrise: 90.833,   // geometric + refraction + solar radius
+    civil:   96,       // civil twilight (6° below horizon)
+    golden_lo: 96,     // golden hour lower bound (sun at -6°)... see below
+  };
+  // Golden hour: from sun at -4° (or horizon) up to +6°. We use the photographic
+  // convention: golden hour runs while the sun sits between about -4° and +6°.
+  // Blue hour ~ civil twilight band (sun -6° to -4°, we treat civil band as blue).
+  const ZEN = {
+    rise_set: 90.833,        // 0° (with refraction)
+    civil:    96.0,          // -6°
+    blue_in:  94.0,          // -4° (start of "blue" toward day) — inner blue edge
+    golden_hi: 84.0          // +6° (golden hour upper edge, sun above horizon)
+  };
+
+  function computeDay(lat, lon, tz, dateObj){
+    const y = dateObj.getFullYear(), mo = dateObj.getMonth() + 1, da = dateObj.getDate();
+    const jd = toJulian(y, mo, da);
+
+    const ev = (zen, which) => eventMinutes(jd, lon, lat, tz, zen, which).minutes;
+    const evState = (zen, which) => eventMinutes(jd, lon, lat, tz, zen, which).state;
+
+    const sunrise = ev(ZEN.rise_set, 'rise');
+    const sunset  = ev(ZEN.rise_set, 'set');
+    const noon    = solarNoonMinutes(jd, lon, tz);
+
+    const civilDawn = ev(ZEN.civil, 'rise');     // -6° morning
+    const civilDusk = ev(ZEN.civil, 'set');      // -6° evening
+    const blueInDawn = ev(ZEN.blue_in, 'rise');  // -4° morning
+    const blueInDusk = ev(ZEN.blue_in, 'set');   // -4° evening
+    const goldenHiDawn = ev(ZEN.golden_hi, 'rise'); // +6° morning
+    const goldenHiDusk = ev(ZEN.golden_hi, 'set');  // +6° evening
+
+    const riseState = evState(ZEN.rise_set, 'rise');
+
+    let dayLength = null;
+    if (sunrise !== null && sunset !== null) dayLength = sunset - sunrise;
+
+    return {
+      jd, sunrise, sunset, noon, dayLength,
+      // blue (civil) hours: full civil-twilight band
+      blueMorning: [civilDawn, sunrise],
+      blueEvening: [sunset, civilDusk],
+      // golden hours: photographic band, from sunrise-ish to +6° (morning), reverse (evening)
+      goldenMorning: [sunrise, goldenHiDawn],
+      goldenEvening: [goldenHiDusk, sunset],
+      riseState
+    };
+  }
+
+  /* ---- arc rendering: bands across the 24h day ---- */
+  function clampDay(m){
+    if (m === null) return null;
+    return Math.max(0, Math.min(1440, m));
+  }
+
+  function renderArc(d){
+    const svg = $('arc');
+    const W = 900, H = 132;
+    svg.innerHTML = '';
+    const ns = 'http://www.w3.org/2000/svg';
+    const x = m => (clampDay(m) / 1440) * W;
+
+    function band(x0, x1, fill, opacity){
+      if (x0 === null || x1 === null) return;
+      let a = x(Math.min(x0, x1)), b = x(Math.max(x0, x1));
+      if (b - a < 0.5) return;
+      const r = document.createElementNS(ns, 'rect');
+      r.setAttribute('x', a); r.setAttribute('y', 0);
+      r.setAttribute('width', b - a); r.setAttribute('height', H);
+      r.setAttribute('fill', fill);
+      if (opacity) r.setAttribute('opacity', opacity);
+      svg.appendChild(r);
+    }
+
+    // base: night everywhere
+    band(0, 1440, 'var(--night)');
+
+    // daylight block (sunrise→sunset)
+    if (d.sunrise !== null && d.sunset !== null) band(d.sunrise, d.sunset, 'var(--day)');
+    // blue (civil) bands
+    band(d.blueMorning[0], d.blueMorning[1], 'var(--blue)');
+    band(d.blueEvening[0], d.blueEvening[1], 'var(--blue)');
+    // golden bands on top
+    band(d.goldenMorning[0], d.goldenMorning[1], 'var(--golden)');
+    band(d.goldenEvening[0], d.goldenEvening[1], 'var(--golden)');
+
+    // polar edge cases: if the sun never rises, paint all night; if never sets, all day
+    if (d.riseState === 'always-below'){ band(0, 1440, 'var(--night)'); }
+    if (d.riseState === 'always-above'){ band(0, 1440, 'var(--day)', '0.9'); }
+
+    // a subtle top sheen so it reads like sky
+    const sheen = document.createElementNS(ns, 'rect');
+    sheen.setAttribute('x', 0); sheen.setAttribute('y', 0);
+    sheen.setAttribute('width', W); sheen.setAttribute('height', H);
+    sheen.setAttribute('fill', 'url(#skySheen)');
+    const defs = document.createElementNS(ns, 'defs');
+    defs.innerHTML = `<linearGradient id="skySheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.25"/></linearGradient>`;
+    svg.appendChild(defs); svg.appendChild(sheen);
+
+    // solar noon marker
+    if (d.noon !== null && d.noon >= 0 && d.noon <= 1440){
+      const ln = document.createElementNS(ns, 'line');
+      ln.setAttribute('x1', x(d.noon)); ln.setAttribute('x2', x(d.noon));
+      ln.setAttribute('y1', 0); ln.setAttribute('y2', H);
+      ln.setAttribute('stroke', 'var(--accent)'); ln.setAttribute('stroke-width', '1');
+      ln.setAttribute('stroke-dasharray', '3 4'); ln.setAttribute('opacity', '0.55');
+      svg.appendChild(ln);
+    }
+
+    // "now" marker if the chosen date is today (in the chosen tz)
+    renderNow(d, svg, ns, x, H);
+
+    // hour axis labels
+    renderAxis();
+  }
+
+  let nowTimer = null;
+  function renderNow(d, svg, ns, x, H){
+    const wrap = $('arcWrap');
+    let nowEl = document.getElementById('nowMarker');
+    if (nowEl) nowEl.remove();
+
+    if (!state.isToday) return;
+    // minutes-from-midnight in the chosen tz, derived from real UTC now
+    const now = new Date();
+    const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes() + now.getUTCSeconds() / 60;
+    let localMin = utcMin + state.tz * 60;
+    localMin = ((localMin % 1440) + 1440) % 1440;
+
+    const grp = document.createElementNS(ns, 'g');
+    grp.setAttribute('id', 'nowMarker');
+    const px = x(localMin);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', px); ln.setAttribute('x2', px);
+    ln.setAttribute('y1', 0); ln.setAttribute('y2', H);
+    ln.setAttribute('stroke', '#ffffff'); ln.setAttribute('stroke-width', '1.5');
+    ln.setAttribute('class', 'now-pulse');
+    grp.appendChild(ln);
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', px); dot.setAttribute('cy', 6); dot.setAttribute('r', 3.5);
+    dot.setAttribute('fill', '#ffffff'); dot.setAttribute('class', 'now-pulse');
+    grp.appendChild(dot);
+    svg.appendChild(grp);
+  }
+
+  function renderAxis(){
+    const axis = $('arcAxis');
+    axis.innerHTML = '';
+    [0, 6, 12, 18, 24].forEach(h => {
+      const s = document.createElement('span');
+      s.className = 'mono text-[9px] absolute';
+      s.style.color = 'var(--ink-ghost)';
+      s.style.left = (h / 24 * 100) + '%';
+      s.style.transform = h === 0 ? 'translateX(0)' : (h === 24 ? 'translateX(-100%)' : 'translateX(-50%)');
+      const lbl = h === 24 ? '24:00' : String(h).padStart(2, '0') + ':00';
+      s.textContent = lbl;
+      axis.appendChild(s);
+    });
+  }
+
+  /* ---- stat cells + thresholds + moon ---- */
+  function statCell(label, value, sub){
+    return `<div class="stat rounded-lg p-3">
+      <div class="label mb-1">${label}</div>
+      <div class="text-base md:text-lg font-medium text-white mono">${value}</div>
+      ${sub ? `<div class="mono text-[10px] mt-0.5" style="color:var(--ink-ghost)">${sub}</div>` : ''}
+    </div>`;
+  }
+
+  function renderStats(d){
+    const stats = $('stats');
+    stats.innerHTML =
+      statCell('Sunrise', fmtTime(d.sunrise)) +
+      statCell('Solar noon', fmtTime(d.noon), 'sun at its highest') +
+      statCell('Sunset', fmtTime(d.sunset)) +
+      statCell('Day length', fmtDur(d.dayLength), d.dayLength!==null ? 'sunrise to sunset' : 'no clean rise/set') +
+      statCell('Golden (morning)', spanLabel(d.goldenMorning)) +
+      statCell('Golden (evening)', spanLabel(d.goldenEvening));
+  }
+
+  function spanLabel(span){
+    if (span[0] === null || span[1] === null) return '—';
+    const a = Math.min(span[0], span[1]), b = Math.max(span[0], span[1]);
+    return `${fmtTime(a)} – ${fmtTime(b)}`;
+  }
+
+  function renderThresholds(d){
+    const t = $('thresholds');
+    const row = (label, val, color) =>
+      `<div class="flex items-baseline justify-between gap-3">
+        <span class="mono text-[11px]" style="color:var(--ink-dim)">${label}</span>
+        <span class="mono text-[12px]" style="color:${color || 'var(--ink)'}">${val}</span>
+      </div>`;
+    t.innerHTML =
+      row('Blue hour · morning', spanLabel(d.blueMorning), 'color-mix(in srgb, var(--blue) 60%, #8fb6e0)') +
+      row('Golden hour · morning', spanLabel(d.goldenMorning), 'var(--accent)') +
+      `<div class="my-1 border-t" style="border-color:var(--line-soft)"></div>` +
+      row('Golden hour · evening', spanLabel(d.goldenEvening), 'var(--accent)') +
+      row('Blue hour · evening', spanLabel(d.blueEvening), 'color-mix(in srgb, var(--blue) 60%, #8fb6e0)');
+  }
+
+  function moonGlyphSVG(phaseFrac, illum, waxing){
+    // draw a moon disc with the lit portion. Simple terminator approximation.
+    const R = 26, cx = 30, cy = 30;
+    // lit side: waxing -> lit on right, waning -> lit on left
+    const litRight = waxing;
+    // The terminator x-scale: cos of phase angle
+    const k = Math.cos(2 * Math.PI * phaseFrac); // -1 full ... +1 new
+    // Build via two half-ellipses
+    const bright = '#f5d99b', shadow = '#1a1d28', edge = '#2a2e3c';
+    let inner;
+    const sweepFull = (illum > 0.999);
+    if (illum < 0.001){
+      inner = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${shadow}"/>`;
+    } else if (sweepFull){
+      inner = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${bright}"/>`;
+    } else {
+      // dark base, then a lit lune using path arcs
+      const rx = Math.abs(k) * R;
+      const bigGibbous = illum > 0.5;
+      // outer semicircle on lit side + inner ellipse forming terminator
+      const dir = litRight ? 1 : -1;
+      // semicircle (lit half outline)
+      const top = `${cx},${cy - R}`, bot = `${cx},${cy + R}`;
+      // outer arc sweeps along lit side
+      const outerSweep = litRight ? 1 : 0;
+      // inner ellipse curves toward dark for crescent, toward lit for gibbous
+      const innerSweep = bigGibbous ? outerSweep : (1 - outerSweep);
+      inner = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${shadow}"/>
+        <path d="M ${top}
+                 A ${R} ${R} 0 0 ${outerSweep} ${bot}
+                 A ${rx} ${R} 0 0 ${innerSweep} ${top} Z"
+              fill="${bright}"/>`;
+    }
+    return `<svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true">
+      <defs><radialGradient id="mg" cx="40%" cy="35%" r="75%">
+        <stop offset="0" stop-color="#fff5dd"/><stop offset="1" stop-color="#e9c682"/>
+      </radialGradient></defs>
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="${edge}"/>
+      ${inner}
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="1"/>
+    </svg>`;
+  }
+
+  function renderMoon(date){
+    const m = moonInfo(date);
+    $('moonGlyph').innerHTML = moonGlyphSVG(m.phaseFrac, m.illum, m.waxing);
+    $('moonPhase').textContent = m.name;
+    $('moonPct').textContent = Math.round(m.illum * 100) + '% lit';
+    $('moonAge').textContent = `${m.age.toFixed(1)} days since new · ${m.waxing ? 'waxing' : 'waning'}`;
+    const notes = {
+      'New Moon': 'the sky is darkest. good for stars, blind for moonlight.',
+      'Waxing Crescent': 'a thin blade in the west after sunset.',
+      'First Quarter': 'half-lit, high at dusk — sets near midnight.',
+      'Waxing Gibbous': 'fattening toward full, bright into the small hours.',
+      'Full Moon': 'rises as the sun sets. the mountain casts shadows all night.',
+      'Waning Gibbous': 'rises after dark, lingers into morning.',
+      'Last Quarter': 'half-lit, rises near midnight — high at dawn.',
+      'Waning Crescent': 'a paring in the east before sunrise.'
+    };
+    $('moonNote').textContent = notes[m.name] || '';
+  }
+
+  function renderWarning(d){
+    const w = $('warning');
+    if (d.riseState === 'always-above'){
+      w.classList.remove('hidden');
+      w.textContent = 'the sun never sets at this latitude on this date — endless day. golden and blue hours dissolve into a low circling light.';
+    } else if (d.riseState === 'always-below'){
+      w.classList.remove('hidden');
+      w.textContent = 'the sun never rises here on this date — polar night. only twilight and stars, if that.';
+    } else if (d.sunrise === null || d.sunset === null){
+      w.classList.remove('hidden');
+      w.textContent = 'the sun grazes the horizon — rise and set are ambiguous at this extreme. read the bands with care.';
+    } else {
+      w.classList.add('hidden');
+    }
+  }
+
+  /* ================================================================
+     STATE + WIRING
+     ================================================================ */
+  const state = { lat: 10.82, lon: 106.63, tz: 7, date: null, isToday: false };
+
+  function localDateString(dt){
+    const y = dt.getFullYear(), m = String(dt.getMonth()+1).padStart(2,'0'), d = String(dt.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function readInputs(){
+    const dStr = $('date').value;
+    const parts = dStr.split('-').map(Number);
+    const dateObj = parts.length === 3 ? new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0) : new Date();
+    state.lat = parseFloat($('lat').value);
+    state.lon = parseFloat($('lon').value);
+    state.tz  = parseFloat($('tz').value);
+    if (!isFinite(state.lat)) state.lat = 0;
+    if (!isFinite(state.lon)) state.lon = 0;
+    if (!isFinite(state.tz)) state.tz = 0;
+    state.lat = Math.max(-90, Math.min(90, state.lat));
+    state.lon = Math.max(-180, Math.min(180, state.lon));
+    state.tz  = Math.max(-14, Math.min(14, state.tz));
+    state.date = dateObj;
+    state.isToday = (localDateString(dateObj) === localDateString(new Date()));
+  }
+
+  function run(){
+    readInputs();
+    const d = computeDay(state.lat, state.lon, state.tz, state.date);
+
+    const opts = { weekday:'short', year:'numeric', month:'short', day:'numeric' };
+    const tzLabel = (state.tz >= 0 ? '+' : '') + (Number.isInteger(state.tz) ? state.tz : state.tz);
+    $('dayHeader').textContent = state.date.toLocaleDateString(undefined, opts) + ` · UTC${tzLabel}`;
+
+    renderArc(d);
+    renderStats(d);
+    renderThresholds(d);
+    renderMoon(state.date);
+    renderWarning(d);
+
+    // breathe the arc card on update
+    const card = $('arc').closest('.card');
+    card.classList.remove('reveal'); void card.offsetWidth; card.classList.add('reveal');
+
+    // persist location (not date)
+    try {
+      localStorage.setItem(STORE, JSON.stringify({ lat: state.lat, lon: state.lon, tz: state.tz }));
+    } catch(e){}
+
+    // restart the live "now" updater if today
+    if (nowTimer) { clearInterval(nowTimer); nowTimer = null; }
+    if (state.isToday){
+      nowTimer = setInterval(() => {
+        const svg = $('arc');
+        renderNow(d, svg, 'http://www.w3.org/2000/svg', m => (clampDay(m)/1440)*900, 132);
+      }, 30000);
+    }
+  }
+
+  function applyPreset(lat, lon, tz, btn){
+    $('lat').value = lat; $('lon').value = lon; $('tz').value = tz;
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('on'));
+    if (btn) btn.classList.add('on');
+    run();
+  }
+
+  function init(){
+    // restore saved location or default to Saigon
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORE)); } catch(e){}
+    const devTz = -new Date().getTimezoneOffset() / 60;
+
+    if (saved && isFinite(saved.lat) && isFinite(saved.lon)){
+      $('lat').value = saved.lat; $('lon').value = saved.lon;
+      $('tz').value = isFinite(saved.tz) ? saved.tz : devTz;
+    } else {
+      $('lat').value = 10.82; $('lon').value = 106.63; $('tz').value = 7;
+    }
+    $('date').value = localDateString(new Date());
+
+    // mark matching preset
+    document.querySelectorAll('.preset').forEach(btn => {
+      btn.addEventListener('click', () => applyPreset(btn.dataset.lat, btn.dataset.lon, btn.dataset.tz, btn));
+      if (parseFloat(btn.dataset.lat) === parseFloat($('lat').value) &&
+          parseFloat(btn.dataset.lon) === parseFloat($('lon').value)){
+        btn.classList.add('on');
+      }
+    });
+
+    $('compute').addEventListener('click', run);
+    ['date','lat','lon','tz'].forEach(id => {
+      $(id).addEventListener('change', () => {
+        document.querySelectorAll('.preset').forEach(p => p.classList.remove('on'));
+        run();
+      });
+      $(id).addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+    });
+
+    run();
+  }
+
+  /* ===== Atmosphere: drifting embers ===== */
+  (function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const host = $('embers');
+    const N = 7;
+    for (let i = 0; i < N; i++){
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (6 + Math.random()*88) + '%';
+      e.style.animationDelay = (Math.random()*14) + 's';
+      e.style.animationDuration = (12 + Math.random()*8) + 's';
+      host.appendChild(e);
+    }
+  })();
+
+  /* ===== Easter egg: type "prizrak" wakes a watcher ===== */
+  (function watcher(){
+    let buf = '';
+    window.addEventListener('keydown', (ev) => {
+      if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+      if (ev.key && ev.key.length === 1){
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak'){
+          const g = $('ghostLine');
+          g.textContent = 'a watcher opens its eye. it has been counting sunrises since before you were born.';
+          g.style.opacity = '1';
+          g.classList.add('flicker');
+        }
+      }
+    });
+  })();
+
+  /* ===== Easter egg: triple-click the title → one extra ember ===== */
+  (function titleSpark(){
+    const t = $('title');
+    if (!t) return;
+    t.addEventListener('click', (ev) => {
+      if (ev.detail === 3){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (40 + Math.random()*20) + '%';
+        e.style.animationDuration = '11s';
+        $('embers').appendChild(e);
+        setTimeout(() => e.remove(), 12000);
+      }
+    });
+  })();
+
+  /* ===== Night-hours footer whisper (00:00–03:00 local) ===== */
+  (function nightWatch(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3){
+      $('footerLine').textContent = 'the mountain does not sleep. it waits for the light.';
+    }
+  })();
+
+  /* ===== Idle 60s → the watcher leans in ===== */
+  (function idleWatch(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let timer;
+    const g = $('ghostLine');
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!g.textContent){
+          g.textContent = 'still here. still watching the light leave.';
+          g.style.opacity = '1';
+          setTimeout(() => { if (g.textContent === 'still here. still watching the light leave.') g.style.opacity = '0'; }, 6000);
+        }
+      }, 60000);
+    };
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, arm, {passive:true}));
+    arm();
+  })();
+
+  document.addEventListener('DOMContentLoaded', init);
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

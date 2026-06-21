@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Palimpsest | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Spectral:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a855f7;          /* the violet ink that survives the erasure */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); font-family:'Spectral', Georgia, serif; }
+
+        .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        .glass{
+            background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+            backdrop-filter:blur(12px);
+            border:1px solid var(--line);
+            box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+        }
+        .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+        textarea::placeholder{ color:var(--ink-ghost); }
+
+        textarea:focus-visible,
+        button:focus-visible,
+        [tabindex]:focus-visible{
+            outline:none;
+            border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+
+        .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+        /* === THE ERASURE: words on the page === */
+        #page{ line-height:2.05; font-size:1.15rem; }
+        .word{
+            position:relative;
+            cursor:pointer;
+            border-radius:3px;
+            padding:1px 2px;
+            transition:color .35s ease, opacity .35s ease, background-color .2s, text-shadow .35s ease;
+            color:var(--ink-ghost);          /* default = redacted */
+            -webkit-user-select:none; user-select:none;
+        }
+        /* the bar of ink that blacks a word out */
+        .word::after{
+            content:"";
+            position:absolute;
+            left:0; right:0; top:50%;
+            height:1.35em;
+            transform:translateY(-50%) scaleX(1);
+            transform-origin:left center;
+            background:#050505;
+            border-radius:2px;
+            box-shadow:inset 0 0 0 1px #050505, 0 1px 0 rgba(0,0,0,.6);
+            pointer-events:none;
+            transition:transform .4s cubic-bezier(.22,1,.36,1), opacity .4s ease;
+            opacity:1;
+        }
+        .word.kept{
+            color:var(--accent);
+            text-shadow:0 0 10px var(--glow);
+        }
+        .word.kept::after{ transform:translateY(-50%) scaleX(0); opacity:0; }
+        .word:not(.kept):hover{ color:var(--ink-dim); }
+        .word:not(.kept):hover::after{ opacity:.78; }
+        .word.kept:hover{ background:color-mix(in srgb, var(--accent) 14%, transparent); }
+        /* faint hint of the buried word when reduced motion / printing */
+        .punct{ color:var(--ink-ghost); opacity:.5; }
+
+        /* === MOTION VOCABULARY === */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .btn-lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s, color .15s; }
+        .btn-lift:hover{ transform:translateY(-2px); }
+        .btn-lift:active{ transform:translateY(1px); }
+
+        .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .word,.word::after{transition:none!important}
+        }
+    </style>
+</head>
+<body class="text-zinc-300 antialiased min-h-screen flex items-start justify-center p-4 sm:p-6 grain">
+    <!-- ambient layers (decorative, behind everything) -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <div class="relative z-[2] max-w-3xl w-full glass rounded-2xl p-6 sm:p-8 my-6">
+        <header class="mb-7 text-center">
+            <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-600 mb-3 flicker">PRÍZRAK / OFFERINGS — INSTRUMENT 21</div>
+            <h1 id="title" class="text-3xl font-bold text-white mb-2 select-none cursor-default breathe h1-glow">The Palimpsest</h1>
+            <p class="text-zinc-500 text-sm italic">Every page is two pages. Black out the loud one until the quiet one surfaces.</p>
+        </header>
+
+        <!-- ===== INPUT VIEW ===== -->
+        <section id="input-view" class="space-y-5">
+            <div>
+                <label class="block mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">THE WALL OF TEXT</label>
+                <textarea id="source" rows="7" class="w-full well rounded-lg px-4 py-3 text-zinc-200 leading-relaxed resize-y mono text-sm transition-colors" placeholder="Paste a wall of text here — an email, a contract, a chapter, a confession. The poem is already inside it, waiting to be uncovered."></textarea>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <button id="render-btn" class="btn-lift mono text-sm uppercase tracking-[0.18em] text-white font-bold px-5 py-2.5 rounded-lg border border-transparent" style="background:var(--accent);box-shadow:0 0 18px -6px var(--glow)">
+                    Lay the Page
+                </button>
+                <button id="sample-btn" class="btn-lift mono text-[11px] uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-100 border border-zinc-800 hover:border-violet-500 rounded-lg px-4 py-2.5">
+                    summon a sample
+                </button>
+                <span id="sample-cycle" class="mono text-[10px] uppercase tracking-[0.2em] text-zinc-700"></span>
+            </div>
+            <p class="mono text-[10px] text-zinc-700 leading-relaxed">Nothing leaves this page. Your text and the words you keep are saved only to this browser.</p>
+        </section>
+
+        <!-- ===== ERASURE VIEW ===== -->
+        <section id="erasure-view" class="hidden space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-4">
+                <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+                    THE ERASURE
+                    <span id="counts" class="text-zinc-700 ml-2 normal-case tracking-normal"></span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="seance-btn" class="btn-lift mono text-[10px] uppercase tracking-[0.18em] text-violet-300 hover:text-white border border-violet-900/70 hover:border-violet-500 rounded px-3 py-1.5">
+                        ⟁ auto-séance
+                    </button>
+                    <button id="clear-btn" class="btn-lift mono text-[10px] uppercase tracking-[0.18em] text-zinc-500 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-600 rounded px-3 py-1.5">
+                        black it all
+                    </button>
+                    <button id="all-btn" class="btn-lift mono text-[10px] uppercase tracking-[0.18em] text-zinc-500 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-600 rounded px-3 py-1.5">
+                        keep all
+                    </button>
+                </div>
+            </div>
+
+            <p class="mono text-[10px] text-zinc-600 -mt-2">Click a word to <span class="text-violet-300">keep</span> it. Click again to bury it. The kept words, in order, are your found poem.</p>
+
+            <!-- the page the user erases (also the PNG target) -->
+            <div id="page-frame" class="well rounded-lg p-5 sm:p-6 result-glow">
+                <div id="page"></div>
+            </div>
+
+            <!-- the surfaced poem -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">WHAT SURFACED</h3>
+                    <span id="poem-stamp" class="mono text-[10px] uppercase tracking-[0.2em] text-zinc-700"></span>
+                </div>
+                <div id="poem" class="well rounded-lg p-5 text-[1.05rem] leading-relaxed whitespace-pre-wrap min-h-[3rem] italic" style="color:var(--accent);text-shadow:0 0 12px var(--glow)"></div>
+            </div>
+
+            <!-- actions -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button id="copy-btn" class="btn-lift mono text-[10px] uppercase tracking-[0.16em] text-zinc-400 hover:text-white border border-zinc-800 hover:border-violet-500 rounded px-2 py-2.5">copy poem</button>
+                <button id="png-btn" class="btn-lift mono text-[10px] uppercase tracking-[0.16em] text-zinc-400 hover:text-white border border-zinc-800 hover:border-violet-500 rounded px-2 py-2.5">export page · png</button>
+                <button id="reseance-btn" class="btn-lift mono text-[10px] uppercase tracking-[0.16em] text-zinc-400 hover:text-white border border-zinc-800 hover:border-violet-500 rounded px-2 py-2.5">séance again</button>
+                <button id="back-btn" class="btn-lift mono text-[10px] uppercase tracking-[0.16em] text-zinc-500 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-600 rounded px-2 py-2.5">← new page</button>
+            </div>
+            <div id="toast" class="hidden mono text-[10px] uppercase tracking-[0.2em] text-center text-violet-300"></div>
+        </section>
+
+        <footer class="mt-8 pt-4 border-t border-zinc-900 text-center">
+            <p id="footer-line" class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-700">the page keeps what it kept. the rest is ink.</p>
+            <p id="ghost-watcher" class="mono text-[10px] tracking-[0.2em] mt-2 opacity-0 transition-opacity duration-700" style="color:var(--ink-ghost)"></p>
+        </footer>
+    </div>
+
+    <script>
+    (function(){
+        'use strict';
+
+        const LS_KEY = 'palimpsest-v1';
+
+        // ---------- sample wells ----------
+        const SAMPLES = [
+            // 0 — a bureaucratic letter (erasure turns it tender / strange)
+            `We regret to inform you that after careful review of your application, the committee has determined that your continued presence is no longer required. Please understand this decision reflects circumstances beyond anyone's control. You will be remembered as a diligent worker, quiet in the corridors, faithful to the small hours. We ask that you return your keys, your badge, and the light you kept on past closing. The building will be cold without you, though no one will say so aloud. We wish you every success in whatever rooms you wander into next.`,
+            // 1 — a weather report (erasure turns it elegiac)
+            `Overnight the fog moved down from the high ridges and settled in the valley like a held breath. Temperatures will fall through the early hours; the river will keep its slow black counsel beneath the bridge. Expect low visibility on the mountain roads where the dead leaves gather. By morning a thin frost will cover everything that did not move in the night. The sun, when it comes, will burn the haze away and leave the day ordinary again, as if nothing at all had passed through.`,
+            // 2 — instructions / manual (erasure turns it into a spell)
+            `To begin, open the lid slowly and allow the mechanism to settle. Do not force any part that resists. Insert the key only when the chamber is dark and the house is quiet. Turn it once to wake the sleeping gears, twice to call the small light up from below. Keep your hands steady. If a sound rises that you do not recognize, do not answer it. Close the lid before dawn. The machine remembers every hand that has touched it, and it does not forgive the careless.`,
+            // 3 — a resignation / confession
+            `I have been meaning to tell you for a long time now that the house feels different in the evenings. I stay later than I should, watching the way the streetlight bends through the old glass. I keep the radio low so as not to wake whatever sleeps in the walls. Some nights I am certain I am not alone, and on those nights I do my best work, as though someone kind were reading over my shoulder, forgiving the mistakes before I make them.`
+        ];
+        let sampleIdx = 0;
+
+        // ---------- state ----------
+        // tokens: [{ raw, word(lower stripped), isWord(bool) }], kept: Set of word-token indices
+        let tokens = [];
+        let kept = new Set();
+        let srcText = '';
+
+        // ---------- elements ----------
+        const $ = (id) => document.getElementById(id);
+        const inputView = $('input-view'), erasureView = $('erasure-view');
+        const sourceEl = $('source'), pageEl = $('page'), poemEl = $('poem');
+
+        // ---------- evocative bias lexicon for the auto-séance ----------
+        const FILLER = new Set('a an the and or but of to in on at by for with from as is are was were be been being am do does did has have had will would shall should may might must can could that this these those it its i you he she we they them him her his hers their our your my me us not no nor so if then than too very just only also into over under out up down off about above below again further once here there when where why how all any both each few more most other some such which who whom whose what whatever upon onto unto per via amid amongst whilst'.split(/\s+/));
+        const EVOCATIVE = new Set('fog frost ash ghost ember ink shadow ridge valley river mountain night dawn moon hollow stone bone breath silence light dark cold rain snow wind smoke door window glass key lid chamber gears clock candle thread veil dust hour quiet hush whisper dream sleep wake remember forget burn fade drown gather wander vanish forgive haunt linger flicker glow ruin bloom wither cinder marrow grief sorrow longing tender wound mercy still alone empty deep slow black white pale grey gray violet hidden buried secret old strange faithful keeper watcher corridors corridor key keys badge light building cold'.split(/\s+/));
+
+        // ---------- tokenize ----------
+        function tokenize(text){
+            // split keeping separators; a "word" is a run of letters/digits/apostrophes
+            const parts = text.match(/[A-Za-z0-9][A-Za-z0-9'’-]*|[^A-Za-z0-9]+/g) || [];
+            return parts.map(raw => {
+                const isWord = /[A-Za-z0-9]/.test(raw);
+                return {
+                    raw,
+                    isWord,
+                    word: isWord ? raw.toLowerCase().replace(/[^a-z0-9']/g,'') : ''
+                };
+            });
+        }
+
+        // ---------- render the page ----------
+        function renderPage(){
+            pageEl.innerHTML = '';
+            tokens.forEach((tok, i) => {
+                if (tok.isWord){
+                    const span = document.createElement('span');
+                    span.className = 'word' + (kept.has(i) ? ' kept' : '');
+                    span.textContent = tok.raw;
+                    span.dataset.idx = i;
+                    span.setAttribute('role','button');
+                    span.setAttribute('tabindex','0');
+                    span.setAttribute('aria-pressed', kept.has(i) ? 'true' : 'false');
+                    pageEl.appendChild(span);
+                } else {
+                    // preserve whitespace/newlines/punctuation as literal text nodes
+                    const frag = tok.raw.replace(/\n/g, ''); // placeholder kept; we use white-space
+                    const span = document.createElement('span');
+                    span.className = 'punct';
+                    span.textContent = tok.raw;
+                    pageEl.appendChild(span);
+                }
+            });
+            // honor newlines visually
+            pageEl.style.whiteSpace = 'pre-wrap';
+            updateDerived();
+        }
+
+        function toggleWord(i){
+            if (kept.has(i)) kept.delete(i); else kept.add(i);
+            const span = pageEl.querySelector('.word[data-idx="'+i+'"]');
+            if (span){
+                span.classList.toggle('kept', kept.has(i));
+                span.setAttribute('aria-pressed', kept.has(i) ? 'true' : 'false');
+            }
+            updateDerived();
+            save();
+        }
+
+        // delegate clicks/keys on the page
+        pageEl.addEventListener('click', (e) => {
+            const t = e.target.closest('.word');
+            if (!t) return;
+            toggleWord(parseInt(t.dataset.idx,10));
+        });
+        pageEl.addEventListener('keydown', (e) => {
+            const t = e.target.closest('.word');
+            if (!t) return;
+            if (e.key === 'Enter' || e.key === ' '){
+                e.preventDefault();
+                toggleWord(parseInt(t.dataset.idx,10));
+            }
+        });
+
+        // ---------- the surfaced poem ----------
+        function buildPoem(){
+            // kept words in reading order; rebuild rough line breaks from original newlines
+            const idxs = [...kept].sort((a,b)=>a-b);
+            if (!idxs.length) return '';
+            let out = '';
+            let prev = -1;
+            idxs.forEach((i) => {
+                if (prev !== -1){
+                    // look at the gap between prev and i for a newline → line break in poem
+                    let hasNewline = false;
+                    for (let g = prev+1; g < i; g++){
+                        if (tokens[g] && !tokens[g].isWord && /\n/.test(tokens[g].raw)) { hasNewline = true; break; }
+                    }
+                    out += hasNewline ? '\n' : ' ';
+                }
+                out += tokens[i].raw;
+                prev = i;
+            });
+            return out.trim();
+        }
+
+        function updateDerived(){
+            const total = tokens.filter(t=>t.isWord).length;
+            const keptCount = kept.size;
+            $('counts').textContent = keptCount + ' kept · ' + (total - keptCount) + ' buried · ' + total + ' total';
+            const poem = buildPoem();
+            poemEl.textContent = poem || '— nothing kept yet. the page is all ink. —';
+            poemEl.style.fontStyle = poem ? 'italic' : 'normal';
+            poemEl.style.color = poem ? 'var(--accent)' : 'var(--ink-ghost)';
+            poemEl.style.textShadow = poem ? '0 0 12px var(--glow)' : 'none';
+            const words = poem ? poem.split(/\s+/).filter(Boolean).length : 0;
+            $('poem-stamp').textContent = words ? words + (words===1?' word':' words') : '';
+        }
+
+        // ---------- auto-séance: surface a plausible found-poem ----------
+        function autoSeance(){
+            kept = new Set();
+            const wordTokens = tokens.map((t,i)=>({t,i})).filter(o=>o.t.isWord);
+            if (!wordTokens.length){ renderPage(); save(); return; }
+
+            // score each word; higher = more likely to be kept
+            const scored = wordTokens.map(o => {
+                const w = o.t.word;
+                let s = 0;
+                if (FILLER.has(w)) s -= 5;
+                if (EVOCATIVE.has(w)) s += 6;
+                if (w.length >= 6) s += 2;          // longer words tend to be content words
+                if (w.length <= 2) s -= 2;          // tiny words tend to be filler
+                if (/[A-Z]/.test(o.t.raw[0]) && o.i !== firstWordIndex()) s += 1.2; // mid-sentence capitals = proper nouns
+                if (/(ing|ed|s)$/.test(w) && w.length > 4) s += 0.8;  // verby/noun-y morphology
+                s += (Math.random() * 3 - 1.2);     // séance noise — never the same twice
+                return { i: o.i, s };
+            });
+
+            // target density: keep ~14% of words, clamped to a readable range
+            const total = scored.length;
+            let target = Math.round(total * 0.14);
+            target = Math.max(4, Math.min(target, Math.max(6, Math.round(total*0.22)), 26));
+
+            scored.sort((a,b)=> b.s - a.s);
+            const chosen = scored.slice(0, target).map(o=>o.i);
+
+            // avoid two adjacent kept words reading as a run too often: light thinning
+            chosen.sort((a,b)=>a-b);
+            const finalKeep = [];
+            let last = -99;
+            for (const i of chosen){
+                if (i - last === 1 && Math.random() < 0.45) { continue; } // sometimes drop immediate neighbor
+                finalKeep.push(i); last = i;
+            }
+            // ensure we still have a few
+            (finalKeep.length >= 3 ? finalKeep : chosen).forEach(i => kept.add(i));
+
+            renderPage();
+            save();
+        }
+
+        let _firstWordIdx = null;
+        function firstWordIndex(){
+            if (_firstWordIdx !== null) return _firstWordIdx;
+            _firstWordIdx = tokens.findIndex(t=>t.isWord);
+            return _firstWordIdx;
+        }
+
+        // ---------- view switching ----------
+        function showErasure(){
+            inputView.classList.add('hidden');
+            erasureView.classList.remove('hidden');
+            erasureView.classList.remove('reveal'); void erasureView.offsetWidth; erasureView.classList.add('reveal');
+        }
+        function showInput(){
+            erasureView.classList.add('hidden');
+            inputView.classList.remove('hidden');
+            inputView.classList.remove('reveal'); void inputView.offsetWidth; inputView.classList.add('reveal');
+        }
+
+        function loadText(text, freshKept){
+            srcText = text;
+            tokens = tokenize(text);
+            _firstWordIdx = null;
+            kept = freshKept instanceof Set ? freshKept : new Set();
+            renderPage();
+        }
+
+        // ---------- persistence ----------
+        function save(){
+            try {
+                localStorage.setItem(LS_KEY, JSON.stringify({
+                    text: srcText,
+                    kept: [...kept],
+                    onErasure: !erasureView.classList.contains('hidden')
+                }));
+            } catch(e){}
+        }
+        function restore(){
+            try {
+                const raw = localStorage.getItem(LS_KEY);
+                if (!raw) return false;
+                const data = JSON.parse(raw);
+                if (!data || typeof data.text !== 'string' || !data.text.trim()) return false;
+                sourceEl.value = data.text;
+                loadText(data.text, new Set(Array.isArray(data.kept) ? data.kept : []));
+                if (data.onErasure) showErasure();
+                return true;
+            } catch(e){ return false; }
+        }
+
+        // ---------- toast ----------
+        let toastTimer;
+        function toast(msg){
+            const el = $('toast');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            el.classList.remove('flicker'); void el.offsetWidth; el.classList.add('flicker');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(()=> el.classList.add('hidden'), 1800);
+        }
+
+        // ---------- copy ----------
+        function copyPoem(){
+            const poem = buildPoem();
+            if (!poem){ toast('nothing kept to copy'); return; }
+            const text = poem + '\n\n— erased from the palimpsest';
+            const done = () => toast('the poem is on your tongue');
+            if (navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(text).then(done).catch(done);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text; document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); } catch(e){}
+                ta.remove(); done();
+            }
+        }
+
+        // ---------- PNG export (canvas render of the blacked-out page) ----------
+        function exportPNG(){
+            const W = 1000, pad = 64;
+            const fontSize = 24, lineH = 46;
+            const innerW = W - pad*2;
+
+            // measure pass on an offscreen canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const font = '500 ' + fontSize + "px 'Spectral', Georgia, serif";
+
+            // build a flat list of render items split by original newlines
+            // each item: {text, isWord, kept}
+            const items = [];
+            tokens.forEach((tok, i) => {
+                if (tok.isWord){
+                    items.push({ text: tok.raw, isWord:true, kept: kept.has(i) });
+                } else {
+                    // split on newlines so we honor hard breaks; keep spaces inline
+                    const segs = tok.raw.split(/(\n)/);
+                    segs.forEach(seg => {
+                        if (seg === '\n') items.push({ newline:true });
+                        else if (seg) items.push({ text: seg, isWord:false, kept:false });
+                    });
+                }
+            });
+
+            // layout into lines (word-wrap on word boundaries)
+            ctx.font = font;
+            const lines = [];
+            let line = [];
+            let lineW = 0;
+            const measure = (t) => ctx.measureText(t).width;
+
+            const pushLine = () => { lines.push(line); line = []; lineW = 0; };
+
+            for (const it of items){
+                if (it.newline){ pushLine(); continue; }
+                const w = measure(it.text);
+                if (it.isWord && lineW + w > innerW && line.length){
+                    pushLine();
+                }
+                // also wrap on long whitespace runs gracefully: collapse leading space at line start
+                if (!it.isWord && lineW === 0 && /^\s+$/.test(it.text)) continue;
+                line.push({ ...it, w });
+                lineW += w;
+            }
+            if (line.length) pushLine();
+
+            const H = pad*2 + Math.max(lines.length,1)*lineH + 64; // extra for footer
+            canvas.width = W; canvas.height = H;
+
+            // background
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0,0,W,H);
+            // subtle frame
+            ctx.strokeStyle = '#26262b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(10,10,W-20,H-20);
+
+            ctx.font = font;
+            ctx.textBaseline = 'middle';
+
+            let y = pad + lineH/2;
+            for (const ln of lines){
+                let x = pad;
+                for (const it of ln){
+                    if (it.isWord){
+                        if (it.kept){
+                            ctx.fillStyle = '#c98bff';
+                            ctx.shadowColor = 'rgba(168,85,247,0.55)';
+                            ctx.shadowBlur = 14;
+                            ctx.fillText(it.text, x, y);
+                            ctx.shadowBlur = 0;
+                        } else {
+                            // black bar over the buried word
+                            ctx.fillStyle = '#050505';
+                            ctx.fillRect(x - 1, y - fontSize*0.72, it.w + 2, fontSize*1.42);
+                            // faint ghost edge so bars read as redactions, not gaps
+                            ctx.strokeStyle = 'rgba(40,40,46,0.9)';
+                            ctx.lineWidth = 1;
+                            ctx.strokeRect(x - 1, y - fontSize*0.72, it.w + 2, fontSize*1.42);
+                        }
+                    } else {
+                        // whitespace/punctuation drawn faintly
+                        ctx.fillStyle = '#3a3530';
+                        ctx.fillText(it.text, x, y);
+                    }
+                    x += it.w;
+                }
+                y += lineH;
+            }
+
+            // footer mark
+            ctx.shadowBlur = 0;
+            ctx.font = "11px 'JetBrains Mono', monospace";
+            ctx.fillStyle = '#5a5560';
+            ctx.fillText('PRÍZRAK · THE PALIMPSEST · ' + new Date().toISOString().slice(0,10), pad, H - 36);
+
+            try {
+                const url = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'palimpsest-' + Date.now() + '.png';
+                document.body.appendChild(a); a.click(); a.remove();
+                toast('the page is saved as ink');
+            } catch(e){
+                toast('the page resisted export');
+            }
+        }
+
+        // ---------- wire up controls ----------
+        $('render-btn').addEventListener('click', () => {
+            const text = sourceEl.value.trim();
+            if (!text){
+                toast('give the page something to bury');
+                sourceEl.classList.add('flicker');
+                setTimeout(()=>sourceEl.classList.remove('flicker'), 1200);
+                return;
+            }
+            loadText(sourceEl.value, new Set());
+            showErasure();
+            save();
+        });
+
+        $('sample-btn').addEventListener('click', () => {
+            const text = SAMPLES[sampleIdx % SAMPLES.length];
+            sampleIdx++;
+            $('sample-cycle').textContent = 'well ' + (((sampleIdx-1) % SAMPLES.length)+1) + '/' + SAMPLES.length;
+            sourceEl.value = text;
+            loadText(text, new Set());
+            showErasure();
+            // give a first séance so the sample arrives already half-erased, evocatively
+            autoSeance();
+            save();
+        });
+
+        $('seance-btn').addEventListener('click', () => { autoSeance(); toast('the séance chose'); });
+        $('reseance-btn').addEventListener('click', () => { autoSeance(); toast('the séance chose again'); });
+        $('clear-btn').addEventListener('click', () => { kept = new Set(); renderPage(); save(); });
+        $('all-btn').addEventListener('click', () => {
+            kept = new Set(tokens.map((t,i)=> t.isWord ? i : -1).filter(i=>i>=0));
+            renderPage(); save();
+        });
+        $('copy-btn').addEventListener('click', copyPoem);
+        $('png-btn').addEventListener('click', exportPNG);
+        $('back-btn').addEventListener('click', () => { showInput(); save(); });
+
+        // ---------- init ----------
+        if (!restore()){
+            // seed the textarea with the first sample (not yet laid) so the page isn't empty
+            sourceEl.value = SAMPLES[0];
+        }
+
+        /* ===== ambient embers (capped, reduced-motion-safe) ===== */
+        (function(){
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            const host = $('embers');
+            for (let i=0;i<7;i++){
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (6 + Math.random()*88) + '%';
+                e.style.animationDelay = (Math.random()*14) + 's';
+                e.style.animationDuration = (12 + Math.random()*8) + 's';
+                host.appendChild(e);
+            }
+        })();
+
+        /* ===== night-hours footer whisper (00:00–03:00 local) ===== */
+        (function(){
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3){
+                $('footer-line').textContent = 'the mountain does not sleep. it reads.';
+            }
+        })();
+
+        /* ===== easter egg: type "prizrak" to wake a watcher ===== */
+        (function(){
+            let buf = '';
+            window.addEventListener('keydown', (ev)=>{
+                if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+                if (!ev.key || ev.key.length !== 1) return;
+                buf = (buf + ev.key.toLowerCase()).slice(-7);
+                if (buf === 'prizrak'){
+                    const g = $('ghost-watcher');
+                    g.textContent = 'a watcher leans over the page, reading what you kept.';
+                    g.style.opacity = '1';
+                    g.classList.add('flicker');
+                }
+            });
+        })();
+
+        /* ===== easter egg: triple-click the title → one extra ember ===== */
+        (function(){
+            const title = $('title');
+            if (!title) return;
+            title.addEventListener('click', (ev)=>{
+                if (ev.detail === 3){
+                    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                    const e = document.createElement('div');
+                    e.className = 'ember';
+                    e.style.left = (40 + Math.random()*20) + '%';
+                    e.style.animationDuration = '11s';
+                    $('embers').appendChild(e);
+                    setTimeout(()=>e.remove(), 11000);
+                }
+            });
+        })();
+
+        /* ===== easter egg: idle 60s → ghost line fades in ===== */
+        (function(){
+            const g = $('ghost-watcher');
+            let timer;
+            const arm = ()=>{
+                clearTimeout(timer);
+                timer = setTimeout(()=>{
+                    if (!g.textContent){
+                        g.textContent = 'still here. still reading over your shoulder.';
+                        g.style.opacity = '1';
+                        setTimeout(()=>{ if (g.textContent==='still here. still reading over your shoulder.'){ g.style.opacity='0'; } }, 6000);
+                    }
+                }, 60000);
+            };
+            ['mousemove','keydown','click','scroll','touchstart'].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+            arm();
+        })();
+    })();
+    </script>
+
+    <script src="/shared/star-widget.js"></script>
+</body>
+</html>

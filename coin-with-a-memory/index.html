@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Coin With a Memory | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#f5c518;            /* gold — the coin's own light */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        .glass{
+            background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+            backdrop-filter:blur(12px);
+            border:1px solid var(--line);
+            box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+        }
+        .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+        input[type="text"]{ background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink); transition:border-color .18s, box-shadow .18s; }
+        input[type="text"]:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+        input::placeholder{ color:var(--ink-ghost); }
+
+        button:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+        /* === MOTION VOCABULARY === */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* tactile hover/press on action buttons */
+        .btn-lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s, filter .15s; }
+        .btn-lift:hover{ transform:translateY(-2px); }
+        .btn-lift:active{ transform:translateY(1px); }
+
+        /* ===== THE COIN (CSS 3D) ===== */
+        .coin-stage{ width:160px; height:160px; margin:0 auto; perspective:900px; }
+        .coin{
+            position:relative; width:100%; height:100%;
+            transform-style:preserve-3d;
+            transform:rotateX(-12deg) rotateY(0deg);
+        }
+        .coin-face{
+            position:absolute; inset:0; border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            backface-visibility:hidden;
+            background:
+                radial-gradient(circle at 35% 30%, #fff6cf 0%, var(--accent) 38%, #b3870a 78%, #7a5c06 100%);
+            box-shadow:
+                inset 0 0 0 4px rgba(255,255,255,.18),
+                inset 0 0 0 9px rgba(122,92,6,.55),
+                0 0 38px -6px var(--glow);
+            border:1px solid #7a5c06;
+        }
+        .coin-face .label{
+            font-family:'JetBrains Mono', monospace;
+            font-weight:700; color:#3a2c02;
+            text-transform:uppercase; letter-spacing:.06em;
+            text-align:center; padding:0 14px; line-height:1.1;
+            text-shadow:0 1px 0 rgba(255,255,255,.35);
+            word-break:break-word; max-width:100%;
+        }
+        .coin-face.tails{ transform:rotateY(180deg); }
+        .coin.spinning{ animation:coinFlip 2.05s cubic-bezier(.33,.05,.2,1) forwards; }
+        /* idle: a slow, restless wobble like it's thinking */
+        .coin.idle{ animation:coinIdle 7s ease-in-out infinite; }
+        @keyframes coinIdle{
+            0%,100%{ transform:rotateX(-12deg) rotateY(-9deg); }
+            50%{ transform:rotateX(-12deg) rotateY(9deg); }
+        }
+        /* the flip lands either on 0deg (A/heads) or 180deg (B/tails); JS sets --land */
+        @keyframes coinFlip{
+            0%{ transform:rotateX(-12deg) rotateY(0deg); }
+            100%{ transform:rotateX(-12deg) rotateY(var(--land)); }
+        }
+        .coin-shadow{
+            width:118px; height:16px; margin:14px auto 0; border-radius:50%;
+            background:radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.55), transparent 72%);
+            filter:blur(2px); transition:transform .3s ease, opacity .3s ease;
+        }
+        .coin.spinning ~ .coin-shadow{ animation:shadowPulse 2.05s ease-in-out; }
+        @keyframes shadowPulse{ 0%,100%{transform:scaleX(1);opacity:.7} 45%{transform:scaleX(.55);opacity:.3} }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .coin.idle{ animation:none!important; transform:rotateX(-12deg) rotateY(0deg); }
+            .coin.spinning{ animation:none!important; transition:transform .5s ease; transform:rotateX(-12deg) rotateY(var(--land)); }
+            .coin-shadow,.coin.spinning ~ .coin-shadow{ animation:none!important; }
+        }
+    </style>
+</head>
+<body class="text-zinc-300 antialiased min-h-screen flex items-center justify-center p-4 grain">
+    <!-- ambient layers (decorative, behind everything) -->
+    <div class="fog"></div>
+    <div id="embers"></div>
+
+    <div class="relative z-[2] max-w-2xl w-full glass rounded-2xl p-8">
+        <header class="mb-8 text-center">
+            <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-600 mb-3 flicker">PRÍZRAK / INSTRUMENT 22 — AUGURY</div>
+            <h1 id="title" class="text-3xl font-bold text-white mb-2 select-none cursor-default breathe" style="text-shadow:0 0 14px var(--glow)">The Coin With a Memory</h1>
+            <p class="text-zinc-500 text-sm italic">For the decisions that are truly 50/50. The coin does not choose for you. It catches the flinch.</p>
+        </header>
+
+        <!-- ===== STAGE 1: NAME THE SIDES ===== -->
+        <div id="stage-name" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">SIDE A / HEADS</label>
+                    <input id="sideA" type="text" maxlength="42" class="w-full rounded-lg px-4 py-2 text-zinc-200 mono text-sm" placeholder="take the job">
+                </div>
+                <div>
+                    <label class="block mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">SIDE B / TAILS</label>
+                    <input id="sideB" type="text" maxlength="42" class="w-full rounded-lg px-4 py-2 text-zinc-200 mono text-sm" placeholder="stay where you are">
+                </div>
+            </div>
+            <div>
+                <label class="block mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">THE QUESTION <span class="text-zinc-700">(optional — for the ledger)</span></label>
+                <input id="question" type="text" maxlength="90" class="w-full rounded-lg px-4 py-2 text-zinc-200 mono text-sm" placeholder="what should i do?">
+            </div>
+
+            <button onclick="toHoping()" class="btn-lift relative overflow-hidden w-full text-black font-bold py-3 rounded-lg border border-transparent shadow-lg" style="background:var(--accent)">
+                <span class="relative z-10 mono tracking-[0.2em] uppercase text-sm">Take Up the Coin</span>
+            </button>
+
+            <div id="name-note" class="hidden text-center mono text-[10px] uppercase tracking-[0.2em] text-zinc-600"></div>
+        </div>
+
+        <!-- ===== STAGE 2: THE QUIET QUESTION ===== -->
+        <div id="stage-hoping" class="hidden space-y-6">
+            <p class="text-center text-zinc-400 text-sm leading-relaxed">
+                Before it leaves your hand — quietly, only to yourself —<br>
+                <span class="text-zinc-200">which were you hoping for?</span>
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="setHope('A')" id="hopeA" class="btn-lift well rounded-lg px-4 py-5 text-left transition-colors hover:border-yellow-500">
+                    <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">SIDE A</div>
+                    <div id="hopeA-text" class="text-zinc-200 text-sm font-bold mono"></div>
+                </button>
+                <button onclick="setHope('B')" id="hopeB" class="btn-lift well rounded-lg px-4 py-5 text-left transition-colors hover:border-yellow-500">
+                    <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">SIDE B</div>
+                    <div id="hopeB-text" class="text-zinc-200 text-sm font-bold mono"></div>
+                </button>
+            </div>
+            <button onclick="setHope('NONE')" class="btn-lift w-full py-2 mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 hover:text-zinc-300 transition-colors">
+                truly no preference — just flip it
+            </button>
+            <p class="text-center mono text-[10px] tracking-[0.15em] text-zinc-700 italic">the coin will not be told your answer until after it lands.</p>
+        </div>
+
+        <!-- ===== STAGE 3: THE FLIP ===== -->
+        <div id="stage-flip" class="hidden space-y-7">
+            <div class="text-center">
+                <div class="coin-stage">
+                    <div id="coin" class="coin idle">
+                        <div class="coin-face heads"><span id="face-a" class="label text-sm"></span></div>
+                        <div class="coin-face tails"><span id="face-b" class="label text-sm"></span></div>
+                    </div>
+                </div>
+                <div class="coin-shadow"></div>
+            </div>
+
+            <div id="flip-prompt" class="text-center">
+                <button onclick="flip()" id="flip-btn" class="btn-lift text-black font-bold py-3 px-10 rounded-lg shadow-lg mono tracking-[0.2em] uppercase text-sm" style="background:var(--accent)">
+                    Flip
+                </button>
+                <p class="mt-4 mono text-[10px] uppercase tracking-[0.2em] text-zinc-600">true 50 / 50 — no thumb on the scale</p>
+            </div>
+
+            <!-- the held beat: result withheld, feeling asked -->
+            <div id="held-beat" class="hidden text-center space-y-4">
+                <p class="text-zinc-400 text-sm italic">it has landed. it is face-down in your palm.</p>
+                <p class="text-zinc-200 text-sm">before you look — <span class="breathe" style="color:var(--accent)">what are you hoping it says?</span></p>
+            </div>
+        </div>
+
+        <!-- ===== STAGE 4: THE REFLECTION ===== -->
+        <div id="stage-result" class="hidden space-y-7">
+            <div class="text-center border-b border-zinc-800 pb-6">
+                <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-500 mb-3">IT LANDED ON</div>
+                <div id="landed-text" class="text-4xl font-bold text-white breathe mono"></div>
+                <div id="landed-side" class="mono text-[11px] uppercase tracking-[0.25em] text-zinc-600 mt-2"></div>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">THE VERDICT</h3>
+                <div id="verdict" class="well p-5 rounded-lg text-sm leading-relaxed result-glow"></div>
+            </div>
+
+            <div id="obey-block" class="space-y-3">
+                <p class="text-center mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">did you obey the coin?</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="recordObey(true)" id="obey-yes" class="btn-lift well rounded-lg py-3 mono text-xs uppercase tracking-[0.15em] text-zinc-300 hover:border-yellow-500 transition-colors">i obeyed</button>
+                    <button onclick="recordObey(false)" id="obey-no" class="btn-lift well rounded-lg py-3 mono text-xs uppercase tracking-[0.15em] text-zinc-300 hover:border-yellow-500 transition-colors">i defied it</button>
+                </div>
+                <p id="obey-echo" class="hidden text-center mono text-[10px] uppercase tracking-[0.2em] text-yellow-500/80 italic"></p>
+            </div>
+
+            <div id="history" class="hidden space-y-2">
+                <h3 class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">THE LEDGER</h3>
+                <div id="history-list" class="space-y-1"></div>
+            </div>
+
+            <button onclick="reset()" class="btn-lift w-full py-2 mono text-[10px] uppercase tracking-[0.3em] text-zinc-500 hover:text-zinc-300 transition-colors">
+                ← another decision
+            </button>
+        </div>
+
+        <footer class="mt-8 pt-4 border-t border-zinc-900 text-center">
+            <p id="footer-line" class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-700">the coin already did its job the moment you flinched.</p>
+            <p id="ghost-watcher" class="mono text-[10px] tracking-[0.2em] mt-2 opacity-0 transition-opacity duration-700" style="color:var(--ink-ghost)"></p>
+        </footer>
+    </div>
+
+    <script>
+        const LEDGER_KEY = 'coin-with-a-memory-v1';
+
+        // session state for the current decision
+        let state = { a:'', b:'', q:'', hope:null, landed:null, obeyed:null, withheld:false };
+
+        const $ = (id)=>document.getElementById(id);
+
+        function readLedger(){
+            try { return JSON.parse(localStorage.getItem(LEDGER_KEY)) || []; }
+            catch(e){ return []; }
+        }
+        function writeLedger(arr){
+            try { localStorage.setItem(LEDGER_KEY, JSON.stringify(arr.slice(-30))); } catch(e){}
+        }
+
+        function show(id){
+            ['stage-name','stage-hoping','stage-flip','stage-result'].forEach(s=>$(s).classList.add('hidden'));
+            const el = $(id);
+            el.classList.remove('hidden');
+            el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal');
+        }
+
+        // ---- Stage 1 -> 2 ----
+        function toHoping(){
+            const a = $('sideA').value.trim();
+            const b = $('sideB').value.trim();
+            if (!a || !b){
+                const note = $('name-note');
+                note.innerText = 'the coin needs two faces. name both sides.';
+                note.classList.remove('hidden');
+                note.classList.add('flicker');
+                setTimeout(()=>note.classList.remove('flicker'), 1200);
+                return;
+            }
+            state.a = a; state.b = b; state.q = $('question').value.trim();
+            state.hope = null; state.landed = null; state.obeyed = null;
+
+            $('hopeA-text').innerText = a;
+            $('hopeB-text').innerText = b;
+
+            // ~38% of the time, the coin withholds and asks how you feel instead of asking up front
+            state.withheld = Math.random() < 0.38;
+
+            if (state.withheld){
+                // skip the up-front secret question; go straight to flip, ask feeling after landing
+                prepFlip();
+                show('stage-flip');
+            } else {
+                show('stage-hoping');
+            }
+        }
+
+        // ---- Stage 2 (secret hope) ----
+        function setHope(side){
+            state.hope = side; // 'A' | 'B' | 'NONE'
+            prepFlip();
+            show('stage-flip');
+        }
+
+        function prepFlip(){
+            $('face-a').innerText = state.a;
+            $('face-b').innerText = state.b;
+            const coin = $('coin');
+            coin.className = 'coin idle';
+            coin.style.removeProperty('--land');
+            $('flip-prompt').classList.remove('hidden');
+            $('held-beat').classList.add('hidden');
+            $('flip-btn').disabled = false;
+        }
+
+        // ---- Stage 3 (the flip) ----
+        let flipping = false;
+        function flip(){
+            if (flipping) return;
+            flipping = true;
+            $('flip-btn').disabled = true;
+            $('flip-prompt').classList.add('hidden');
+
+            // TRUE 50/50
+            const landsA = Math.random() < 0.5;
+            state.landed = landsA ? 'A' : 'B';
+
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            // multiple full turns + final half-turn for tails; keep it deterministic per result
+            const turns = reduce ? 0 : (4 + Math.floor(Math.random()*3)); // 4–6 spins
+            const finalDeg = (turns * 360) + (landsA ? 0 : 180);
+
+            const coin = $('coin');
+            coin.classList.remove('idle');
+            coin.style.setProperty('--land', finalDeg + 'deg');
+            // restart spin animation cleanly
+            coin.classList.remove('spinning'); void coin.offsetWidth; coin.classList.add('spinning');
+
+            const spinTime = reduce ? 520 : 2050;
+
+            if (state.withheld){
+                // the held beat: result is real but hidden from the user for a moment
+                setTimeout(()=>{
+                    // hide the coin's verdict visually by NOT revealing it yet — show the feeling prompt
+                    coin.style.filter = 'brightness(.35) saturate(.4)';
+                    $('held-beat').classList.remove('hidden');
+                    // after the user has had a beat to feel it, ask which they want via the same buttons,
+                    // reusing stage-hoping inline is awkward — instead, reveal feeling capture here:
+                    buildHeldChoice();
+                }, spinTime);
+            } else {
+                setTimeout(()=>{ revealResult(); }, spinTime + 350);
+            }
+        }
+
+        // For the withheld path, inject A/B feeling buttons under the held beat, then reveal.
+        function buildHeldChoice(){
+            const host = $('held-beat');
+            if (host.querySelector('.held-choices')) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'held-choices grid grid-cols-1 md:grid-cols-2 gap-3 mt-2';
+            wrap.innerHTML = `
+                <button class="btn-lift well rounded-lg px-4 py-4 text-left hover:border-yellow-500 transition-colors" data-h="A">
+                    <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">hoping for A</div>
+                    <div class="text-zinc-200 text-sm font-bold mono">${escapeHtml(state.a)}</div>
+                </button>
+                <button class="btn-lift well rounded-lg px-4 py-4 text-left hover:border-yellow-500 transition-colors" data-h="B">
+                    <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">hoping for B</div>
+                    <div class="text-zinc-200 text-sm font-bold mono">${escapeHtml(state.b)}</div>
+                </button>`;
+            host.appendChild(wrap);
+            const none = document.createElement('button');
+            none.className = 'btn-lift held-none w-full py-2 mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 hover:text-zinc-300 transition-colors';
+            none.innerText = 'i felt nothing either way';
+            host.appendChild(none);
+
+            wrap.querySelectorAll('button').forEach(btn=>{
+                btn.addEventListener('click', ()=>{ state.hope = btn.dataset.h; $('coin').style.filter=''; revealResult(); });
+            });
+            none.addEventListener('click', ()=>{ state.hope = 'NONE'; $('coin').style.filter=''; revealResult(); });
+        }
+
+        function escapeHtml(s){
+            return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        // ---- Stage 4 (reflection) ----
+        function revealResult(){
+            flipping = false;
+            const landedSide = state.landed; // 'A' | 'B'
+            const landedLabel = landedSide === 'A' ? state.a : state.b;
+
+            $('landed-text').innerText = landedLabel;
+            $('landed-side').innerText = landedSide === 'A' ? 'SIDE A · HEADS' : 'SIDE B · TAILS';
+
+            $('verdict').innerHTML = composeVerdict();
+
+            // reset obey block for this run
+            $('obey-yes').style.borderColor=''; $('obey-yes').style.color='';
+            $('obey-no').style.borderColor=''; $('obey-no').style.color='';
+            $('obey-echo').classList.add('hidden');
+            state.obeyed = null;
+
+            show('stage-result');
+            renderHistory();
+            $('stage-result').scrollIntoView({behavior:'smooth', block:'center'});
+
+            // pre-write the ledger entry (obeyed null until recorded)
+            commitLedger();
+        }
+
+        function composeVerdict(){
+            const hope = state.hope;              // 'A' | 'B' | 'NONE'
+            const landed = state.landed;          // 'A' | 'B'
+            const landedLabel = landed === 'A' ? state.a : state.b;
+            const hopedLabel = hope === 'A' ? state.a : hope === 'B' ? state.b : null;
+
+            if (hope === 'NONE' || hope == null){
+                return `You claimed no preference, and the coin took you at your word — it landed on <strong style="color:var(--accent)">${escapeHtml(landedLabel)}</strong>.<br><br>
+                Now sit with it for one breath. If a quiet "good" rose in you, that was the preference you said you didn't have. If you felt the urge to flip again, the coin already has your answer. Indifference is rarer than people think. Check whether yours was real.`;
+            }
+
+            const obeyedByChance = (hope === landed);
+            if (obeyedByChance){
+                return `You were hoping for <strong style="color:var(--accent)">${escapeHtml(hopedLabel)}</strong>. The coin agreed.<br><br>
+                Relief, then. But notice how fast it came — that speed is the data, not the landing. You did not need the coin to tell you ${escapeHtml(landedLabel)}; you needed permission to admit you'd already chosen it. The flip was theater. The flinch toward this side, before it ever spun, was the decision.`;
+            } else {
+                const hopedShort = escapeHtml(hopedLabel);
+                return `You were hoping for <strong style="color:var(--accent)">${hopedShort}</strong>. The coin landed on <strong>${escapeHtml(landedLabel)}</strong>.<br><br>
+                Watch what happens in your chest right now. If it sank — if some part of you wants to call it "best of three" — there's your answer, and it isn't the coin's. Disappointment is a compass. You hoped for <strong>${hopedShort}</strong> hard enough to feel its absence. Stop pretending this was ever fifty-fifty.`;
+            }
+        }
+
+        // ---- obey ----
+        function recordObey(yes){
+            state.obeyed = yes;
+            const y = $('obey-yes'), n = $('obey-no');
+            const on = yes ? y : n, off = yes ? n : y;
+            on.style.borderColor = 'var(--accent)'; on.style.color = 'var(--accent)';
+            off.style.borderColor = ''; off.style.color = '';
+
+            const echo = $('obey-echo');
+            const followedHope = (state.hope !== 'NONE' && state.hope != null && state.hope === state.landed);
+            if (yes){
+                echo.innerText = followedHope
+                    ? 'obeyed the coin — but you obeyed yourself first.'
+                    : 'you obeyed the coin over your own hope. brave, or afraid?';
+            } else {
+                echo.innerText = followedHope
+                    ? 'you defied the coin to keep what you wanted. honest, at least.'
+                    : 'you defied the coin — and chose the thing you were hoping for. you knew all along.';
+            }
+            echo.classList.remove('hidden');
+            echo.classList.remove('flicker'); void echo.offsetWidth; echo.classList.add('flicker');
+            setTimeout(()=>echo.classList.remove('flicker'), 1400);
+
+            commitLedger(true);
+            renderHistory();
+        }
+
+        // write/update the most recent ledger entry for this decision
+        let currentEntryId = null;
+        function commitLedger(update){
+            const ledger = readLedger();
+            const entry = {
+                id: currentEntryId || (Date.now()+''+Math.floor(Math.random()*999)),
+                t: Date.now(),
+                q: state.q || '',
+                a: state.a, b: state.b,
+                hope: state.hope,
+                landed: state.landed,
+                obeyed: state.obeyed,
+                withheld: state.withheld
+            };
+            if (update && currentEntryId){
+                const i = ledger.findIndex(e=>e.id===currentEntryId);
+                if (i>=0){ ledger[i] = entry; writeLedger(ledger); return; }
+            }
+            currentEntryId = entry.id;
+            ledger.push(entry);
+            writeLedger(ledger);
+        }
+
+        function labelFor(e, side){ return side === 'A' ? e.a : e.b; }
+
+        function renderHistory(){
+            const ledger = readLedger();
+            const wrap = $('history');
+            const list = $('history-list');
+            // prior decisions (exclude the one in progress)
+            const prior = ledger.filter(e=>e.id !== currentEntryId).slice(-6).reverse();
+            if (!prior.length){ wrap.classList.add('hidden'); return; }
+            wrap.classList.remove('hidden');
+            list.innerHTML = prior.map(e=>{
+                const d = new Date(e.t);
+                const stamp = d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+                const landedLabel = labelFor(e, e.landed);
+                let hopeMark, hopeColor;
+                if (e.hope === 'NONE' || e.hope == null){ hopeMark='—'; hopeColor='text-zinc-600'; }
+                else if (e.hope === e.landed){ hopeMark='got hoped'; hopeColor='text-yellow-500/80'; }
+                else { hopeMark='against hope'; hopeColor='text-rose-400/80'; }
+                let obeyMark;
+                if (e.obeyed === true) obeyMark='obeyed';
+                else if (e.obeyed === false) obeyMark='defied';
+                else obeyMark='—';
+                const qline = e.q ? escapeHtml(e.q) : (escapeHtml(e.a)+' / '+escapeHtml(e.b));
+                return `<div class="well rounded px-3 py-2 text-xs">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="mono text-zinc-400 truncate">${qline}</span>
+                        <span class="mono text-zinc-600 shrink-0">${stamp}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 mt-1">
+                        <span class="mono text-zinc-300 truncate">→ ${escapeHtml(landedLabel)}</span>
+                        <span class="mono shrink-0 ${hopeColor}">${hopeMark} · <span class="text-zinc-500">${obeyMark}</span></span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function reset(){
+            state = { a:'', b:'', q:'', hope:null, landed:null, obeyed:null, withheld:false };
+            currentEntryId = null;
+            flipping = false;
+            $('sideA').value=''; $('sideB').value=''; $('question').value='';
+            $('name-note').classList.add('hidden');
+            // clear any injected held-choices
+            const held = $('held-beat');
+            held.querySelectorAll('.held-choices, .held-none').forEach(n=>n.remove());
+            $('coin').style.filter='';
+            show('stage-name');
+            $('stage-name').scrollIntoView({behavior:'smooth', block:'center'});
+            renderHistory();
+        }
+
+        // render any existing ledger on first load (under result is hidden; but expose via stage-name? keep simple: skip)
+
+        /* ===== ambient embers (capped, reduced-motion-safe) ===== */
+        (function(){
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce) return;
+            const host = $('embers');
+            const N = 7;
+            for (let i=0;i<N;i++){
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (6 + Math.random()*88) + '%';
+                e.style.animationDelay = (Math.random()*14) + 's';
+                e.style.animationDuration = (12 + Math.random()*8) + 's';
+                host.appendChild(e);
+            }
+        })();
+
+        /* ===== night-hours footer whisper (00:00–03:00 local) ===== */
+        (function(){
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3){
+                $('footer-line').innerText = 'the mountain does not sleep. flip anyway.';
+            }
+        })();
+
+        /* ===== easter egg: type "prizrak" ===== */
+        (function(){
+            let buf = '';
+            window.addEventListener('keydown', (ev)=>{
+                if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+                if (ev.key.length !== 1) return;
+                buf = (buf + ev.key.toLowerCase()).slice(-7);
+                if (buf === 'prizrak'){
+                    const g = $('ghost-watcher');
+                    g.innerText = 'you found the watcher. it has been calling every flip.';
+                    g.style.opacity = '1';
+                }
+            });
+        })();
+
+        /* ===== easter egg: triple-click the title → one extra ember ===== */
+        (function(){
+            const title = $('title');
+            if (!title) return;
+            title.addEventListener('click', (ev)=>{
+                if (ev.detail === 3){
+                    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    if (reduce) return;
+                    const e = document.createElement('div');
+                    e.className = 'ember';
+                    e.style.left = (40 + Math.random()*20) + '%';
+                    e.style.animationDuration = '11s';
+                    $('embers').appendChild(e);
+                    setTimeout(()=>e.remove(), 11000);
+                }
+            });
+        })();
+
+        /* ===== easter egg: idle 60s → ghost line fades in ===== */
+        (function(){
+            let timer;
+            const g = $('ghost-watcher');
+            const arm = ()=>{
+                clearTimeout(timer);
+                timer = setTimeout(()=>{
+                    if (!g.innerText){
+                        g.innerText = 'still here. still watching which way you lean.';
+                        g.style.opacity = '1';
+                        setTimeout(()=>{ if (g.innerText.startsWith('still here')){ g.style.opacity='0'; } }, 6000);
+                    }
+                }, 60000);
+            };
+            ['mousemove','keydown','click','scroll','touchstart'].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+            arm();
+        })();
+
+        // surface prior ledger on the naming stage so the memory is felt from the start
+        (function(){
+            const ledger = readLedger();
+            if (!ledger.length) return;
+            // build a small "the coin remembers N flips" line under the header note
+            renderHistory(); // populates list, but it's inside hidden result stage
+        })();
+    </script>
+
+    <script src="/shared/star-widget.js"></script>
+</body>
+</html>

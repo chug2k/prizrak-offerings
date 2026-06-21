@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Cartographer's Bench | Prízrak</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#f59e0b;                 /* amber — the cartographer's lamp */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+      --map-ink:#5eb6e6;                /* cold ink — the intended map */
+      --terrain-ink:#f59e0b;            /* warm ink — the real ground */
+    }
+
+    html,body{ background:var(--bg); }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible{
+      outline:none; border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+
+    /* tool buttons — tactile press */
+    .tool{
+      background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink-dim);
+      transition:transform .12s, border-color .15s, color .15s, box-shadow .15s, background-color .15s;
+    }
+    .tool:hover{ border-color:color-mix(in srgb,var(--accent) 40%,var(--line)); color:var(--ink); transform:translateY(-1px); }
+    .tool:active{ transform:translateY(1px); }
+    .tool.is-active{
+      border-color:var(--accent); color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow), 0 0 18px -8px var(--glow);
+      background:color-mix(in srgb,var(--accent) 8%,var(--bg-sunk));
+    }
+
+    /* layer rows */
+    .layer-row{ background:var(--bg-sunk); border:1px solid var(--line); transition:border-color .15s, opacity .2s; }
+    .layer-row.is-hidden{ opacity:.45; }
+    .swatch{ width:14px; height:14px; border-radius:3px; box-shadow:0 0 8px -2px currentColor; }
+
+    .eye-toggle{ transition:color .15s, transform .12s; }
+    .eye-toggle:active{ transform:scale(.9); }
+
+    /* the canvas well — sunken bench, breathing amber rim */
+    .canvas-frame{
+      background:var(--bg-sunk);
+      border:1px solid var(--line);
+      box-shadow:inset 0 0 60px -20px #000, 0 0 0 1px var(--line-soft);
+      position:relative; overflow:hidden;
+    }
+    canvas{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+    canvas.erasing{ cursor:cell; }
+
+    .glow-breathe{ animation:glowBreathe 5s ease-in-out infinite; }
+    @keyframes glowBreathe{ 0%,100%{ box-shadow:inset 0 0 60px -20px #000, 0 0 0 1px var(--line-soft) } 50%{ box-shadow:inset 0 0 60px -20px #000, 0 0 0 1px color-mix(in srgb,var(--accent) 30%,var(--line-soft)), 0 0 26px -14px var(--glow) } }
+
+    @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+    #ghostLine,#idleLine,#nightWhisper{ color:var(--ink-ghost); }
+
+    /* toast */
+    #toast{ transition:opacity .3s, transform .3s; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker,.reveal,.glow-breathe{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 grain antialiased">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="relative z-[2] w-full max-w-5xl glass rounded-2xl p-6 md:p-8 reveal">
+
+    <!-- Header -->
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-600 mb-2 flicker">PRÍZRAK / INSTRUMENT 27 — SURVEY</div>
+        <h1 id="appTitle" class="text-2xl md:text-3xl font-bold text-white h1-glow breathe select-none cursor-default">The Cartographer's Bench</h1>
+        <p class="text-zinc-500 text-sm italic mt-1 max-w-xl">Draw the clean intended <span style="color:var(--map-ink)">map</span> in cold ink. Draw the real <span style="color:var(--terrain-ink)">terrain</span> in warm. The distance between the two is the only honest measurement you have.</p>
+      </div>
+      <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-600 text-right leading-relaxed hidden sm:block">
+        <div id="saveState">unsaved bench</div>
+        <div class="text-zinc-700">karst survey · 1:25 000</div>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5">
+
+      <!-- Control column -->
+      <aside class="space-y-5">
+
+        <!-- Tools -->
+        <section>
+          <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">INSTRUMENT</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="tool-pen" class="tool is-active rounded-lg py-2 mono text-[11px] uppercase tracking-[0.12em]" data-tool="pen">✦ Pen</button>
+            <button id="tool-eraser" class="tool rounded-lg py-2 mono text-[11px] uppercase tracking-[0.12em]" data-tool="eraser">⌫ Eraser</button>
+          </div>
+        </section>
+
+        <!-- Ink -->
+        <section>
+          <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">DRAWING ON LAYER</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="ink-map" class="tool is-active rounded-lg py-2.5 mono text-[11px] uppercase tracking-[0.1em] flex items-center justify-center gap-2" data-layer="map">
+              <span class="swatch" style="background:var(--map-ink);color:var(--map-ink)"></span> Map
+            </button>
+            <button id="ink-terrain" class="tool rounded-lg py-2.5 mono text-[11px] uppercase tracking-[0.1em] flex items-center justify-center gap-2" data-layer="terrain">
+              <span class="swatch" style="background:var(--terrain-ink);color:var(--terrain-ink)"></span> Terrain
+            </button>
+          </div>
+        </section>
+
+        <!-- Width -->
+        <section>
+          <div class="flex justify-between mb-2">
+            <span class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">Nib width</span>
+            <span id="widthVal" class="mono text-[11px]" style="color:var(--accent)">3 px</span>
+          </div>
+          <input type="range" id="width" min="1" max="48" value="3" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </section>
+
+        <!-- Layer visibility -->
+        <section>
+          <div class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">LAYERS</div>
+          <div class="space-y-2">
+            <div id="row-map" class="layer-row rounded-lg px-3 py-2 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="swatch" style="background:var(--map-ink);color:var(--map-ink)"></span>
+                <span class="mono text-[11px] uppercase tracking-[0.1em] text-zinc-300">Map</span>
+              </div>
+              <button class="eye-toggle mono text-[10px] uppercase tracking-[0.15em]" data-eye="map" style="color:var(--accent)">shown</button>
+            </div>
+            <div id="row-terrain" class="layer-row rounded-lg px-3 py-2 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="swatch" style="background:var(--terrain-ink);color:var(--terrain-ink)"></span>
+                <span class="mono text-[11px] uppercase tracking-[0.1em] text-zinc-300">Terrain</span>
+              </div>
+              <button class="eye-toggle mono text-[10px] uppercase tracking-[0.15em]" data-eye="terrain" style="color:var(--accent)">shown</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Actions -->
+        <section class="space-y-2 pt-1">
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-undo" class="tool rounded-lg py-2 mono text-[11px] uppercase tracking-[0.12em]">↶ Undo</button>
+            <button id="btn-clear" class="tool rounded-lg py-2 mono text-[11px] uppercase tracking-[0.12em]">✕ Clear</button>
+          </div>
+          <button id="btn-export" class="w-full rounded-lg py-2.5 mono text-[11px] uppercase tracking-[0.18em] font-bold text-black transition" style="background:var(--accent);box-shadow:0 0 18px -6px var(--glow)">
+            ↧ Export PNG
+          </button>
+        </section>
+      </aside>
+
+      <!-- Canvas -->
+      <div class="canvas-frame glow-breathe rounded-xl aspect-[4/3] lg:aspect-auto lg:min-h-[520px]" id="frame">
+        <canvas id="board"></canvas>
+      </div>
+
+    </div>
+
+    <!-- Footer whisper -->
+    <footer class="mt-6 pt-4 border-t border-zinc-900 flex flex-wrap items-center justify-between gap-2">
+      <p class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-700">the cartographer measures the distance between the map and the ground.</p>
+      <p id="nightWhisper" class="mono text-[10px] uppercase tracking-[0.2em]" style="display:none">the mountain does not sleep.</p>
+      <p id="ghostLine" class="mono text-[10px] tracking-[0.2em]" style="display:none">you found the watcher.</p>
+      <p id="idleLine" class="mono text-[10px] tracking-[0.2em]" style="display:none;opacity:0;transition:opacity 1.2s ease">still here. still surveying.</p>
+    </footer>
+  </div>
+
+  <!-- toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[40] opacity-0 pointer-events-none well rounded-lg px-4 py-2 mono text-[11px] uppercase tracking-[0.18em]" style="color:var(--accent)"></div>
+
+  <script>
+  (function(){
+    "use strict";
+    const LS_KEY = "cartographers-bench-v1";
+
+    // ── Layers: each is its own offscreen canvas at device resolution ──────────
+    const LAYERS = ["map","terrain"]; // draw order: map under terrain
+    const INK = { map:"#5eb6e6", terrain:"#f59e0b" };
+
+    const frame  = document.getElementById("frame");
+    const board  = document.getElementById("board");
+    const ctx    = board.getContext("2d");
+    const widthInput = document.getElementById("width");
+    const widthVal   = document.getElementById("widthVal");
+    const toastEl    = document.getElementById("toast");
+
+    let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+    let W = 0, H = 0; // CSS pixels of canvas
+
+    // offscreen buffers per layer
+    const buffers = {};   // name -> {canvas, ctx}
+    const visible = { map:true, terrain:true };
+    let activeLayer = "map";
+    let tool = "pen";       // "pen" | "eraser"
+    let nib = 3;
+
+    // undo stack: list of {layer, before:ImageData} captured before each stroke
+    const undoStack = [];
+    const UNDO_MAX = 40;
+
+    function makeBuffer(){
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(W * DPR));
+      c.height = Math.max(1, Math.round(H * DPR));
+      const cx = c.getContext("2d");
+      cx.lineCap = "round";
+      cx.lineJoin = "round";
+      cx.scale(DPR, DPR);
+      return { canvas:c, ctx:cx };
+    }
+
+    // compose all visible layers onto the visible board, over the grid
+    function paintGrid(){
+      ctx.save();
+      ctx.fillStyle = "#0c0c0e";
+      ctx.fillRect(0,0,W,H);
+      // grid lines
+      const step = 28;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(120,120,130,0.07)";
+      ctx.beginPath();
+      for(let x=step; x<W; x+=step){ ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,H); }
+      for(let y=step; y<H; y+=step){ ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); }
+      ctx.stroke();
+      // bolder every 5th line
+      ctx.strokeStyle = "rgba(120,120,130,0.12)";
+      ctx.beginPath();
+      for(let x=step*5; x<W; x+=step*5){ ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,H); }
+      for(let y=step*5; y<H; y+=step*5){ ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function compose(){
+      paintGrid();
+      for(const name of LAYERS){
+        if(visible[name] && buffers[name]){
+          ctx.drawImage(buffers[name].canvas, 0,0, W, H);
+        }
+      }
+    }
+
+    // ── Sizing. Preserve existing art when the frame resizes. ─────────────────
+    function resize(preserve){
+      const rect = frame.getBoundingClientRect();
+      const newW = Math.max(1, Math.floor(rect.width));
+      const newH = Math.max(1, Math.floor(rect.height));
+      if(newW === W && newH === H && buffers.map) return;
+
+      // snapshot old art scaled into new buffers
+      const old = preserve && buffers.map ? {} : null;
+      if(old){ for(const n of LAYERS){ old[n] = buffers[n].canvas; } }
+
+      W = newW; H = newH;
+      board.width = Math.round(W * DPR);
+      board.height = Math.round(H * DPR);
+      board.style.width = W + "px";
+      board.style.height = H + "px";
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.scale(DPR, DPR);
+
+      for(const n of LAYERS){
+        const nb = makeBuffer();
+        if(old && old[n]){
+          // stretch old content to new size (keeps proportion of the survey)
+          nb.ctx.setTransform(1,0,0,1,0,0);
+          nb.ctx.drawImage(old[n], 0,0, nb.canvas.width, nb.canvas.height);
+          nb.ctx.setTransform(1,0,0,1,0,0);
+          nb.ctx.scale(DPR, DPR);
+        }
+        buffers[n] = nb;
+      }
+      compose();
+    }
+
+    // ── Drawing ───────────────────────────────────────────────────────────────
+    let drawing = false;
+    let last = null;
+    let strokeCaptured = false;
+
+    function pointFromEvent(e){
+      const rect = board.getBoundingClientRect();
+      return {
+        x:(e.clientX - rect.left),
+        y:(e.clientY - rect.top)
+      };
+    }
+
+    function captureUndo(){
+      const buf = buffers[activeLayer];
+      try{
+        const data = buf.ctx.getImageData(0,0, buf.canvas.width, buf.canvas.height);
+        undoStack.push({ layer:activeLayer, data });
+        if(undoStack.length > UNDO_MAX) undoStack.shift();
+      }catch(err){ /* tainted/oversize — skip */ }
+    }
+
+    function strokeTo(p){
+      const buf = buffers[activeLayer];
+      const cx = buf.ctx;
+      cx.save();
+      if(tool === "eraser"){
+        cx.globalCompositeOperation = "destination-out";
+        cx.strokeStyle = "rgba(0,0,0,1)";
+        cx.lineWidth = nib * 2.2;
+      }else{
+        cx.globalCompositeOperation = "source-over";
+        cx.strokeStyle = INK[activeLayer];
+        cx.lineWidth = nib;
+      }
+      cx.lineCap = "round"; cx.lineJoin = "round";
+      cx.beginPath();
+      if(last){ cx.moveTo(last.x, last.y); } else { cx.moveTo(p.x - 0.01, p.y); }
+      cx.lineTo(p.x, p.y);
+      cx.stroke();
+      cx.restore();
+      last = p;
+      compose();
+    }
+
+    function pointerDown(e){
+      if(e.button !== undefined && e.button !== 0) return;
+      // eraser hits the active layer's content; ink draws on the active layer.
+      // either way, make sure the layer we touch is visible so the user sees it.
+      if(!visible[activeLayer]) toggleLayer(activeLayer, true);
+      drawing = true;
+      strokeCaptured = true;
+      captureUndo();
+      last = null;
+      const p = pointFromEvent(e);
+      strokeTo(p);            // a single tap leaves a dot
+      board.setPointerCapture && e.pointerId !== undefined && board.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    }
+    function pointerMove(e){
+      if(!drawing) return;
+      // coalesced events for smoother lines on supporting browsers
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      for(const ev of events){ strokeTo(pointFromEvent(ev)); }
+      e.preventDefault();
+    }
+    function pointerUp(e){
+      if(!drawing) return;
+      drawing = false; last = null;
+      if(strokeCaptured){ scheduleSave(); strokeCaptured = false; }
+      e.preventDefault && e.preventDefault();
+    }
+
+    board.addEventListener("pointerdown", pointerDown);
+    board.addEventListener("pointermove", pointerMove);
+    window.addEventListener("pointerup", pointerUp);
+    board.addEventListener("pointercancel", pointerUp);
+
+    // ── Tool / layer / width UI ────────────────────────────────────────────────
+    function setTool(t){
+      tool = t;
+      document.getElementById("tool-pen").classList.toggle("is-active", t==="pen");
+      document.getElementById("tool-eraser").classList.toggle("is-active", t==="eraser");
+      board.classList.toggle("erasing", t==="eraser");
+    }
+    function setActiveLayer(name){
+      activeLayer = name;
+      document.getElementById("ink-map").classList.toggle("is-active", name==="map");
+      document.getElementById("ink-terrain").classList.toggle("is-active", name==="terrain");
+    }
+    document.getElementById("tool-pen").onclick = ()=>setTool("pen");
+    document.getElementById("tool-eraser").onclick = ()=>setTool("eraser");
+    document.getElementById("ink-map").onclick = ()=>setActiveLayer("map");
+    document.getElementById("ink-terrain").onclick = ()=>setActiveLayer("terrain");
+
+    widthInput.addEventListener("input", ()=>{
+      nib = parseInt(widthInput.value,10);
+      widthVal.textContent = nib + " px";
+    });
+
+    function toggleLayer(name, forceShow){
+      visible[name] = forceShow === undefined ? !visible[name] : !!forceShow;
+      const row = document.getElementById("row-"+name);
+      const btn = row.querySelector("[data-eye]");
+      row.classList.toggle("is-hidden", !visible[name]);
+      btn.textContent = visible[name] ? "shown" : "hidden";
+      btn.style.color = visible[name] ? "var(--accent)" : "var(--ink-dim)";
+      compose();
+    }
+    document.querySelectorAll("[data-eye]").forEach(btn=>{
+      btn.addEventListener("click", ()=>toggleLayer(btn.getAttribute("data-eye")));
+    });
+
+    // ── Undo / Clear ───────────────────────────────────────────────────────────
+    document.getElementById("btn-undo").onclick = ()=>{
+      const last = undoStack.pop();
+      if(!last){ toast("nothing to retract"); return; }
+      const buf = buffers[last.layer];
+      buf.ctx.setTransform(1,0,0,1,0,0);
+      buf.ctx.putImageData(last.data, 0,0);
+      buf.ctx.scale(DPR, DPR);
+      if(!visible[last.layer]) toggleLayer(last.layer, true);
+      compose();
+      scheduleSave();
+    };
+    document.getElementById("btn-clear").onclick = ()=>{
+      // clear only the active layer, but capture undo so it's reversible
+      captureUndo();
+      const buf = buffers[activeLayer];
+      buf.ctx.setTransform(1,0,0,1,0,0);
+      buf.ctx.clearRect(0,0, buf.canvas.width, buf.canvas.height);
+      buf.ctx.scale(DPR, DPR);
+      compose();
+      scheduleSave();
+      toast("cleared the " + activeLayer + " layer");
+    };
+
+    // ── Export PNG (flattens grid + visible layers) ────────────────────────────
+    document.getElementById("btn-export").onclick = ()=>{
+      const out = document.createElement("canvas");
+      out.width = board.width; out.height = board.height;
+      const ox = out.getContext("2d");
+      // dark backing so the PNG isn't transparent
+      ox.fillStyle = "#0a0a0a";
+      ox.fillRect(0,0,out.width,out.height);
+      ox.drawImage(board, 0, 0); // board already holds grid + composed visible layers
+      let url;
+      try{ url = out.toDataURL("image/png"); }
+      catch(err){ toast("export blocked"); return; }
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+      a.href = url;
+      a.download = "cartographers-bench-" + stamp + ".png";
+      document.body.appendChild(a); a.click(); a.remove();
+      toast("survey exported");
+    };
+
+    // ── Persistence (dataURL of each layer) ────────────────────────────────────
+    let saveTimer = null;
+    function scheduleSave(){
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(save, 400);
+    }
+    function save(){
+      try{
+        const payload = { v:1, w:W, h:H, visible:{...visible}, layers:{} };
+        for(const n of LAYERS){ payload.layers[n] = buffers[n].canvas.toDataURL("image/png"); }
+        localStorage.setItem(LS_KEY, JSON.stringify(payload));
+        document.getElementById("saveState").textContent = "bench saved";
+      }catch(err){
+        document.getElementById("saveState").textContent = "save failed (full?)";
+      }
+    }
+
+    function load(){
+      let raw;
+      try{ raw = localStorage.getItem(LS_KEY); }catch(e){ return false; }
+      if(!raw) return false;
+      let data;
+      try{ data = JSON.parse(raw); }catch(e){ return false; }
+      if(!data || !data.layers) return false;
+
+      let pending = 0, ok = false;
+      for(const n of LAYERS){
+        const src = data.layers[n];
+        if(!src) continue;
+        pending++;
+        const img = new Image();
+        img.onload = ()=>{
+          const buf = buffers[n];
+          buf.ctx.setTransform(1,0,0,1,0,0);
+          buf.ctx.drawImage(img, 0,0, buf.canvas.width, buf.canvas.height);
+          buf.ctx.scale(DPR, DPR);
+          compose();
+          ok = true;
+          if(--pending === 0){ document.getElementById("saveState").textContent = "bench restored"; }
+        };
+        img.onerror = ()=>{ if(--pending === 0 && ok){ compose(); } };
+        img.src = src;
+      }
+      // restore visibility
+      if(data.visible){
+        for(const n of LAYERS){
+          if(data.visible[n] === false) toggleLayer(n, false);
+        }
+      }
+      return pending > 0;
+    }
+
+    function toast(msg){
+      toastEl.textContent = msg;
+      toastEl.style.opacity = "1";
+      toastEl.style.transform = "translate(-50%, -4px)";
+      clearTimeout(toast._t);
+      toast._t = setTimeout(()=>{
+        toastEl.style.opacity = "0";
+        toastEl.style.transform = "translate(-50%, 0)";
+      }, 1500);
+    }
+
+    // ── Boot ────────────────────────────────────────────────────────────────────
+    resize(false);
+    load();
+
+    // resize observer (debounced) — preserve the survey across reflow
+    let rzTimer = null;
+    const ro = new ResizeObserver(()=>{
+      clearTimeout(rzTimer);
+      rzTimer = setTimeout(()=>resize(true), 120);
+    });
+    ro.observe(frame);
+
+    // keyboard helpers (ignore when typing in a field — none here, but safe)
+    window.addEventListener("keydown",(e)=>{
+      const t = e.target;
+      if(t && /INPUT|TEXTAREA/.test(t.tagName)) return;
+      if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="z"){ e.preventDefault(); document.getElementById("btn-undo").click(); }
+      else if(e.key==="p"||e.key==="P"){ setTool("pen"); }
+      else if(e.key==="e"||e.key==="E"){ setTool("eraser"); }
+      else if(e.key==="1"){ setActiveLayer("map"); }
+      else if(e.key==="2"){ setActiveLayer("terrain"); }
+      else if(e.key==="["){ widthInput.value = Math.max(1, nib-1); widthInput.dispatchEvent(new Event("input")); }
+      else if(e.key==="]"){ widthInput.value = Math.min(48, nib+1); widthInput.dispatchEvent(new Event("input")); }
+    });
+
+    // ───────── Ambient: embers (reduced-motion safe) ─────────
+    (function(){
+      if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const host = document.getElementById("embers");
+      for(let i=0;i<7;i++){
+        const e = document.createElement("div");
+        e.className = "ember";
+        e.style.left = (6 + Math.random()*88) + "%";
+        e.style.animationDelay = (Math.random()*14) + "s";
+        e.style.animationDuration = (12 + Math.random()*8) + "s";
+        host.appendChild(e);
+      }
+    })();
+
+    // ───────── Night whisper (00:00–03:00 local) ─────────
+    (function(){
+      const h = new Date().getHours();
+      if(h >= 0 && h < 3){ document.getElementById("nightWhisper").style.display = "block"; }
+    })();
+
+    // ───────── Easter egg: type "prizrak" to wake the watcher ─────────
+    (function(){
+      let buf = "";
+      const ghost = document.getElementById("ghostLine");
+      window.addEventListener("keydown",(ev)=>{
+        if(ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if(ev.key && ev.key.length === 1){
+          buf = (buf + ev.key.toLowerCase()).slice(-7);
+          if(buf === "prizrak" && ghost){
+            ghost.style.display = "block";
+            ghost.classList.add("flicker");
+          }
+        }
+      });
+    })();
+
+    // ───────── Easter egg: triple-click title → one extra ember ─────────
+    (function(){
+      const t = document.getElementById("appTitle");
+      if(!t) return;
+      t.addEventListener("click",(ev)=>{
+        if(ev.detail === 3){
+          if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          const e = document.createElement("div");
+          e.className = "ember";
+          e.style.left = (40 + Math.random()*20) + "%";
+          e.style.animationDuration = "11s";
+          document.getElementById("embers").appendChild(e);
+          setTimeout(()=>e.remove(), 12000);
+        }
+      });
+    })();
+
+    // ───────── Easter egg: idle 60s → the surveyor leans in ─────────
+    (function(){
+      if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const line = document.getElementById("idleLine");
+      let timer;
+      function arm(){
+        if(line){ line.style.opacity = "0"; setTimeout(()=>{ if(line && line.style.opacity==="0") line.style.display="none"; }, 1200); }
+        clearTimeout(timer);
+        timer = setTimeout(()=>{
+          if(line){ line.style.display="block"; requestAnimationFrame(()=>{ line.style.opacity="1"; }); }
+        }, 60000);
+      }
+      ["pointermove","keydown","click","scroll","touchstart"].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+      arm();
+    })();
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>
