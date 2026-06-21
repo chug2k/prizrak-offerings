@@ -5,75 +5,167 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Invite Receipt</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#fbbf24;          /* amber — the existing lead color */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body{color:var(--ink);font-feature-settings:"ss01";}
+
+    /* ---- atmosphere layers ---- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @keyframes breathe{0%,100%{opacity:.88;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* content above decoration */
+    .stage{position:relative;z-index:2}
+
+    /* labels */
+    .label{font-size:.66rem;text-transform:uppercase;letter-spacing:.22em;color:var(--ink-dim)}
+
+    /* inputs */
+    .field{background:var(--bg-sunk);border:1px solid var(--line);transition:border-color .15s,box-shadow .15s}
+    .field::placeholder{color:var(--ink-ghost)}
+    .field:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    /* panels lift on hover */
+    .panel{transition:transform .15s,box-shadow .15s,border-color .15s}
+    .panel.lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+
+    /* primary button */
+    .btn-accent{background:var(--accent);color:#1a1206;transition:transform .12s,box-shadow .15s,background .15s;
+      box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow)}
+    .btn-accent:hover{box-shadow:0 0 0 1px var(--accent),0 0 30px -8px var(--glow)}
+    .btn-accent:active{transform:translateY(1px)}
+
+    /* the result panel breathes when defensible */
+    .panel-glow{box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow)}
+
+    /* history seal stamp */
+    .seal{transition:transform .15s,border-color .15s,box-shadow .15s}
+    .seal:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 0 22px -12px var(--glow)}
+
+    .ghostline{color:var(--ink-ghost)}
+
+    @keyframes copyFlash{0%{color:var(--accent)}100%{color:var(--ink-dim)}}
+    .copyflash{animation:copyFlash 1.2s ease-out}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.copyflash{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen">
-  <div class="max-w-5xl mx-auto px-4 py-8">
-    <header class="mb-8">
-      <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">Prízrak Offering</p>
-      <h1 class="text-4xl font-bold mt-2 text-amber-300">The Invite Receipt</h1>
-      <p class="mt-3 max-w-3xl text-zinc-400">A meeting is not scheduled because a tool said 200. It is scheduled when the artifact exists. Lock the details, then check the proof.</p>
+<body class="grain min-h-screen" style="background:var(--bg);color:var(--ink)">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="stage max-w-5xl mx-auto px-4 py-10">
+    <header class="mb-9">
+      <p class="label flicker">Prízrak Offering · No. 47 / the ledger of arrivals</p>
+      <h1 id="title" class="text-4xl font-bold mt-3 breathe" style="color:var(--accent);cursor:default">The Invite Receipt</h1>
+      <p class="mt-4 max-w-3xl" style="color:var(--ink-dim)">A meeting is not scheduled because a tool whispered <span style="color:var(--ink)">200</span>. It is scheduled when the artifact exists, cold and dated, like a name carved above a cave mouth. Lock the details. Then demand the proof.</p>
     </header>
 
     <div class="grid lg:grid-cols-2 gap-6">
-      <section class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl">
-        <h2 class="text-lg font-semibold text-white mb-4">Meeting write</h2>
-        <div class="space-y-4">
+      <section class="panel lift rounded-2xl p-5" style="background:var(--bg-raised);border:1px solid var(--line)">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold" style="color:var(--ink)">Meeting write</h2>
+          <span class="label">domain 01 / the summons</span>
+        </div>
+        <div class="space-y-4 mt-5">
           <label class="block">
-            <span class="text-sm text-zinc-400">Person</span>
-            <input id="person" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="Willis / Haike / Trung" />
+            <span class="label">Person</span>
+            <input id="person" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" placeholder="Willis / Haike / Trung" />
           </label>
           <label class="block">
-            <span class="text-sm text-zinc-400">Calendar account</span>
-            <input id="account" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="cl@clpanic.com" />
+            <span class="label">Calendar account</span>
+            <input id="account" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" placeholder="cl@clpanic.com" />
           </label>
           <label class="block">
-            <span class="text-sm text-zinc-400">Attendee email</span>
-            <input id="email" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="person@example.com" />
+            <span class="label">Attendee email</span>
+            <input id="email" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" placeholder="person@example.com" />
           </label>
           <div class="grid grid-cols-2 gap-4">
             <label class="block">
-              <span class="text-sm text-zinc-400">When</span>
-              <input id="when" type="datetime-local" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" />
+              <span class="label">When</span>
+              <input id="when" type="datetime-local" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" />
             </label>
             <label class="block">
-              <span class="text-sm text-zinc-400">Duration (min)</span>
-              <input id="duration" type="number" value="45" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" />
+              <span class="label">Duration (min)</span>
+              <input id="duration" type="number" value="45" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" />
             </label>
           </div>
           <label class="block">
-            <span class="text-sm text-zinc-400">Location or Meet link</span>
-            <input id="where" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="Faro Coffee / https://meet.google.com/..." />
+            <span class="label">Location or Meet link</span>
+            <input id="where" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" placeholder="Faro Coffee / https://meet.google.com/..." />
           </label>
           <label class="block">
-            <span class="text-sm text-zinc-400">What this meeting must produce</span>
-            <textarea id="objective" rows="3" class="mt-1 w-full rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2" placeholder="Clear next step, investor context, founder fit, etc."></textarea>
+            <span class="label">What this meeting must produce</span>
+            <textarea id="objective" rows="3" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" placeholder="Clear next step, investor context, founder fit, etc."></textarea>
           </label>
-          <button id="save" class="w-full rounded-xl bg-amber-400 text-zinc-950 font-semibold py-3 hover:bg-amber-300 transition">Generate receipt</button>
+          <button id="save" class="btn-accent w-full rounded-xl font-semibold py-3">Generate receipt</button>
         </div>
       </section>
 
-      <section class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl">
+      <section id="proofPanel" class="panel rounded-2xl p-5" style="background:var(--bg-raised);border:1px solid var(--line)">
         <div class="flex items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-white">Artifact proof</h2>
-          <span id="status" class="text-xs px-2 py-1 rounded-full border border-zinc-700 text-zinc-400">waiting</span>
+          <h2 class="text-lg font-semibold" style="color:var(--ink)">Artifact proof</h2>
+          <div class="flex items-center gap-2">
+            <button id="copy" class="text-xs px-2 py-1 rounded-lg" style="border:1px solid var(--line);color:var(--ink-dim)" title="copy the receipt to the ledger">copy</button>
+            <span id="status" class="text-xs px-2 py-1 rounded-full" style="border:1px solid var(--line);color:var(--ink-dim)">waiting</span>
+          </div>
         </div>
-        <div id="receipt" class="mt-4 space-y-4 text-sm text-zinc-300"></div>
+        <div id="receipt" class="mt-4 space-y-4 text-sm" style="color:var(--ink)"></div>
       </section>
     </div>
 
-    <section class="mt-6 bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+    <section class="panel mt-6 rounded-2xl p-5" style="background:var(--bg-raised);border:1px solid var(--line)">
       <div class="flex items-center justify-between gap-3 mb-3">
-        <h2 class="text-lg font-semibold text-white">Recent receipts</h2>
-        <button id="clear" class="text-xs text-zinc-500 hover:text-zinc-300">clear local history</button>
+        <h2 class="text-lg font-semibold" style="color:var(--ink)">Recent receipts</h2>
+        <button id="clear" class="text-xs hover:underline" style="color:var(--ink-dim)">let the fog take it</button>
       </div>
       <div id="history" class="grid md:grid-cols-2 gap-3"></div>
     </section>
+
+    <footer class="mt-10 text-center">
+      <p id="whisper" class="text-xs ghostline">we do not trust the response code. we trust the carving.</p>
+    </footer>
   </div>
 
   <script>
     const KEY = 'prizrak-invite-receipt-v1';
     const fields = ['person','account','email','when','duration','where','objective'];
     const el = (id) => document.getElementById(id);
+    let current = null; // last rendered item, for copy-to-ledger
 
     function load() {
       try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
@@ -82,9 +174,11 @@
       localStorage.setItem(KEY, JSON.stringify(items.slice(0, 12)));
     }
     function escapeHtml(str='') {
-      return str.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+      return String(str).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     }
+
     function renderReceipt(item) {
+      current = item;
       const checks = [
         ['Calendar account chosen', item.account],
         ['Attendee address explicit', item.email],
@@ -94,35 +188,62 @@
       ];
       const score = checks.filter(([,ok]) => ok).length;
       const ready = score === checks.length;
-      el('status').textContent = ready ? 'artifact defensible' : 'still vapor';
-      el('status').className = `text-xs px-2 py-1 rounded-full border ${ready ? 'border-emerald-700 text-emerald-300' : 'border-amber-700 text-amber-300'}`;
+
+      const st = el('status');
+      st.textContent = ready ? 'artifact defensible' : 'still vapor';
+      st.style.borderColor = ready ? '#047857' : 'var(--accent)';
+      st.style.color = ready ? '#6ee7b7' : 'var(--accent)';
+      st.className = 'text-xs px-2 py-1 rounded-full' + (ready ? ' breathe' : '');
+
+      const panel = el('proofPanel');
+      panel.classList.toggle('panel-glow', ready);
+
+      const verdict = ready
+        ? 'the bridge holds. the meeting will survive contact with morning. the mountain is watching.'
+        : (score === 0
+            ? 'the cave is empty. nothing has fossilized yet.'
+            : `${5 - score} carving${5 - score === 1 ? '' : 's'} missing. half a summons is a rumor.`);
+
+      el('copy').style.display = '';
+
       el('receipt').innerHTML = `
-        <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-          <div class="text-xl font-semibold text-white">${escapeHtml(item.person || 'Unnamed meeting')}</div>
-          <div class="mt-1 text-zinc-400">${item.when ? new Date(item.when).toLocaleString() : 'No time locked'} · ${escapeHtml(item.duration || '')} min</div>
+        <div class="reveal rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line)">
+          <div class="text-xl font-semibold" style="color:var(--ink)">${escapeHtml(item.person || 'Unnamed meeting')}</div>
+          <div class="mt-1" style="color:var(--ink-dim)">${item.when ? escapeHtml(new Date(item.when).toLocaleString()) : 'No time locked'} · ${escapeHtml(item.duration || '')} min</div>
           <div class="mt-3 grid gap-2">
-            <div><span class="text-zinc-500">Account:</span> ${escapeHtml(item.account || 'missing')}</div>
-            <div><span class="text-zinc-500">Attendee:</span> ${escapeHtml(item.email || 'missing')}</div>
-            <div><span class="text-zinc-500">Where:</span> ${escapeHtml(item.where || 'missing')}</div>
-            <div><span class="text-zinc-500">Objective:</span> ${escapeHtml(item.objective || 'missing')}</div>
+            <div><span class="label">Account</span> <span style="color:var(--ink)">${escapeHtml(item.account || '—')}</span></div>
+            <div><span class="label">Attendee</span> <span style="color:var(--ink)">${escapeHtml(item.email || '—')}</span></div>
+            <div><span class="label">Where</span> <span style="color:var(--ink)">${escapeHtml(item.where || '—')}</span></div>
+            <div><span class="label">Objective</span> <span style="color:var(--ink)">${escapeHtml(item.objective || '—')}</span></div>
           </div>
         </div>
-        <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-          <div class="text-zinc-400 mb-2">Proof checklist</div>
+        <div class="reveal rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line)">
+          <div class="flex items-center justify-between mb-3">
+            <span class="label">Proof checklist</span>
+            <span class="label" style="color:${ready ? '#6ee7b7' : 'var(--accent)'}">${score} / 5 carved</span>
+          </div>
           <ul class="space-y-2">
-            ${checks.map(([label,ok]) => `<li class="flex items-center justify-between gap-3"><span>${label}</span><span class="text-xs ${ok ? 'text-emerald-300' : 'text-amber-300'}">${ok ? 'present' : 'missing'}</span></li>`).join('')}
+            ${checks.map(([label,ok]) => `<li class="flex items-center justify-between gap-3"><span style="color:${ok ? 'var(--ink)' : 'var(--ink-dim)'}">${label}</span><span class="text-xs" style="color:${ok ? '#6ee7b7' : 'var(--accent)'}">${ok ? 'carved' : 'absent'}</span></li>`).join('')}
           </ul>
-          <p class="mt-4 text-xs text-zinc-500">A response code is narration. A filled receipt is closer to the ground.</p>
+          <p class="mt-4 text-xs ghostline">${escapeHtml(verdict)}</p>
         </div>`;
+
+      if (window.matchMedia && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        el('proofPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
+
     function renderHistory() {
       const items = load();
       el('history').innerHTML = items.length ? items.map((item, idx) => `
-        <button data-idx="${idx}" class="text-left rounded-xl border border-zinc-800 bg-zinc-950 p-4 hover:border-zinc-600 transition">
-          <div class="text-white font-medium">${escapeHtml(item.person || 'Unnamed')}</div>
-          <div class="text-xs text-zinc-500 mt-1">${item.when ? new Date(item.when).toLocaleString() : 'No time'} · ${escapeHtml(item.account || 'No account')}</div>
-          <div class="text-sm text-zinc-400 mt-2 line-clamp-2">${escapeHtml(item.objective || 'No objective')}</div>
-        </button>`).join('') : '<div class="text-sm text-zinc-500">No receipts yet. The first one will be uglier than the tenth. Like a potato, it will still keep you alive in winter.</div>';
+        <button data-idx="${idx}" class="seal text-left rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line)">
+          <div class="flex items-center justify-between">
+            <div class="font-medium" style="color:var(--ink)">${escapeHtml(item.person || 'Unnamed')}</div>
+            <span class="label">№ ${String(items.length - idx).padStart(2,'0')}</span>
+          </div>
+          <div class="text-xs mt-1" style="color:var(--ink-dim)">${item.when ? escapeHtml(new Date(item.when).toLocaleString()) : 'No time'} · ${escapeHtml(item.account || 'No account')}</div>
+          <div class="text-sm mt-2 line-clamp-2" style="color:var(--ink-dim)">${escapeHtml(item.objective || 'No objective')}</div>
+        </button>`).join('') : '<div class="text-sm ghostline">the cave is empty. the first receipt will be uglier than the tenth. like a potato, it will still keep you alive in winter.</div>';
       [...el('history').querySelectorAll('[data-idx]')].forEach(btn => btn.onclick = () => renderReceipt(load()[Number(btn.dataset.idx)]));
     }
 
@@ -133,14 +254,130 @@
       renderReceipt(item);
       renderHistory();
     };
+
     el('clear').onclick = () => {
+      if (!confirm('let the fog take it? the ledger forgets, and this cannot be recovered.')) return;
       localStorage.removeItem(KEY);
       el('receipt').innerHTML = '';
-      el('status').textContent = 'waiting';
-      el('status').className = 'text-xs px-2 py-1 rounded-full border border-zinc-700 text-zinc-400';
+      current = null;
+      const st = el('status');
+      st.textContent = 'waiting';
+      st.className = 'text-xs px-2 py-1 rounded-full';
+      st.style.borderColor = 'var(--line)';
+      st.style.color = 'var(--ink-dim)';
+      el('proofPanel').classList.remove('panel-glow');
+      el('copy').style.display = 'none';
       renderHistory();
     };
 
+    // ---- copy the receipt to the ledger ----
+    el('copy').onclick = async () => {
+      if (!current) return;
+      const i = current;
+      const checks = [
+        ['Calendar account', i.account],
+        ['Attendee', i.email],
+        ['Time + duration', i.when && i.duration],
+        ['Place / link', i.where],
+        ['Objective', i.objective],
+      ];
+      const lines = [
+        `INVITE RECEIPT — ${i.person || 'Unnamed meeting'}`,
+        `When:      ${i.when ? new Date(i.when).toLocaleString() : '—'}  (${i.duration || '?'} min)`,
+        `Account:   ${i.account || '—'}`,
+        `Attendee:  ${i.email || '—'}`,
+        `Where:     ${i.where || '—'}`,
+        `Objective: ${i.objective || '—'}`,
+        ``,
+        ...checks.map(([l,ok]) => `  [${ok ? 'x' : ' '}] ${l}`),
+        ``,
+        `— filed with Prízrak. a response code is narration; a filled receipt is closer to the ground.`,
+      ];
+      const btn = el('copy');
+      try {
+        await navigator.clipboard.writeText(lines.join('\n'));
+        btn.textContent = 'copied to the ledger';
+        btn.classList.add('copyflash');
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        setTimeout(() => {
+          btn.textContent = 'copy';
+          btn.classList.remove('copyflash');
+          btn.style.borderColor = 'var(--line)';
+          btn.style.color = 'var(--ink-dim)';
+        }, 1200);
+      } catch {
+        btn.textContent = 'the fog refused';
+        setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+      }
+    };
+
+    // ---- ambient embers (capped) ----
+    (function spawnEmbers(){
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const host = el('embers');
+      const N = 8;
+      for (let k = 0; k < N; k++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (4 + Math.random() * 92) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 8) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg 1: type "prizrak" → the watcher answers ----
+    (function watcher(){
+      let buf = '';
+      addEventListener('keydown', (ev) => {
+        if (ev.key.length !== 1) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+          const w = el('whisper');
+          w.textContent = 'you found the watcher. it was always reading over your shoulder.';
+          w.classList.add('flicker');
+          w.style.color = 'var(--accent)';
+          setTimeout(() => {
+            w.textContent = 'we do not trust the response code. we trust the carving.';
+            w.classList.remove('flicker');
+            w.style.color = '';
+          }, 5000);
+        }
+      });
+    })();
+
+    // ---- easter egg 2: triple-click the title → one extra ember ----
+    el('title').addEventListener('click', (() => {
+      let n = 0, t = 0;
+      return () => {
+        const now = Date.now();
+        n = (now - t < 600) ? n + 1 : 1;
+        t = now;
+        if (n >= 3) {
+          n = 0;
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random() * 20) + '%';
+          e.style.animationDuration = '12s';
+          el('embers').appendChild(e);
+          setTimeout(() => e.remove(), 12000);
+        }
+      };
+    })());
+
+    // ---- easter egg 3: deep-night footer whisper (00:00–03:00 local) ----
+    (function nightWatch(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const w = el('whisper');
+        w.textContent = 'the mountain does not sleep. neither does the ledger.';
+      }
+    })();
+
+    // ---- seed (only fills blank inputs; never touches saved state) ----
     const seed = {
       person: 'Willis',
       account: 'cl@clpanic.com',

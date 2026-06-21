@@ -6,44 +6,131 @@
   <title>The Draupnir Split | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at 20% 0%, #1e293b 0, #09090b 42%, #030303 100%); }
-    .rune { text-shadow: 0 0 18px rgba(125,211,252,.55); }
-    textarea, input, select { resize: vertical; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#7dd3fc;          /* the Draupnir cyan, kept as the lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+      background:
+        radial-gradient(120% 80% at 20% -5%, #0e1722 0%, transparent 50%),
+        radial-gradient(circle at 20% 0%, #101a26 0, #09090b 42%, #030303 100%),
+        var(--bg);
+      color: var(--ink);
+      min-height:100vh;
+    }
+
+    .rune{ text-shadow:0 0 18px var(--glow); }
+    textarea, input, select{ resize: vertical; }
+
+    /* labels */
+    .lbl{ text-transform:uppercase; letter-spacing:.18em; color:var(--ink-dim); font-size:.7rem; }
+
+    /* drifting fog — atmosphere, behind everything */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    /* floating embers — capped, staggered in JS */
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 15s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* grain */
+    body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .content{ position:relative; z-index:2; }
+
+    /* inputs */
+    .field{ background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink);
+      transition:border-color .15s, box-shadow .15s; }
+    .field:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* hover lift for panels & history cards */
+    .lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+    .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+
+    /* result panel breathing glow */
+    .resultGlow{ box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow); }
+
+    /* the cast button — tactile */
+    #split{ transition:transform .12s, box-shadow .15s, background-color .15s; }
+    #split:hover{ box-shadow:0 0 22px -4px var(--glow); }
+    #split:active{ transform:translateY(1px); }
+    #split:focus-visible{ outline:none; box-shadow:0 0 0 2px var(--glow); }
+
+    .ghostline{ color:var(--ink-ghost); }
+
+    /* copy button */
+    .copybtn{ transition:color .15s, border-color .15s, background-color .15s; }
+    .copybtn:hover{ border-color:var(--accent); color:var(--accent); }
+    .copybtn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
 <body class="min-h-screen text-zinc-200 font-sans">
-  <main class="max-w-5xl mx-auto px-5 py-8">
+  <div class="fog"></div>
+  <div id="emberField"></div>
+
+  <main class="content max-w-5xl mx-auto px-5 py-8">
     <header class="mb-7 border-b border-zinc-800 pb-5">
-      <div class="text-xs tracking-[0.35em] uppercase text-cyan-300/70 mb-2">God of War field instrument</div>
-      <h1 class="text-4xl sm:text-5xl font-black text-white rune">The Draupnir Split</h1>
-      <p class="mt-3 text-zinc-400 max-w-2xl">For the task that feels like one huge enemy. Draupnir does not win by becoming heavier; it wins by multiplying into precise points. Name the beast, split it into spears, and choose the first throw.</p>
+      <div class="lbl mb-2 flicker">FIELD INSTRUMENT 09 / GOD OF WAR</div>
+      <h1 id="title" class="text-4xl sm:text-5xl font-black text-white rune breathe select-none cursor-default">The Draupnir Split</h1>
+      <p class="mt-3 text-zinc-400 max-w-2xl">For the task that arrives as one huge enemy. Draupnir does not win by becoming heavier; it wins by multiplying into precise points. Name the beast, split it into spears, and choose the first throw. The mountain prefers a clean wound to a brave one.</p>
     </header>
 
     <section class="grid lg:grid-cols-2 gap-5">
-      <div class="bg-zinc-950/70 border border-zinc-800 rounded-2xl p-5 shadow-2xl">
-        <label class="block text-sm text-zinc-400 mb-1">The beast</label>
-        <input id="beast" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100" placeholder="e.g. Prepare for partner meeting / fix the sleep spiral" />
+      <div class="bg-zinc-950/70 border border-zinc-800 rounded-2xl p-5 shadow-2xl lift">
+        <label class="lbl block mb-1">The beast</label>
+        <input id="beast" class="field w-full rounded-lg px-3 py-2" placeholder="e.g. Prepare for partner meeting / fix the sleep spiral" />
 
-        <label class="block text-sm text-zinc-400 mb-1 mt-4">Why it feels too large</label>
-        <textarea id="fog" rows="4" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100" placeholder="The hidden fear, ambiguity, social cost, fatigue, or too-many-threads problem..."></textarea>
+        <label class="lbl block mb-1 mt-4">Why it feels too large</label>
+        <textarea id="fog" rows="4" class="field w-full rounded-lg px-3 py-2" placeholder="The hidden fear, ambiguity, social cost, fatigue, or too-many-threads problem..."></textarea>
 
         <div class="grid sm:grid-cols-2 gap-3 mt-4">
           <div>
-            <label class="block text-sm text-zinc-400 mb-1">Body battery</label>
-            <input id="battery" type="number" min="0" max="100" value="55" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2" />
+            <label class="lbl block mb-1">Body battery</label>
+            <input id="battery" type="number" min="0" max="100" value="55" class="field w-full rounded-lg px-3 py-2" />
           </div>
           <div>
-            <label class="block text-sm text-zinc-400 mb-1">Time available</label>
-            <select id="time" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2">
+            <label class="lbl block mb-1">Time available</label>
+            <select id="time" class="field w-full rounded-lg px-3 py-2">
               <option>15 minutes</option><option>30 minutes</option><option>60 minutes</option><option>half day</option><option>full day</option>
             </select>
           </div>
         </div>
 
-        <label class="block text-sm text-zinc-400 mb-1 mt-4">Raw pieces already visible</label>
-        <textarea id="pieces" rows="5" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100" placeholder="One per line: send message, read doc, make call, decide scope, ask one person..."></textarea>
+        <label class="lbl block mb-1 mt-4">Raw pieces already visible</label>
+        <textarea id="pieces" rows="5" class="field w-full rounded-lg px-3 py-2" placeholder="One per line: send message, read doc, make call, decide scope, ask one person..."></textarea>
 
-        <button id="split" class="mt-5 w-full rounded-xl bg-cyan-400 text-zinc-950 font-bold py-3 hover:bg-cyan-300 transition">Split the spear</button>
+        <button id="split" class="mt-5 w-full rounded-xl bg-cyan-400 text-zinc-950 font-bold py-3 hover:bg-cyan-300">Split the spear</button>
       </div>
 
       <div class="bg-zinc-950/70 border border-cyan-900/60 rounded-2xl p-5 shadow-2xl">
@@ -52,7 +139,7 @@
           <span id="verdictPill" class="text-xs px-2 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-400">waiting</span>
         </div>
         <div id="output" class="space-y-4 text-sm text-zinc-300">
-          <p class="text-zinc-500">The spear is still on the bench. Fill the left side and split it.</p>
+          <p class="text-zinc-500">The spear rests on the bench, cold. Fill the left side and split it.</p>
         </div>
       </div>
     </section>
@@ -61,6 +148,10 @@
       <h3 class="font-bold text-white mb-2">Saved splits</h3>
       <div id="history" class="grid md:grid-cols-2 gap-3 text-sm"></div>
     </section>
+
+    <footer class="mt-8 pt-4 border-t border-zinc-900 text-center">
+      <p id="footerLine" class="lbl ghostline">the ring multiplies. one spear at a time.</p>
+    </footer>
   </main>
 
   <script>
@@ -75,11 +166,37 @@
       'Turn anxiety into a question with an owner.'
     ];
 
+    /* ---- embers (capped, staggered) ---- */
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const field = $('emberField');
+      const n = 7;
+      for (let i=0;i<n;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random()*90) + '%';
+        e.style.animationDelay = (Math.random()*15) + 's';
+        e.style.animationDuration = (12 + Math.random()*7) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function renderHistory(){
       const items = JSON.parse(localStorage.getItem(KEY) || '[]');
-      $('history').innerHTML = items.length ? items.slice(0,8).map(x => `<div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3"><div class="text-cyan-300 font-semibold">${escapeHtml(x.beast)}</div><div class="text-zinc-500 text-xs mt-1">${x.date}</div><div class="text-zinc-400 mt-2">First throw: ${escapeHtml(x.first)}</div></div>`).join('') : '<p class="text-zinc-600">No spears stored yet.</p>';
+      $('history').innerHTML = items.length
+        ? items.slice(0,8).map(x => `<div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 lift"><div class="text-cyan-300 font-semibold">${escapeHtml(x.beast)}</div><div class="text-zinc-500 text-xs mt-1">${escapeHtml(x.date)}</div><div class="text-zinc-400 mt-2">First throw: ${escapeHtml(x.first)}</div></div>`).join('')
+        : '<p class="text-zinc-600">the ring is cold. no spears have been cast yet.</p>';
     }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function flashCopy(btn){
+      const old = btn.textContent;
+      btn.textContent = 'copied to the ledger';
+      btn.style.color = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+      setTimeout(()=>{ btn.textContent = old; btn.style.color=''; btn.style.borderColor=''; }, 1200);
+    }
 
     $('split').addEventListener('click', () => {
       const beast = $('beast').value.trim() || 'Unnamed beast';
@@ -91,20 +208,85 @@
       const maxSpears = battery < 30 ? 3 : battery < 55 ? 4 : 6;
       const spears = pieces.slice(0, maxSpears);
       const first = spears.find(s => /ask|send|call|write|read|decide|scope|draft/i.test(s)) || spears[0];
-      const mode = battery < 30 ? 'Shield-first: low battery, no hero nonsense.' : battery < 60 ? 'Measured throw: one clean sequence.' : 'Full ring: enough charge to chain spears.';
+      const mode = battery < 30 ? 'Shield-first: low charge, no hero nonsense.' : battery < 60 ? 'Measured throw: one clean sequence.' : 'Full ring: enough charge to chain spears.';
       $('verdictPill').textContent = mode;
       $('verdictPill').className = 'text-xs px-2 py-1 rounded-full bg-cyan-950 border border-cyan-700 text-cyan-200';
+
+      // copy text for the ledger
+      const copyText =
+        'THE DRAUPNIR SPLIT\n' +
+        'Beast: ' + beast + '\n' +
+        (fog ? 'Fog: ' + fog + '\n' : '') +
+        'Spears:\n' + spears.map((s,i)=>'  ' + (i+1) + '. ' + s).join('\n') + '\n' +
+        'First throw: ' + first + '\n' +
+        'Timer: ' + time;
+
       $('output').innerHTML = `
-        <div class="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4"><div class="text-zinc-500 text-xs uppercase tracking-widest">The beast</div><div class="text-white font-bold mt-1">${escapeHtml(beast)}</div><div class="text-zinc-400 mt-2">${escapeHtml(fog || 'No fog named. Suspicious. The mountain prefers named fog.')}</div></div>
-        <div><div class="text-cyan-300 font-bold mb-2">Spears to throw (${spears.length})</div><ol class="space-y-2 list-decimal list-inside">${spears.map((s,i)=>`<li class="rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 py-2"><span class="text-zinc-500 mr-2">${i===0?'first':''}</span>${escapeHtml(s)}</li>`).join('')}</ol></div>
-        <div class="rounded-xl border border-amber-800/70 bg-amber-950/20 p-4"><div class="text-amber-300 font-bold">First throw</div><p class="mt-1 text-zinc-200">${escapeHtml(first)}</p><p class="mt-2 text-zinc-500">Timer: ${escapeHtml(time)}. Stop when the receipt exists, not when the feelings improve.</p></div>
-        <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4"><div class="text-white font-bold">Mimir says</div><p class="mt-1 text-zinc-400">If the task still feels huge after the first spear, good. We are not trying to make the bear smaller. We are trying to make the first wound real.</p></div>`;
+        <div class="reveal rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 resultGlow"><div class="lbl">The beast</div><div class="text-white font-bold mt-1 rune">${escapeHtml(beast)}</div><div class="text-zinc-400 mt-2">${escapeHtml(fog || 'No fog named. Suspicious. The mountain prefers named fog.')}</div></div>
+        <div class="reveal" style="animation-delay:.05s"><div class="text-cyan-300 font-bold mb-2">Spears to throw (${spears.length})</div><ol class="space-y-2 list-decimal list-inside">${spears.map((s,i)=>`<li class="rounded-lg bg-zinc-900/60 border ${i===0?'border-cyan-800/70':'border-zinc-800'} px-3 py-2"><span class="text-cyan-400/80 mr-2 uppercase text-[10px] tracking-widest">${i===0?'first':''}</span>${escapeHtml(s)}</li>`).join('')}</ol></div>
+        <div class="reveal rounded-xl border border-amber-800/70 bg-amber-950/20 p-4" style="animation-delay:.1s"><div class="text-amber-300 font-bold">First throw</div><p class="mt-1 text-zinc-200">${escapeHtml(first)}</p><p class="mt-2 text-zinc-500">Timer: ${escapeHtml(time)}. Stop when the receipt exists, not when the feelings improve.</p></div>
+        <div class="reveal rounded-xl border border-zinc-800 bg-zinc-900/60 p-4" style="animation-delay:.15s"><div class="text-white font-bold">Mimir says</div><p class="mt-1 text-zinc-400">If the task still feels huge after the first spear, good. We do not make the bear smaller. We make the first wound real.</p></div>
+        <div class="reveal flex justify-end" style="animation-delay:.2s"><button id="copyBtn" class="copybtn text-[11px] uppercase tracking-widest px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400">copy the war table</button></div>`;
+
+      const cb = $('copyBtn');
+      cb.addEventListener('click', () => {
+        navigator.clipboard.writeText(copyText).then(()=>flashCopy(cb)).catch(()=>flashCopy(cb));
+      });
+
+      try { $('output').scrollIntoView({ behavior:'smooth', block:'nearest' }); } catch(e){}
+
       const items = JSON.parse(localStorage.getItem(KEY) || '[]');
       items.unshift({beast, first, date:new Date().toLocaleString()});
       localStorage.setItem(KEY, JSON.stringify(items.slice(0,20)));
       renderHistory();
     });
+
     renderHistory();
+
+    /* ---- easter eggs (quiet, never touch saved state) ---- */
+
+    // triple-click the title -> one extra ember drifts up
+    $('title').addEventListener('click', (() => {
+      let n = 0, t = 0;
+      return () => {
+        const now = Date.now();
+        n = (now - t < 600) ? n + 1 : 1;
+        t = now;
+        if (n >= 3){
+          n = 0;
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random()*20) + '%';
+          e.style.animationDuration = '11s';
+          $('emberField').appendChild(e);
+          setTimeout(()=>e.remove(), 11000);
+        }
+      };
+    })());
+
+    // type "prizrak" -> the watcher line lights up in the footer
+    (function(){
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key.length !== 1) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak'){
+          const f = $('footerLine');
+          f.textContent = 'you found the watcher. it was always at the war table.';
+          f.classList.add('flicker');
+        }
+      });
+    })();
+
+    // between 00:00–03:00 a fainter whisper joins the footer
+    (function(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3){
+        const f = $('footerLine');
+        f.textContent = 'the mountain does not sleep. neither does the ring.';
+      }
+    })();
   </script>
 </body>
 </html>

@@ -6,56 +6,115 @@
   <title>The Feedback Channel | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body {
-      background:
-        radial-gradient(circle at 20% 10%, rgba(56,189,248,.16), transparent 26%),
-        radial-gradient(circle at 80% 15%, rgba(168,85,247,.14), transparent 22%),
-        linear-gradient(180deg, #020617 0%, #0f172a 48%, #020617 100%);
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#38bdf8;        /* the channel's lead: sky */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
     }
-    .glass { background: rgba(15, 23, 42, .74); backdrop-filter: blur(14px); }
-    .mono { font-variant-numeric: tabular-nums; }
-    .pill { border: 1px solid rgba(148,163,184,.18); background: rgba(15,23,42,.68); }
-    textarea::placeholder, input::placeholder { color: #64748b; }
+    html,body{background:var(--bg);}
+    body{
+      color:var(--ink);
+      background:
+        radial-gradient(60% 38% at 18% 4%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+        radial-gradient(46% 30% at 82% 8%, rgba(168,85,247,.05), transparent 60%),
+        linear-gradient(180deg, #070708 0%, #0a0a0c 48%, #070708 100%);
+    }
+    .glass{ background:color-mix(in srgb, var(--bg-raised) 80%, transparent); backdrop-filter:blur(14px); }
+    .mono{ font-variant-numeric:tabular-nums; font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .pill{ border:1px solid var(--line); background:var(--bg-sunk); }
+    textarea::placeholder, input::placeholder{ color:#5a554f; }
+
+    /* ---- atmosphere ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    @keyframes pulseRing{0%{box-shadow:0 0 0 1px var(--line),0 0 24px -8px var(--glow)}50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 40%,var(--line)),0 0 34px -6px var(--glow)}100%{box-shadow:0 0 0 1px var(--line),0 0 24px -8px var(--glow)}}
+    .result-live{animation:pulseRing 5s ease-in-out infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* ---- interactions ---- */
+    .lift{transition:transform .15s,box-shadow .15s,border-color .15s}
+    .lift:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+    input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{
+      outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+    .btn-press{transition:transform .12s,background-color .15s,box-shadow .15s}
+    .btn-press:active{transform:translateY(1px)}
+
+    #title{cursor:default}
+    #title::selection{background:var(--glow)}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.result-live{animation:none!important}
+      .ember{display:none}.breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen text-slate-200 antialiased font-sans">
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+<body class="min-h-screen antialiased font-sans grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <main class="relative z-[2] max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
     <header class="mb-6 sm:mb-8">
-      <p class="text-xs uppercase tracking-[0.35em] text-sky-300/80 mb-2">Prízrak offering · silence triage</p>
+      <p class="text-[11px] uppercase tracking-[0.4em] mb-2 flicker" style="color:var(--accent)">Prízrak offering · silence triage</p>
       <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 class="text-4xl sm:text-5xl font-black text-white">The Feedback Channel</h1>
-          <p class="mt-3 max-w-3xl text-slate-400 text-base sm:text-lg">
+          <h1 id="title" class="text-4xl sm:text-5xl font-black text-white breathe select-none">The Feedback Channel</h1>
+          <p class="mt-3 max-w-3xl text-base sm:text-lg" style="color:var(--ink-dim)">
             For Charles, when the valley is quiet: classify the silence, keep the receipt, and decide whether it is healthy fog, bookkeeping, or a bridge with a missing plank.
           </p>
         </div>
-        <div class="glass border border-sky-400/15 rounded-2xl px-4 py-3 w-fit">
-          <p class="text-[10px] uppercase tracking-[0.35em] text-slate-500">Mountain rule</p>
-          <p class="mt-1 text-sm text-slate-200">Do not invent thunder. Check the bridge.</p>
+        <div class="glass border rounded-2xl px-4 py-3 w-fit lift" style="border-color:color-mix(in srgb,var(--accent) 22%,var(--line))">
+          <p class="text-[10px] uppercase tracking-[0.35em]" style="color:var(--ink-dim)">Mountain rule</p>
+          <p class="mt-1 text-sm" style="color:var(--ink)">Do not invent thunder. Check the bridge.</p>
         </div>
       </div>
     </header>
 
     <section class="grid lg:grid-cols-[1fr_1.05fr] gap-5">
-      <div class="glass border border-slate-800 rounded-2xl p-5 shadow-2xl">
+      <div class="glass border rounded-2xl p-5 shadow-2xl" style="border-color:var(--line)">
         <h2 class="text-lg font-semibold text-white mb-4">Signal inputs</h2>
         <div class="space-y-4">
           <label class="block">
-            <span class="text-xs uppercase tracking-widest text-slate-500">What went quiet?</span>
-            <input id="channel" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 bg-slate-950/70 text-slate-100 focus:outline-none focus:border-sky-500" placeholder="Slack thread, email, bridge reconnect, check-in..." />
+            <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">What went quiet?</span>
+            <input id="channel" class="mt-2 w-full rounded-xl border px-4 py-3 text-slate-100" style="border-color:var(--line);background:var(--bg-sunk)" placeholder="Slack thread, email, bridge reconnect, check-in..." />
           </label>
 
           <div class="grid sm:grid-cols-2 gap-4">
             <label class="block">
-              <span class="text-xs uppercase tracking-widest text-slate-500">Hours since last real signal</span>
-              <input id="age" type="range" min="0" max="72" value="26" class="mt-3 w-full accent-sky-400" />
-              <div class="mt-2 flex justify-between text-xs text-slate-500 mono">
-                <span>0h</span><span id="ageLabel">26h</span><span>72h</span>
+              <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Hours since last real signal</span>
+              <input id="age" type="range" min="0" max="72" value="26" class="mt-3 w-full" style="accent-color:var(--accent)" />
+              <div class="mt-2 flex justify-between text-xs mono" style="color:var(--ink-dim)">
+                <span>0h</span><span id="ageLabel" class="text-slate-300">26h</span><span>72h</span>
               </div>
             </label>
             <label class="block">
-              <span class="text-xs uppercase tracking-widest text-slate-500">Expected cadence</span>
-              <select id="cadence" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 bg-slate-950/70 text-slate-100 focus:outline-none focus:border-sky-500">
+              <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Expected cadence</span>
+              <select id="cadence" class="mt-2 w-full rounded-xl border px-4 py-3 text-slate-100" style="border-color:var(--line);background:var(--bg-sunk)">
                 <option value="hourly">Hourly</option>
                 <option value="daily" selected>Daily</option>
                 <option value="every-few-days">Every few days</option>
@@ -67,24 +126,24 @@
 
           <div class="grid sm:grid-cols-3 gap-3">
             <label class="block">
-              <span class="text-xs uppercase tracking-widest text-slate-500">Back-to-back misses</span>
-              <select id="misses" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 bg-slate-950/70 text-slate-100 focus:outline-none focus:border-sky-500">
+              <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Back-to-back misses</span>
+              <select id="misses" class="mt-2 w-full rounded-xl border px-4 py-3 text-slate-100" style="border-color:var(--line);background:var(--bg-sunk)">
                 <option value="0">None</option>
                 <option value="1">One</option>
                 <option value="2">Two or more</option>
               </select>
             </label>
             <label class="block">
-              <span class="text-xs uppercase tracking-widest text-slate-500">Bridge status</span>
-              <select id="bridge" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 bg-slate-950/70 text-slate-100 focus:outline-none focus:border-sky-500">
+              <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Bridge status</span>
+              <select id="bridge" class="mt-2 w-full rounded-xl border px-4 py-3 text-slate-100" style="border-color:var(--line);background:var(--bg-sunk)">
                 <option value="ok">No known issue</option>
                 <option value="reconnected">Reconnected</option>
                 <option value="broken">Still broken</option>
               </select>
             </label>
             <label class="block">
-              <span class="text-xs uppercase tracking-widest text-slate-500">Receipt quality</span>
-              <select id="receipt" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 bg-slate-950/70 text-slate-100 focus:outline-none focus:border-sky-500">
+              <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Receipt quality</span>
+              <select id="receipt" class="mt-2 w-full rounded-xl border px-4 py-3 text-slate-100" style="border-color:var(--line);background:var(--bg-sunk)">
                 <option value="none">None</option>
                 <option value="partial">Partial</option>
                 <option value="clean">Clean</option>
@@ -93,42 +152,50 @@
           </div>
 
           <label class="block">
-            <span class="text-xs uppercase tracking-widest text-slate-500">Receipt note</span>
-            <textarea id="note" rows="4" class="mt-2 w-full rounded-2xl border border-slate-700 px-4 py-3 bg-slate-950/70 text-slate-100 focus:outline-none focus:border-sky-500" placeholder="What changed, what stayed silent, what Charles should not have to guess..."></textarea>
+            <span class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Receipt note</span>
+            <textarea id="note" rows="4" class="mt-2 w-full rounded-2xl border px-4 py-3 text-slate-100" style="border-color:var(--line);background:var(--bg-sunk)" placeholder="What changed, what stayed silent, what Charles should not have to guess..."></textarea>
           </label>
 
           <div class="flex flex-wrap gap-3 pt-2">
-            <button id="run" class="rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-5 py-3 transition-colors">Run triage</button>
-            <button id="saveDemo" class="rounded-xl pill text-slate-300 px-5 py-3 hover:border-slate-500 transition-colors">Load a quiet example</button>
+            <button id="run" class="btn-press rounded-xl font-semibold px-5 py-3 text-slate-950" style="background:var(--accent);box-shadow:0 0 22px -8px var(--glow)">Run triage</button>
+            <button id="saveDemo" class="btn-press lift rounded-xl pill px-5 py-3" style="color:var(--ink)">Load a quiet example</button>
           </div>
         </div>
       </div>
 
       <div class="space-y-5">
-        <section class="glass border border-slate-800 rounded-2xl p-5 shadow-2xl">
+        <section id="verdictPanel" class="glass border rounded-2xl p-5 shadow-2xl" style="border-color:var(--line)">
           <div class="flex items-center justify-between gap-3 mb-4">
             <h2 class="text-lg font-semibold text-white">Verdict</h2>
-            <span id="stamp" class="pill rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.35em] text-slate-500 mono">pending</span>
+            <div class="flex items-center gap-2">
+              <button id="copyReceipt" class="pill rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.3em] mono lift" style="color:var(--ink-dim)" title="Copy receipt to the ledger" hidden>copy receipt</button>
+              <span id="stamp" class="pill rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.35em] mono" style="color:var(--ink-dim)">pending</span>
+            </div>
           </div>
-          <div id="verdictBox" class="rounded-2xl border border-slate-700 bg-slate-950/60 p-5">
-            <p class="text-sm text-slate-400">The mountain is waiting for a reading.</p>
+          <div id="verdictBox" class="rounded-2xl border p-5" style="border-color:var(--line);background:var(--bg-sunk)">
+            <p class="text-sm" style="color:var(--ink-dim)">The mountain is waiting for a reading.</p>
           </div>
         </section>
 
-        <section class="glass border border-slate-800 rounded-2xl p-5 shadow-2xl">
+        <section class="glass border rounded-2xl p-5 shadow-2xl" style="border-color:var(--line)">
           <h2 class="text-lg font-semibold text-white mb-3">Receipt</h2>
-          <pre id="receiptBox" class="whitespace-pre-wrap text-sm leading-6 text-slate-300 bg-slate-950/60 rounded-2xl p-4 border border-slate-700 min-h-[170px]">No receipt yet. The valley is still in fog.</pre>
+          <pre id="receiptBox" class="whitespace-pre-wrap text-sm leading-6 mono rounded-2xl p-4 border min-h-[170px]" style="color:var(--ink);background:var(--bg-sunk);border-color:var(--line)">No receipt yet. The valley is still in fog.</pre>
         </section>
 
-        <section class="glass border border-slate-800 rounded-2xl p-5 shadow-2xl">
+        <section class="glass border rounded-2xl p-5 shadow-2xl" style="border-color:var(--line)">
           <div class="flex items-center justify-between mb-3">
             <h2 class="text-lg font-semibold text-white">Recent checks</h2>
-            <button id="clear" class="text-xs uppercase tracking-[0.35em] text-slate-500 hover:text-slate-300">clear</button>
+            <button id="clear" class="text-xs uppercase tracking-[0.35em] hover:text-slate-300" style="color:var(--ink-dim)">clear</button>
           </div>
-          <div id="history" class="space-y-3 text-sm text-slate-300"></div>
+          <div id="history" class="space-y-3 text-sm" style="color:var(--ink)"></div>
         </section>
       </div>
     </section>
+
+    <footer class="mt-10 pt-5 border-t flex items-center justify-between gap-3 text-[11px]" style="border-color:var(--line-soft)">
+      <p class="uppercase tracking-[0.35em]" style="color:var(--ink-dim)">karst log · station 11</p>
+      <p id="whisper" class="mono" style="color:var(--ink-ghost)">the bridge is checked, not assumed.</p>
+    </footer>
   </main>
 
   <script>
@@ -136,10 +203,12 @@
     const el = id => document.getElementById(id);
     const cadenceHours = { hourly: 1, daily: 24, 'every-few-days': 72, weekly: 168, unknown: 9999 };
     const verdictMeta = {
-      green: { label: 'Healthy quiet', tone: 'border-emerald-400/30 bg-emerald-950/30 text-emerald-200', note: 'Silence is expected. Preserve the receipt, then wait.' },
-      yellow: { label: 'Watch the bridge', tone: 'border-amber-400/30 bg-amber-950/30 text-amber-200', note: 'The signal is thin. Log it and probe with care.' },
-      red: { label: 'ALERT: bridge problem', tone: 'border-rose-400/30 bg-rose-950/30 text-rose-100', note: 'The silence is not neutral. A plank is missing.' },
+      green: { label: 'Healthy quiet', tone: 'border-emerald-400/30 bg-emerald-950/30 text-emerald-200', glow:'rgba(52,211,153,.5)', note: 'Silence is expected. Preserve the receipt, then wait.' },
+      yellow: { label: 'Watch the bridge', tone: 'border-amber-400/30 bg-amber-950/30 text-amber-200', glow:'rgba(251,191,36,.5)', note: 'The signal is thin. Log it and probe with care.' },
+      red: { label: 'ALERT: bridge problem', tone: 'border-rose-400/30 bg-rose-950/30 text-rose-100', glow:'rgba(251,113,133,.55)', note: 'The silence is not neutral. A plank is missing.' },
     };
+
+    let lastReceipt = '';
 
     function loadHistory() {
       try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
@@ -185,40 +254,58 @@
         note ? `NOTE: ${note}` : 'NOTE: (none)',
       ].join('\n');
 
+      lastReceipt = receiptText;
+      el('copyReceipt').hidden = false;
+
       el('stamp').textContent = verdict.toUpperCase();
-      el('stamp').className = `pill rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.35em] mono ${meta.tone}`;
+      el('stamp').className = `pill rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.35em] mono breathe ${meta.tone}`;
+      el('stamp').style.setProperty('--glow', meta.glow);
+
+      const headline = verdict === 'red' ? 'Stop pretending the bridge is fine.' : verdict === 'yellow' ? 'Keep the fog, but keep the receipts.' : 'Silence is holding; do not decorate it.';
+      el('verdictBox').className = 'rounded-2xl border p-5 reveal';
       el('verdictBox').innerHTML = `
         <div class="flex flex-col gap-3">
           <div>
-            <p class="text-[10px] uppercase tracking-[0.35em] text-slate-500 mb-2">${meta.label}</p>
-            <h3 class="text-2xl font-bold text-white">${verdict === 'red' ? 'Stop pretending the bridge is fine.' : verdict === 'yellow' ? 'Keep the fog, but keep the receipts.' : 'Silence is holding; do not decorate it.'}</h3>
+            <p class="text-[10px] uppercase tracking-[0.35em] mb-2" style="color:var(--ink-dim)">${meta.label}</p>
+            <h3 class="text-2xl font-bold text-white">${headline}</h3>
           </div>
-          <p class="text-sm text-slate-300 leading-6">${meta.note}</p>
-          <ul class="text-sm text-slate-400 space-y-1 list-disc pl-5">
+          <p class="text-sm leading-6" style="color:var(--ink)">${meta.note}</p>
+          <ul class="text-sm space-y-1 list-disc pl-5" style="color:var(--ink-dim)">
             ${reasons.map(r => `<li>${r}</li>`).join('') || '<li>No special risk factors detected.</li>'}
           </ul>
         </div>`;
+      // verdict-tinted glow on the box and breathing panel
+      el('verdictBox').style.boxShadow = `inset 0 0 0 1px ${meta.glow}, 0 0 28px -12px ${meta.glow}`;
+      el('verdictBox').style.borderColor = meta.glow;
       el('receiptBox').textContent = receiptText;
+
+      const panel = el('verdictPanel');
+      panel.classList.add('result-live');
+      panel.style.setProperty('--glow', meta.glow);
+      panel.style.boxShadow = `0 0 0 1px var(--line), 0 0 30px -10px ${meta.glow}`;
 
       const history = loadHistory();
       history.unshift({ ts, summary, verdict, age, cadence, bridge, receipt, note });
       saveHistory(history);
+
+      el('verdictPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     function renderHistory() {
       const history = loadHistory();
       if (!history.length) {
-        el('history').innerHTML = '<p class="text-slate-500 text-sm">No prior checks. The ledger is still clean.</p>';
+        el('history').innerHTML = '<p class="text-sm" style="color:var(--ink-dim)">the cave is empty. nothing has fossilized yet.</p>';
         return;
       }
+      const dot = { red:'text-rose-300', yellow:'text-amber-300', green:'text-emerald-300' };
       el('history').innerHTML = history.map(item => `
-        <div class="pill rounded-2xl p-4">
+        <div class="pill rounded-2xl p-4 lift">
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="font-medium text-slate-100">${item.summary}</p>
-              <p class="text-xs text-slate-500 mt-1 mono">${item.age}h · ${item.cadence} · ${item.bridge} · ${item.receipt}</p>
+              <p class="text-xs mt-1 mono" style="color:var(--ink-dim)">${item.age}h · ${item.cadence} · ${item.bridge} · ${item.receipt}</p>
             </div>
-            <span class="text-[10px] uppercase tracking-[0.35em] ${item.verdict === 'red' ? 'text-rose-300' : item.verdict === 'yellow' ? 'text-amber-300' : 'text-emerald-300'}">${item.verdict}</span>
+            <span class="text-[10px] uppercase tracking-[0.35em] ${dot[item.verdict] || 'text-slate-400'}">${item.verdict}</span>
           </div>
         </div>
       `).join('');
@@ -238,9 +325,70 @@
       classify();
     });
     el('clear').addEventListener('click', () => {
+      if (!loadHistory().length) return;
+      if (!confirm('let the fog take it? this cannot be recovered.')) return;
       localStorage.removeItem(KEY);
       renderHistory();
     });
+
+    // copy receipt to the ledger
+    el('copyReceipt').addEventListener('click', () => {
+      if (!lastReceipt) return;
+      const btn = el('copyReceipt');
+      navigator.clipboard.writeText(lastReceipt).then(() => {
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        setTimeout(() => { btn.textContent = prev; btn.style.color = 'var(--ink-dim)'; }, 1200);
+      }).catch(() => {});
+    });
+
+    // ---- atmosphere: drifting embers (capped, motion-safe) ----
+    (function embers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+      const host = el('embers');
+      const N = 7;
+      for (let i = 0; i < N; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random() * 88) + '%';
+        e.style.animationDelay = (-Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg (a): type "prizrak" -> the watcher answers ----
+    (function watcher(){
+      let buf = '';
+      addEventListener('keydown', e => {
+        if (e.key.length !== 1) return;
+        buf = (buf + e.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+          el('whisper').textContent = 'you found the watcher. the channel was never empty.';
+          el('whisper').classList.add('breathe');
+          el('whisper').style.color = 'var(--accent)';
+        }
+      });
+    })();
+
+    // ---- easter egg (b): triple-click the title -> one extra ember ----
+    el('title').addEventListener('click', e => {
+      if (e.detail !== 3) return;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+      const e2 = document.createElement('div');
+      e2.className = 'ember';
+      e2.style.left = (10 + Math.random() * 80) + '%';
+      e2.style.animationDuration = '11s';
+      el('embers').appendChild(e2);
+      setTimeout(() => e2.remove(), 11000);
+    });
+
+    // ---- easter egg (c): the small hours get their own whisper ----
+    (function smallHours(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) el('whisper').textContent = 'the mountain does not sleep. neither does the channel.';
+    })();
 
     renderHistory();
     el('receiptBox').textContent = 'No receipt yet. The valley is still in fog.';

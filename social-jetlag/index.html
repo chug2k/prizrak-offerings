@@ -89,11 +89,22 @@
   #ghost-egg{ color: var(--ink-ghost); }
   #idle-whisper{ color: var(--ink-ghost); }
 
+  /* the dial — two clocks on one ring */
+  .dial-cap{ font-family:'IBM Plex Mono',monospace; font-size:8px; letter-spacing:2px; }
+  .dial-num{ font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:300; }
+  .dial-tick{ font-family:'IBM Plex Mono',monospace; font-size:8px; letter-spacing:1px; }
+  #dial-gap{ filter: drop-shadow(0 0 4px var(--glow)); transition: opacity .4s ease; }
+  #dial-bio circle{ filter: drop-shadow(0 0 5px var(--glow)); }
+  #dial .marker-move{ transition: transform .9s cubic-bezier(.2,.7,.2,1); }
+  @keyframes dialSweep{ from{ stroke-dasharray:0 600; } to{ stroke-dasharray:600 0; } }
+  .dial-draw{ animation: dialSweep .9s ease-out both; }
+
   @media (prefers-reduced-motion:reduce){
-    .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+    .fog,.ember,.breathe,.reveal,.flicker,.dial-draw{animation:none!important}
     .ember{display:none}
     .breathe,.flicker{opacity:1!important}
     .gauge-fill{transition:none}
+    #dial .marker-move{transition:none}
   }
 </style>
 </head>
@@ -109,7 +120,7 @@
     <h1 id="title" class="text-lg font-light text-white mb-2 breathe select-none cursor-default">Social Jetlag</h1>
     <p class="text-xs text-zinc-600 leading-relaxed">
       The gap between the hour your biology wants the dark, and the hour the calendar drags you back into the light.<br>
-      Named by Roenneberg et al., 2006. Measured in hours of weekly misalignment — the toll for living on someone else's clock.
+      Named by Roenneberg et al., 2006. Measured in hours of weekly misalignment — the quiet toll for living on someone else's clock. The body keeps the receipt.
     </p>
     <div class="mt-3 h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
   </div>
@@ -161,6 +172,32 @@
           <div class="text-xs text-zinc-600 mb-1">CHRONOTYPE</div>
           <div class="text-sm font-medium" id="chronotype-label">—</div>
         </div>
+      </div>
+
+      <!-- The two clocks, drawn on one 24h ring. The arc between them is the distance. -->
+      <div class="flex justify-center my-5">
+        <svg id="dial" viewBox="0 0 240 240" class="w-44 h-44 select-none" aria-hidden="true">
+          <!-- midnight / noon ticks -->
+          <circle cx="120" cy="120" r="92" fill="none" stroke="var(--line)" stroke-width="1"></circle>
+          <line x1="120" y1="22" x2="120" y2="34" stroke="var(--line)" stroke-width="1"></line>
+          <line x1="120" y1="206" x2="120" y2="218" stroke="var(--line-soft)" stroke-width="1"></line>
+          <line x1="22" y1="120" x2="34" y2="120" stroke="var(--line-soft)" stroke-width="1"></line>
+          <line x1="206" y1="120" x2="218" y2="120" stroke="var(--line-soft)" stroke-width="1"></line>
+          <!-- the gap arc: biology → world -->
+          <path id="dial-gap" d="" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" opacity="0.9"></path>
+          <!-- the two midsleep markers (start at center, sweep outward) -->
+          <g id="dial-bio" transform="translate(120 120)"><circle r="5" fill="var(--accent)"></circle></g>
+          <g id="dial-soc" transform="translate(120 120)"><circle r="4" fill="none" stroke="var(--ink-dim)" stroke-width="1.5"></circle></g>
+          <!-- center read -->
+          <text x="120" y="116" text-anchor="middle" class="dial-cap" fill="var(--ink-dim)">DRIFT</text>
+          <text id="dial-center" x="120" y="138" text-anchor="middle" class="dial-num" fill="var(--ink)">—</text>
+          <text x="120" y="30" text-anchor="middle" class="dial-tick" fill="var(--ink-ghost)">00</text>
+          <text x="120" y="214" text-anchor="middle" class="dial-tick" fill="var(--ink-ghost)">12</text>
+        </svg>
+      </div>
+      <div class="flex justify-center gap-5 text-xs text-zinc-700 mb-4 -mt-1">
+        <span class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-full" style="background:var(--accent)"></span>body</span>
+        <span class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-full border" style="border-color:var(--ink-dim)"></span>world</span>
       </div>
 
       <!-- Gauge -->
@@ -260,6 +297,26 @@ function formatHours(mins) {
 // holds the last verdict so the ghost can copy it to the ledger
 let lastLedger = '';
 
+// --- the dial: project a 24h time onto the ring (00:00 at top, clockwise) ---
+const DIAL_CX = 120, DIAL_CY = 120, DIAL_R = 92;
+function dialPoint(minutes, r){
+  // 0 min -> top (-90deg), full day -> 360deg clockwise
+  const ang = (((minutes % 1440) + 1440) % 1440) / 1440 * 2 * Math.PI - Math.PI/2;
+  return [DIAL_CX + Math.cos(ang) * r, DIAL_CY + Math.sin(ang) * r];
+}
+function dialGapPath(fromMin, toMin, r){
+  // draw the SHORTER arc from body(MSF) to world(MSW) — the visible distance
+  let delta = toMin - fromMin;
+  // normalize to -720..720 so we sweep the short way
+  while(delta > 720) delta -= 1440;
+  while(delta < -720) delta += 1440;
+  const [x1,y1] = dialPoint(fromMin, r);
+  const [x2,y2] = dialPoint(toMin, r);
+  const large = 0;                 // always the short arc (<=12h)
+  const sweep = delta >= 0 ? 1 : 0; // clockwise if world is "later" on the ring
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} ${sweep} ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+}
+
 function calculate() {
   const bioSleep = timeToMinutes(document.getElementById('bio-sleep').value);
   const bioWake = timeToMinutes(document.getElementById('bio-wake').value);
@@ -331,6 +388,25 @@ function calculate() {
   document.getElementById('gauge-fill').style.width = gaugeWidth + '%';
   document.getElementById('gauge-fill').style.background = gaugeColor;
   document.getElementById('gauge-fill').style.color = gaugeColor;
+
+  // --- render the dial: two clocks, one ring, the gap between them lit ---
+  const msfRing = ((msf % 1440) + 1440) % 1440;
+  const mswRing = ((msw % 1440) + 1440) % 1440;
+  const [bx, by] = dialPoint(msfRing, DIAL_R);
+  const [sx, sy] = dialPoint(mswRing, DIAL_R);
+  const bioG = document.getElementById('dial-bio');
+  const socG = document.getElementById('dial-soc');
+  bioG.classList.add('marker-move'); socG.classList.add('marker-move');
+  bioG.setAttribute('transform', `translate(${bx.toFixed(2)} ${by.toFixed(2)})`);
+  socG.setAttribute('transform', `translate(${sx.toFixed(2)} ${sy.toFixed(2)})`);
+  const gap = document.getElementById('dial-gap');
+  gap.setAttribute('d', dialGapPath(msfRing, mswRing, DIAL_R));
+  gap.setAttribute('stroke', gaugeColor);
+  gap.style.opacity = sjlAbs < 0.1 ? '0.25' : '0.9';
+  // re-sweep the arc each calculation (reduced-motion guard handled in CSS)
+  gap.classList.remove('dial-draw'); void gap.getBoundingClientRect(); gap.classList.add('dial-draw');
+  document.getElementById('dial-center').textContent = sjlAbs < 0.1 ? '~0h' : (sjl >= 0 ? '+' : '−') + sjlAbs.toFixed(1) + 'h';
+  document.getElementById('dial-center').setAttribute('fill', gaugeColor);
 
   document.getElementById('interpretation').textContent = interpretation;
 

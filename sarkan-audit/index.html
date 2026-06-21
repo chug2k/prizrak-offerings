@@ -56,6 +56,23 @@
         }
         .serpent-fast { animation-duration: 1.6s !important; }
 
+        /* The ridgeline of the high pass — a slow exhale at the base of the cave */
+        @keyframes ridgeBreath{0%,100%{opacity:.5}50%{opacity:.85}}
+        .ridge{position:fixed;left:0;right:0;bottom:0;height:34vh;pointer-events:none;z-index:0;
+            opacity:.6;animation:ridgeBreath 11s ease-in-out infinite}
+
+        /* Per-snake incubation meter — how close to the next molt */
+        .molt-track{height:3px;background:var(--line-soft);border-radius:99px;overflow:hidden;margin-top:.5rem}
+        .molt-fill{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+        @keyframes moltCreep{0%{transform:translateX(-30%)}100%{transform:translateX(30%)}}
+        .molt-fill.near{position:relative}
+        .molt-fill.near::after{content:"";position:absolute;inset:0;
+            background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);
+            animation:moltCreep 2.4s ease-in-out infinite}
+
+        /* Dragon tier keeps a faint heartbeat */
+        @keyframes dragonHeart{0%,100%{box-shadow:0 0 0 1px rgba(180,0,0,0.15), 0 0 28px -12px rgba(220,60,30,0.5)}50%{box-shadow:0 0 0 1px rgba(180,0,0,0.3), 0 0 40px -10px rgba(220,60,30,0.8)}}
+
         /* ---------- ENTRIES ---------- */
         .snake-entry {
             transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .3s ease;
@@ -72,7 +89,7 @@
         .tier-snake { border-left: 3px solid rgba(80,180,40,0.5); }
         .tier-growing { border-left: 3px solid rgba(255,180,0,0.6); }
         .tier-wings { border-left: 3px solid rgba(220,80,40,0.7); }
-        .tier-dragon { border-left: 3px solid rgba(180,0,0,0.9); box-shadow: 0 0 0 1px rgba(180,0,0,0.15), 0 0 28px -12px rgba(220,60,30,0.5); }
+        .tier-dragon { border-left: 3px solid rgba(180,0,0,0.9); animation: dragonHeart 3.2s ease-in-out infinite; }
 
         input, textarea, select {
             background: transparent;
@@ -113,9 +130,11 @@
         }
 
         @media (prefers-reduced-motion:reduce){
-            .fog,.ember,.breathe,.reveal,.flicker,.serpent-glow,.fade-in,.ledger-flash{animation:none!important}
+            .fog,.ember,.breathe,.reveal,.flicker,.serpent-glow,.fade-in,.ledger-flash,
+            .ridge,.tier-dragon,.molt-fill.near::after{animation:none!important}
             .ember{display:none}
-            .breathe,.flicker{opacity:1!important}
+            .breathe,.flicker,.ridge{opacity:1!important}
+            .molt-fill{transition:none}
         }
     </style>
 </head>
@@ -125,6 +144,13 @@
 <div class="fog"></div>
 <!-- Embers spawned by JS into here -->
 <div id="ember-field" aria-hidden="true"></div>
+<!-- The ridgeline of the high pass, breathing slow at the base of the cave -->
+<svg class="ridge" viewBox="0 0 1200 340" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 340 L0 230 L120 180 L240 250 L380 140 L520 210 L640 120 L780 200 L900 150 L1040 220 L1140 170 L1200 210 L1200 340 Z"
+          fill="rgba(80,180,40,0.05)"/>
+    <path d="M0 340 L0 280 L160 240 L300 290 L460 210 L600 270 L760 200 L920 260 L1080 230 L1200 270 L1200 340 Z"
+          fill="rgba(80,180,40,0.035)"/>
+</svg>
 
 <div class="max-w-2xl mx-auto px-4 py-10 relative" style="z-index:2">
 
@@ -267,6 +293,7 @@ const WATCH_LABELS = {
 
 let snakes = JSON.parse(localStorage.getItem('sarkan_registry') || '[]');
 let lastVerdictText = '';
+let lastTally = { dragons: 0, wings: 0, growing: 0, snakes: 0 };
 
 function getTier(snake) {
     const age = parseInt(snake.age);
@@ -274,10 +301,30 @@ function getTier(snake) {
     const watchScore = { yes: 0, periodic: 1, no: 2, forgotten: 3 }[watch] || 0;
     const riskScore = age + watchScore;
 
-    if (riskScore >= 9) return { tier: 'dragon', label: '🐉 DRAGON', css: 'tier-dragon', color: 'text-red-500', glow: 'dragon-glow' };
-    if (riskScore >= 6) return { tier: 'wings', label: '🔥 GROWING WINGS', css: 'tier-wings', color: 'text-orange-400', glow: '' };
-    if (riskScore >= 3) return { tier: 'growing', label: '⚠ GROWING', css: 'tier-growing', color: 'text-yellow-400', glow: '' };
-    return { tier: 'snake', label: '🐍 SNAKE', css: 'tier-snake', color: 'text-green-400', glow: '' };
+    // Where this snake sits between its current threshold and the next molt.
+    // Thresholds: snake<3, growing 3, wings 6, dragon 9. Cap at 11 (age8+forgotten).
+    let lo, hi, nextLabel, fillColor;
+    if (riskScore >= 9)      { lo = 9;  hi = 11; nextLabel = 'fully fledged'; fillColor = 'rgba(220,60,30,0.9)'; }
+    else if (riskScore >= 6) { lo = 6;  hi = 9;  nextLabel = 'until dragon';  fillColor = 'rgba(220,80,40,0.8)'; }
+    else if (riskScore >= 3) { lo = 3;  hi = 6;  nextLabel = 'until wings';   fillColor = 'rgba(255,180,0,0.75)'; }
+    else                     { lo = 0;  hi = 3;  nextLabel = 'until it stirs'; fillColor = 'rgba(80,180,40,0.7)'; }
+    const molt = Math.max(0, Math.min(100, Math.round(((riskScore - lo) / (hi - lo)) * 100)));
+
+    if (riskScore >= 9) return { tier: 'dragon', label: '🐉 DRAGON', css: 'tier-dragon', color: 'text-red-500', glow: 'dragon-glow', riskScore, molt, nextLabel, fillColor };
+    if (riskScore >= 6) return { tier: 'wings', label: '🔥 GROWING WINGS', css: 'tier-wings', color: 'text-orange-400', glow: '', riskScore, molt, nextLabel, fillColor };
+    if (riskScore >= 3) return { tier: 'growing', label: '⚠ GROWING', css: 'tier-growing', color: 'text-yellow-400', glow: '', riskScore, molt, nextLabel, fillColor };
+    return { tier: 'snake', label: '🐍 SNAKE', css: 'tier-snake', color: 'text-green-400', glow: '', riskScore, molt, nextLabel, fillColor };
+}
+
+// How long this thing has sat in the dark since it was logged.
+function daysInCave(snake) {
+    if (!snake.addedAt) return null;
+    const ms = Date.now() - new Date(snake.addedAt).getTime();
+    if (isNaN(ms) || ms < 0) return null;
+    const days = Math.floor(ms / 86400000);
+    if (days <= 0) return 'logged today';
+    if (days === 1) return '1 day in the ledger';
+    return `${days} days in the ledger`;
 }
 
 function addSnake() {
@@ -351,6 +398,8 @@ function render() {
 
     registry.innerHTML = sorted.map(snake => {
         const t = getTier(snake);
+        const cave = daysInCave(snake);
+        const nearMolt = t.molt >= 70 && t.tier !== 'dragon';
         return `
         <div class="snake-entry ${t.css} p-4 reveal">
             <div class="flex items-start justify-between gap-3">
@@ -364,7 +413,15 @@ function render() {
                     <div class="mono text-xs space-y-0.5" style="color:var(--ink-dim)">
                         <div>⏳ In darkness: <span class="text-green-700">${AGE_LABELS[snake.age]}</span></div>
                         <div>👁 ${WATCH_LABELS[snake.watch]}</div>
+                        ${cave ? `<div class="text-green-900">🕯 ${cave}</div>` : ''}
                         ${snake.consequence ? `<div class="mt-1 text-green-900 italic">If transformed: "${escHtml(snake.consequence.substring(0,100))}${snake.consequence.length > 100 ? '...' : ''}"</div>` : ''}
+                    </div>
+                    <div class="molt-track" title="incubation toward the next molt">
+                        <div class="molt-fill ${nearMolt ? 'near' : ''}" style="width:${t.molt}%;background:${t.fillColor}"></div>
+                    </div>
+                    <div class="mono text-[10px] mt-1 flex items-center justify-between" style="color:var(--ink-ghost)">
+                        <span>${t.tier === 'dragon' ? 'incubation complete' : 'incubation ' + t.molt + '%'}</span>
+                        <span class="uppercase tracking-wider">${t.nextLabel}</span>
                     </div>
                 </div>
                 <div class="flex flex-col gap-1 shrink-0">
@@ -413,6 +470,7 @@ function renderSummary(sorted) {
     }
 
     lastVerdictText = verdict;
+    lastTally = { dragons: dragons.length, wings: wings.length, growing: growing.length, snakes: snakeOnly.length };
 
     document.getElementById('summary-content').innerHTML = `
         <div class="grid grid-cols-4 gap-2 mb-4 mono text-xs text-center">
@@ -430,7 +488,9 @@ function renderSummary(sorted) {
 function copyVerdict() {
     const btn = document.getElementById('copy-verdict');
     if (!lastVerdictText) return;
-    const text = `THE ŠARKAN AUDIT — Prízrak assessment\n\n"${lastVerdictText}"\n\n— logged in the snake registry`;
+    const t = lastTally;
+    const tally = `census · ${t.dragons} dragon${t.dragons!==1?'s':''} / ${t.wings} winged / ${t.growing} growing / ${t.snakes} snake${t.snakes!==1?'s':''}`;
+    const text = `THE ŠARKAN AUDIT — Prízrak assessment\n${tally}\n\n"${lastVerdictText}"\n\n— filed in the snake registry. the ledger remembers.`;
     const done = () => {
         const prev = btn.textContent;
         btn.textContent = 'copied to the ledger';
@@ -532,7 +592,36 @@ if (serpent) {
             setTimeout(() => serpent.classList.remove('serpent-fast'), 3000);
         }
     });
+    // Hold the glyph → the watcher leans in, breathing faster while held.
+    const holdOn = () => serpent.classList.add('serpent-fast');
+    const holdOff = () => serpent.classList.remove('serpent-fast');
+    serpent.addEventListener('mousedown', holdOn);
+    serpent.addEventListener('touchstart', holdOn, { passive: true });
+    ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => serpent.addEventListener(ev, holdOff));
 }
+
+// 2b. The old code: ↑↑↓↓←→←→ B A → the serpents wake, a brief flight of embers.
+const KONAMI = ['arrowup','arrowup','arrowdown','arrowdown','arrowleft','arrowright','arrowleft','arrowright','b','a'];
+let konamiPos = 0;
+window.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const k = (e.key || '').toLowerCase();
+    konamiPos = (k === KONAMI[konamiPos]) ? konamiPos + 1 : (k === KONAMI[0] ? 1 : 0);
+    if (konamiPos === KONAMI.length) {
+        konamiPos = 0;
+        for (let i = 0; i < 6; i++) setTimeout(() => spawnEmber(true), i * 120);
+        let line = document.getElementById('watcher-line');
+        if (!line) {
+            line = document.createElement('p');
+            line.id = 'watcher-line';
+            line.className = 'fell italic text-center mt-4 reveal';
+            line.style.color = 'var(--ink-ghost)';
+            document.querySelector('.max-w-2xl').appendChild(line);
+        }
+        line.textContent = 'the old code wakes the old snakes. they were never asleep.';
+    }
+});
 
 // 3. Between 00:00–03:00 local time, a whisper wakes in the footer.
 (function nightWhisper(){

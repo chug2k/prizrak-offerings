@@ -48,6 +48,14 @@
     @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
     .flicker{animation:flicker 6s steps(1) infinite}
 
+    /* a slow red pulse for entries that are still burning */
+    @keyframes pulse-hot{0%,100%{box-shadow:inset 3px 0 0 -1px #dc2626, 0 0 0 1px var(--line-soft)}
+      50%{box-shadow:inset 3px 0 0 -1px #f87171, 0 0 22px -10px rgba(220,38,38,0.6), 0 0 0 1px var(--line-soft)}}
+
+    /* the heartbeat glyph in the pulse bar */
+    @keyframes heart{0%,100%{transform:scale(1);opacity:.7}14%{transform:scale(1.35);opacity:1}28%{transform:scale(1)}42%{transform:scale(1.2)}56%{transform:scale(1)}}
+    .heart{display:inline-block;animation:heart 2.4s ease-in-out infinite;color:var(--accent);text-shadow:0 0 8px var(--glow)}
+
     /* content sits above decoration */
     .stage{ position:relative; z-index:2; }
 
@@ -71,7 +79,7 @@
     }
     .entry-card:hover { transform: translateY(-2px); border-color: var(--line);
       box-shadow: 0 0 0 1px var(--line), 0 0 28px -14px var(--glow); }
-    .entry-card.status-hot   { border-left-color: #dc2626; }
+    .entry-card.status-hot   { border-left-color: #dc2626; animation: pulse-hot 3.6s ease-in-out infinite; }
     .entry-card.status-warm  { border-left-color: #d97706; }
     .entry-card.status-done  { border-left-color: var(--accent); opacity: 0.6; }
     .entry-card.status-cold  { border-left-color: #374151; opacity: 0.5; }
@@ -128,10 +136,27 @@
 
     .copy-btn{ font-size:0.6rem; padding:2px 8px; }
 
+    /* ---- the ledger pulse: a tiny readout of the room's temperature ---- */
+    .pulse-bar{
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+      background:var(--bg-sunk); border:1px solid var(--line-soft);
+      border-radius:3px; padding:8px 12px; margin-top:14px;
+      box-shadow:0 0 0 1px var(--line-soft), 0 0 30px -18px var(--glow);
+    }
+    .pulse-stat{ display:flex; align-items:baseline; gap:6px; font-size:0.7rem; color:var(--ink-dim); letter-spacing:0.08em; }
+    .pulse-stat b{ font-size:0.95rem; font-family:'Special Elite',cursive; color:var(--ink); }
+    .pulse-stat .c-hot{ color:#f87171; }
+    .pulse-stat .c-warm{ color:#fbbf24; }
+    .pulse-stat .c-pending{ color:var(--accent); }
+    .pulse-read{ margin-left:auto; font-size:0.62rem; color:var(--ink-ghost); letter-spacing:0.1em; text-transform:lowercase; }
+
+    .entry-card{ scroll-margin-top:90px; }
+
     @media (prefers-reduced-motion:reduce){
-      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .fog,.ember,.breathe,.reveal,.flicker,.heart{animation:none!important}
       .ember{display:none}
-      .breathe,.flicker{opacity:1!important}
+      .entry-card.status-hot{animation:none!important}
+      .breathe,.flicker,.heart{opacity:1!important}
       .entry-card:hover, .btn:hover, .btn:active{ transform:none; }
     }
   </style>
@@ -154,11 +179,16 @@
         <button class="btn btn-primary" onclick="toggleForm()">+ NEW ENTRY</button>
       </div>
     </div>
+
+    <!-- Ledger pulse: live temperature of the record -->
+    <div id="pulse-bar" class="pulse-bar"></div>
+
     <div class="border-t mt-4 pt-3 flex gap-2 flex-wrap items-center" style="border-color:var(--line-soft)">
       <span class="text-xs mr-2" style="color:var(--ink-dim)">SORT:</span>
       <button class="btn sort-btn active" id="sort-date" onclick="setSort('date')">DATE</button>
       <button class="btn sort-btn" id="sort-status" onclick="setSort('status')">STATUS</button>
       <button class="btn sort-btn" id="sort-person" onclick="setSort('person')">PERSON</button>
+      <button class="btn sort-btn" id="export-btn" onclick="exportLedger(this)" title="Copy the whole record" style="margin-left:6px">DOSSIER</button>
       <div class="ml-auto">
         <input type="text" id="search" placeholder="search the ledger..." style="width:180px" oninput="render()" />
       </div>
@@ -360,9 +390,51 @@ function verdict(e){
   return 'cold. dormant in the karst. let it sleep.';
 }
 
-function copyEntry(id){
-  const e = entries.find(x => x.id === id);
-  if (!e) return;
+// the pulse bar's one-line reading of the whole room
+function ledgerReading(stats){
+  if (stats.total === 0) return 'a still, cold cave.';
+  if (stats.pending === 0 && stats.hot === 0) return 'all debts paid. the watcher rests.';
+  if (stats.hot >= 3) return 'the room is on fire. tend it.';
+  if (stats.hot > 0) return 'something still burns. attend.';
+  if (stats.pending > 0) return 'threads left untied. the mountain notices.';
+  return 'the bridge holds. for now.';
+}
+
+function renderPulse(){
+  const stats = {
+    total: entries.length,
+    hot:   entries.filter(e => e.status === 'hot').length,
+    warm:  entries.filter(e => e.status === 'warm').length,
+    pending: entries.reduce((n,e) => n + e.followups.filter(f=>!f.done).length, 0),
+  };
+  const bar = document.getElementById('pulse-bar');
+  bar.innerHTML = `
+    <span class="pulse-stat"><span class="heart">♥</span> <b>${stats.total}</b> souls logged</span>
+    <span class="pulse-stat"><b class="c-hot">${stats.hot}</b> burning</span>
+    <span class="pulse-stat"><b class="c-warm">${stats.warm}</b> warm</span>
+    <span class="pulse-stat"><b class="c-pending">${stats.pending}</b> threads open</span>
+    <span class="pulse-read">${ledgerReading(stats)}</span>
+  `;
+}
+
+// flash a button label, then restore it (shared by copy + dossier)
+function flashBtn(btn, label){
+  if (!btn) return;
+  const orig = btn.dataset._orig || btn.textContent;
+  btn.dataset._orig = orig;
+  btn.textContent = label;
+  btn.style.color = 'var(--accent)';
+  btn.style.borderColor = 'var(--accent)';
+  setTimeout(() => { btn.textContent = btn.dataset._orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1200);
+}
+
+function writeClip(txt, cb){
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(cb).catch(()=>fallbackCopy(txt, cb));
+  } else { fallbackCopy(txt, cb); }
+}
+
+function entryToText(e){
   const lines = [];
   lines.push(`${e.person}${e.venue ? '  @ ' + e.venue : ''}`);
   lines.push(`${e.date || '—'}  [${(statusMeta[e.status]||statusMeta.warm).label}]`);
@@ -371,20 +443,29 @@ function copyEntry(id){
     lines.push('', 'FOLLOW-UPS:');
     e.followups.forEach(f => lines.push(`  [${f.done?'x':' '}] ${f.text}`));
   }
-  const txt = lines.join('\n');
-  const btn = document.querySelector(`[data-copy-id="${id}"]`);
-  const done = () => {
-    if (!btn) return;
-    const orig = btn.textContent;
-    btn.textContent = 'copied to the ledger';
-    btn.style.color = 'var(--accent)';
-    btn.style.borderColor = 'var(--accent)';
-    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1200);
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt, done));
-  } else { fallbackCopy(txt, done); }
+  return lines.join('\n');
 }
+
+function copyEntry(id){
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  const btn = document.querySelector(`[data-copy-id="${id}"]`);
+  writeClip(entryToText(e), () => flashBtn(btn, 'copied to the ledger'));
+}
+
+// export the whole record as a plain-text dossier
+function exportLedger(btn){
+  if (!entries.length){ flashBtn(btn, 'nothing to dossier'); return; }
+  const ordered = getSorted(entries);
+  const head = [
+    'PRÍZRAK / THE SOCIAL LEDGER',
+    `filed ${new Date().toISOString().slice(0,10)} — ${entries.length} entr${entries.length===1?'y':'ies'}`,
+    '─────────────────────────────', ''
+  ];
+  const body = ordered.map(entryToText).join('\n\n─ ─ ─\n\n');
+  writeClip(head.join('\n') + body, () => flashBtn(btn, 'the dossier is yours'));
+}
+
 function fallbackCopy(txt, cb){
   try {
     const ta = document.createElement('textarea');
@@ -406,6 +487,7 @@ function render() {
   }
   const sorted = getSorted(filtered);
   document.getElementById('entry-count').textContent = `${entries.length} entr${entries.length===1?'y':'ies'}`;
+  renderPulse();
 
   const container = document.getElementById('entries-list');
   if (!sorted.length) {
@@ -522,6 +604,14 @@ render();
   ['mousemove','keydown','scroll','touchstart','click'].forEach(ev =>
     window.addEventListener(ev, wake, { passive: true }));
   wake();
+
+  // Easter egg 5: hold the heartbeat in the pulse bar -> it races for 3s
+  document.addEventListener('pointerdown', (ev) => {
+    const heart = ev.target.closest('.heart');
+    if (!heart || reduce) return;
+    heart.style.animationDuration = '0.7s';
+    setTimeout(() => { heart.style.animationDuration = ''; }, 3000);
+  });
 })();
 </script>
 </body>

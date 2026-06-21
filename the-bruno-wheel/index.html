@@ -6,42 +6,111 @@
   <title>The Bruno Wheel</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0f0f12; }
-    .ring-label { font-family: monospace; }
-    .slot { transition: all 0.2s; cursor: pointer; }
-    .slot:hover { background: rgba(139,92,246,0.15); }
-    .slot.locked { background: rgba(139,92,246,0.25); border-color: #7c3aed !important; color: #c4b5fd; }
-    .spin-btn { transition: all 0.15s; }
-    .spin-btn:hover { transform: rotate(15deg); }
-    @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    .flashing { animation: flash 0.4s ease; }
-    .wheel-svg text { font-family: monospace; font-size: 9px; }
-    .verdict { border-left: 3px solid #7c3aed; background: rgba(124,58,237,0.08); }
-    .history-item { border-left: 2px solid #3f3f46; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#8b5cf6;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body{color:var(--ink);}
+    .ring-label{font-family:monospace;}
+
+    /* ── motion vocabulary (reduced-motion-safe at the end) ── */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* a slow ring rotation behind the title — the wheel never quite stops */
+    @keyframes slowturn{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+    .turn{animation:slowturn 90s linear infinite}
+
+    /* ── component styling ── */
+    .panel{background:var(--bg-raised);border:1px solid var(--line);border-radius:.75rem;}
+    .slot-row{transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+    .slot-row:hover{transform:translateY(-1px);border-color:var(--accent);}
+    .slot.locked{background:rgba(139,92,246,0.25);border-color:#7c3aed !important;color:#c4b5fd;}
+
+    @keyframes spinpulse{0%{box-shadow:0 0 0 0 var(--glow)}100%{box-shadow:0 0 0 8px transparent}}
+    .spinning{animation:spinpulse .5s ease-out;}
+    .glyph-turn{display:inline-block;transition:transform .5s cubic-bezier(.2,.8,.2,1);}
+    .spin-btn:hover .glyph-turn{transform:rotate(180deg);}
+    .spin-btn:active{transform:translateY(1px);}
+
+    @keyframes flash{0%,100%{opacity:1}50%{opacity:0.3}}
+    .flashing{animation:flash 0.4s ease;}
+
+    .wheel-svg text{font-family:monospace;font-size:9px;}
+    .verdict{border-left:3px solid var(--accent);background:rgba(124,58,237,0.08);
+      box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow);}
+    .history-item{border-left:2px solid #3f3f46;transition:border-color .15s ease, transform .15s ease;}
+    .history-item:hover{border-left-color:var(--accent);transform:translateX(2px);}
+
+    button:focus-visible, textarea:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);}
+
+    .ghost-line{color:var(--ink-ghost);opacity:0;transition:opacity 1.2s ease;}
+    .ghost-line.show{opacity:1;}
   </style>
 </head>
-<body class="text-zinc-300 min-h-screen font-sans antialiased">
-  <div class="max-w-3xl mx-auto px-4 py-8">
+<body class="text-zinc-300 min-h-screen font-sans antialiased grain">
+
+  <!-- ambient atmosphere (decorative, behind content) -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <div class="max-w-3xl mx-auto px-4 py-8 relative" style="z-index:2">
 
     <!-- Header -->
-    <div class="mb-8">
-      <h1 class="text-3xl font-bold text-white mb-1">The Bruno Wheel</h1>
-      <p class="text-zinc-500 text-sm">Five rings. 3,750 cells. Spin to generate a framing for your stuck problem.<br>Based on Giordano Bruno's <em>De Umbris Idearum</em> (1582) — the first search index without a ranking algorithm.</p>
+    <div class="mb-8 relative">
+      <!-- faint rotating ring behind the title: the wheel never fully stops -->
+      <svg class="turn absolute -left-2 -top-3 opacity-[0.12] pointer-events-none" width="86" height="86" viewBox="0 0 86 86" aria-hidden="true">
+        <circle cx="43" cy="43" r="40" fill="none" stroke="var(--accent)" stroke-width="0.6"/>
+        <circle cx="43" cy="43" r="30" fill="none" stroke="var(--accent)" stroke-width="0.6" stroke-dasharray="2 4"/>
+        <circle cx="43" cy="43" r="20" fill="none" stroke="var(--accent)" stroke-width="0.6"/>
+        <line x1="43" y1="3" x2="43" y2="83" stroke="var(--accent)" stroke-width="0.4"/>
+        <line x1="3" y1="43" x2="83" y2="43" stroke="var(--accent)" stroke-width="0.4"/>
+      </svg>
+      <h1 id="title" class="text-3xl font-bold text-white mb-1 breathe relative cursor-default select-none" style="width:max-content">The Bruno Wheel</h1>
+      <p class="text-zinc-500 text-sm">Five rings. 3,750 cells. Spin to wring a framing out of a problem that has stopped moving.<br>After Giordano Bruno's <em>De Umbris Idearum</em> (1582) — the first search index built without a ranking algorithm. The Great Key was never written. That part is left to you.</p>
     </div>
 
     <!-- Problem input -->
     <div class="mb-6">
-      <label class="block text-xs font-mono text-zinc-500 mb-2 uppercase tracking-wider">Your Stuck Problem</label>
-      <textarea id="problem" rows="2" placeholder="What are you trying to figure out? (optional — the wheel works without it)" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 resize-none"></textarea>
+      <label class="block text-xs font-mono text-zinc-500 mb-2 uppercase tracking-wider">The Problem That Has Stopped Moving</label>
+      <textarea id="problem" rows="2" placeholder="name the thing you are stuck inside — optional. the wheel turns regardless." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 focus:outline-none placeholder-zinc-600 resize-none"></textarea>
     </div>
 
     <!-- The Wheel Display -->
-    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+    <div class="panel p-6 mb-6">
       <div class="flex items-center justify-between mb-4">
         <span class="text-xs font-mono text-zinc-500 uppercase tracking-wider">Current Alignment</span>
         <div class="flex gap-2">
-          <button onclick="spinAll()" class="spin-btn px-4 py-1.5 bg-violet-800 hover:bg-violet-700 text-violet-100 text-sm rounded-lg font-mono">⟳ Spin All</button>
-          <button onclick="clearLocks()" class="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm rounded-lg font-mono">Clear Locks</button>
+          <button onclick="spinAll()" class="spin-btn px-4 py-1.5 bg-violet-800 hover:bg-violet-700 text-violet-100 text-sm rounded-lg font-mono transition-all"><span class="glyph-turn">⟳</span> Spin All</button>
+          <button onclick="clearLocks()" class="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm rounded-lg font-mono transition-all">Clear Locks</button>
         </div>
       </div>
 
@@ -58,17 +127,17 @@
     <!-- Generate Brief -->
     <div class="mb-6">
       <button onclick="generateBrief()" id="briefBtn" class="w-full py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-violet-700 text-zinc-200 rounded-xl font-mono text-sm transition-all">
-        Generate Brief from Locked Rings
+        Read the Alignment
       </button>
     </div>
 
     <!-- Brief output -->
     <div id="brief" class="hidden mb-6 verdict rounded-xl p-5">
-      <div class="text-xs font-mono text-violet-400 mb-3 uppercase tracking-wider">Prízrak Reads the Alignment</div>
+      <div class="text-xs font-mono text-violet-400 mb-3 uppercase tracking-wider breathe" style="width:max-content">Prízrak Reads the Alignment</div>
       <div id="briefText" class="text-sm text-zinc-300 leading-relaxed"></div>
       <div class="mt-4 flex gap-2">
-        <button onclick="saveBrief()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-mono rounded-lg">Save to Log</button>
-        <button onclick="copyBrief()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-mono rounded-lg">Copy</button>
+        <button onclick="saveBrief()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-mono rounded-lg transition-all">File to the Ledger</button>
+        <button onclick="copyBrief()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs font-mono rounded-lg transition-all">Copy</button>
       </div>
     </div>
 
@@ -82,13 +151,15 @@
     <div class="mt-10 pt-6 border-t border-zinc-800 text-center">
       <p class="text-xs text-zinc-600">Bruno's Clavis Magna was never finished. The scoring function is yours.</p>
       <p class="text-[10px] text-zinc-700 mt-1">De Umbris Idearum · 1582 · Paris</p>
+      <p id="nightWhisper" class="text-[10px] mt-2 ghost-line font-mono"></p>
+      <p id="idleWhisper" class="text-[10px] mt-1 ghost-line font-mono"></p>
     </div>
   </div>
 
 <script>
 // The five rings of Bruno's wheel
 // Ring 1 (outermost): Agent — who or what is acting
-// Ring 2: Action — what is being done  
+// Ring 2: Action — what is being done
 // Ring 3: Emblem — the symbol/image that makes it vivid
 // Ring 4: Attribute — the quality or condition
 // Ring 5 (innermost): Circumstance — context, when/where/why
@@ -191,6 +262,7 @@ function spinAll() {
   save();
   render();
   updateAddress();
+  pulseSpin();
 }
 
 function spinOne(id) {
@@ -199,6 +271,19 @@ function spinOne(id) {
   state.locked[id] = false;
   save();
   render();
+  pulseSpin(id);
+}
+
+// brief accent pulse on the rows that just changed
+function pulseSpin(id){
+  if (prefersReduced()) return;
+  const rows = id
+    ? [document.querySelector('[data-ring="'+id+'"]')]
+    : RINGS.filter(r=>!state.locked[r.id]).map(r=>document.querySelector('[data-ring="'+r.id+'"]'));
+  rows.forEach(el=>{
+    if(!el) return;
+    el.classList.remove('spinning'); void el.offsetWidth; el.classList.add('spinning');
+  });
 }
 
 function toggleLock(id) {
@@ -220,12 +305,12 @@ function render() {
     const val = state.rings[r.id] || rand(r.values);
     const locked = state.locked[r.id];
     return `
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3" data-ring="${r.id}">
       <div class="w-32 shrink-0">
         <div class="text-[10px] font-mono text-zinc-600 leading-tight">${r.label}</div>
         <div class="text-[9px] text-zinc-700 italic">${r.sublabel}</div>
       </div>
-      <div class="flex-1 flex items-center gap-2 bg-zinc-800/50 border ${locked ? 'border-violet-700' : 'border-zinc-700/50'} rounded-lg px-3 py-2 ${locked ? 'bg-violet-900/10' : ''}">
+      <div class="slot-row flex-1 flex items-center gap-2 bg-zinc-800/50 border ${locked ? 'border-violet-700' : 'border-zinc-700/50'} rounded-lg px-3 py-2 ${locked ? 'bg-violet-900/10' : ''}">
         <div class="w-1.5 h-1.5 rounded-full shrink-0 ${locked ? 'bg-violet-400' : r.dotColor.replace('bg-','bg-') + '/60'}"></div>
         <span class="flex-1 text-sm ${locked ? 'text-violet-200' : r.color.split(' ')[1]}">${val}</span>
         <div class="flex gap-1.5 shrink-0">
@@ -254,25 +339,29 @@ function updateAddress() {
 
 function generateBrief() {
   const lockedCount = RINGS.filter(r => state.locked[r.id]).length;
-  
+
   const vals = {};
   RINGS.forEach(r => vals[r.id] = state.rings[r.id]);
-  
+
   const problem = document.getElementById('problem').value.trim();
-  
+
   // Generate a Prizrak-style brief from the alignment
   const briefs = [
     `${vals.agent} ${vals.action} something ${vals.attribute}.\n\nThe emblem: ${vals.emblem}.\n\nCircumstance: ${vals.circumstance}.\n\n${problem ? `Your problem — "${problem}" — seen through this window: the ${vals.attribute.replace(/^(a |an |the )/,'')} state is not the obstacle. It is the condition that makes the next step visible.` : `The wheel has aligned. The combination is not the answer. It is the question the answer is inside.`}\n\nThe Clavis Magna is still missing. What does this framing unlock that your previous framing didn't?` ,
-    
+
     `The alignment: ${vals.agent} / ${vals.action} / ${vals.attribute}.\n\nThe image to hold: ${vals.emblem}.\n\nContext: ${vals.circumstance}.\n\n${problem ? `"${problem}" — the frame this alignment offers: who is the actual agent? Not who you assumed. The emblem makes it concrete. Place that image in the cell and walk past it.` : `Bruno loaded images into cells to make combinations retrievable. The combination isn't stored until you name what it is for. What does this combination retrieve?`}\n\nSpin again or lock what fits. The key is yours to write.`,
-    
+
     `A cell in the 3,750: ${vals.agent} is ${vals.action.replace('is ','')} something ${vals.attribute}, ${vals.circumstance}.\n\nThe symbolic anchor: ${vals.emblem}.\n\n${problem ? `Held against "${problem}": the emblem is doing the work the explanation cannot. What does ${vals.emblem} tell you about this situation that your own framing didn't?` : `The wheel produces the address. The address points to an image. The image retrieves the thought. This is the sequence Bruno built. The missing step — the Great Key — is the judgment about whether this thought is worth retrieving.`}\n\nIs this combination signal or noise? Only you can answer. That was always the point.`
   ];
-  
+
   const brief = briefs[Math.floor(Math.random() * briefs.length)];
-  
+
   document.getElementById('briefText').innerHTML = brief.replace(/\n/g, '<br>');
-  document.getElementById('brief').classList.remove('hidden');
+  const briefBox = document.getElementById('brief');
+  briefBox.classList.remove('hidden');
+  // reveal + breathing glow on the verdict
+  briefBox.classList.remove('reveal'); void briefBox.offsetWidth; briefBox.classList.add('reveal');
+  if (!prefersReduced()) briefBox.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 function saveBrief() {
@@ -280,7 +369,7 @@ function saveBrief() {
   const problem = document.getElementById('problem').value.trim();
   const alignment = {};
   RINGS.forEach(r => alignment[r.label.split('—')[1].trim().toLowerCase()] = state.rings[r.id]);
-  
+
   const entry = {
     date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}),
@@ -292,14 +381,24 @@ function saveBrief() {
   if (state.history.length > 20) state.history = state.history.slice(0,20);
   save();
   renderHistory();
+  // confirm with the house voice
+  const btn = event && event.target ? event.target : null;
+  if (btn){
+    const orig = btn.textContent;
+    btn.textContent = 'filed. the ledger remembers.';
+    btn.classList.add('text-violet-300');
+    setTimeout(()=>{ btn.textContent = orig; btn.classList.remove('text-violet-300'); }, 1400);
+  }
 }
 
 function copyBrief() {
   const text = document.getElementById('briefText').textContent;
+  const btn = event && event.target ? event.target : null;
   navigator.clipboard.writeText(text).then(() => {
-    const btn = event.target;
-    btn.textContent = 'Copied';
-    setTimeout(() => btn.textContent = 'Copy', 1500);
+    if(!btn) return;
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('text-violet-300');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('text-violet-300'); }, 1200);
   });
 }
 
@@ -320,7 +419,7 @@ function renderHistory() {
       <div class="flex flex-wrap gap-1 mb-2">
         ${Object.entries(e.alignment).map(([k,v]) => `<span class="text-[10px] font-mono px-1.5 py-0.5 bg-zinc-800 text-zinc-500 rounded">${v}</span>`).join('')}
       </div>
-      <button onclick="deleteHistory(${i})" class="text-[10px] text-zinc-700 hover:text-zinc-500 font-mono">delete</button>
+      <button onclick="deleteHistory(${i})" class="text-[10px] text-zinc-700 hover:text-zinc-500 font-mono">let the fog take it</button>
     </div>
   `).join('');
 }
@@ -335,9 +434,95 @@ function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+/* ── atmosphere + easter eggs (non-blocking, never touch saved state) ── */
+function prefersReduced(){
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function spawnEmbers(){
+  if (prefersReduced()) return;
+  const field = document.getElementById('emberField');
+  if(!field) return;
+  const n = 8;
+  for(let k=0;k<n;k++){
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = Math.round(Math.random()*100) + 'vw';
+    e.style.animationDelay = (Math.random()*14).toFixed(1) + 's';
+    e.style.animationDuration = (12 + Math.random()*6).toFixed(1) + 's';
+    field.appendChild(e);
+  }
+}
+
+// extra ember on triple-click of the title
+function bindTitleEgg(){
+  const t = document.getElementById('title');
+  if(!t) return;
+  t.addEventListener('click', (ev)=>{
+    if(ev.detail === 3 && !prefersReduced()){
+      const field = document.getElementById('emberField');
+      if(!field) return;
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = '50vw';
+      e.style.animationDuration = '9s';
+      field.appendChild(e);
+      setTimeout(()=>e.remove(), 9000);
+    }
+  });
+}
+
+// type "prizrak" → light a hidden line in the footer
+function bindKeyEgg(){
+  let buf = '';
+  const target = 'prizrak';
+  window.addEventListener('keydown', (e)=>{
+    if (e.key && e.key.length === 1) {
+      buf = (buf + e.key.toLowerCase()).slice(-target.length);
+      if (buf === target){
+        const w = document.getElementById('idleWhisper');
+        if(w){ w.textContent = 'you found the watcher.'; w.classList.add('show'); }
+      }
+    }
+  });
+}
+
+// between 00:00–03:00 local time, a faint footer whisper appears
+function nightWhisper(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3){
+    const w = document.getElementById('nightWhisper');
+    if(w){ w.textContent = 'the mountain does not sleep.'; w.classList.add('show'); }
+  }
+}
+
+// idle 60s → one ghost line fades in (won't override the prizrak egg)
+function bindIdleEgg(){
+  let timer;
+  const w = document.getElementById('idleWhisper');
+  const reset = ()=>{
+    clearTimeout(timer);
+    timer = setTimeout(()=>{
+      if(w && !w.textContent){ w.textContent = 'still here. still watching.'; w.classList.add('show'); }
+    }, 60000);
+  };
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(ev=>
+    window.addEventListener(ev, ()=>{
+      if(w && w.textContent === 'still here. still watching.'){ w.classList.remove('show'); w.textContent=''; }
+      reset();
+    }, {passive:true})
+  );
+  reset();
+}
+
 window.addEventListener('load', () => {
   init();
   renderHistory();
+  spawnEmbers();
+  bindTitleEgg();
+  bindKeyEgg();
+  bindIdleEgg();
+  nightWhisper();
 });
 </script>
 </body>

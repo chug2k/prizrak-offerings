@@ -5,72 +5,183 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Echo Probe | Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #18181b; }
-        .glass { background: rgba(24, 24, 27, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(63, 63, 70, 0.4); }
-        input[type="range"] { accent-color: #8b5cf6; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#8b5cf6;          /* the probe's existing violet, the lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        .glass{
+            background:color-mix(in srgb, var(--bg-raised) 86%, transparent);
+            backdrop-filter:blur(12px);
+            border:1px solid var(--line);
+            box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+        }
+        .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+
+        input[type="range"]{ accent-color:var(--accent); }
+        textarea::placeholder{ color:var(--ink-ghost); }
+
+        textarea:focus-visible,
+        button:focus-visible{
+            outline:none;
+            border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+
+        /* the active result panel breathes */
+        .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+        /* === MOTION VOCABULARY === */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        @keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(220%)}}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* tactile hover/press on action buttons */
+        .btn-lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s; }
+        .btn-lift:hover{ transform:translateY(-2px); }
+        .btn-lift:active{ transform:translateY(1px); }
+
+        /* the probe meter (a radar ring around the score) */
+        .ring{ transition:stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1), stroke .6s ease; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .ring{transition:none!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-sans antialiased min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-2xl w-full glass rounded-2xl shadow-2xl p-8">
+<body class="text-zinc-300 antialiased min-h-screen flex items-center justify-center p-4 grain">
+    <!-- ambient layers (decorative, behind everything) -->
+    <div class="fog"></div>
+    <div id="embers"></div>
+
+    <div class="relative z-[2] max-w-2xl w-full glass rounded-2xl p-8">
         <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-white mb-2">The Echo Probe</h1>
-            <p class="text-zinc-500 text-sm italic">Verify the signal. Silence the echo.</p>
+            <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-600 mb-3 flickerable">PRÍZRAK / INSTRUMENT 14 — RESONANCE</div>
+            <h1 id="title" class="text-3xl font-bold text-white mb-2 select-none cursor-default breathe" style="text-shadow:0 0 14px var(--glow)">The Echo Probe</h1>
+            <p class="text-zinc-500 text-sm italic">Lower the probe into the well. Count how much of what returns is only your own voice.</p>
         </header>
 
         <div id="input-form" class="space-y-6">
             <div>
-                <label class="block text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">The Core Belief / Strategy</label>
-                <textarea id="belief" rows="3" class="w-full bg-zinc-900/50 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200 focus:outline-none focus:border-violet-500 transition-colors resize-none" placeholder="What do you currently assume to be true?"></textarea>
+                <label class="block mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">SIGNAL 01 / THE CORE BELIEF</label>
+                <textarea id="belief" rows="3" class="w-full well rounded-lg px-4 py-2 text-zinc-200 transition-colors resize-none" placeholder="what do you currently hold as true?"></textarea>
             </div>
 
             <div>
-                <label class="block text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">The Strongest Counter-Evidence</label>
-                <textarea id="counter" rows="3" class="w-full bg-zinc-900/50 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-200 focus:outline-none focus:border-violet-500 transition-colors resize-none" placeholder="What is the most uncomfortable truth that contradicts this?"></textarea>
+                <label class="block mono text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-2">SIGNAL 02 / THE STRONGEST COUNTER-EVIDENCE</label>
+                <textarea id="counter" rows="3" class="w-full well rounded-lg px-4 py-2 text-zinc-200 transition-colors resize-none" placeholder="the most uncomfortable truth that contradicts it"></textarea>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <div class="flex justify-between mb-2">
-                        <label class="text-xs font-mono uppercase tracking-wider text-zinc-500">Internal Confidence</label>
-                        <span id="conf-val" class="text-xs text-violet-400 font-mono">50%</span>
+                        <label class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">INTERNAL CONFIDENCE</label>
+                        <span id="conf-val" class="text-xs mono" style="color:var(--accent)">50%</span>
                     </div>
                     <input type="range" id="confidence" min="0" max="100" value="50" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
                 </div>
                 <div>
                     <div class="flex justify-between mb-2">
-                        <label class="text-xs font-mono uppercase tracking-wider text-zinc-500">Counterweight</label>
-                        <span id="counter-val" class="text-xs text-rose-400 font-mono">50%</span>
+                        <label class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">COUNTERWEIGHT</label>
+                        <span id="counter-val" class="text-xs text-rose-400 mono">50%</span>
                     </div>
                     <input type="range" id="counterweight" min="0" max="100" value="50" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
                 </div>
             </div>
 
-            <button onclick="probe()" class="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold py-3 rounded-lg transition-all transform active:scale-95 shadow-lg">
-                Run Probe
+            <button onclick="probe()" class="btn-lift relative overflow-hidden w-full text-white font-bold py-3 rounded-lg border border-transparent shadow-lg" style="background:var(--accent)">
+                <span class="relative z-10 mono tracking-[0.2em] uppercase text-sm">Lower the Probe</span>
             </button>
+
+            <div id="ledger-note" class="hidden text-center mono text-[10px] uppercase tracking-[0.2em] text-zinc-600"></div>
         </div>
 
-        <div id="results" class="hidden space-y-8 animate-in fade-in duration-500">
+        <div id="results" class="hidden space-y-8">
             <div class="text-center border-b border-zinc-800 pb-6">
-                <div class="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Echo Intensity</div>
-                <div id="echo-score" class="text-6xl font-bold text-white">0%</div>
-                <p id="verdict" class="text-sm text-zinc-400 mt-2 italic"></p>
-            </div>
+                <div class="mono text-[10px] uppercase tracking-[0.35em] text-zinc-500 mb-4">ECHO INTENSITY</div>
 
-            <div class="space-y-4">
-                <h3 class="text-xs font-mono uppercase tracking-wider text-zinc-500">The Diagnostic</h3>
-                <div id="diagnostic" class="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 text-sm leading-relaxed">
+                <div class="relative mx-auto" style="width:172px;height:172px">
+                    <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="var(--line)" stroke-width="6"></circle>
+                        <circle id="ring" class="ring" cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"
+                            stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <div id="echo-score" class="text-5xl font-bold text-white breathe">0%</div>
+                        <div id="verdict" class="mono text-[11px] uppercase tracking-[0.2em] mt-1 italic"></div>
+                    </div>
                 </div>
             </div>
 
-            <button onclick="reset()" class="w-full py-2 text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors">
-                ← Back to Input
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">THE DIAGNOSTIC</h3>
+                    <button id="copy-btn" onclick="copyVerdict()" class="btn-lift mono text-[10px] uppercase tracking-[0.2em] text-zinc-500 hover:text-zinc-200 border border-zinc-800 hover:border-violet-500 rounded px-3 py-1">
+                        copy to the ledger
+                    </button>
+                </div>
+                <div id="diagnostic" class="well p-4 rounded-lg text-sm leading-relaxed result-glow"></div>
+            </div>
+
+            <div id="history" class="hidden space-y-2">
+                <h3 class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">PRIOR SOUNDINGS</h3>
+                <div id="history-list" class="space-y-1"></div>
+            </div>
+
+            <button onclick="reset()" class="btn-lift w-full py-2 mono text-[10px] uppercase tracking-[0.3em] text-zinc-500 hover:text-zinc-300 transition-colors">
+                ← lower it again
             </button>
         </div>
+
+        <footer class="mt-8 pt-4 border-t border-zinc-900 text-center">
+            <p id="footer-line" class="mono text-[10px] uppercase tracking-[0.25em] text-zinc-700">the well answers in your own voice. mind that.</p>
+            <p id="ghost-watcher" class="mono text-[10px] tracking-[0.2em] mt-2 opacity-0 transition-opacity duration-700" style="color:var(--ink-ghost)"></p>
+        </footer>
     </div>
 
     <script>
+        const HISTORY_KEY = 'echo-probe-history';
+
         const confidenceInput = document.getElementById('confidence');
         const counterweightInput = document.getElementById('counterweight');
         const confVal = document.getElementById('conf-val');
@@ -79,59 +190,218 @@
         confidenceInput.oninput = () => confVal.innerText = confidenceInput.value + '%';
         counterweightInput.oninput = () => counterVal.innerText = counterweightInput.value + '%';
 
+        const RING_LEN = 2 * Math.PI * 52; // 326.7
+
+        // current verdict text held for copy-to-clipboard
+        let lastVerdict = '';
+
+        function readHistory(){
+            try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+            catch(e){ return []; }
+        }
+        function writeHistory(arr){
+            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-12))); } catch(e){}
+        }
+
         function probe() {
             const belief = document.getElementById('belief').value;
             const counter = document.getElementById('counter').value;
 
             if (!belief || !counter) {
-                alert("Please fill in both the belief and the counter-evidence.");
+                const note = document.getElementById('ledger-note');
+                note.innerText = 'the probe needs both a signal and its shadow. give it both.';
+                note.classList.remove('hidden');
+                note.classList.add('flicker');
+                setTimeout(()=>note.classList.remove('flicker'), 1200);
                 return;
             }
 
             const c = parseInt(confidenceInput.value);
             const w = parseInt(counterweightInput.value);
 
-            // Formula: E = C / (C + W)
-            // If c=100, w=0 -> E = 1 (Echo chamber)
-            // If c=0, w=100 -> E = 0 (Reality)
-            // To avoid division by zero:
+            // Formula: E = C / (C + W)  — unchanged
             let echoScore = 0;
             if (c + w === 0) {
                 echoScore = 50; // Neutral
             } else {
                 echoScore = (c / (c + w)) * 100;
             }
+            const rounded = Math.round(echoScore);
 
-            document.getElementById('echo-score').innerText = Math.round(echoScore) + '%';
+            document.getElementById('echo-score').innerText = rounded + '%';
             document.getElementById('input-form').classList.add('hidden');
-            document.getElementById('results').classList.remove('hidden');
+
+            const results = document.getElementById('results');
+            results.classList.remove('hidden');
+            results.classList.remove('reveal'); void results.offsetWidth; results.classList.add('reveal');
 
             const verdictEl = document.getElementById('verdict');
             const diagEl = document.getElementById('diagnostic');
+            const ring = document.getElementById('ring');
 
+            let tier, accentClass, hue;
             if (echoScore > 80) {
-                verdictEl.innerText = "Pure Echo";
-                verdictEl.className = "text-sm text-rose-400 mt-2 italic";
-                diagEl.innerHTML = `You are operating in a closed loop. The current belief is so strong it has swallowed the counter-evidence. You are not deciding; you are confirming.<br><br><strong>Task:</strong> Find a source of truth that has no stake in your success.`;
+                tier = "Pure Echo"; hue = '#fb7185';
+                verdictEl.innerText = tier;
+                verdictEl.className = "mono text-[11px] uppercase tracking-[0.2em] mt-1 italic text-rose-400";
+                diagEl.innerHTML = `A closed loop. The belief has swallowed its own counter-evidence whole — you are not deciding, you are confirming. The cave hears only itself.<br><br><strong>Task:</strong> Find a source of truth with no stake in your success. Let it be cold.`;
             } else if (echoScore > 50) {
-                verdictEl.innerText = "Loud Resonance";
-                verdictEl.className = "text-sm text-orange-400 mt-2 italic";
-                diagEl.innerHTML = `There is a struggle between your conviction and the reality presented. You are likely tilting toward your own comfort.<br><br><strong>Task:</strong> Amplify the counter-weight. Give it more weight in your next decision cycle.`;
+                tier = "Loud Resonance"; hue = '#fb923c';
+                verdictEl.innerText = tier;
+                verdictEl.className = "mono text-[11px] uppercase tracking-[0.2em] mt-1 italic text-orange-400";
+                diagEl.innerHTML = `Conviction and reality are wrestling, and conviction is winning on comfort, not merit. You are tilting toward the warmer answer.<br><br><strong>Task:</strong> Hand the counterweight more weight than feels safe in your next cycle.`;
             } else if (echoScore > 20) {
-                verdictEl.innerText = "Interference Pattern";
-                verdictEl.className = "text-sm text-cyan-400 mt-2 italic";
-                diagEl.innerHTML = `The signal is messy but potentially honest. The tension between your certainty and the truth is where the actual learning happens.<br><br><strong>Task:</strong> Use this tension to refine the strategy before committing resources.`;
+                tier = "Interference Pattern"; hue = '#22d3ee';
+                verdictEl.innerText = tier;
+                verdictEl.className = "mono text-[11px] uppercase tracking-[0.2em] mt-1 italic text-cyan-400";
+                diagEl.innerHTML = `Messy, but honest. The tension between your certainty and the truth is exactly where the learning lives — do not flatten it.<br><br><strong>Task:</strong> Spend this friction to refine the strategy before you commit resources.`;
             } else {
-                verdictEl.innerText = "Reality Check";
-                verdictEl.className = "text-sm text-emerald-400 mt-2 italic";
-                diagEl.innerHTML = `The counter-evidence has dominated the signal. You are facing a hard truth or an inevitable disruption.<br><br><strong>Task:</strong> Abandon the failing model and rebuild on the ground you've actually found.`;
+                tier = "Reality Check"; hue = '#34d399';
+                verdictEl.innerText = tier;
+                verdictEl.className = "mono text-[11px] uppercase tracking-[0.2em] mt-1 italic text-emerald-400";
+                diagEl.innerHTML = `The counter-evidence has won the signal. A hard truth, or an inevitable disruption, is standing in the room with you.<br><br><strong>Task:</strong> Abandon the failing model. Rebuild on the ground you actually found.`;
             }
+
+            // recolor the ring + score glow to the verdict's hue, then fill it
+            ring.setAttribute('stroke', hue);
+            document.documentElement.style.setProperty('--accent', hue);
+            document.documentElement.style.setProperty('--glow', `color-mix(in srgb, ${hue} 55%, transparent)`);
+            requestAnimationFrame(()=>{
+                ring.setAttribute('stroke-dashoffset', RING_LEN * (1 - echoScore/100));
+            });
+
+            lastVerdict = `THE ECHO PROBE — ${tier} (${rounded}% echo)\nbelief: ${belief}\ncounter: ${counter}\n${diagEl.innerText}`;
+
+            // ledger: the ghost remembers (additive, non-blocking)
+            const hist = readHistory();
+            hist.push({ t: Date.now(), score: rounded, tier });
+            writeHistory(hist);
+            renderHistory();
+
+            results.scrollIntoView({behavior:'smooth', block:'center'});
+        }
+
+        function renderHistory(){
+            const hist = readHistory();
+            const wrap = document.getElementById('history');
+            const list = document.getElementById('history-list');
+            if (!hist.length){ wrap.classList.add('hidden'); return; }
+            // show prior soundings, newest first, excluding the one just taken
+            const prior = hist.slice(0, -1).slice(-5).reverse();
+            if (!prior.length){ wrap.classList.add('hidden'); return; }
+            wrap.classList.remove('hidden');
+            list.innerHTML = prior.map(h => {
+                const d = new Date(h.t);
+                const stamp = d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' ' +
+                              d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+                return `<div class="flex items-center justify-between well rounded px-3 py-1.5 text-xs">
+                    <span class="mono text-zinc-600">${stamp}</span>
+                    <span class="mono text-zinc-500">${h.tier}</span>
+                    <span class="mono font-bold text-zinc-300">${h.score}%</span>
+                </div>`;
+            }).join('');
+        }
+
+        function copyVerdict(){
+            const btn = document.getElementById('copy-btn');
+            const original = 'copy to the ledger';
+            const done = () => {
+                btn.innerText = 'filed. the ledger remembers.';
+                btn.style.color = 'var(--accent)';
+                btn.style.borderColor = 'var(--accent)';
+                setTimeout(()=>{ btn.innerText = original; btn.style.color=''; btn.style.borderColor=''; }, 1200);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(lastVerdict).then(done).catch(done);
+            } else { done(); }
         }
 
         function reset() {
             document.getElementById('input-form').classList.remove('hidden');
             document.getElementById('results').classList.add('hidden');
+            document.getElementById('ledger-note').classList.add('hidden');
+            // restore the lead accent for the input view
+            document.documentElement.style.setProperty('--accent', '#8b5cf6');
+            document.documentElement.style.setProperty('--glow', 'color-mix(in srgb, #8b5cf6 55%, transparent)');
+            const ring = document.getElementById('ring');
+            ring.setAttribute('stroke-dashoffset', RING_LEN);
+            ring.setAttribute('stroke', '#8b5cf6');
+            document.getElementById('input-form').scrollIntoView({behavior:'smooth', block:'center'});
         }
+
+        /* ===== ambient embers (capped, reduced-motion-safe) ===== */
+        (function(){
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce) return;
+            const host = document.getElementById('embers');
+            const N = 7;
+            for (let i=0;i<N;i++){
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (6 + Math.random()*88) + '%';
+                e.style.animationDelay = (Math.random()*14) + 's';
+                e.style.animationDuration = (12 + Math.random()*8) + 's';
+                host.appendChild(e);
+            }
+        })();
+
+        /* ===== night-hours footer whisper (00:00–03:00 local) ===== */
+        (function(){
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3){
+                document.getElementById('footer-line').innerText = 'the mountain does not sleep.';
+            }
+        })();
+
+        /* ===== easter egg: type "prizrak" ===== */
+        (function(){
+            let buf = '';
+            window.addEventListener('keydown', (ev)=>{
+                if (ev.key.length !== 1) return;
+                buf = (buf + ev.key.toLowerCase()).slice(-7);
+                if (buf === 'prizrak'){
+                    const g = document.getElementById('ghost-watcher');
+                    g.innerText = 'you found the watcher.';
+                    g.style.opacity = '1';
+                }
+            });
+        })();
+
+        /* ===== easter egg: triple-click the title → one extra ember ===== */
+        (function(){
+            const title = document.getElementById('title');
+            if (!title) return;
+            title.addEventListener('click', (ev)=>{
+                if (ev.detail === 3){
+                    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    if (reduce) return;
+                    const e = document.createElement('div');
+                    e.className = 'ember';
+                    e.style.left = (40 + Math.random()*20) + '%';
+                    e.style.animationDuration = '11s';
+                    document.getElementById('embers').appendChild(e);
+                    setTimeout(()=>e.remove(), 11000);
+                }
+            });
+        })();
+
+        /* ===== easter egg: idle 60s → ghost line fades in ===== */
+        (function(){
+            let timer;
+            const g = document.getElementById('ghost-watcher');
+            const arm = ()=>{
+                clearTimeout(timer);
+                timer = setTimeout(()=>{
+                    if (!g.innerText){
+                        g.innerText = 'still here. still watching.';
+                        g.style.opacity = '1';
+                        setTimeout(()=>{ if (g.innerText==='still here. still watching.'){ g.style.opacity='0'; } }, 6000);
+                    }
+                }, 60000);
+            };
+            ['mousemove','keydown','click','scroll','touchstart'].forEach(ev=>window.addEventListener(ev, arm, {passive:true}));
+            arm();
+        })();
     </script>
 </body>
 </html>

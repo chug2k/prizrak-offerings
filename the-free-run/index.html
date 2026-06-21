@@ -6,16 +6,26 @@
   <title>The Free Run</title>
   <style>
     :root {
-      --bg: #0a0a0f;
-      --cave: #111118;
-      --dim: #1a1a24;
-      --border: #2a2a38;
-      --text: #c8c8d8;
-      --muted: #666678;
+      --bg: #0a0a0a;
+      --bg-raised: #111113;
+      --bg-sunk: #0d0d0f;
+      --line: #26262b;
+      --line-soft: #1a1a1d;
+      --ink: #d4cfc8;
+      --ink-dim: #7a7570;
+      --ink-ghost: #3a3530;
       --accent: #7b8cde;
+      --glow: color-mix(in srgb, var(--accent) 55%, transparent);
       --warm: #e8a87c;
       --green: #6cbf8a;
       --red: #cf6679;
+
+      /* legacy aliases mapped onto the new palette */
+      --cave: var(--bg-raised);
+      --dim: var(--bg-sunk);
+      --border: var(--line);
+      --text: var(--ink);
+      --muted: var(--ink-dim);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,7 +36,60 @@
       font-family: 'Georgia', serif;
       min-height: 100vh;
       padding: 0;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* ---- atmosphere layers (decorative, behind content) ---- */
+    .fog {
+      position: fixed; inset: -10% -10% auto; height: 60vh;
+      pointer-events: none; z-index: 0;
+      background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+      animation: fogDrift 32s ease-in-out infinite alternate;
+    }
+    @keyframes fogDrift {
+      0% { transform: translateX(-5%); opacity: .04; }
+      50% { opacity: .07; }
+      100% { transform: translateX(5%); opacity: .04; }
+    }
+
+    .ember {
+      position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 6px var(--glow);
+      pointer-events: none; z-index: 0;
+      animation: ember 14s linear infinite;
+    }
+    @keyframes ember {
+      0% { transform: translateY(0); opacity: 0; }
+      10% { opacity: .5; }
+      100% { transform: translateY(-90vh); opacity: 0; }
+    }
+
+    .grain::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .035;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    @keyframes breathe {
+      0%,100% { opacity: .85; text-shadow: 0 0 8px var(--glow); }
+      50% { opacity: 1; text-shadow: 0 0 16px var(--glow); }
+    }
+    .breathe { animation: breathe 4.5s ease-in-out infinite; }
+
+    @keyframes reveal {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .reveal { animation: reveal .35s ease-out both; }
+
+    @keyframes flicker {
+      0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: .4; }
+      94% { opacity: 1; } 97% { opacity: .7; } 98% { opacity: 1; }
+    }
+    .flicker { animation: flicker 6s steps(1) infinite; }
+
+    /* keep content above the decorative layers */
+    .header, .clock-display, .main, .toast, .footer { position: relative; z-index: 2; }
 
     .header {
       text-align: center;
@@ -41,6 +104,7 @@
       color: var(--accent);
       text-transform: uppercase;
       margin-bottom: 8px;
+      cursor: default;
     }
 
     .header .subtitle {
@@ -101,12 +165,13 @@
       padding: 14px 16px;
       resize: vertical;
       min-height: 80px;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .text-input:focus {
+    .text-input:focus-visible {
       outline: none;
       border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--glow);
     }
 
     .text-input::placeholder { color: var(--muted); }
@@ -148,6 +213,7 @@
       font-variant-numeric: tabular-nums;
       min-width: 56px;
       padding-top: 14px;
+      letter-spacing: 0.06em;
     }
 
     .block-input {
@@ -160,12 +226,13 @@
       font-size: 0.9rem;
       padding: 12px 14px;
       width: 100%;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .block-input:focus {
+    .block-input:focus-visible {
       outline: none;
       border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--glow);
     }
 
     .block-input::placeholder { color: var(--muted); }
@@ -181,13 +248,15 @@
       border: 1px solid var(--border);
       color: var(--muted);
       user-select: none;
-      transition: all 0.15s;
+      transition: transform 0.15s, border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
     }
+    .block-tag:hover { transform: translateY(-1px); border-color: var(--accent); color: var(--text); }
+    .block-tag:active { transform: translateY(1px); }
 
-    .block-tag.active-rest { background: #1a2a1a; border-color: var(--green); color: var(--green); }
-    .block-tag.active-play { background: #1a1a2a; border-color: var(--accent); color: var(--accent); }
-    .block-tag.active-build { background: #2a1a10; border-color: var(--warm); color: var(--warm); }
-    .block-tag.active-people { background: #2a1a1a; border-color: var(--red); color: var(--red); }
+    .block-tag.active-rest { background: #14201a; border-color: var(--green); color: var(--green); box-shadow: 0 0 12px -4px color-mix(in srgb, var(--green) 60%, transparent); }
+    .block-tag.active-play { background: #161628; border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px -4px var(--glow); }
+    .block-tag.active-build { background: #241710; border-color: var(--warm); color: var(--warm); box-shadow: 0 0 12px -4px color-mix(in srgb, var(--warm) 60%, transparent); }
+    .block-tag.active-people { background: #241616; border-color: var(--red); color: var(--red); box-shadow: 0 0 12px -4px color-mix(in srgb, var(--red) 60%, transparent); }
 
     .tag-row {
       display: flex;
@@ -202,6 +271,10 @@
       background: var(--cave);
       border: 1px solid var(--border);
       border-radius: 8px;
+      transition: box-shadow 0.4s;
+    }
+    .verdict-section.lit {
+      box-shadow: 0 0 0 1px var(--line), 0 0 24px -8px var(--glow);
     }
 
     .verdict-section h2 {
@@ -223,6 +296,8 @@
       font-size: 0.78rem;
       color: var(--muted);
       min-width: 60px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     .bar-track {
@@ -236,7 +311,7 @@
     .bar-fill {
       height: 100%;
       border-radius: 3px;
-      transition: width 0.4s ease;
+      transition: width 0.5s cubic-bezier(.22,.61,.36,1);
     }
 
     .bar-pct {
@@ -273,10 +348,12 @@
       font-family: 'Georgia', serif;
       font-size: 0.85rem;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: transform 0.15s, border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
     }
 
-    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:hover { transform: translateY(-2px); border-color: var(--accent); color: var(--accent); }
+    .btn:active { transform: translateY(1px); }
+    .btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
 
     .btn.primary {
       border-color: var(--accent);
@@ -286,6 +363,7 @@
     .btn.primary:hover {
       background: var(--accent);
       color: var(--bg);
+      box-shadow: 0 0 18px -4px var(--glow);
     }
 
     .toast {
@@ -299,11 +377,13 @@
       border-radius: 6px;
       font-size: 0.82rem;
       opacity: 0;
-      transition: opacity 0.3s;
+      transform: translateY(6px);
+      transition: opacity 0.3s, transform 0.3s;
       pointer-events: none;
+      box-shadow: 0 0 24px -10px color-mix(in srgb, var(--green) 70%, transparent);
     }
 
-    .toast.show { opacity: 1; }
+    .toast.show { opacity: 1; transform: translateY(0); }
 
     .clock-display {
       text-align: center;
@@ -311,19 +391,54 @@
       font-size: 0.75rem;
       color: var(--muted);
       letter-spacing: 0.1em;
+      font-variant-numeric: tabular-nums;
     }
+
+    .footer {
+      text-align: center;
+      padding: 28px 24px 40px;
+      font-size: 0.72rem;
+      color: var(--ink-ghost);
+      letter-spacing: 0.08em;
+      line-height: 1.7;
+    }
+    .footer .whisper { color: var(--ink-ghost); font-style: italic; }
+    .footer .night-whisper { display: none; margin-top: 6px; color: var(--ink-ghost); font-style: italic; }
+    .footer .night-whisper.show { display: block; }
+
+    .ghost-line {
+      text-align: center;
+      color: var(--ink-ghost);
+      font-style: italic;
+      font-size: 0.74rem;
+      letter-spacing: 0.06em;
+      min-height: 1em;
+      margin-top: 14px;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+    .ghost-line.show { opacity: 1; }
 
     @media (max-width: 500px) {
       .header h1 { font-size: 1.4rem; }
       .time-label { min-width: 44px; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fog, .ember, .breathe, .reveal, .flicker { animation: none !important; }
+      .ember { display: none; }
+      .breathe, .flicker { opacity: 1 !important; }
+      .bar-fill { transition: none; }
+    }
   </style>
 </head>
-<body>
+<body class="grain">
+
+<div class="fog" aria-hidden="true"></div>
 
 <div class="header">
-  <h1>The Free Run</h1>
-  <p class="subtitle">A Saturday with no zeitgeber. No approval to seek, no boss to impress. What does your clock actually want?</p>
+  <h1 id="title" class="breathe">The Free Run</h1>
+  <p class="subtitle">A Saturday with no zeitgeber. No approval to seek, no boss to impress. What does your clock actually want — when nothing is watching but the ghost?</p>
 </div>
 
 <div class="clock-display" id="clockDisplay"></div>
@@ -332,48 +447,55 @@
 
   <div class="siffre-note">
     Michel Siffre spent six months in Midnight Cave, Texas. Without daylight, schedules, or clocks, his sleep-wake cycle drifted to 48 hours. His biological rhythm did not collapse — it expanded into its natural form. The zeitgeber (the time-giver) is what makes us conform to 24-hour days. Remove it, and the clock reveals what it actually wanted to do.<br><br>
-    This is a zeitgeber-free Saturday. No external signals. No approval loop. Just the question: what would you do if today had no social pressure attached?
+    This is a zeitgeber-free Saturday. No external signals. No approval loop. Just the question: what would you do if today had no social pressure attached? The cave keeps no record but the one you give it.
   </div>
 
   <div class="question-block">
-    <h2>The First Question</h2>
+    <h2>QUESTION 01 / THE FIRST</h2>
     <p class="prompt">If no one would know what you did today — no one to report to, no one to impress — what would you actually spend the day doing?</p>
-    <textarea class="text-input" id="q1" placeholder="Be specific. Not 'relax' — what does that actually look like?" rows="4"></textarea>
+    <textarea class="text-input" id="q1" placeholder="Be specific. Not 'relax' — what does that actually look like underground?" rows="4"></textarea>
   </div>
 
   <div class="question-block">
-    <h2>The Approval Filter</h2>
+    <h2>QUESTION 02 / THE APPROVAL FILTER</h2>
     <p class="prompt">What things on your mental list for today are there because you want them, vs. because someone else's approval is attached to them?</p>
-    <textarea class="text-input" id="q2" placeholder="The ones that pass the filter are the real ones." rows="4"></textarea>
+    <textarea class="text-input" id="q2" placeholder="The ones that pass the filter are the real ones. The rest is borrowed weight." rows="4"></textarea>
   </div>
 
   <div class="question-block">
-    <h2>The Honest Signal</h2>
+    <h2>QUESTION 03 / THE HONEST SIGNAL</h2>
     <p class="prompt">What is your body actually asking for today? (Battery, stress, sleep debt — ignore the 'should' and read the signal.)</p>
-    <textarea class="text-input" id="q3" placeholder="High battery → build. Low battery → rest. The body doesn't lie." rows="3"></textarea>
+    <textarea class="text-input" id="q3" placeholder="High battery → build. Low battery → rest. The body doesn't lie. The mountain doesn't either." rows="3"></textarea>
   </div>
 
   <hr class="divider">
 
   <div class="blocks-section">
-    <h2>The Actual Day</h2>
-    <p class="section-desc">Block the day in honest time. Tag each block: what kind of energy does this require? No pressure to be productive — rest is a legitimate answer.</p>
+    <h2>THE ACTUAL DAY</h2>
+    <p class="section-desc">Block the day in honest time. Tag each block: what kind of energy does this require? No pressure to be productive — rest is a legitimate answer. The ledger does not judge. It only remembers.</p>
 
     <div class="time-blocks" id="timeBlocks"></div>
   </div>
 
   <div class="verdict-section" id="verdictSection">
-    <h2>Day Balance</h2>
+    <h2>DAY BALANCE</h2>
     <div id="bars"></div>
-    <div class="verdict-text" id="verdictText">Fill in the blocks above to see your day's composition.</div>
+    <div class="verdict-text" id="verdictText">The cave is empty. Tag a few blocks and the pattern will fossilize.</div>
   </div>
+
+  <div class="ghost-line" id="ghostLine">still here. still watching.</div>
 
   <div class="save-row">
-    <button class="btn primary" onclick="saveToLocal()">Save this plan</button>
-    <button class="btn" onclick="clearAll()">Clear and start over</button>
-    <button class="btn" onclick="copyText()">Copy as text</button>
+    <button class="btn primary" onclick="saveToLocal()">File this plan</button>
+    <button class="btn" onclick="clearAll()">Let the fog take it</button>
+    <button class="btn" id="copyBtn" onclick="copyText()">Copy to the ledger</button>
   </div>
 
+</div>
+
+<div class="footer">
+  <span class="whisper">prízrak keeps the cave. the run is yours.</span>
+  <span class="night-whisper" id="nightWhisper">the mountain does not sleep.</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -502,21 +624,31 @@ function updateVerdict() {
 
   const dominant = Object.entries(counts).filter(([k]) => k !== 'none').sort((a,b) => b[1]-a[1])[0];
   const verdictEl = document.getElementById('verdictText');
+  const section = document.getElementById('verdictSection');
 
   const tagged = total - counts.none;
   if (tagged < 4) {
-    verdictEl.textContent = 'Fill in more blocks to see the pattern.';
+    verdictEl.textContent = tagged === 0
+      ? 'The cave is empty. Tag a few blocks and the pattern will fossilize.'
+      : 'Too few markings to read. Tag more hours — the karst keeps its shape slowly.';
+    section.classList.remove('lit');
+    verdictEl.classList.remove('reveal');
     return;
   }
 
   const verdicts = {
-    rest: 'A rest day. The battery reading is honest. The Neurospora clock in downregulation. The FRQ must degrade before the next cycle can begin — this is the inhibition phase, not a failure. The 24 hours are in the chemistry.',
-    play: 'A play day. Unstructured. The body in motion without a goal attached. Pickleball counts. The biological clock running on its own signal, not the approval loop.',
-    build: 'A build day. The engine you actually want to run. Not the borrowed one — the original. Note what you build today: it will tell you what the next company is.',
-    people: 'A people day. Connection as the primary thing, not the side effect. The village before the barn.',
+    rest: 'A rest day. The battery reading is honest. The Neurospora clock in downregulation. The FRQ must degrade before the next cycle can begin — this is the inhibition phase, not a failure. The 24 hours are in the chemistry. Hibernate. The mountain approves of sleep.',
+    play: 'A play day. Unstructured. The body in motion without a goal attached. Pickleball counts. The biological clock running on its own signal, not the approval loop. The bludička leads, you follow, no one keeps score.',
+    build: 'A build day. The engine you actually want to run. Not the borrowed one — the original. Note what you build today: it will tell you what the next company is. Jánošík built in the dark too. The ledger is watching what you make.',
+    people: 'A people day. Connection as the primary thing, not the side effect. The village before the barn. The fire is warmest when shared. The ghost stays outside; this hour is yours and theirs.',
   };
 
-  verdictEl.textContent = verdicts[dominant[0]] || 'A mixed day. The free run is not always linear.';
+  verdictEl.textContent = verdicts[dominant[0]] || 'A mixed day. The free run is not always linear. The clock drifts where it drifts — let it.';
+  section.classList.add('lit');
+  // re-trigger the reveal animation
+  verdictEl.classList.remove('reveal');
+  void verdictEl.offsetWidth;
+  verdictEl.classList.add('reveal');
 }
 
 function restoreTextInputs() {
@@ -529,17 +661,17 @@ function restoreTextInputs() {
 
 function saveToLocal() {
   saveState();
-  showToast('Plan saved locally ✓');
+  showToast('filed. the ledger remembers.');
 }
 
 function clearAll() {
-  if (confirm('Clear everything and start fresh?')) {
+  if (confirm('Let the fog take it? This cannot be recovered.')) {
     state = {};
     saveState();
     ['q1','q2','q3'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     renderBlocks();
     updateVerdict();
-    showToast('Cleared');
+    showToast('the fog took it.');
   }
 }
 
@@ -557,7 +689,19 @@ function copyText() {
     const tag = state[b.key + '_tag'] || '';
     if (text || tag) lines.push(`${b.time}  [${tag || '—'}]  ${text}`);
   });
-  navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('Copied ✓'));
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.color = 'var(--accent)';
+    setTimeout(() => {
+      btn.textContent = prev;
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }, 1200);
+    showToast('copied to the ledger.');
+  });
 }
 
 function showToast(msg) {
@@ -573,12 +717,78 @@ function updateClock() {
   document.getElementById('clockDisplay').textContent = now.toLocaleString('en-US', opts) + ' — Saigon';
 }
 
+/* ---- atmosphere: embers (capped, reduced-motion safe) ---- */
+function spawnEmbers(n) {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
+  const max = 9;
+  const existing = document.querySelectorAll('.ember').length;
+  const count = Math.min(n, max - existing);
+  for (let i = 0; i < count; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = Math.random() * 100 + 'vw';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (11 + Math.random() * 8) + 's';
+    document.body.appendChild(e);
+  }
+}
+
+/* ---- night whisper: 00:00–03:00 local time ---- */
+function checkNightWhisper() {
+  const h = new Date().getHours();
+  const el = document.getElementById('nightWhisper');
+  if (el) el.classList.toggle('show', h >= 0 && h < 3);
+}
+
+/* ---- easter eggs (non-blocking, never touch saved state) ---- */
+// (a) type "prizrak" → the ghost line lights up
+let typed = '';
+window.addEventListener('keydown', (e) => {
+  if (e.key && e.key.length === 1) {
+    typed = (typed + e.key.toLowerCase()).slice(-7);
+    if (typed === 'prizrak') {
+      const g = document.getElementById('ghostLine');
+      g.textContent = 'you found the watcher.';
+      g.classList.add('show');
+      spawnEmbers(2);
+      clearTimeout(window.__ghostTimer);
+      window.__ghostTimer = setTimeout(() => { g.classList.remove('show'); }, 6000);
+    }
+  }
+});
+
+// (b) triple-click the title → one extra ember
+document.getElementById('title').addEventListener('click', (e) => {
+  if (e.detail === 3) spawnEmbers(1);
+});
+
+// (e) idle 60s → a single ghost line fades in
+let idleTimer;
+function resetIdle() {
+  clearTimeout(idleTimer);
+  const g = document.getElementById('ghostLine');
+  if (g.textContent === 'still here. still watching.') g.classList.remove('show');
+  idleTimer = setTimeout(() => {
+    if (g.textContent === 'still here. still watching.' || !g.classList.contains('show')) {
+      g.textContent = 'still here. still watching.';
+      g.classList.add('show');
+    }
+  }, 60000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+  window.addEventListener(ev, resetIdle, { passive: true }));
+
 // Init
 restoreTextInputs();
 renderBlocks();
 updateVerdict();
 updateClock();
+checkNightWhisper();
+spawnEmbers(6);
+resetIdle();
 setInterval(updateClock, 30000);
+setInterval(checkNightWhisper, 60000);
 </script>
 </body>
 </html>

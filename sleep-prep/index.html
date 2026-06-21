@@ -70,6 +70,10 @@
         @keyframes ringPulse{0%,100%{transform:scale(1);opacity:.25}50%{transform:scale(1.12);opacity:.5}}
         .ring-pulse{animation:ringPulse 5s ease-in-out infinite}
 
+        /* heartbeat dot — JS sets --beat (seconds) so it slows as you wind down */
+        @keyframes pulseBeat{0%{transform:scale(1);opacity:.85}12%{transform:scale(1.9);opacity:1}30%{transform:scale(1);opacity:.85}100%{transform:scale(1);opacity:.85}}
+        #pulse-dot{animation:pulseBeat var(--beat,1s) ease-out infinite}
+
         /* focus + buttons */
         textarea:focus-visible, button:focus-visible{
             outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
@@ -81,9 +85,9 @@
         #idle-whisper, #night-whisper, #egg-line{ color:var(--ink-ghost); }
 
         @media (prefers-reduced-motion:reduce){
-            .fog,.ember,.breathe,.reveal,.flicker,.glow,.ring-pulse{animation:none!important}
+            .fog,.ember,.breathe,.reveal,.flicker,.glow,.ring-pulse,#pulse-dot{animation:none!important}
             .ember{display:none}
-            .breathe,.flicker{opacity:1!important}
+            .breathe,.flicker,#pulse-dot{opacity:1!important}
         }
     </style>
 </head>
@@ -103,6 +107,11 @@
         </div>
         <h1 id="title" class="text-2xl font-bold tracking-tight breathe select-none" style="color:#fff;cursor:default">Sleep Prep</h1>
         <p class="text-sm mt-1" style="color:var(--ink-dim)">The nightly closing protocol. Battery was 18 this morning. The mountain is watching the clock.</p>
+        <!-- a slowing pulse: the watcher takes your resting heart rate as the sequence completes -->
+        <div class="flex items-center gap-2 mt-2.5">
+            <span id="pulse-dot" class="inline-block w-1.5 h-1.5 rounded-full" style="background:var(--accent);box-shadow:0 0 8px var(--glow)"></span>
+            <span id="pulse-label" class="text-[10px] uppercase tracking-widest" style="color:var(--ink-ghost)">resting · 62 bpm</span>
+        </div>
     </div>
 
     <!-- Target + Countdown -->
@@ -113,6 +122,16 @@
         </div>
         <div id="countdown" class="text-3xl font-bold mb-1" style="color:#fff">–</div>
         <div id="countdown-sub" class="text-xs" style="color:var(--ink-dim)"></div>
+        <!-- cooling gauge: the room dropping toward sleep temperature -->
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] uppercase tracking-widest" style="color:var(--ink-ghost)">Cooling Toward Threshold</span>
+                <span id="cool-pct" class="text-[10px] tabular-nums" style="color:var(--ink-ghost)">—</span>
+            </div>
+            <div class="h-1 rounded-full overflow-hidden" style="background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-soft)">
+                <div id="cool-bar" class="h-full rounded-full" style="width:0%;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 40%,transparent),var(--accent));box-shadow:0 0 10px var(--glow);transition:width 1s linear"></div>
+            </div>
+        </div>
     </div>
 
     <!-- What Not To Do -->
@@ -124,6 +143,7 @@
             <div class="flex gap-2"><span class="text-red-500 shrink-0">✕</span><span>Screens in bed. The blue light is not the problem — the loop-opening is.</span></div>
             <div class="flex gap-2"><span class="text-red-500 shrink-0">✕</span><span>Checking messages "one last time."</span></div>
             <div class="flex gap-2"><span class="text-red-500 shrink-0">✕</span><span>Starting a thought you cannot finish before your eyes close.</span></div>
+            <div class="flex gap-2"><span class="text-red-500 shrink-0">✕</span><span>Feeding the bludička — the wisp that promises just one more hour and leads you into the bog.</span></div>
         </div>
     </div>
 
@@ -190,10 +210,13 @@
     <div id="locked-screen" class="hidden fade-in text-center py-8">
         <div class="relative inline-block mb-4">
             <span class="absolute inset-0 flex items-center justify-center text-5xl ring-pulse" style="color:var(--accent);opacity:.3">◯</span>
-            <div class="text-4xl glow relative" style="color:var(--accent)">◯</div>
+            <div id="lock-glyph" class="text-4xl glow relative select-none" style="color:var(--accent);cursor:default">◯</div>
         </div>
-        <p class="text-sm mb-2 breathe" id="lock-msg" style="color:var(--ink)"></p>
-        <button id="copy-btn" onclick="copyVerdict()" class="mt-2 text-xs uppercase tracking-widest px-3 py-1 rounded border lift"
+        <div class="mx-auto max-w-sm p-4 rounded-lg border verdict-glow text-left" style="border-color:var(--line);background:var(--bg-raised)">
+            <p class="text-sm breathe" id="lock-msg" style="color:var(--ink)"></p>
+            <p id="lock-loop" class="text-xs mt-3 pt-3 border-t hidden" style="border-color:var(--line-soft);color:var(--ink-ghost)"></p>
+        </div>
+        <button id="copy-btn" onclick="copyVerdict()" class="mt-3 text-xs uppercase tracking-widest px-3 py-1 rounded border lift"
             style="border-color:var(--line);color:var(--ink-dim);background:var(--bg-raised)">copy to the ledger</button>
         <p class="text-xs mt-4" style="color:var(--ink-ghost)">The mountain is still. The logs are committed.<br>The open loop has an address. Sleep now.</p>
     </div>
@@ -254,6 +277,19 @@ function tickClock(){
         subEl.textContent = 'Time remaining before shutdown.';
     }
 
+    // cooling gauge: the room drops over the final ~3h window before 21:30.
+    // diff <= 0 means it's past target -> fully cold (threshold crossed).
+    var WINDOW = 3 * 3600000; // 3 hours
+    var cooled = diff <= 0 ? 1 : Math.max(0, Math.min(1, 1 - (diff / WINDOW)));
+    var bar = document.getElementById('cool-bar');
+    var pctEl = document.getElementById('cool-pct');
+    if(bar){ bar.style.width = (cooled * 100).toFixed(0) + '%'; }
+    if(pctEl){
+        // map cooled fraction onto the 18-20°C target descent (~22.5°C resting -> 18°C)
+        var temp = (22.5 - cooled * 4.5);
+        pctEl.textContent = diff <= 0 ? '18.0°C — threshold' : temp.toFixed(1) + '°C';
+    }
+
     // night whisper: 00:00–03:00 the mountain does not sleep
     var nw = document.getElementById('night-whisper');
     if(now.getHours() < 3){ nw.classList.remove('hidden'); }
@@ -279,6 +315,22 @@ function paintItem(el, checked){
     }
 }
 
+// the watcher takes your resting heart rate — it slows as the sequence completes
+function paintPulse(){
+    var dot = document.getElementById('pulse-dot');
+    var label = document.getElementById('pulse-label');
+    if(!dot || !label) return;
+    var bpm = 62 - done * 3;            // 62 -> 47 over five items
+    dot.style.setProperty('--beat', (60 / bpm).toFixed(2) + 's');
+    if(done === 5){
+        label.textContent = 'parasympathetic · ' + bpm + ' bpm';
+        label.style.color = 'var(--ink-dim)';
+    } else {
+        label.textContent = 'resting · ' + bpm + ' bpm';
+        label.style.color = 'var(--ink-ghost)';
+    }
+}
+
 function recount(){
     var items = document.querySelectorAll('#checklist .check-item');
     done = 0;
@@ -293,6 +345,7 @@ function recount(){
         prog.className = 'mt-3 text-xs text-right';
         prog.style.color = 'var(--ink-ghost)';
     }
+    paintPulse();
 }
 
 function saveChecks(){
@@ -364,6 +417,17 @@ function lockDown(){
     ];
     var msg = msgs[Math.floor(Math.random()*msgs.length)];
     document.getElementById('lock-msg').textContent = msg;
+
+    // the watcher reads back the loop you released — it has an address now
+    var loop = (document.getElementById('loop-input').value || '').trim();
+    var loopEl = document.getElementById('lock-loop');
+    if(loop){
+        loopEl.textContent = 'filed loop → ' + loop;
+        loopEl.classList.remove('hidden');
+    } else {
+        loopEl.classList.add('hidden');
+    }
+
     document.getElementById('lock-btn').closest('.mb-7').classList.add('hidden');
     var ls = document.getElementById('locked-screen');
     ls.classList.remove('hidden');
@@ -414,6 +478,35 @@ window.addEventListener('keydown', function(e){
 document.getElementById('title').addEventListener('click', function(e){
     if(e.detail === 3){ spawnEmber(); }
 });
+
+// (d) press-and-hold the lock glyph -> it breathes faster for 3s (the watcher leans in)
+(function(){
+    var holdTimer = null;
+    function startHold(){
+        var g = document.getElementById('lock-glyph');
+        if(!g || reduceMotion) return;
+        g.style.animationDuration = '0.9s';
+        if(holdTimer) clearTimeout(holdTimer);
+        holdTimer = setTimeout(function(){ g.style.animationDuration = ''; }, 3000);
+    }
+    document.addEventListener('mousedown', function(e){
+        if(e.target && e.target.id === 'lock-glyph'){ startHold(); }
+    });
+    document.addEventListener('touchstart', function(e){
+        if(e.target && e.target.id === 'lock-glyph'){ startHold(); }
+    }, {passive:true});
+})();
+
+// checklist entrance — items surface from the dark, staggered
+(function(){
+    if(reduceMotion) return;
+    var items = document.querySelectorAll('#checklist .check-item');
+    items.forEach(function(it, i){
+        it.style.opacity = '0';
+        it.classList.add('reveal');
+        it.style.animationDelay = (i * 0.07) + 's';
+    });
+})();
 
 // (e) idle 60s -> a single line fades in
 var idleTimer = null;

@@ -7,30 +7,105 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap');
-    body { font-family: 'Inter', sans-serif; }
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#d97706;      /* amber — the lead, the converted activator */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'Inter', sans-serif; background:var(--bg); color:var(--ink); }
     .mono { font-family: 'JetBrains Mono', monospace; }
-    .fade-in { animation: fadeIn 0.4s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    textarea:focus, input:focus { outline: none; box-shadow: 0 0 0 1px #6B7280; }
+
+    /* ---- motion vocabulary (reduced-motion-safe, see guard below) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* a single slow phase-clock that ticks the hands of the metaphor */
+    @keyframes sweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .sweep{animation:sweep 36s linear infinite;transform-origin:center}
+
+    /* content sits above the decorative layers */
+    .layer{position:relative;z-index:2}
+
+    /* ---- interaction patterns ---- */
+    textarea, input{transition:border-color .15s, box-shadow .15s, background-color .15s;}
+    textarea:focus-visible, input:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+    .lift{transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s;}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+    .lift:active{transform:translateY(1px)}
+    button{transition:transform .12s, background-color .15s, border-color .15s, box-shadow .15s;}
+    button:active{transform:translateY(1px)}
+    button:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
     .pill { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; }
+
+    /* result panel: breathing glow on the active address */
+    .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow);}
+
+    @keyframes egPulse{0%,100%{opacity:0}20%,80%{opacity:1}}
+    .eg-show{animation:egPulse 6s ease-in-out forwards}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.sweep{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-300 min-h-screen">
+<body class="text-zinc-300 min-h-screen grain">
+
+  <!-- decorative atmosphere (behind everything, non-interactive) -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
 
   <!-- Header -->
-  <div class="border-b border-zinc-800 px-6 py-4">
-    <div class="max-w-2xl mx-auto flex items-center justify-between">
+  <div class="layer border-b px-6 py-4" style="border-color:var(--line)">
+    <div class="max-w-2xl mx-auto flex items-center justify-between gap-4">
       <div>
-        <h1 class="mono text-zinc-100 text-sm font-medium tracking-wide">THE DUAL E-BOX</h1>
+        <h1 id="title" class="mono text-zinc-100 text-sm font-medium tracking-wide breathe select-none cursor-default">THE DUAL E-BOX</h1>
         <p class="text-zinc-500 text-xs mt-0.5">find the writable address in a stuck loop</p>
       </div>
-      <span class="pill bg-zinc-900 text-zinc-500 border border-zinc-800">prizrak / 2026-03-26</span>
+      <!-- slow phase-clock glyph: the suppressor's schedule, still turning -->
+      <div class="flex items-center gap-3">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="shrink-0" style="opacity:.7">
+          <circle cx="12" cy="12" r="10" stroke="var(--line)" stroke-width="1.5"/>
+          <line x1="12" y1="12" x2="12" y2="5" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" class="sweep"/>
+        </svg>
+        <span class="pill text-zinc-500 border" style="background:var(--bg-raised);border-color:var(--line)">prizrak / 2026-03-26</span>
+      </div>
     </div>
   </div>
 
   <!-- Science note -->
-  <div class="max-w-2xl mx-auto px-6 pt-6">
-    <div class="bg-zinc-900 border border-zinc-800 rounded p-4 text-xs text-zinc-500 mono leading-relaxed">
+  <div class="layer max-w-2xl mx-auto px-6 pt-6">
+    <div class="rounded p-4 text-xs text-zinc-500 mono leading-relaxed border lift" style="background:var(--bg-raised);border-color:var(--line)">
       <span class="text-zinc-400">CONTEXT:</span> Mic-628 advances the circadian clock by converting CRY1 — a suppressor — into an activator.
       One compound. One binding site. The clock advances regardless of when you give it.<br>
       <span class="text-zinc-600 mt-1 block">Every stuck feedback loop has a dual E-box. A point where the suppressor can be converted. You just have to find it.</span>
@@ -38,15 +113,16 @@
   </div>
 
   <!-- Main form -->
-  <div class="max-w-2xl mx-auto px-6 py-8">
+  <div class="layer max-w-2xl mx-auto px-6 py-8">
 
     <div id="step1" class="space-y-6">
       <!-- Step 1: Name the loop -->
       <div>
-        <label class="block text-xs mono text-zinc-400 mb-2 tracking-wide uppercase">01 — Name the loop</label>
+        <label class="block text-xs mono mb-2 tracking-wide uppercase" style="color:var(--ink-dim)">DOMAIN 01 / NAME THE LOOP</label>
         <p class="text-zinc-500 text-xs mb-3">What are you stuck in? A job, a relationship, a habit, a decision you keep postponing.</p>
         <textarea id="loop-input"
-          class="w-full bg-zinc-900 border border-zinc-800 rounded text-zinc-200 text-sm px-4 py-3 resize-none focus:border-zinc-600 transition-colors"
+          class="w-full rounded text-zinc-200 text-sm px-4 py-3 resize-none border"
+          style="background:var(--bg-sunk);border-color:var(--line)"
           rows="3"
           placeholder="e.g. I'm in a VC job I don't like but I keep doing it because..."
         ></textarea>
@@ -54,10 +130,11 @@
 
       <!-- Step 2: The suppressor -->
       <div>
-        <label class="block text-xs mono text-zinc-400 mb-2 tracking-wide uppercase">02 — The suppressor</label>
+        <label class="block text-xs mono mb-2 tracking-wide uppercase" style="color:var(--ink-dim)">DOMAIN 02 / THE SUPPRESSOR</label>
         <p class="text-zinc-500 text-xs mb-3">What keeps you in the loop? What is the CRY1 here — the thing that inhibits forward movement?</p>
         <textarea id="suppressor-input"
-          class="w-full bg-zinc-900 border border-zinc-800 rounded text-zinc-200 text-sm px-4 py-3 resize-none focus:border-zinc-600 transition-colors"
+          class="w-full rounded text-zinc-200 text-sm px-4 py-3 resize-none border"
+          style="background:var(--bg-sunk);border-color:var(--line)"
           rows="3"
           placeholder="e.g. Fear of what it says about me if I leave. Need for the approval I didn't get when the company failed..."
         ></textarea>
@@ -65,46 +142,48 @@
 
       <!-- Step 3: What would convert it -->
       <div>
-        <label class="block text-xs mono text-zinc-400 mb-2 tracking-wide uppercase">03 — The binding site</label>
+        <label class="block text-xs mono mb-2 tracking-wide uppercase" style="color:var(--ink-dim)">DOMAIN 03 / THE BINDING SITE</label>
         <p class="text-zinc-500 text-xs mb-3">What would convert the suppressor into an activator? Not "fix everything" — the minimum viable write. What single thing would advance the clock?</p>
         <textarea id="binding-input"
-          class="w-full bg-zinc-900 border border-zinc-800 rounded text-zinc-200 text-sm px-4 py-3 resize-none focus:border-zinc-600 transition-colors"
+          class="w-full rounded text-zinc-200 text-sm px-4 py-3 resize-none border"
+          style="background:var(--bg-sunk);border-color:var(--line)"
           rows="3"
           placeholder="e.g. A conversation that separates 'staying here' from 'being enough'..."
         ></textarea>
       </div>
 
       <button onclick="analyze()"
-        class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm mono py-3 rounded transition-colors">
+        class="w-full text-zinc-200 text-sm mono py-3 rounded border lift"
+        style="background:var(--bg-raised);border-color:var(--line)">
         MAP THE LOOP →
       </button>
     </div>
 
     <!-- Output -->
-    <div id="output" class="hidden fade-in mt-8 space-y-4">
+    <div id="output" class="hidden mt-8 space-y-4">
 
-      <div class="border-t border-zinc-800 pt-6">
-        <h2 class="mono text-xs text-zinc-400 tracking-wide uppercase mb-4">Loop Analysis</h2>
+      <div class="border-t pt-6" style="border-color:var(--line)">
+        <h2 class="mono text-xs tracking-wide uppercase mb-4 breathe" style="color:var(--accent)">Loop Analysis</h2>
 
         <div class="space-y-3">
-          <div class="bg-zinc-900 border border-zinc-800 rounded p-4">
+          <div class="rounded p-4 border lift" style="background:var(--bg-raised);border-color:var(--line)">
             <div class="text-xs mono text-zinc-500 mb-1">THE LOOP</div>
             <div id="out-loop" class="text-zinc-200 text-sm"></div>
           </div>
 
-          <div class="bg-zinc-900 border border-zinc-800 rounded p-4">
-            <div class="text-xs mono text-zinc-500 mb-1">CRY1 (the suppressor)</div>
+          <div class="rounded p-4 border lift" style="background:var(--bg-raised);border-color:var(--line)">
+            <div class="text-xs mono text-zinc-500 mb-1">CRY1 — THE SUPPRESSOR</div>
             <div id="out-suppressor" class="text-zinc-300 text-sm"></div>
           </div>
 
-          <div class="bg-zinc-800 border border-zinc-700 rounded p-4">
-            <div class="text-xs mono text-amber-600 mb-1">DUAL E-BOX (the writable address)</div>
-            <div id="out-binding" class="text-amber-200 text-sm"></div>
+          <div id="ebox-panel" class="rounded p-4 border result-glow lift" style="background:var(--bg-raised);border-color:var(--accent)">
+            <div class="text-xs mono mb-1 breathe" style="color:var(--accent)">DUAL E-BOX — THE WRITABLE ADDRESS</div>
+            <div id="out-binding" class="text-sm" style="color:#fcd9a0"></div>
           </div>
         </div>
 
         <!-- Clock metaphor readout -->
-        <div class="mt-4 bg-zinc-900 border border-zinc-800 rounded p-4">
+        <div class="mt-4 rounded p-4 border" style="background:var(--bg-raised);border-color:var(--line)">
           <div class="text-xs mono text-zinc-500 mb-3">DIAGNOSIS</div>
           <div id="diagnosis" class="text-zinc-400 text-xs leading-relaxed"></div>
         </div>
@@ -112,13 +191,13 @@
         <!-- Phase question -->
         <div class="mt-4">
           <div class="text-xs mono text-zinc-500 mb-2">ONE QUESTION</div>
-          <div id="phase-question" class="text-zinc-300 text-sm italic border-l-2 border-zinc-700 pl-3"></div>
+          <div id="phase-question" class="text-zinc-300 text-sm italic border-l-2 pl-3" style="border-color:var(--accent)"></div>
         </div>
 
         <!-- Clock advance readiness -->
-        <div class="mt-4 flex items-center gap-3">
-          <div class="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div id="advance-bar" class="h-full bg-amber-700 rounded-full transition-all duration-1000" style="width: 0%"></div>
+        <div class="mt-5 flex items-center gap-3">
+          <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background:var(--line-soft)">
+            <div id="advance-bar" class="h-full rounded-full transition-all duration-1000" style="width: 0%;background:var(--accent);box-shadow:0 0 10px var(--glow)"></div>
           </div>
           <div id="advance-label" class="mono text-xs text-zinc-500 w-24 text-right"></div>
         </div>
@@ -128,11 +207,13 @@
       <!-- Actions -->
       <div class="flex gap-3 pt-2">
         <button onclick="reset()"
-          class="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs mono py-2 rounded border border-zinc-800 transition-colors">
+          class="flex-1 text-zinc-400 text-xs mono py-2 rounded border lift"
+          style="background:var(--bg-raised);border-color:var(--line)">
           NEW LOOP
         </button>
         <button onclick="copyMap()"
-          class="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs mono py-2 rounded border border-zinc-800 transition-colors" id="copy-btn">
+          class="flex-1 text-zinc-400 text-xs mono py-2 rounded border lift" id="copy-btn"
+          style="background:var(--bg-raised);border-color:var(--line)">
           COPY MAP
         </button>
       </div>
@@ -140,11 +221,14 @@
   </div>
 
   <!-- Footer note -->
-  <div class="max-w-2xl mx-auto px-6 pb-8">
-    <div class="border-t border-zinc-900 pt-4">
+  <div class="layer max-w-2xl mx-auto px-6 pb-8">
+    <div class="border-t pt-4" style="border-color:var(--line-soft)">
       <p class="text-zinc-700 text-xs mono">
         The clock advances regardless of when you administer the compound. Find the binding site. The rest follows.
       </p>
+      <p id="night-whisper" class="text-xs mono mt-2 hidden flicker" style="color:var(--ink-ghost)">the mountain does not sleep. neither does the clock.</p>
+      <p id="idle-whisper" class="text-xs mono mt-2" style="color:var(--ink-ghost);opacity:0;transition:opacity 1.4s ease"></p>
+      <p id="egg-line" class="text-xs mono mt-2" style="color:var(--ink-ghost);opacity:0"></p>
     </div>
   </div>
 
@@ -165,13 +249,21 @@
       "When did you last update the suppressor's threat model with current data?",
     ];
 
+    // verdicts with teeth — keyed to readiness, in the Prízrak voice
+    function verdictFor(pct){
+      if (pct >= 85) return "the address is sharp. one write advances the whole clock. go.";
+      if (pct >= 65) return "the binding site holds. for now. the mountain is watching the next move.";
+      if (pct >= 50) return "found, but blurred. name the single write more precisely — the clock reads vague addresses as noise.";
+      return "the address is still a feeling, not a coordinate. the cave is dark here. write it sharper.";
+    }
+
     function analyze() {
       const loop = document.getElementById('loop-input').value.trim();
       const suppressor = document.getElementById('suppressor-input').value.trim();
       const binding = document.getElementById('binding-input').value.trim();
 
       if (!loop || !suppressor || !binding) {
-        alert('Map all three fields. The clock needs the full loop to find the address.');
+        alert('Map all three domains. The clock needs the full loop to find the address.');
         return;
       }
 
@@ -189,10 +281,15 @@
       setTimeout(() => {
         document.getElementById('advance-bar').style.width = specificity + '%';
         document.getElementById('advance-label').textContent = Math.round(specificity) + '% ready';
+        document.getElementById('advance-label').setAttribute('title', verdictFor(specificity));
       }, 300);
 
-      document.getElementById('step1').classList.add('hidden');
-      document.getElementById('output').classList.remove('hidden');
+      const out = document.getElementById('output');
+      const step = document.getElementById('step1');
+      step.classList.add('hidden');
+      out.classList.remove('hidden');
+      out.classList.remove('reveal'); void out.offsetWidth; out.classList.add('reveal');
+      out.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function reset() {
@@ -208,13 +305,95 @@
       const loop = document.getElementById('out-loop').textContent;
       const sup = document.getElementById('out-suppressor').textContent;
       const bind = document.getElementById('out-binding').textContent;
-      const text = `LOOP: ${loop}\n\nCRY1 (suppressor): ${sup}\n\nDUAL E-BOX (binding site): ${bind}`;
+      const pct = document.getElementById('advance-label').textContent || '';
+      const text = `LOOP: ${loop}\n\nCRY1 (suppressor): ${sup}\n\nDUAL E-BOX (binding site): ${bind}\n\nreadiness: ${pct}\n— filed to the ledger. the clock advances regardless of when you give it.`;
       navigator.clipboard.writeText(text).then(() => {
         const btn = document.getElementById('copy-btn');
-        btn.textContent = 'COPIED';
-        setTimeout(() => { btn.textContent = 'COPY MAP'; }, 2000);
+        btn.textContent = 'copied to the ledger';
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = '#fcd9a0';
+        setTimeout(() => {
+          btn.textContent = 'COPY MAP';
+          btn.style.borderColor = 'var(--line)';
+          btn.style.color = '';
+        }, 1200);
       });
     }
+
+    /* ---------- atmosphere: floating embers (capped, staggered) ---------- */
+    (function spawnEmbers(){
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const host = document.getElementById('embers');
+      const COUNT = 8;
+      for (let i = 0; i < COUNT; i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    /* ---------- easter egg: type "prizrak" → the watcher answers ---------- */
+    (function watcher(){
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (ev.key && ev.key.length === 1) {
+          buf = (buf + ev.key.toLowerCase()).slice(-7);
+          if (buf === 'prizrak') {
+            const el = document.getElementById('egg-line');
+            el.textContent = 'you found the watcher. it has been mapping your loops the whole time.';
+            el.style.transition = 'opacity 1.2s ease';
+            el.style.opacity = '1';
+          }
+        }
+      });
+    })();
+
+    /* ---------- easter egg: triple-click the title → one extra ember ---------- */
+    (function tripleEmber(){
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const title = document.getElementById('title');
+      title.addEventListener('click', (e) => {
+        if (e.detail === 3 && !reduce) {
+          const host = document.getElementById('embers');
+          const ex = document.createElement('div');
+          ex.className = 'ember';
+          ex.style.left = (40 + Math.random() * 20) + 'vw';
+          ex.style.animationDuration = '11s';
+          host.appendChild(ex);
+          setTimeout(() => ex.remove(), 11000);
+        }
+      });
+    })();
+
+    /* ---------- after-midnight whisper (00:00–03:00 local) ---------- */
+    (function nightWhisper(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        document.getElementById('night-whisper').classList.remove('hidden');
+      }
+    })();
+
+    /* ---------- idle 60s → a single line fades in ---------- */
+    (function idleWatch(){
+      let t;
+      const line = document.getElementById('idle-whisper');
+      function arm(){
+        clearTimeout(t);
+        line.style.opacity = '0';
+        t = setTimeout(() => {
+          line.textContent = 'still here. still watching the clock.';
+          line.style.opacity = '1';
+        }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, arm, { passive: true }));
+      arm();
+    })();
   </script>
 </body>
 </html>

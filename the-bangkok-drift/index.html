@@ -6,16 +6,75 @@
     <title>The Bangkok Drift | Offerings</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #18181b; }
-        .glow { text-shadow: 0 0 8px currentColor; }
-        .drag-over { border-color: #fbbf24 !important; background: rgba(251,191,36,0.05) !important; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#22d3ee;            /* this app's existing lead: cyan */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background: var(--bg); }
+        body{ color: var(--ink); }
+
+        .glow { text-shadow: 0 0 10px var(--glow); }
+        .drag-over { border-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 7%, transparent) !important; box-shadow:0 0 18px -6px var(--glow); }
+
+        /* --- ambient motion vocabulary --- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* --- tactile interactions --- */
+        .lift{transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease}
+        .lift:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 0 22px -10px var(--glow)}
+        .resultpanel{box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow)}
+
+        input:focus-visible, select:focus-visible, button:focus-visible{
+            outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)
+        }
+        button:active{transform:translateY(1px)}
+
+        #content{position:relative;z-index:2}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono min-h-screen">
-    <div class="max-w-3xl mx-auto px-4 py-8">
+<body class="text-zinc-300 font-mono min-h-screen grain">
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <div id="content" class="max-w-3xl mx-auto px-4 py-8">
         <header class="mb-6">
-            <h1 class="text-3xl font-bold text-cyan-400 glow mb-1">The Bangkok Drift</h1>
-            <p class="text-zinc-500 text-sm">Plan the days. Count the steps. The mountain approves of preparation.</p>
+            <p class="text-[10px] tracking-[0.25em] text-zinc-600 uppercase mb-2">PRÍZRAK / ITINERARY 07 — THE DRIFT</p>
+            <h1 id="title" class="text-3xl font-bold text-cyan-400 glow breathe mb-1 select-none cursor-default">The Bangkok Drift</h1>
+            <p class="text-zinc-500 text-sm">Plot the days. Tally the steps. The mountain keeps a ledger of every kilometre.</p>
         </header>
 
         <div id="app"></div>
@@ -40,11 +99,11 @@
     ];
 
     const STEP_VERDICTS = [
-        { max: 8000, text: "The mountain rests.", color: "text-zinc-400", sub: "A gentle day. Save the legs for tomorrow." },
-        { max: 12000, text: "A reasonable march.", color: "text-emerald-400", sub: "The farmer walks to market and back. Sensible." },
-        { max: 15000, text: "The mountain approves.", color: "text-cyan-400", sub: "Solid coverage. Hydrate or face consequences." },
-        { max: 20000, text: "The Tatras would be proud.", color: "text-amber-400", sub: "You are walking the equivalent of a ridge hike. In 35°C. With humidity." },
-        { max: Infinity, text: "Even the mountain rests.", color: "text-red-400", sub: "This is not a walking tour. This is a forced march. The body battery will file a complaint." },
+        { max: 8000, text: "The mountain rests.", color: "text-zinc-400", sub: "A gentle day. Save the legs for the ridge ahead." },
+        { max: 12000, text: "A reasonable march.", color: "text-emerald-400", sub: "The farmer walks to market and back. Sensible. The body battery does not complain." },
+        { max: 15000, text: "The mountain approves.", color: "text-cyan-400", sub: "Solid coverage. Hydrate, or the heat will collect what you owe." },
+        { max: 20000, text: "The Tatras would be proud.", color: "text-amber-400", sub: "You are walking the equivalent of a ridge hike. In 35°C. With humidity. On purpose." },
+        { max: Infinity, text: "Even the mountain rests.", color: "text-red-400", sub: "This is not a walking tour. This is a forced march. The body files a complaint to the ledger." },
     ];
 
     function load() {
@@ -72,6 +131,8 @@
         return STEP_VERDICTS.find(v => steps <= v.max) || STEP_VERDICTS[STEP_VERDICTS.length - 1];
     }
 
+    function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     let dragItem = null;
     let dragDay = null;
 
@@ -79,14 +140,19 @@
         const data = load();
         const app = document.getElementById("app");
 
+        // trip-wide tally for the closing ledger
+        const tripMin = data.days.reduce((s, d) => s + d.items.reduce((a, it) => a + (it.walkMin || 0), 0), 0);
+        const tripSteps = Math.round(tripMin * 120);
+        const tripStops = data.days.reduce((s, d) => s + d.items.length, 0);
+
         app.innerHTML = `
             <!-- Hotel -->
-            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 mb-6">
+            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 mb-6 lift reveal">
                 <div class="flex items-center gap-3">
                     <span class="text-2xl">🏨</span>
                     <div class="flex-1">
-                        <label class="text-xs text-zinc-500">Base Camp</label>
-                        <input id="hotel" type="text" value="${data.hotel}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-200 focus:border-cyan-600 focus:outline-none mt-1" placeholder="Hotel / area">
+                        <label class="text-[10px] tracking-[0.18em] text-zinc-500 uppercase">Base Camp</label>
+                        <input id="hotel" type="text" value="${esc(data.hotel)}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-200 focus:outline-none mt-1" placeholder="Hotel / area">
                     </div>
                 </div>
             </div>
@@ -98,64 +164,77 @@
                     const estSteps = Math.round(totalWalk * 120); // ~120 steps/min walking
                     const v = getStepVerdict(estSteps);
                     return `
-                    <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4">
+                    <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 lift reveal">
                         <div class="flex justify-between items-center mb-3">
-                            <input type="text" value="${day.name}" onchange="renameDay(${di}, this.value)" class="bg-transparent border-none text-lg font-bold text-zinc-200 focus:outline-none w-40">
+                            <input type="text" value="${esc(day.name)}" onchange="renameDay(${di}, this.value)" class="bg-transparent border-none text-lg font-bold text-zinc-200 focus:outline-none w-40">
                             <div class="flex items-center gap-3">
-                                <span class="text-xs text-zinc-500">${totalWalk} min walk · ~${estSteps.toLocaleString()} steps</span>
-                                <button onclick="removeDay(${di})" class="text-zinc-600 hover:text-red-400 text-xs">✕</button>
+                                <span class="text-xs text-zinc-500">${totalWalk} min on foot · ~${estSteps.toLocaleString()} steps</span>
+                                <button onclick="removeDay(${di})" title="dissolve this day" class="text-zinc-600 hover:text-red-400 text-xs">✕</button>
                             </div>
                         </div>
 
                         <!-- Items -->
-                        <div class="space-y-1 min-h-[40px] drop-zone" data-day="${di}">
+                        <div class="space-y-1 min-h-[40px] drop-zone rounded-lg transition-colors" data-day="${di}">
+                            ${day.items.length === 0 ? `<p class="text-xs text-zinc-700 italic px-1 py-2">the cave is empty. drop a stop here, or add one below.</p>` : ''}
                             ${day.items.map((it, ii) => `
-                                <div class="flex items-center gap-2 bg-zinc-900/60 rounded-lg px-3 py-2 border border-zinc-700/50 cursor-move group" draggable="true" data-day="${di}" data-idx="${ii}">
-                                    <span class="text-zinc-600 text-xs w-5">${ii+1}</span>
+                                <div class="flex items-center gap-2 bg-zinc-900/60 rounded-lg px-3 py-2 border border-zinc-700/50 cursor-move group transition-colors hover:border-cyan-700/60" draggable="true" data-day="${di}" data-idx="${ii}">
+                                    <span class="text-zinc-600 text-xs w-5 group-hover:text-cyan-500">${ii+1}</span>
                                     <div class="flex-1 min-w-0">
-                                        <span class="text-sm text-zinc-200">${it.name}</span>
-                                        <span class="text-xs text-zinc-500 ml-2">${it.walkMin}min walk</span>
-                                        ${it.note ? `<p class="text-xs text-zinc-600 mt-0.5 truncate">${it.note}</p>` : ''}
+                                        <span class="text-sm text-zinc-200">${esc(it.name)}</span>
+                                        <span class="text-xs text-zinc-500 ml-2">${it.walkMin}min on foot</span>
+                                        ${it.note ? `<p class="text-xs text-zinc-600 mt-0.5 truncate">${esc(it.note)}</p>` : ''}
                                     </div>
-                                    <button onclick="editItem(${di},${ii})" class="text-zinc-600 hover:text-cyan-400 text-xs opacity-0 group-hover:opacity-100">✎</button>
-                                    <button onclick="removeItem(${di},${ii})" class="text-zinc-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100">✕</button>
+                                    <button onclick="editItem(${di},${ii})" title="amend" class="text-zinc-600 hover:text-cyan-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✎</button>
+                                    <button onclick="removeItem(${di},${ii})" title="strike from the ledger" class="text-zinc-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
                                 </div>
                             `).join("")}
                         </div>
 
                         <!-- Add item -->
                         <div class="flex gap-2 mt-2">
-                            <select class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-300 focus:outline-none focus:border-cyan-600" id="addSel-${di}">
-                                <option value="">+ Add landmark...</option>
-                                ${LANDMARKS.map(l => `<option value="${l.name}">${l.name} (${l.area})</option>`).join("")}
-                                <option value="__custom__">✏️ Custom place...</option>
+                            <select class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-300 focus:outline-none" id="addSel-${di}">
+                                <option value="">+ Summon a landmark...</option>
+                                ${LANDMARKS.map(l => `<option value="${esc(l.name)}">${esc(l.name)} (${esc(l.area)})</option>`).join("")}
+                                <option value="__custom__">✏️ Mark your own place...</option>
                             </select>
                         </div>
 
                         <!-- Verdict -->
                         ${day.items.length > 0 ? `
-                        <div class="mt-3 pt-3 border-t border-zinc-700/50">
-                            <p class="text-sm font-bold ${v.color}">${v.text}</p>
+                        <div class="mt-3 pt-3 border-t border-zinc-700/50 resultpanel rounded-lg px-3 py-2">
+                            <p class="text-[10px] tracking-[0.18em] text-zinc-600 uppercase mb-0.5">VERDICT</p>
+                            <p class="text-sm font-bold ${v.color} breathe">${v.text}</p>
                             <p class="text-xs text-zinc-600">${v.sub}</p>
                         </div>` : ''}
                     </div>`;
                 }).join("")}
             </div>
 
-            <button onclick="addDay()" class="mt-4 w-full px-3 py-2 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700 border-dashed rounded-xl text-sm text-zinc-500 hover:text-zinc-300">+ Add Day</button>
+            <button onclick="addDay()" class="mt-4 w-full px-3 py-2 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700 border-dashed rounded-xl text-sm text-zinc-500 hover:text-zinc-300 lift">+ Open another day</button>
+
+            <!-- Trip ledger -->
+            <div class="mt-6 bg-zinc-900/50 border border-zinc-700 rounded-xl p-4 reveal resultpanel">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <p class="text-[10px] tracking-[0.2em] text-zinc-600 uppercase mb-1">THE LEDGER / WHOLE DRIFT</p>
+                        <p class="text-sm text-zinc-300"><span class="text-cyan-400 font-bold">${data.days.length}</span> days · <span class="text-cyan-400 font-bold">${tripStops}</span> stops · <span class="text-cyan-400 font-bold">${tripMin.toLocaleString()}</span> min on foot · <span class="text-cyan-400 font-bold">~${tripSteps.toLocaleString()}</span> steps</p>
+                    </div>
+                    <button id="copyTrip" class="px-3 py-1.5 text-xs border border-zinc-700 rounded text-zinc-400 hover:text-cyan-300 hover:border-cyan-700 transition-colors lift">copy the drift</button>
+                </div>
+            </div>
 
             <!-- Landmark Reference -->
-            <div class="mt-8 bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4">
-                <h3 class="text-sm font-bold text-zinc-400 mb-3">Bangkok Landmarks</h3>
+            <div class="mt-8 bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4 reveal">
+                <h3 class="text-[10px] tracking-[0.2em] text-zinc-500 uppercase mb-3">Bangkok Landmarks / The Map the Ghost Drew</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     ${LANDMARKS.map(l => `
                     <div class="flex items-start gap-2 text-xs">
                         <span class="text-cyan-600 mt-0.5">●</span>
                         <div>
-                            <span class="text-zinc-300">${l.name}</span>
-                            <span class="text-zinc-600 ml-1">(${l.area})</span>
-                            ${l.bts ? `<span class="text-emerald-700 ml-1">BTS ${l.bts}</span>` : ''}
-                            <p class="text-zinc-600">${l.note}</p>
+                            <span class="text-zinc-300">${esc(l.name)}</span>
+                            <span class="text-zinc-600 ml-1">(${esc(l.area)})</span>
+                            ${l.bts ? `<span class="text-emerald-700 ml-1">BTS ${esc(l.bts)}</span>` : ''}
+                            <p class="text-zinc-600">${esc(l.note)}</p>
                         </div>
                     </div>`).join("")}
                 </div>
@@ -163,6 +242,8 @@
 
             <div class="mt-6 pt-4 border-t border-zinc-700/50 text-center">
                 <p class="text-xs text-zinc-600">The mountain does not drift. But sometimes the mountain visits Bangkok. — Prízrak</p>
+                <p id="nightWhisper" class="text-xs mt-1 flicker" style="color:var(--ink-ghost);display:none">the mountain does not sleep. neither, apparently, do you.</p>
+                <p id="ghostLine" class="text-xs mt-1" style="color:var(--ink-ghost);display:none">you found the watcher. it was always counting your steps.</p>
             </div>
         `;
 
@@ -179,19 +260,59 @@
                 const v = e.target.value;
                 if (!v) return;
                 if (v === "__custom__") {
-                    const name = prompt("Place name:");
+                    const name = prompt("Name the place the ghost should remember:");
                     if (!name) { e.target.value = ""; return; }
-                    const walkMin = parseInt(prompt("Walking time (minutes) from previous stop:", "15")) || 15;
+                    const walkMin = parseInt(prompt("Walking time (minutes) from the previous stop:", "15")) || 15;
                     const note = prompt("Note (optional):", "") || "";
                     data.days[di].items.push({ name, walkMin, note });
                 } else {
                     const lm = LANDMARKS.find(l => l.name === v);
-                    const walkMin = parseInt(prompt(`Walking time (min) to ${v} from previous stop:`, "15")) || 15;
+                    const walkMin = parseInt(prompt(`Walking time (min) to ${v} from the previous stop:`, "15")) || 15;
                     data.days[di].items.push({ name: v, walkMin, note: lm ? lm.note : "" });
                 }
                 save(data);
                 render();
             });
+        });
+
+        // Copy the whole drift to the ledger (clipboard)
+        const copyBtn = document.getElementById("copyTrip");
+        if (copyBtn) copyBtn.addEventListener("click", () => {
+            const lines = [];
+            lines.push(`THE BANGKOK DRIFT`);
+            lines.push(`Base Camp: ${data.hotel}`);
+            lines.push(``);
+            data.days.forEach(d => {
+                const min = d.items.reduce((a, it) => a + (it.walkMin || 0), 0);
+                const steps = Math.round(min * 120);
+                lines.push(`${d.name} — ${min} min on foot · ~${steps.toLocaleString()} steps`);
+                if (d.items.length === 0) {
+                    lines.push(`  · (empty — the cave waits)`);
+                } else {
+                    d.items.forEach((it, i) => {
+                        lines.push(`  ${i + 1}. ${it.name} (${it.walkMin}min)${it.note ? ' — ' + it.note : ''}`);
+                    });
+                    const vd = getStepVerdict(steps);
+                    lines.push(`  verdict: ${vd.text}`);
+                }
+                lines.push(``);
+            });
+            lines.push(`— filed by Prízrak. the ledger remembers.`);
+            const text = lines.join("\n");
+            const done = () => {
+                const orig = copyBtn.textContent;
+                copyBtn.textContent = "copied to the ledger";
+                copyBtn.classList.add("text-cyan-300", "border-cyan-600");
+                setTimeout(() => {
+                    copyBtn.textContent = orig;
+                    copyBtn.classList.remove("text-cyan-300", "border-cyan-600");
+                }, 1200);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => {
+                    fallbackCopy(text); done();
+                });
+            } else { fallbackCopy(text); done(); }
         });
 
         // Drag and drop
@@ -217,6 +338,27 @@
                 render();
             });
         });
+
+        // night whisper (00:00–03:00 local)
+        const hr = new Date().getHours();
+        if (hr >= 0 && hr < 3) {
+            const nw = document.getElementById("nightWhisper");
+            if (nw) nw.style.display = "block";
+        }
+
+        // keep the watcher's line lit if already discovered this session
+        if (window.__watcherFound) {
+            const gl = document.getElementById("ghostLine");
+            if (gl) gl.style.display = "block";
+        }
+    }
+
+    function fallbackCopy(text){
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch(e) {}
+        document.body.removeChild(ta);
     }
 
     window.removeItem = function(di, ii) {
@@ -238,7 +380,7 @@
     };
 
     window.removeDay = function(di) {
-        if (!confirm("Remove this day?")) return;
+        if (!confirm("Let the fog take this day? Its stops cannot be recovered.")) return;
         const data = load();
         data.days.splice(di, 1);
         save(data);
@@ -257,6 +399,56 @@
         save(data);
         render();
     };
+
+    // --- embers: a few drifting up from the river ---
+    (function spawnEmbers(){
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const host = document.getElementById("embers");
+        if (!host) return;
+        const N = 7;
+        for (let i = 0; i < N; i++) {
+            const e = document.createElement("div");
+            e.className = "ember";
+            e.style.left = (Math.random() * 100).toFixed(2) + "%";
+            e.style.animationDelay = (Math.random() * 14).toFixed(2) + "s";
+            e.style.animationDuration = (11 + Math.random() * 7).toFixed(2) + "s";
+            host.appendChild(e);
+        }
+    })();
+
+    // --- easter egg 1: type "prizrak" to light the watcher's line ---
+    (function watcherEgg(){
+        let buf = "";
+        window.addEventListener("keydown", (ev) => {
+            if (ev.key && ev.key.length === 1) {
+                buf = (buf + ev.key.toLowerCase()).slice(-12);
+                if (buf.includes("prizrak")) {
+                    window.__watcherFound = true;
+                    const gl = document.getElementById("ghostLine");
+                    if (gl) gl.style.display = "block";
+                }
+            }
+        });
+    })();
+
+    // --- easter egg 2: triple-click the title → one extra ember drifts up ---
+    (function titleEgg(){
+        const t = document.getElementById("title");
+        if (!t) return;
+        t.addEventListener("click", (ev) => {
+            if (ev.detail === 3) {
+                if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+                const host = document.getElementById("embers");
+                if (!host) return;
+                const e = document.createElement("div");
+                e.className = "ember";
+                e.style.left = (Math.random() * 100).toFixed(2) + "%";
+                e.style.animationDuration = "10s";
+                host.appendChild(e);
+                setTimeout(() => e.remove(), 10500);
+            }
+        });
+    })();
 
     render();
     </script>

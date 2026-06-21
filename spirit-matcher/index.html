@@ -90,6 +90,38 @@
 
     #title{cursor:default;user-select:none}
 
+    /* faster breath for the held-glyph easter egg */
+    @keyframes breatheFast{0%,100%{opacity:.85;text-shadow:0 0 10px var(--glow)}50%{opacity:1;text-shadow:0 0 22px var(--glow)}}
+    .breathe-fast{animation:breatheFast 1.1s ease-in-out infinite}
+
+    /* spirit sigil — thin glyph that hangs above the verdict */
+    #spiritSigil{
+      font-family:'JetBrains Mono', monospace; line-height:1;
+      color:var(--accent); text-shadow:0 0 18px var(--glow);
+    }
+
+    /* the divination interstitial — the mountain reading the signs */
+    #divination{
+      display:none; text-align:center; padding:2.25rem 0 .5rem;
+    }
+    #divGlyphRow{ font-family:'JetBrains Mono', monospace; font-size:1.6rem; letter-spacing:.5rem; }
+    #divGlyphRow span{ display:inline-block; opacity:.18; color:var(--accent); }
+    @keyframes augur{0%{opacity:.18;transform:translateY(0)}40%{opacity:1;text-shadow:0 0 14px var(--glow);transform:translateY(-2px)}100%{opacity:.18;transform:translateY(0)}}
+    #divGlyphRow.casting span{ animation:augur 1.1s ease-in-out infinite; }
+
+    /* recall line — restores a previous reading when clicked */
+    #recall{
+      cursor:pointer; border:1px dashed var(--line); color:var(--ink-dim);
+      transition:border-color .15s ease, color .15s ease, transform .12s ease;
+    }
+    #recall:hover{border-color:var(--accent);color:var(--ink);transform:translateY(-1px)}
+    #recall:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    @media (prefers-reduced-motion:reduce){
+      .breathe-fast{animation:none!important;opacity:1!important}
+      #divGlyphRow.casting span{animation:none!important;opacity:1!important}
+    }
+
     @media (prefers-reduced-motion:reduce){
       .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
       .ember{display:none}
@@ -117,6 +149,11 @@
     <div class="spirit-card rounded p-6 mb-8">
       <h2 class="text-lg mb-1">Current State Assessment</h2>
       <p class="mono text-[10px] fog-text tracking-widest mb-6 pb-3 border-b" style="border-color:var(--line)">INTAKE 01 / FIVE READINGS, THEN A VERDICT</p>
+
+      <!-- recall: the ledger remembers the last reading -->
+      <div id="recall" role="button" tabindex="0" class="mono text-[10px] tracking-widest rounded px-3 py-2 mb-6" style="display:none">
+        <span class="fog-text">LAST READING · </span><span id="recallSummary"></span><span class="ghost-text"> · tap to restore the signs</span>
+      </div>
 
       <!-- Body Battery -->
       <div class="mb-6">
@@ -176,12 +213,20 @@
       </button>
     </div>
 
+    <!-- Divination interstitial: the mountain reads the signs -->
+    <div id="divination">
+      <p class="mono text-[10px] tracking-widest fog-text mb-3">READING THE SIGNS</p>
+      <div id="divGlyphRow"><span>☽</span><span>△</span><span>✦</span><span>⛰</span><span>☾</span></div>
+      <p id="divLine" class="mono text-[11px] ghost-text mt-3"></p>
+    </div>
+
     <!-- Result -->
     <div id="result" class="spirit-card rounded p-6 hidden">
       <div class="flex items-center justify-between mb-4">
         <p class="mono text-xs fog-text tracking-widest">CLASSIFICATION RESULT</p>
         <button id="copyBtn" onclick="copyVerdict()" class="copy-btn mono text-[10px] tracking-widest rounded px-2 py-1">COPY TO LEDGER</button>
       </div>
+      <div id="spiritSigil" class="text-4xl mb-3 breathe" aria-hidden="true"></div>
       <div id="spiritName" class="text-3xl mb-2 result-glow breathe"></div>
       <div id="spiritTranslation" class="text-sm fog-text italic mb-6"></div>
       <div id="spiritDescription" class="text-sm leading-relaxed mb-6"></div>
@@ -207,48 +252,56 @@
     const spirits = {
       mora: {
         name: "Mora",
+        sigil: "☾",
         translation: "The Night Drain",
         description: "The Mora sits on the chest of sleeping men and draws their strength away. You are not being attacked — you are being depleted. Slowly. Continuously. The Mora does not announce herself. She just costs you something you cannot quite locate until the total is already gone. Your current state carries this signature: high expenditure, low reserves, the sense that effort is not translating into progress in any visible ratio.",
         advice: "The Mora is defeated by naming her. What specific thing is draining you that you have not yet named? Once named, it becomes finite. The unnamed drain is unlimited. The named drain has an edge."
       },
       vodnik: {
         name: "Vodník",
+        sigil: "≋",
         translation: "The Water Grandfather",
         description: "The Vodník collects. He keeps souls in sealed jars in his underwater dwelling. He is not malicious — he is accumulative. Something in your current state mirrors his nature: you are gathering things (tasks, obligations, relationships, tabs) that you have not yet processed. The green-bearded Grandfather of the deep is patient. He will wait for you. But the collection is growing while you are not looking.",
         advice: "Open one jar today. Not all of them — just one. The Vodník's power comes from the sealed containers, not the contents. Unseal one thing and deal with it directly. The rest can wait. The mill keeps running."
       },
       samodivy: {
         name: "Samodiva",
+        sigil: "➳",
         translation: "The Autonomous One",
         description: "The samodiva (a variant of the víla) is completely self-directed. She has her own hunting grounds, her own rules, her own schedule. She is not waiting for permission. In your current state, you are operating with high autonomy and the energy to back it. This is not always comfortable — the samodiva can be destructive when she has too much energy and no channel for it. The arrow that confuses men's spirits was not always aimed.",
         advice: "Aim the energy. The samodiva is powerful but imprecise. Pick one target and hunt it cleanly. Diffuse energy at this level gets you a confused forest and no meat."
       },
       janošík: {
         name: "Jánošík",
+        sigil: "⚔",
         translation: "The Mountain Outlaw",
         description: "The real Jánošík was caught, tortured, and executed. The mythological Jánošík robbed from lords and gave to the poor. You are somewhere between these: taking on a challenge that exceeds your formal authority, operating outside the established path, not entirely sure if you are the hero or the criminal in this particular story. The mountain respects this ambiguity. The ballads were always about the outlaw, not the magistrate.",
         advice: "Jánošík was betrayed by someone who knew him. In your current state, the risk is not the challenge — it is the assumption that everyone in your circle has the same goals you do. They do not. This is not paranoia. It is the accurate read of the historical record."
       },
       poludnica: {
         name: "Poludnica",
+        sigil: "☀",
         translation: "The Noon Demon",
         description: "The Poludnica appears precisely during the rest break, in full sunlight, and asks difficult questions. You cannot change the subject or she kills you. Your current state carries her signature: you are in the interval between work cycles, and the questions that were deferred during the action phase are now arriving. The Poludnica is the embodiment of the things you owe yourself an honest answer to.",
         advice: "She cannot be escaped. She requires engagement. Answer the difficult question directly. Not the easy version — the actual one. Trying to change the subject is exactly how people die at noon in the wheat fields."
       },
       šarkan: {
         name: "Šarkan",
+        sigil: "𓆙",
         translation: "The Patient Dragon",
         description: "The šarkan begins as an ordinary snake. It grows wings in the dark, over time, undisturbed. Your current situation has a šarkan in it: something that started small and has been quietly becoming something larger in a corner you have not been watching. This is not a crisis yet. It may not become one. But the Carpathian folk tradition is specific: once the snake has wings, it has wings. The question of prevention has expired.",
         advice: "Identify the snake. Not the dragon — you cannot fight the dragon yet. Find it in its current form, while it is still a snake with aspirations. Name it in your log. This is what the mountain requires."
       },
       bosorka: {
         name: "Bosorka",
+        sigil: "⚇",
         translation: "The Double-Souled",
         description: "The bosorka's second soul leaves while she sleeps and causes harm without her conscious knowledge. You are not the bosorka — you are in the situation her victims described: something in your environment is causing friction through a process that has no visible author, no deliberate intent, and no obvious entry point. The harm is real. The source is architectural, not malicious.",
         advice: "Do not look for the person who is doing this. Look for the process. The bosorka's second soul is not a person making decisions — it is a system producing consequences. Trace the consequence back to its structural origin. Fix the architecture."
       },
       víla: {
         name: "Víla",
+        sigil: "△",
         translation: "The Threshold Warrior",
         description: "The víla fights for territory she does not legally own. She demands acknowledgment, not worship. You are in a state of high clarity and moderate resources, occupying a space where you know the terms and have acknowledged them. You are leaving ribbons at the thresholds. You are in the forest with open eyes. The cloud-castles are visible from here.",
         advice: "You are in the correct mode. The only risk is assuming the acknowledgment-ritual was permanent. Thresholds require fresh ribbons. The old ribbon fades. Mark it again when you cross it again."
@@ -257,13 +310,8 @@
 
     let lastVerdictText = '';
 
-    function classify() {
-      const battery = parseInt(document.getElementById('battery').value);
-      const stress = parseInt(document.getElementById('stress').value);
-      const hour = document.getElementById('hour').value;
-      const challenge = document.getElementById('challenge').value;
-      const activity = document.getElementById('activity').value;
-
+    // pure: read the five signs and decide which spirit walks
+    function computeSpirit(battery, stress, hour, challenge, activity) {
       let spirit = 'víla'; // default
 
       // Classification logic — the mountain has opinions
@@ -298,22 +346,74 @@
       } else if (battery < 50 && challenge === 'building') {
         spirit = 'šarkan';
       }
+      return spirit;
+    }
 
+    // whispered while the signs are read — terse, ominous, varies per cast
+    const DIV_LINES = [
+      'the cold is measured. the ledger opens.',
+      'five readings cross the threshold.',
+      'the karst remembers your shape.',
+      'the mountain leans in to look.',
+      'something stirs in the hibernating dark.',
+      'the fog parts for exactly one answer.'
+    ];
+
+    let casting = false;
+
+    function classify() {
+      if (casting) return;
+      const battery = parseInt(document.getElementById('battery').value);
+      const stress = parseInt(document.getElementById('stress').value);
+      const hour = document.getElementById('hour').value;
+      const challenge = document.getElementById('challenge').value;
+      const activity = document.getElementById('activity').value;
+
+      const spirit = computeSpirit(battery, stress, hour, challenge, activity);
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (reduce) {
+        renderVerdict(spirit, battery, stress, hour, challenge, activity);
+        return;
+      }
+
+      // the augury: glyphs flicker for a beat before the verdict lands
+      casting = true;
+      document.getElementById('result').classList.add('hidden');
+      const div = document.getElementById('divination');
+      const row = document.getElementById('divGlyphRow');
+      const line = document.getElementById('divLine');
+      line.textContent = DIV_LINES[Math.floor(Math.random() * DIV_LINES.length)];
+      div.style.display = 'block';
+      row.classList.add('casting');
+      [...row.children].forEach((sp, i) => { sp.style.animationDelay = (i * 0.16) + 's'; });
+      div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      setTimeout(() => {
+        row.classList.remove('casting');
+        div.style.display = 'none';
+        casting = false;
+        renderVerdict(spirit, battery, stress, hour, challenge, activity);
+      }, 1250);
+    }
+
+    function renderVerdict(spirit, battery, stress, hour, challenge, activity) {
       const s = spirits[spirit];
+      document.getElementById('spiritSigil').textContent = s.sigil;
       document.getElementById('spiritName').textContent = s.name;
       document.getElementById('spiritTranslation').textContent = s.translation;
       document.getElementById('spiritDescription').textContent = s.description;
-      document.getElementById('spiritAdvice').textContent = '🥔 Prízrak notes: ' + s.advice;
+      document.getElementById('spiritAdvice').textContent = 'Prízrak notes — ' + s.advice;
 
       // Battery annotation
       let batteryNote = '';
-      if (battery < 20) batteryNote = `⚠ Body battery ${battery}/100 — the Garmin has logged the cost. The mountain sees it.`;
+      if (battery < 20) batteryNote = `Body battery ${battery}/100 — the Garmin has logged the cost. The mountain sees it.`;
       else if (battery < 40) batteryNote = `Body battery ${battery}/100 — below threshold. Recovery precedes performance.`;
       else if (battery > 80) batteryNote = `Body battery ${battery}/100 — strong reserves. The harvest window is open.`;
       document.getElementById('batteryNote').textContent = batteryNote;
 
       // assemble the ledger line (for copy-to-clipboard)
-      lastVerdictText = `${s.name} — ${s.translation}\n\n${s.description}\n\n🥔 Prízrak notes: ${s.advice}${batteryNote ? '\n\n' + batteryNote : ''}\n\n— Tatra Spirit Classifier`;
+      lastVerdictText = `${s.sigil}  ${s.name} — ${s.translation}\n\n${s.description}\n\nPrízrak notes — ${s.advice}${batteryNote ? '\n\n' + batteryNote : ''}\n\n— Tatra Spirit Classifier`;
 
       const result = document.getElementById('result');
       result.classList.remove('hidden');
@@ -428,6 +528,81 @@
       ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
         window.addEventListener(ev, reset, { passive: true }));
       reset();
+    })();
+
+    // ---- the ledger remembers: surface + restore the last reading ----
+    (function(){
+      let last;
+      try { last = JSON.parse(localStorage.getItem('spirit-matcher:last') || 'null'); }
+      catch (e) { last = null; }
+      if (!last || !last.spirit || !spirits[last.spirit]) return;
+
+      const recall = document.getElementById('recall');
+      const summary = document.getElementById('recallSummary');
+      const s = spirits[last.spirit];
+
+      // human-scaled "how long ago" — the cave keeps time loosely
+      let ago = '';
+      if (typeof last.at === 'number') {
+        const mins = Math.max(0, Math.round((Date.now() - last.at) / 60000));
+        if (mins < 1) ago = ' · moments ago';
+        else if (mins < 60) ago = ` · ${mins}m ago`;
+        else if (mins < 1440) ago = ` · ${Math.round(mins / 60)}h ago`;
+        else ago = ` · ${Math.round(mins / 1440)}d ago`;
+      }
+      summary.innerHTML = '<span style="color:var(--accent)">' + s.sigil + ' ' + s.name + '</span>' +
+        '<span class="fog-text">' + ago + '</span>';
+      recall.style.display = 'block';
+      recall.classList.add('reveal');
+
+      function restore() {
+        const setRange = (id, v) => {
+          const el = document.getElementById(id);
+          if (el && typeof v === 'number') {
+            el.value = v;
+            el.dispatchEvent(new Event('input'));
+          }
+        };
+        const setSel = (id, v) => {
+          const el = document.getElementById(id);
+          if (el && v != null && [...el.options].some(o => o.value === v)) el.value = v;
+        };
+        setRange('battery', last.battery);
+        setRange('stress', last.stress);
+        setSel('hour', last.hour);
+        setSel('challenge', last.challenge);
+        setSel('activity', last.activity);
+        // re-cast the same signs; the verdict returns through the full augury
+        classify();
+      }
+      recall.addEventListener('click', restore);
+      recall.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); restore(); }
+      });
+    })();
+
+    // ---- easter egg: hold the title and the glow breathes faster for 3s ----
+    (function(){
+      const title = document.getElementById('title');
+      let timer, releaseTimer;
+      const start = () => {
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) return;
+        timer = setTimeout(() => {
+          title.classList.remove('breathe');
+          title.classList.add('breathe-fast');
+          clearTimeout(releaseTimer);
+          releaseTimer = setTimeout(() => {
+            title.classList.remove('breathe-fast');
+            title.classList.add('breathe');
+          }, 3000);
+        }, 450);
+      };
+      const cancel = () => clearTimeout(timer);
+      title.addEventListener('mousedown', start);
+      title.addEventListener('touchstart', start, { passive: true });
+      ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev =>
+        title.addEventListener(ev, cancel));
     })();
   </script>
   <script src="/shared/star-widget.js"></script>

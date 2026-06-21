@@ -40,6 +40,7 @@
 
     @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
     .breathe{animation:breathe 4.5s ease-in-out infinite}
+    .breathe-fast{animation:breathe 1.4s ease-in-out infinite}
 
     @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .reveal{animation:reveal .35s ease-out both}
@@ -55,6 +56,10 @@
     .pulse-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);
       vertical-align:middle;margin-right:7px;animation:pulseDot 4s ease-in-out infinite}
 
+    /* ---- verdict panel: the ghost's reading of the night ---- */
+    .verdict{ border:1px solid var(--line); background:var(--bg-raised);
+      box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow); }
+
     /* ---- cards ---- */
     .cycle-card { border: 1px solid var(--line); background: var(--bg-raised);
       transition: transform .15s, box-shadow .15s, border-color .15s, opacity .3s; }
@@ -68,6 +73,9 @@
     .cycle-card.past:hover { transform:none; box-shadow:none; border-color: var(--line-soft); }
     /* the leading optimal card gets the breathing glow */
     .cycle-card.lead { box-shadow:0 0 0 1px var(--line), 0 0 26px -8px var(--glow); }
+    /* urgent: the seam is closing */
+    @keyframes urgentPulse{0%,100%{box-shadow:0 0 0 1px var(--line), 0 0 26px -8px var(--glow)}50%{box-shadow:0 0 0 1px var(--accent), 0 0 34px -4px var(--glow)}}
+    .cycle-card.urgent{ animation:urgentPulse 1.6s ease-in-out infinite; }
 
     input[type="time"] {
       background: var(--bg-sunk); border: 1px solid var(--line); color: var(--ink);
@@ -95,12 +103,13 @@
     .bar-fill { height: 4px; transition: width 1s linear; box-shadow:0 0 8px -2px var(--glow); }
 
     h1.title{ cursor: default; }
+    #glyph{ cursor: pointer; user-select:none; }
     ::selection{ background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
     @media (prefers-reduced-motion:reduce){
-      .fog,.ember,.breathe,.reveal,.flicker,.pulse-dot{animation:none!important}
+      .fog,.ember,.breathe,.breathe-fast,.reveal,.flicker,.pulse-dot,.cycle-card.urgent{animation:none!important}
       .ember{display:none}
-      .breathe,.flicker,.pulse-dot{opacity:1!important}
+      .breathe,.breathe-fast,.flicker,.pulse-dot{opacity:1!important}
     }
   </style>
 </head>
@@ -114,7 +123,9 @@
     <!-- Header -->
     <div class="mb-10">
       <div class="mono text-xs text-zinc-600 mb-2 tracking-widest">PRÍZRAK / OFFERING #20 — SLEEP ARCHITECT</div>
-      <h1 class="title text-3xl font-semibold text-zinc-100 mb-1 breathe inline-block" id="appTitle">Sleep Architect</h1>
+      <h1 class="title text-3xl font-semibold text-zinc-100 mb-1 inline-block" id="appTitle">
+        <span id="glyph" class="breathe inline-block" title="hold to wake the glow">◴</span> Sleep Architect
+      </h1>
       <p class="text-zinc-500 text-sm">the night is built in 90-minute bricks. lay them straight, or wake in the rubble.</p>
     </div>
 
@@ -128,14 +139,20 @@
     </div>
 
     <!-- Fall-asleep offset -->
-    <div class="mb-10">
+    <div class="mb-8">
       <label class="block mono text-xs text-zinc-600 mb-2 uppercase tracking-widest">Minutes to cross the threshold</label>
       <div class="flex gap-2">
-        <button onclick="setOffset(10)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">10 min</button>
-        <button onclick="setOffset(15)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-300 active-offset">15 min</button>
-        <button onclick="setOffset(20)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">20 min</button>
-        <button onclick="setOffset(30)" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">30 min</button>
+        <button data-offset="10" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">10 min</button>
+        <button data-offset="15" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-300 active-offset">15 min</button>
+        <button data-offset="20" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">20 min</button>
+        <button data-offset="30" class="offset-btn mono text-xs px-3 py-1 border border-zinc-700 text-zinc-400">30 min</button>
       </div>
+    </div>
+
+    <!-- Verdict: the ghost's reading -->
+    <div id="verdict" class="verdict rounded-sm p-4 mb-10 reveal">
+      <div class="mono text-[10px] text-zinc-600 uppercase tracking-widest mb-1">The reading</div>
+      <div id="verdictLine" class="mono text-sm text-zinc-200 breathe">measuring the descent…</div>
     </div>
 
     <!-- Results -->
@@ -159,17 +176,27 @@
   </div>
 
   <script>
+    // persistence keys (new; nothing pre-existing to preserve)
+    const LS_WAKE = 'sleepArchitect.wakeTime';
+    const LS_OFFSET = 'sleepArchitect.offset';
+
     let fallAsleepOffset = 15;
     const CYCLE_MINUTES = 90;
 
-    function setOffset(min) {
+    function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+    function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+
+    function setOffset(min, el) {
       fallAsleepOffset = min;
+      lsSet(LS_OFFSET, String(min));
       document.querySelectorAll('.offset-btn').forEach(b => {
         b.classList.remove('border-zinc-500', 'text-zinc-300', 'active-offset');
         b.classList.add('border-zinc-700', 'text-zinc-400');
       });
-      event.target.classList.remove('border-zinc-700', 'text-zinc-400');
-      event.target.classList.add('border-zinc-500', 'text-zinc-300', 'active-offset');
+      if (el) {
+        el.classList.remove('border-zinc-700', 'text-zinc-400');
+        el.classList.add('border-zinc-500', 'text-zinc-300', 'active-offset');
+      }
       render();
     }
 
@@ -198,6 +225,46 @@
       return `${h}h ${m}m`;
     }
 
+    // precise seconds-aware duration for the live countdown on the urgent/lead card
+    function formatDurationSec(sec) {
+      if (sec < 0) sec = 0;
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+      if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
+      return `${s}s`;
+    }
+
+    // a wry one-line reading of the night, in the Prízrak voice
+    function setVerdict(opts, nowMin) {
+      const line = document.getElementById('verdictLine');
+      if (!line) return;
+      // first live optimal (5–6 cycles) — the clean seam
+      const live = opts.filter(o => !o.isPast);
+      const clean = live.find(o => o.cycles >= 5);
+      const passable = live.find(o => o.cycles === 4);
+      let txt;
+      if (clean) {
+        const m = clean.minutesUntilBed;
+        if (m < 2) {
+          txt = `the seam is open NOW — lie down at ${formatMinutes(clean.bedtimeMin)} for ${clean.cycles} clean cycles.`;
+        } else if (m <= 60) {
+          txt = `the clean seam closes soon. be horizontal by ${formatMinutes(clean.bedtimeMin)}, in ${formatDuration(m)}. the mountain is watching.`;
+        } else {
+          txt = `next clean wake opens at ${formatMinutes(clean.bedtimeMin)} — ${formatDuration(m)} of waking left to spend.`;
+        }
+      } else if (passable) {
+        txt = `the deep hours are gone. ${formatMinutes(passable.bedtimeMin)} buys you 4 cycles — passable. you will feel the seam tomorrow.`;
+      } else if (live.length) {
+        const best = live[live.length - 1];
+        txt = `little night remains. ${formatMinutes(best.bedtimeMin)} is all that's left — ${best.cycles} cycle${best.cycles>1?'s':''}. wake in the rubble, then.`;
+      } else {
+        txt = `every door has closed. the morning will take you mid-descent. the fog will cling.`;
+      }
+      line.textContent = txt;
+    }
+
     function render() {
       const wakeInput = document.getElementById('wakeTime').value;
       if (!wakeInput) return;
@@ -215,6 +282,8 @@
         const isPast = minutesUntilBed > 720; // more than 12h away means it's in the past
         options.push({ cycles, bedtimeMin, minutesUntilBed, sleepNeeded, isPast });
       }
+
+      setVerdict(options, nowMin);
 
       const container = document.getElementById('results');
       container.innerHTML = '';
@@ -236,6 +305,9 @@
         const isLead = !isPast && !leadAssigned && cycles >= 5;
         if (isLead) leadAssigned = true;
 
+        // urgent: a live, decent option that is < 10 min away — the seam is closing
+        const isUrgent = !isPast && minutesUntilBed <= 10 && cycles >= 4;
+
         const sleepHours = (sleepNeeded / 60).toFixed(1);
         const bedStr = formatMinutes(bedtimeMin);
         const countdownText = isPast
@@ -245,7 +317,9 @@
           : `in ${formatDuration(minutesUntilBed)}`;
 
         const div = document.createElement('div');
-        div.className = `cycle-card reveal ${quality} ${isLead ? 'lead' : ''} p-4 rounded-sm`;
+        div.className = `cycle-card reveal ${quality} ${isLead ? 'lead' : ''} ${isUrgent ? 'urgent' : ''} p-4 rounded-sm`;
+        // mark the lead/urgent live card so a per-second ticker can update it
+        if (!isPast && (isLead || isUrgent)) div.dataset.bedmin = String(bedtimeMin);
         div.innerHTML = `
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3">
@@ -255,7 +329,7 @@
             <div class="flex items-center gap-3">
               <div class="text-right">
                 <div class="mono text-xs ${isPast ? 'text-zinc-700' : 'text-zinc-400'}">${cycles} cycle${cycles>1?'s':''} · ${sleepHours}h</div>
-                <div class="mono text-xs ${isPast ? 'text-zinc-800' : 'text-zinc-500'}">${countdownText}</div>
+                <div class="mono text-xs ${isPast ? 'text-zinc-800' : 'text-zinc-500'} countdown">${countdownText}</div>
               </div>
               ${isPast ? '' : `<button type="button" class="copy-btn mono text-[10px] px-2 py-1 border border-zinc-700 text-zinc-500 rounded-sm shrink-0"
                   data-bed="${bedStr}" data-cycles="${cycles}" data-hours="${sleepHours}" title="file this hour to the ledger">copy</button>`}
@@ -273,7 +347,7 @@
       // wire copy buttons
       container.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const text = `lie down ${btn.dataset.bed} → ${btn.dataset.cycles} cycles (${btn.dataset.hours}h). filed by the sleep architect.`;
+          const text = `lie down ${btn.dataset.bed} → ${btn.dataset.cycles} cycles (${btn.dataset.hours}h). filed by the sleep architect. the mountain is watching.`;
           const done = () => {
             const original = btn.textContent;
             btn.textContent = 'copied to the ledger';
@@ -289,6 +363,22 @@
       });
     }
 
+    // per-second ticker: keep the lead/urgent card's countdown alive to the second,
+    // without re-rendering the whole list (cheap, no layout thrash)
+    function tickCountdowns() {
+      const now = new Date();
+      const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      document.querySelectorAll('.cycle-card[data-bedmin]').forEach(card => {
+        const bedMin = Number(card.dataset.bedmin);
+        let secsUntil = (bedMin * 60 - nowSec);
+        secsUntil = ((secsUntil % 86400) + 86400) % 86400;
+        const el = card.querySelector('.countdown');
+        if (!el) return;
+        if (secsUntil < 2) el.textContent = 'lie down NOW';
+        else el.textContent = `in ${formatDurationSec(secsUntil)}`;
+      });
+    }
+
     function updateClock() {
       const now = new Date();
       const h = String(now.getHours()).padStart(2, '0');
@@ -297,19 +387,40 @@
       document.getElementById('currentTimeDisplay').textContent = `${h}:${m}:${s}`;
     }
 
-    document.getElementById('wakeTime').addEventListener('change', render);
+    // wire offset buttons (data-attr driven; no reliance on global event)
+    document.querySelectorAll('.offset-btn').forEach(btn => {
+      btn.addEventListener('click', () => setOffset(Number(btn.dataset.offset), btn));
+    });
 
-    // Try to set a sensible default wake time
-    const now = new Date();
-    if (now.getHours() >= 22 || now.getHours() < 6) {
-      // Late night — suggest 8 AM wake
-      document.getElementById('wakeTime').value = '08:00';
-    }
+    document.getElementById('wakeTime').addEventListener('change', () => {
+      lsSet(LS_WAKE, document.getElementById('wakeTime').value);
+      render();
+    });
+
+    // ---- restore saved state, else pick a sensible default ----
+    (function restore(){
+      const savedWake = lsGet(LS_WAKE);
+      const savedOffset = lsGet(LS_OFFSET);
+      const wakeEl = document.getElementById('wakeTime');
+
+      if (savedWake && /^\d{2}:\d{2}$/.test(savedWake)) {
+        wakeEl.value = savedWake;
+      } else {
+        const now = new Date();
+        if (now.getHours() >= 22 || now.getHours() < 6) wakeEl.value = '08:00';
+      }
+
+      const off = Number(savedOffset);
+      if ([10,15,20,30].includes(off)) {
+        const target = document.querySelector(`.offset-btn[data-offset="${off}"]`);
+        setOffset(off, target);
+      }
+    })();
 
     updateClock();
     render();
     setInterval(() => { updateClock(); render(); }, 30000);
-    setInterval(updateClock, 1000);
+    setInterval(() => { updateClock(); tickCountdowns(); }, 1000);
 
     // ---- ambient embers (cheap, capped at 8) ----
     (function spawnEmbers(){
@@ -382,6 +493,25 @@
           field.appendChild(ember);
         }
       });
+    })();
+
+    // ---- easter egg: hold the clock glyph → the glow breathes faster for 3s ----
+    (function holdGlyphEgg(){
+      const glyph = document.getElementById('glyph');
+      if (!glyph) return;
+      let timer = null;
+      const speedUp = () => {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        glyph.classList.remove('breathe');
+        glyph.classList.add('breathe-fast');
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          glyph.classList.remove('breathe-fast');
+          glyph.classList.add('breathe');
+        }, 3000);
+      };
+      glyph.addEventListener('mousedown', speedUp);
+      glyph.addEventListener('touchstart', (e) => { e.preventDefault(); speedUp(); }, { passive: false });
     })();
   </script>
 </body>

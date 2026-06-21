@@ -43,6 +43,9 @@
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
 
+        /* Inputs lift on hover/focus — the ledger leans toward you */
+        .ledger-input{ transition: border-color .15s, box-shadow .15s, transform .15s, background-color .15s; }
+        .ledger-input:hover{ border-color:#52525b; }
         input:focus-visible, button:focus-visible {
             outline: none;
             border-color: var(--accent);
@@ -62,6 +65,7 @@
 
         @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
         .breathe{animation:breathe 4.5s ease-in-out infinite}
+        .breathe-fast{animation:breathe 1.3s ease-in-out infinite}
 
         @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         .prizrak-rise{animation:reveal .4s ease-out both}
@@ -85,13 +89,19 @@
 
         .field-hint{ color: var(--ink-dim); }
 
+        /* The doom gauge — a thin seam that fills toward ruin or safety. */
+        .gauge-track{ background:var(--bg-sunk); border:1px solid var(--line); overflow:hidden; }
+        .gauge-fill{ height:100%; width:0%;
+            transition: width .8s cubic-bezier(.22,1,.36,1), background-color .5s ease, box-shadow .5s ease; }
+        @media (prefers-reduced-motion:reduce){ .gauge-fill{ transition:none; } }
+
         #watcher-line{ color: var(--ink-ghost); transition: opacity .8s ease; }
         #idle-line{ color: var(--ink-ghost); transition: opacity 1.2s ease; }
 
         @media (prefers-reduced-motion:reduce){
-            .fog,.ember,.breathe,.prizrak-rise,.flicker{animation:none!important}
+            .fog,.ember,.breathe,.breathe-fast,.prizrak-rise,.flicker{animation:none!important}
             .ember{display:none}
-            .breathe,.flicker{opacity:1!important}
+            .breathe,.breathe-fast,.flicker{opacity:1!important}
         }
     </style>
 </head>
@@ -102,7 +112,7 @@
     <div class="max-w-2xl w-full relative" style="z-index:2">
         <div class="mb-8 text-center border-b border-zinc-700/60 pb-6">
             <h1 id="app-title" class="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2 select-none cursor-default">
-                <i data-lucide="coffee" class="text-violet-400 breathe"></i> Thao Dien Chai ROI
+                <i data-lucide="coffee" id="glyph" class="text-violet-400 breathe cursor-pointer"></i> Thao Dien Chai ROI
             </h1>
             <p class="text-zinc-400 text-sm">An unsentimental ledger for Charles's cafe concept. The mountain has run the numbers.</p>
         </div>
@@ -113,22 +123,22 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                         <label for="rent" class="block text-[11px] font-medium tracking-[0.18em] uppercase field-hint mb-1">Ledger 01 / Monthly Rent (USD)</label>
-                        <input type="number" id="rent" min="0" value="3500" class="w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0 transition" />
+                        <input type="number" id="rent" min="0" value="3500" class="ledger-input w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0" />
                         <p class="text-xs text-zinc-500 mt-1">Thao Dien landlord premium, already extracted.</p>
                     </div>
                     <div>
                         <label for="price" class="block text-[11px] font-medium tracking-[0.18em] uppercase field-hint mb-1">Ledger 02 / Price per Cup (VND)</label>
-                        <input type="number" id="price" min="0" value="85000" class="w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0 transition" />
+                        <input type="number" id="price" min="0" value="85000" class="ledger-input w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0" />
                         <p class="text-xs text-zinc-500 mt-1">The expat pays 85k for milk water and calls it ritual.</p>
                     </div>
                     <div>
                         <label for="cups" class="block text-[11px] font-medium tracking-[0.18em] uppercase field-hint mb-1">Ledger 03 / Cups Sold per Day</label>
-                        <input type="number" id="cups" min="0" value="80" class="w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0 transition" />
+                        <input type="number" id="cups" min="0" value="80" class="ledger-input w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0" />
                         <p class="text-xs text-zinc-500 mt-1">The rainy season halves this. It always comes.</p>
                     </div>
                     <div>
                         <label for="cogs" class="block text-[11px] font-medium tracking-[0.18em] uppercase field-hint mb-1">Ledger 04 / Cost of Goods (VND/Cup)</label>
-                        <input type="number" id="cogs" min="0" value="15000" class="w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0 transition" />
+                        <input type="number" id="cogs" min="0" value="15000" class="ledger-input w-full bg-zinc-800/80 border border-zinc-600 rounded-lg p-2.5 text-white focus:ring-0" />
                         <p class="text-xs text-zinc-500 mt-1">Spices, milk, and the slow attrition of dreams.</p>
                     </div>
                 </div>
@@ -170,6 +180,19 @@
                         <span id="res-profit" class="font-mono font-bold text-xl"></span>
                     </div>
                 </div>
+
+                <!-- The doom gauge: a single seam between ruin and survival -->
+                <div class="mt-6">
+                    <div class="flex justify-between items-baseline mb-1.5">
+                        <span class="text-[10px] tracking-[0.18em] uppercase field-hint" id="gauge-label">SURVIVAL INDEX</span>
+                        <span id="gauge-readout" class="text-[11px] font-mono text-zinc-500"></span>
+                    </div>
+                    <div class="gauge-track h-2 rounded-full w-full">
+                        <div id="gauge-fill" class="gauge-fill rounded-full"></div>
+                    </div>
+                    <p id="runway-line" class="text-[11px] text-zinc-600 mt-2 font-mono"></p>
+                </div>
+
                 <div id="prizrak-comment" class="mt-6 p-4 bg-zinc-900/80 rounded-lg text-zinc-400 italic text-sm text-center border border-zinc-800">
                 </div>
             </div>
@@ -187,11 +210,36 @@
         const VND_TO_USD = 25400;
         // Simplified fixed monthly costs: staff, electricity, licences, etc.
         const STAFF_AND_OPS_VND = 30000000;
+        // The ghost assumes Charles walks in with this much capital. Used for runway.
+        const STARTING_CAPITAL_VND = 1500000000; // ~$59k of severance and hope
 
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         function formatVND(num) {
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(num);
+        }
+
+        /* ---------- The ledger tallies itself: a short count-up to each figure ---------- */
+        const countTokens = new WeakMap();
+        function tallyTo(el, value){
+            // Cancel any in-flight tally on this element.
+            const token = {};
+            countTokens.set(el, token);
+            if (reducedMotion){ el.textContent = formatVND(value); return; }
+            const from = countTokens.has(el) && typeof el._lastVal === 'number' ? el._lastVal : 0;
+            const start = performance.now();
+            const dur = 520;
+            function frame(now){
+                if (countTokens.get(el) !== token) return; // superseded
+                const t = Math.min(1, (now - start) / dur);
+                const eased = 1 - Math.pow(1 - t, 3);
+                const cur = from + (value - from) * eased;
+                el.textContent = formatVND(cur);
+                if (t < 1) requestAnimationFrame(frame);
+                else { el.textContent = formatVND(value); el._lastVal = value; }
+            }
+            el._lastVal = from;
+            requestAnimationFrame(frame);
         }
 
         let lastSnapshot = '';
@@ -209,29 +257,68 @@
 
             const profitVND = revenueVND - totalCogsVND - rentVND - STAFF_AND_OPS_VND;
 
-            document.getElementById('res-rev').textContent  = formatVND(revenueVND);
-            document.getElementById('res-cogs').textContent = formatVND(totalCogsVND);
-            document.getElementById('res-rent').textContent = formatVND(rentVND);
-            document.getElementById('res-ops').textContent  = formatVND(STAFF_AND_OPS_VND);
+            tallyTo(document.getElementById('res-rev'),  revenueVND);
+            tallyTo(document.getElementById('res-cogs'), totalCogsVND);
+            tallyTo(document.getElementById('res-rent'), rentVND);
+            tallyTo(document.getElementById('res-ops'),  STAFF_AND_OPS_VND);
             document.getElementById('res-rent-rate').textContent =
                 '(@ ' + VND_TO_USD.toLocaleString('en-US') + ' VND/USD)';
 
             const profitEl  = document.getElementById('res-profit');
             const commentEl = document.getElementById('prizrak-comment');
-            profitEl.textContent = formatVND(profitVND);
+            tallyTo(profitEl, profitVND);
 
-            let verdict;
-            if (profitVND > 50000000) {
+            // Five tiers of fate, each with teeth.
+            let verdict, gaugePct, gaugeColor, tierLabel;
+            if (profitVND > 100000000) {
                 profitEl.className = 'font-mono font-bold text-xl text-green-400';
+                tierLabel = 'TIER 05 / THE BRIDGE HOLDS';
+                gaugePct = 100; gaugeColor = '#34d399';
+                verdict = '"Obscenely profitable. The landlord has already drafted next year’s rent and the noon-demon has noted your name. Enjoy it before the season turns."';
+            } else if (profitVND > 50000000) {
+                profitEl.className = 'font-mono font-bold text-xl text-green-400';
+                tierLabel = 'TIER 04 / WARM, FOR NOW';
+                gaugePct = 80; gaugeColor = '#4ade80';
                 verdict = '"You are profitable. The landlord has noticed and will double your rent next year. Such is the way of the mountain."';
             } else if (profitVND > 0) {
                 profitEl.className = 'font-mono font-bold text-xl text-green-500';
+                tierLabel = 'TIER 03 / A THIN MARGIN';
+                gaugePct = 52; gaugeColor = '#a3e635';
                 verdict = '"A fragile margin. One broken espresso machine from insolvency. The bridge holds — for now. The mountain is watching."';
+            } else if (profitVND > -30000000) {
+                profitEl.className = 'font-mono font-bold text-xl text-amber-400';
+                tierLabel = 'TIER 02 / THE FOG ROLLS IN';
+                gaugePct = 26; gaugeColor = '#fbbf24';
+                verdict = '"Bleeding slowly. Each month the capital thins like breath on cold glass. The bludička is leading you somewhere, and it is not toward shore."';
             } else {
                 profitEl.className = 'font-mono font-bold text-xl text-red-500';
+                tierLabel = 'TIER 01 / THE VOID OPENS';
+                gaugePct = 8; gaugeColor = '#f87171';
                 verdict = '"Negative cash flow. The void consumes the capital. Perhaps the milk water was never the answer, Charles."';
             }
             commentEl.textContent = verdict;
+
+            // The doom gauge fills toward survival.
+            const gaugeFill = document.getElementById('gauge-fill');
+            gaugeFill.style.width = gaugePct + '%';
+            gaugeFill.style.backgroundColor = gaugeColor;
+            gaugeFill.style.boxShadow = '0 0 12px -2px ' + gaugeColor;
+            document.getElementById('gauge-label').textContent = tierLabel;
+            document.getElementById('gauge-readout').textContent = gaugePct + ' / 100';
+
+            // Runway: how many months until the cave is empty, or how fat the cushion grows.
+            const runwayEl = document.getElementById('runway-line');
+            if (profitVND >= 0) {
+                runwayEl.textContent = '> runway: the cave deepens. capital is accruing, not bleeding.';
+                runwayEl.style.color = '#52525b';
+            } else {
+                const months = STARTING_CAPITAL_VND / Math.abs(profitVND);
+                const label = months >= 240
+                    ? '> 240'
+                    : (months < 1 ? months.toFixed(1) : Math.floor(months).toString());
+                runwayEl.textContent = '> runway: ≈ ' + label + ' months of capital before the cave is empty.';
+                runwayEl.style.color = months < 12 ? '#f87171' : '#a16207';
+            }
 
             // Build a copyable ledger snapshot.
             lastSnapshot =
@@ -242,6 +329,7 @@
                 'Rent:         ' + formatVND(rentVND) + '\n' +
                 'Staff & Ops:  ' + formatVND(STAFF_AND_OPS_VND) + '\n' +
                 'Net:          ' + formatVND(profitVND) + '\n' +
+                tierLabel + '\n' +
                 verdict.replace(/^"|"$/g, '');
 
             const results = document.getElementById('results');
@@ -321,6 +409,30 @@
                 if (count >= 3) { count = 0; spawnEmber(true); }
             };
         })());
+
+        /* ---------- EASTER EGG: hold the coffee glyph → it breathes faster for 3s ---------- */
+        (() => {
+            const glyph = document.getElementById('glyph');
+            if (!glyph) return;
+            let holdTimer, resetTimer;
+            const start = () => {
+                holdTimer = setTimeout(() => {
+                    if (reducedMotion) return;
+                    glyph.classList.remove('breathe');
+                    glyph.classList.add('breathe-fast');
+                    clearTimeout(resetTimer);
+                    resetTimer = setTimeout(() => {
+                        glyph.classList.remove('breathe-fast');
+                        glyph.classList.add('breathe');
+                    }, 3000);
+                }, 450);
+            };
+            const cancel = () => clearTimeout(holdTimer);
+            glyph.addEventListener('mousedown', start);
+            glyph.addEventListener('touchstart', start, { passive: true });
+            ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev =>
+                glyph.addEventListener(ev, cancel));
+        })();
 
         /* ---------- EASTER EGG: type "prizrak" → the watcher reveals itself ---------- */
         (() => {

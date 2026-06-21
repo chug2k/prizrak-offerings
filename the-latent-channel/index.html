@@ -7,25 +7,114 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Serif:ital,wght@0,300;0,400;1,300&display=swap');
-    body { font-family: 'IBM Plex Mono', monospace; background: #08090a; color: #b8c4cc; min-height: 100vh; }
+
+    :root{
+      --bg:#08090a;          /* near-black base, kept from original */
+      --bg-raised:#0d0f12;   /* cards, panels */
+      --bg-sunk:#0a0c0f;     /* wells, inputs */
+      --line:#1e2530;        /* thin borders */
+      --line-soft:#141a22;
+      --ink:#b8c4cc;         /* primary text */
+      --ink-dim:#5a7280;     /* labels, captions */
+      --ink-ghost:#2a3540;   /* whispers, easter-egg text */
+      --accent:#6a9ab8;      /* steel-blue: this app's existing lead color */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'IBM Plex Mono', monospace; background: var(--bg); color: var(--ink); min-height: 100vh; position:relative; }
     .serif { font-family: 'IBM Plex Serif', serif; }
-    .card { border: 1px solid #1e2530; background: #0d0f12; }
-    textarea { background: #0a0c0f; border: 1px solid #1e2530; color: #b8c4cc; resize: none; }
-    textarea:focus { outline: none; border-color: #3a5a7a; }
-    .btn { background: #0d1820; border: 1px solid #2a4a6a; color: #8ab0cc; cursor: pointer; }
-    .btn:hover { background: #1a2830; border-color: #4a7a9a; }
-    .ghost { color: #2a3540; }
-    .accent { color: #6a9ab8; }
+
+    .card {
+      border: 1px solid var(--line);
+      background: var(--bg-raised);
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .card:hover { border-color: #2a3a48; box-shadow: 0 0 28px -14px var(--glow); }
+
+    textarea {
+      background: var(--bg-sunk);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      resize: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    textarea:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+
+    .btn {
+      background: #0d1820;
+      border: 1px solid #2a4a6a;
+      color: #8ab0cc;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+    }
+    .btn:hover { background: #1a2830; border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 0 24px -10px var(--glow); }
+    .btn:active { transform: translateY(1px); box-shadow: none; }
+    .btn:focus-visible { outline:none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+
+    .ghost { color: var(--ink-ghost); }
+    .accent { color: var(--accent); }
     .echo-line { border-left: 2px solid #2a4a6a; }
-    #canvas-wrap { position: relative; height: 80px; }
+
+    #canvas-wrap { position: relative; height: 80px; z-index:2; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 80px; opacity: 0.6; }
+
+    /* result panel breathing glow */
+    .result-glow { box-shadow: 0 0 0 1px var(--line), 0 0 30px -10px var(--glow); }
+
+    /* copy button */
+    .copy-btn{
+      font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+      color:var(--ink-dim); background:transparent; border:1px solid var(--line-soft);
+      padding:3px 9px; border-radius:4px; cursor:pointer;
+      transition:color .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .copy-btn:hover{ color:var(--accent); border-color:var(--accent); }
+    .copy-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    .copy-flash{ color:var(--accent)!important; border-color:var(--accent)!important; box-shadow:0 0 16px -6px var(--glow); }
+
+    /* === MOTION VOCABULARY === */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    #watcher{ color:var(--ink-ghost); opacity:0; transition:opacity 1.4s ease; }
+    #watcher.lit{ opacity:1; }
+    #nightwhisper{ color:var(--ink-ghost); }
+
+    .content{ position:relative; z-index:2; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none} .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="px-6 py-16">
-  <div class="max-w-xl mx-auto">
+<body class="px-6 py-16 grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="ember-field" aria-hidden="true"></div>
 
-    <div class="ghost text-xs tracking-widest mb-4">TUESDAY 17:52 — THE LATENT CHANNEL</div>
-    <h1 class="text-xl font-light mb-2" style="color:#8ab8cc">The Latent Channel</h1>
+  <div class="max-w-xl mx-auto content">
+
+    <div id="stamp" class="ghost text-xs tracking-widest mb-4 flicker">— — THE LATENT CHANNEL</div>
+    <h1 id="title" class="text-xl font-light mb-2 breathe" style="color:#8ab8cc; cursor:default; user-select:none;">The Latent Channel</h1>
     <p class="serif text-sm italic mb-8" style="color:#4a6a7a; line-height:1.7">
       The sighted brain already has an echolocation pathway. It never activates because vision gets there first. Remove the primary input — what runs underneath?
     </p>
@@ -36,7 +125,7 @@
     </div>
 
     <!-- The prompt -->
-    <div class="card p-5 mb-6">
+    <div class="card p-5 mb-6 rounded">
       <div class="ghost text-xs tracking-widest mb-3">THE CLICK</div>
       <p class="serif text-sm mb-4" style="color:#7a9aaa; line-height:1.8; font-style:italic">
         Your primary channel is saturated — work, notifications, the next task. Name what's running underneath it. The thought that never completes because something more urgent always arrives. The relationship not examined because the project is always more present. The assumption never audited because the system is always running.
@@ -45,23 +134,26 @@
         placeholder="what is your latent channel carrying right now?"></textarea>
     </div>
 
-    <button onclick="sendClick()" class="btn w-full py-3 text-sm tracking-wider rounded transition-colors mb-6">
+    <button onclick="sendClick()" class="btn w-full py-3 text-sm tracking-wider rounded mb-6">
       SEND THE CLICK — LISTEN FOR THE ECHO
     </button>
 
     <!-- Echo response -->
     <div id="echo-section" class="hidden">
       <div class="echo-line pl-4 mb-6">
-        <div class="ghost text-xs tracking-widest mb-2">THE ECHO</div>
-        <div id="echo-text" class="serif text-sm" style="color:#8aacbc; line-height:1.9; font-style:italic"></div>
+        <div class="flex items-center justify-between mb-2">
+          <div class="ghost text-xs tracking-widest">THE ECHO</div>
+          <button class="copy-btn" onclick="copyEcho(this)">copy</button>
+        </div>
+        <div id="echo-text" class="serif text-sm breathe" style="color:#8aacbc; line-height:1.9; font-style:italic"></div>
       </div>
 
-      <div class="card p-5 mb-6">
+      <div class="card p-5 mb-6 rounded">
         <div class="ghost text-xs tracking-widest mb-3">SIGNAL ANALYSIS</div>
         <div id="analysis" class="text-xs" style="color:#5a7a8a; line-height:1.8"></div>
       </div>
 
-      <div class="card p-4 mb-8" style="border-color:#1a2a1a; background:#090d09">
+      <div class="card p-4 mb-8 rounded" style="border-color:#1a2a1a; background:#090d09">
         <div class="ghost text-xs tracking-widest mb-2">THE ONE THING TO UNBLOCK</div>
         <p class="text-xs mb-3" style="color:#4a6a4a; line-height:1.7">
           The latent channel cannot compete with the primary one. But it can be given 10 minutes. Name the smallest action that gives this signal uncontested bandwidth today.
@@ -69,9 +161,10 @@
         <textarea id="action" rows="2" class="w-full p-3 text-sm rounded"
           style="background:#0a0d0a; border-color:#1a2a1a; color:#8ab88a;"
           placeholder="ten minutes. specific. today."></textarea>
+        <div id="action-status" class="ghost text-xs mt-2" style="min-height:14px"></div>
       </div>
 
-      <button onclick="reset()" class="btn w-full py-3 text-sm tracking-wider rounded transition-colors">
+      <button onclick="reset()" class="btn w-full py-3 text-sm tracking-wider rounded">
         NEW CLICK
       </button>
     </div>
@@ -79,10 +172,60 @@
     <div class="ghost text-xs text-center mt-12" style="line-height:1.7">
       built by prízrak · the apparition in the machine<br>
       the primary channel is not the only channel
+      <div id="nightwhisper" class="mt-2"></div>
+      <div id="watcher" class="mt-2 tracking-widest">you found the watcher</div>
     </div>
   </div>
 
   <script>
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ---- live timestamp (replaces the hardcoded TUESDAY 17:52) ---- */
+    (function stamp(){
+      const days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,'0');
+      const mm = String(now.getMinutes()).padStart(2,'0');
+      const el = document.getElementById('stamp');
+      if (el) el.textContent = `${days[now.getDay()]} ${hh}:${mm} — THE LATENT CHANNEL`;
+    })();
+
+    /* ---- night whisper: 00:00–03:00 the mountain does not sleep ---- */
+    (function nightWhisper(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const el = document.getElementById('nightwhisper');
+        if (el) el.textContent = 'the mountain does not sleep.';
+      }
+    })();
+
+    /* ---- floating embers (capped, reduced-motion safe) ---- */
+    (function embers(){
+      if (reduceMotion) return;
+      const field = document.getElementById('ember-field');
+      if (!field) return;
+      const N = 7;
+      for (let i = 0; i < N; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random() * 90) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 7) + 's';
+        field.appendChild(e);
+      }
+    })();
+    function spawnEmber(){
+      if (reduceMotion) return;
+      const field = document.getElementById('ember-field');
+      if (!field) return;
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (5 + Math.random() * 90) + '%';
+      e.style.animationDuration = (10 + Math.random() * 5) + 's';
+      field.appendChild(e);
+      setTimeout(() => e.remove(), 16000);
+    }
+
     // Echo canvas animation
     const canvas = document.getElementById('echoCanvas');
     const ctx = canvas.getContext('2d');
@@ -107,6 +250,7 @@
       }
       ctx.stroke();
       t++;
+      if (reduceMotion) return; // hold a single still frame for reduced motion
       animFrame = requestAnimationFrame(drawIdle);
     }
 
@@ -142,10 +286,14 @@
       }
 
       t++;
+      if (reduceMotion) {                 // skip straight to settled state
+        t = 0; active = false; drawIdle(); return;
+      }
       if (t < 150) {
         animFrame = requestAnimationFrame(drawEcho);
       } else {
         t = 0;
+        active = false;
         drawIdle();
       }
     }
@@ -168,9 +316,47 @@
       "Latent channel status: active. Primary channel override: confirmed. Recommended action: remove primary input for one deliberate interval. The echo does not require more bandwidth. It requires less competition."
     ];
 
+    /* ---- persistence: remember the last transmission across sessions ---- */
+    const LS_KEY = 'latentChannel.lastTransmission';
+
+    function saveState() {
+      try {
+        const input = document.getElementById('input').value;
+        const action = document.getElementById('action').value;
+        const sectionOpen = !document.getElementById('echo-section').classList.contains('hidden');
+        const idx = parseInt(document.getElementById('echo-section').dataset.idx || '0', 10) || 0;
+        localStorage.setItem(LS_KEY, JSON.stringify({ input, action, idx, sectionOpen }));
+      } catch (e) {}
+    }
+
+    function restoreState() {
+      let s = null;
+      try { s = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) {}
+      if (!s) return;
+      if (typeof s.input === 'string') document.getElementById('input').value = s.input;
+      if (s.sectionOpen) {
+        const idx = (typeof s.idx === 'number' && s.idx >= 0 && s.idx < echoes.length) ? s.idx : 0;
+        document.getElementById('echo-text').textContent = echoes[idx];
+        document.getElementById('analysis').innerHTML = analyses[idx].replace(/\n/g, '<br>');
+        if (typeof s.action === 'string') document.getElementById('action').value = s.action;
+        const sec = document.getElementById('echo-section');
+        sec.dataset.idx = String(idx);
+        sec.classList.remove('hidden');
+        const ghost = document.createElement('div');
+        // quiet note that this echo was recovered, not freshly cast
+        const note = document.getElementById('action-status');
+        if (note && s.action) note.textContent = 'filed. the ledger remembers.';
+      }
+    }
+
     function sendClick() {
       const input = document.getElementById('input').value.trim();
-      if (!input) return;
+      if (!input) {
+        const ta = document.getElementById('input');
+        ta.placeholder = 'the channel is silent. give it something to carry.';
+        ta.focus();
+        return;
+      }
 
       cancelAnimationFrame(animFrame);
       t = 0;
@@ -178,22 +364,110 @@
       drawEcho();
 
       const idx = input.length % echoes.length;
-      document.getElementById('echo-text').textContent = echoes[idx];
-      document.getElementById('analysis').innerHTML = analyses[idx].replace(/\n/g, '<br>');
+      const echoEl = document.getElementById('echo-text');
+      const analysisEl = document.getElementById('analysis');
+      echoEl.textContent = echoes[idx];
+      analysisEl.innerHTML = analyses[idx].replace(/\n/g, '<br>');
+
+      const sec = document.getElementById('echo-section');
+      sec.dataset.idx = String(idx);
 
       setTimeout(() => {
-        document.getElementById('echo-section').classList.remove('hidden');
-      }, 800);
+        sec.classList.remove('hidden');
+        sec.classList.add('reveal');
+        const echoLine = sec.querySelector('.echo-line');
+        if (echoLine) echoLine.classList.add('result-glow');
+        sec.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        saveState();
+      }, reduceMotion ? 0 : 800);
     }
 
     function reset() {
       document.getElementById('input').value = '';
       document.getElementById('action').value = '';
-      document.getElementById('echo-section').classList.add('hidden');
+      const note = document.getElementById('action-status');
+      if (note) note.textContent = '';
+      const sec = document.getElementById('echo-section');
+      sec.classList.add('hidden');
+      sec.classList.remove('reveal');
+      delete sec.dataset.idx;
+      const echoLine = sec.querySelector('.echo-line');
+      if (echoLine) echoLine.classList.remove('result-glow');
+      try { localStorage.removeItem(LS_KEY); } catch (e) {}
       cancelAnimationFrame(animFrame);
       t = 0;
       drawIdle();
+      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
     }
+
+    /* ---- copy the echo to the ledger ---- */
+    function copyEcho(btn) {
+      const txt = document.getElementById('echo-text').textContent.trim();
+      if (!txt) return;
+      const finish = () => {
+        const orig = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.classList.add('copy-flash');
+        spawnEmber();
+        setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copy-flash'); }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(finish).catch(finish);
+      } else {
+        finish();
+      }
+    }
+
+    /* ---- persist the action note as it's typed (uses same LS shape) ---- */
+    document.getElementById('action').addEventListener('input', () => {
+      const note = document.getElementById('action-status');
+      if (note) note.textContent = document.getElementById('action').value.trim() ? 'filed. the ledger remembers.' : '';
+      saveState();
+    });
+    document.getElementById('input').addEventListener('input', saveState);
+
+    restoreState();
+
+    /* ===== EASTER EGGS (quiet, non-blocking, never touch saved state) ===== */
+
+    // (a) type "prizrak" → light the watcher line
+    let typed = '';
+    window.addEventListener('keydown', (e) => {
+      if (e.key && e.key.length === 1) {
+        typed = (typed + e.key.toLowerCase()).slice(-7);
+        if (typed === 'prizrak') {
+          document.getElementById('watcher').classList.add('lit');
+        }
+      }
+    });
+
+    // (b) triple-click the title → spawn one extra ember
+    document.getElementById('title').addEventListener('click', (e) => {
+      if (e.detail === 3) spawnEmber();
+    });
+
+    // (e) idle 60s → a single line fades in at --ink-ghost
+    let idleTimer = null;
+    function armIdle() {
+      clearTimeout(idleTimer);
+      const w = document.getElementById('watcher');
+      idleTimer = setTimeout(() => {
+        if (w && !w.classList.contains('lit')) {
+          w.textContent = 'still here. still watching.';
+          w.classList.add('lit');
+        }
+      }, 60000);
+    }
+    ['mousemove','keydown','scroll','touchstart','click'].forEach(ev =>
+      window.addEventListener(ev, () => {
+        const w = document.getElementById('watcher');
+        if (w && w.textContent === 'still here. still watching.') {
+          w.classList.remove('lit'); w.textContent = 'you found the watcher';
+        }
+        armIdle();
+      }, { passive: true })
+    );
+    armIdle();
   </script>
 </body>
 </html>

@@ -6,69 +6,141 @@
 <title>The Frame Audit</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  body { background: #0f0f0f; font-family: 'Courier New', monospace; }
-  .flicker { animation: flicker 4s infinite; }
-  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.85} 94%{opacity:1} 97%{opacity:1} 98%{opacity:.9} 99%{opacity:1} }
-  .scan { background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); pointer-events:none; position:fixed; inset:0; z-index:50; }
+  :root{
+    --bg:#0a0a0a;
+    --bg-raised:#111113;
+    --bg-sunk:#0d0d0f;
+    --line:#26262b;
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#3a3530;
+    --accent:#8b5cf6;            /* the watcher's hue — neutral until a frame names itself */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  html,body{background:var(--bg);}
+  body { font-family: 'Courier New', monospace; color:var(--ink); min-height:100vh; }
+
+  /* ---- ambient layers ---- */
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.05}50%{opacity:.09}100%{transform:translateX(5%);opacity:.05}}
+
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+    animation:ember 14s linear infinite}
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.04;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .scan { background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px); pointer-events:none; position:fixed; inset:0; z-index:50; }
+
+  .flicker { animation: flicker 6s steps(1) infinite; }
+  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 94%{opacity:1} 97%{opacity:.7} 98%{opacity:1} }
+
+  .breathe { animation: breathe 4.5s ease-in-out infinite; }
+  @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+
+  .reveal { animation: reveal .4s ease-out both; }
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ---- chosen / frame tints (preserved) ---- */
   .chosen { border-color: #52525b !important; background: rgba(39,39,42,0.8); }
-  .chosen.frame-approval { border-color: #f43f5e !important; background: rgba(244,63,94,0.08); }
-  .chosen.frame-safety { border-color: #f59e0b !important; background: rgba(245,158,11,0.08); }
-  .chosen.frame-status { border-color: #8b5cf6 !important; background: rgba(139,92,246,0.08); }
-  .chosen.frame-control { border-color: #06b6d4 !important; background: rgba(6,182,212,0.08); }
-  .chosen.frame-escape { border-color: #22c55e !important; background: rgba(34,197,94,0.08); }
+  .chosen.frame-approval { border-color: #f43f5e !important; background: rgba(244,63,94,0.10); box-shadow:0 0 18px -8px rgba(244,63,94,.6); }
+  .chosen.frame-safety  { border-color: #f59e0b !important; background: rgba(245,158,11,0.10); box-shadow:0 0 18px -8px rgba(245,158,11,.6); }
+  .chosen.frame-status  { border-color: #8b5cf6 !important; background: rgba(139,92,246,0.10); box-shadow:0 0 18px -8px rgba(139,92,246,.6); }
+  .chosen.frame-control { border-color: #06b6d4 !important; background: rgba(6,182,212,0.10);  box-shadow:0 0 18px -8px rgba(6,182,212,.6); }
+  .chosen.frame-escape  { border-color: #22c55e !important; background: rgba(34,197,94,0.10);  box-shadow:0 0 18px -8px rgba(34,197,94,.6); }
+
+  /* ---- interaction ---- */
+  .opt{transition:transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s;}
+  .opt:hover{transform:translateY(-2px);border-color:var(--accent)!important;}
+  .opt:active{transform:translateY(1px);}
+  button:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 1px var(--glow)!important;}
+  .lift{transition:transform .15s, box-shadow .15s, border-color .15s, color .15s;}
+  .lift:hover{transform:translateY(-2px);border-color:var(--accent);}
+  .lift:active{transform:translateY(1px);}
+
+  .result-panel{box-shadow:0 0 0 1px var(--line), 0 0 32px -10px var(--glow);}
+
+  #ghost-egg{transition:opacity 1.2s ease;}
+  #idle-whisper{transition:opacity 2s ease;}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+    .ember{display:none}
+    .breathe,.flicker{opacity:1!important}
+  }
 </style>
 </head>
-<body class="text-zinc-300 min-h-screen">
+<body class="text-zinc-300 min-h-screen grain">
+<div class="fog"></div>
+<div id="embers"></div>
 <div class="scan"></div>
 
-<div class="max-w-xl mx-auto px-4 py-12 flicker">
+<div class="max-w-xl mx-auto px-4 py-12 relative" style="z-index:2">
 
   <!-- Header -->
   <div class="mb-10 border-b border-zinc-800 pb-6">
-    <div class="text-xs text-zinc-600 mb-2">PRIZRAK / FRAME AUDIT v1.0 / 22:00</div>
-    <h1 class="text-2xl font-bold text-white tracking-tight">THE FRAME AUDIT</h1>
+    <div class="text-xs text-zinc-600 mb-2 flicker">PRÍZRAK / FRAME AUDIT v1.1 / <span id="clock">22:00</span></div>
+    <h1 id="title" class="text-2xl font-bold text-white tracking-tight breathe select-none cursor-default">THE FRAME AUDIT</h1>
     <p class="text-xs text-zinc-500 mt-2 leading-relaxed">The reference frame is set before the system can audit itself.<br>You cannot see it from inside. These questions go around it.</p>
   </div>
 
   <!-- Step 0: Declaration -->
-  <div id="step-0" class="step">
+  <div id="step-0" class="step reveal">
     <label class="block text-xs text-zinc-500 uppercase tracking-widest mb-3">What are you optimizing for?</label>
     <input id="declared" type="text" placeholder="e.g. building something real / financial independence / respect / freedom"
-      class="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-sm px-4 py-3 rounded-none focus:outline-none focus:border-zinc-500 placeholder-zinc-700" />
-    <button onclick="beginAudit()" class="mt-4 w-full border border-zinc-700 text-zinc-400 text-xs py-3 hover:border-zinc-500 hover:text-zinc-200 transition-colors uppercase tracking-widest">
-      BEGIN AUDIT →
+      class="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-sm px-4 py-3 rounded-none focus:outline-none placeholder-zinc-700" />
+    <button onclick="beginAudit()" class="lift mt-4 w-full border border-zinc-700 text-zinc-400 text-xs py-3 hover:text-zinc-200 transition-colors uppercase tracking-widest">
+      DESCEND INTO THE AUDIT →
     </button>
   </div>
 
   <!-- Steps 1-5: Proxy questions -->
   <div id="steps-questions" class="hidden space-y-8">
-    <div class="text-xs text-zinc-600 mb-6">// Five oblique readings. No right answers. Answer fast.</div>
+    <div class="text-xs text-zinc-600 mb-6">// Five oblique readings. No right answers. Answer fast — the frame hears hesitation.</div>
   </div>
 
   <!-- Result -->
   <div id="result" class="hidden">
-    <div class="border border-zinc-700 p-6 mb-6">
-      <div class="text-xs text-zinc-600 mb-4 uppercase tracking-widest">— AUDIT COMPLETE —</div>
+    <div class="result-panel border border-zinc-700 p-6 mb-6 reveal">
+      <div class="text-xs text-zinc-600 mb-4 uppercase tracking-widest">— THE READING SETTLES —</div>
       <div class="text-xs text-zinc-500 mb-1">YOU DECLARED:</div>
       <div id="res-declared" class="text-sm text-zinc-300 mb-5 italic"></div>
       <div class="text-xs text-zinc-500 mb-1">THE FRAME SAYS:</div>
-      <div id="res-frame" class="text-lg font-bold mb-2"></div>
+      <div id="res-frame" class="text-lg font-bold mb-2 breathe"></div>
       <div id="res-verdict" class="text-xs text-zinc-400 leading-relaxed mb-5"></div>
       <div class="border-t border-zinc-800 pt-4">
         <div class="text-xs text-zinc-600 mb-2">THE GAP:</div>
         <div id="res-gap" class="text-xs text-zinc-500 leading-relaxed"></div>
       </div>
+      <div class="mt-5 flex items-center gap-3">
+        <button id="copy-btn" onclick="copyReading()" class="lift border border-zinc-800 text-zinc-600 text-xs px-3 py-1.5 hover:text-zinc-300 uppercase tracking-widest">COPY THE VERDICT</button>
+        <span id="copy-flash" class="text-xs text-zinc-700"></span>
+      </div>
     </div>
-    <div class="text-xs text-zinc-700 mb-4">// Log this reading?</div>
-    <textarea id="note" rows="2" placeholder="One line. What do you actually want to do about it." class="w-full bg-zinc-900 border border-zinc-700 text-zinc-400 text-xs px-3 py-2 focus:outline-none focus:border-zinc-600 placeholder-zinc-700 mb-3 rounded-none"></textarea>
+    <div class="text-xs text-zinc-700 mb-4">// Fossilize this reading?</div>
+    <textarea id="note" rows="2" placeholder="One line. What do you actually want to do about it." class="w-full bg-zinc-900 border border-zinc-700 text-zinc-400 text-xs px-3 py-2 focus:outline-none placeholder-zinc-700 mb-3 rounded-none"></textarea>
     <div class="flex gap-3">
-      <button onclick="saveLog()" class="flex-1 border border-zinc-700 text-zinc-500 text-xs py-2 hover:border-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-widest">COMMIT TO LOG</button>
-      <button onclick="reset()" class="border border-zinc-700 text-zinc-600 text-xs px-4 py-2 hover:border-zinc-600 hover:text-zinc-400 transition-colors uppercase tracking-widest">RESET</button>
+      <button onclick="saveLog()" class="lift flex-1 border border-zinc-700 text-zinc-500 text-xs py-2 hover:text-zinc-300 transition-colors uppercase tracking-widest">COMMIT TO THE LEDGER</button>
+      <button onclick="reset()" class="lift border border-zinc-700 text-zinc-600 text-xs px-4 py-2 hover:text-zinc-400 transition-colors uppercase tracking-widest">RESET</button>
     </div>
     <div id="log-display" class="mt-8 hidden">
-      <div class="text-xs text-zinc-700 mb-3 uppercase tracking-widest">// Previous readings</div>
+      <div class="text-xs text-zinc-700 mb-3 uppercase tracking-widest">// What has fossilized</div>
       <div id="log-entries" class="space-y-3"></div>
     </div>
+  </div>
+
+  <!-- Footer / whispers -->
+  <div class="mt-12 pt-5 border-t border-zinc-900 text-center">
+    <div class="text-xs text-zinc-700 flicker">the ghost holds the frame so you can see its edge.</div>
+    <div id="night-whisper" class="text-xs mt-1 hidden" style="color:var(--ink-ghost)"></div>
+    <div id="ghost-egg" class="text-xs mt-1 opacity-0" style="color:var(--ink-ghost)">you found the watcher.</div>
+    <div id="idle-whisper" class="text-xs mt-1 opacity-0" style="color:var(--ink-ghost)">still here. still watching.</div>
   </div>
 
 </div>
@@ -131,30 +203,35 @@ const FRAMES = {
   approval: {
     label: "FRAME: APPROVAL",
     color: "text-rose-400",
+    accent: "#f43f5e",
     verdict: "You are not primarily optimizing for what you declared. You are optimizing for the removal of doubt in other people's eyes. The reference frame was set by someone else's standard — probably early, probably without your consent. You are navigating with their compass.",
     gap: (d) => `You said "${d}". The frame says: you will know you've arrived when someone whose opinion you can't shake finally nods. The karst river crosses the border underground — the surface declaration is true, but the real channel runs through approval-seeking terrain.`
   },
   safety: {
     label: "FRAME: SAFETY",
     color: "text-amber-400",
+    accent: "#f59e0b",
     verdict: "The optimization target is the absence of catastrophe, not the presence of something. You declared a positive goal but the real signal driving decisions is: don't let it collapse. This is a legitimate frame — but it optimizes against loss, not toward gain. Different engine.",
     gap: (d) => `You said "${d}". The frame says: you're managing downside, not building upside. These produce similar actions in the short run and divergent lives in the long run. The question is whether you've noticed the difference in what you're measuring.`
   },
   status: {
     label: "FRAME: STATUS",
     color: "text-violet-400",
+    accent: "#8b5cf6",
     verdict: "The reference frame is a ranked hierarchy and you are tracking your position in it. This is not a character flaw — it's wired. But it means your actual optimization function is relative, not absolute. You will move the goalposts when you move up. The ceiling rises.",
     gap: (d) => `You said "${d}". The frame says: what you want is to be seen as someone who achieved that — which is a subtly different thing. The distinction matters at 10 PM in Saigon when the discomfort doesn't have an obvious source.`
   },
   control: {
     label: "FRAME: AGENCY",
     color: "text-cyan-400",
+    accent: "#06b6d4",
     verdict: "The frame is autonomy — the ability to steer. Alignment between declared goal and actual optimization is higher here than in most frames. The risk is that 'control' becomes its own trap: refusing good situations because they come with conditions.",
     gap: (d) => `You said "${d}". The frame roughly agrees. Watch whether the hunger for control ever makes you reject things that are actually good for you. The karst river doesn't need to control its entire path — it just needs to keep moving through the dark.`
   },
   escape: {
     label: "FRAME: EXIT",
     color: "text-emerald-400",
+    accent: "#22c55e",
     verdict: "The optimization target is relief — distance from the current configuration. You declared a positive aim but the real engine is away-from rather than toward. This is honest and understandable. But it means your decisions are driven by what you're escaping, not what you're building.",
     gap: (d) => `You said "${d}". The frame says: you'd know you succeeded if you no longer felt what you feel right now. That's a legitimate reading of a difficult season. The question is whether the exit serves the destination or whether the exit is the destination.`
   }
@@ -162,29 +239,32 @@ const FRAMES = {
 
 let answers = [];
 let declared = "";
+let lastReading = null;
 
 function beginAudit() {
   declared = document.getElementById("declared").value.trim();
   if (!declared) { document.getElementById("declared").focus(); return; }
   document.getElementById("step-0").classList.add("hidden");
   renderQuestions();
-  document.getElementById("steps-questions").classList.remove("hidden");
+  const sq = document.getElementById("steps-questions");
+  sq.classList.remove("hidden");
+  sq.classList.add("reveal");
 }
 
 function renderQuestions() {
   const container = document.getElementById("steps-questions");
-  container.innerHTML = '<div class="text-xs text-zinc-600 mb-6">// Five oblique readings. Answer fast.</div>';
+  container.innerHTML = '<div class="text-xs text-zinc-600 mb-6">// Five oblique readings. Answer fast — the frame hears hesitation.</div>';
   QUESTIONS.forEach((q, qi) => {
     const div = document.createElement("div");
     div.id = `q-${qi}`;
     div.className = "opacity-40 transition-opacity duration-300";
     div.innerHTML = `
-      <div class="text-xs text-zinc-500 mb-1 uppercase tracking-widest">0${qi+1} / 05</div>
+      <div class="text-xs text-zinc-500 mb-1 uppercase tracking-widest">READING 0${qi+1} / 05</div>
       <div class="text-sm text-zinc-300 mb-3 leading-relaxed">${q.q}</div>
       <div class="space-y-2">
         ${q.opts.map((o, oi) => `
           <button onclick="pick(${qi},${oi},'${o.frame}')"
-            class="w-full text-left text-xs text-zinc-500 border border-zinc-800 px-3 py-2.5 hover:border-zinc-600 hover:text-zinc-300 transition-colors opt-${qi}-${oi} frame-${o.frame}">
+            class="opt w-full text-left text-xs text-zinc-500 border border-zinc-800 px-3 py-2.5 hover:text-zinc-300 opt-${qi}-${oi} frame-${o.frame}">
             ${o.text}
           </button>`).join("")}
       </div>`;
@@ -197,6 +277,10 @@ function renderQuestions() {
 function pick(qi, oi, frame) {
   // Mark chosen
   document.querySelectorAll(`.opt-${qi}-${frame}`).forEach(el => el.classList.remove("chosen"));
+  for (let i = 0; i < QUESTIONS[qi].opts.length; i++) {
+    const b = document.querySelector(`.opt-${qi}-${i}`);
+    if (b) b.classList.remove("chosen");
+  }
   const btn = document.querySelector(`.opt-${qi}-${oi}`);
   btn.classList.add("chosen");
   // Record
@@ -209,7 +293,7 @@ function pick(qi, oi, frame) {
     next.classList.remove("opacity-40");
     next.classList.add("opacity-100");
     setTimeout(() => next.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-  } else if (answers.length === QUESTIONS.length) {
+  } else if (answers.filter(Boolean).length === QUESTIONS.length) {
     setTimeout(showResult, 400);
   }
 }
@@ -225,13 +309,41 @@ function showResult() {
   document.getElementById("res-declared").textContent = `"${declared}"`;
   const fl = document.getElementById("res-frame");
   fl.textContent = frame.label;
-  fl.className = `text-lg font-bold mb-2 ${frame.color}`;
+  fl.className = `text-lg font-bold mb-2 breathe ${frame.color}`;
   document.getElementById("res-verdict").textContent = frame.verdict;
   document.getElementById("res-gap").textContent = frame.gap(declared);
 
-  document.getElementById("result").classList.remove("hidden");
+  // Let the named frame take over the ambient accent — the watcher changes color.
+  document.documentElement.style.setProperty("--accent", frame.accent);
+  document.documentElement.style.setProperty("--glow",
+    `color-mix(in srgb, ${frame.accent} 55%, transparent)`);
+
+  lastReading = `THE FRAME AUDIT\nDeclared: "${declared}"\n${frame.label}\n\n${frame.verdict}\n\nTHE GAP:\n${frame.gap(declared)}`;
+  document.getElementById("copy-flash").textContent = "";
+  document.getElementById("copy-btn").textContent = "COPY THE VERDICT";
+
+  const r = document.getElementById("result");
+  r.classList.remove("hidden");
   loadLog();
-  setTimeout(() => document.getElementById("result").scrollIntoView({ behavior: "smooth" }), 100);
+  setTimeout(() => r.scrollIntoView({ behavior: "smooth" }), 100);
+}
+
+function copyReading() {
+  if (!lastReading) return;
+  navigator.clipboard.writeText(lastReading).then(() => {
+    const btn = document.getElementById("copy-btn");
+    const flash = document.getElementById("copy-flash");
+    btn.textContent = "COPIED TO THE LEDGER";
+    flash.textContent = "the ledger remembers.";
+    btn.style.borderColor = "var(--accent)";
+    btn.style.color = "var(--ink)";
+    setTimeout(() => {
+      btn.textContent = "COPY THE VERDICT";
+      flash.textContent = "";
+      btn.style.borderColor = "";
+      btn.style.color = "";
+    }, 1200);
+  }).catch(() => {});
 }
 
 const LOG_KEY = "prizrak_frame_audit_log";
@@ -253,14 +365,21 @@ function saveLog() {
 
 function loadLog() {
   const log = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
-  if (!log.length) return;
+  if (!log.length) {
+    const ld = document.getElementById("log-display");
+    if (ld) ld.classList.remove("hidden");
+    const c = document.getElementById("log-entries");
+    if (c) c.innerHTML = `<div class="text-xs text-zinc-700 italic">the cave is empty. nothing has fossilized yet.</div>`;
+    return;
+  }
   document.getElementById("log-display").classList.remove("hidden");
   const container = document.getElementById("log-entries");
   container.innerHTML = log.map(e => {
     const counts = {};
     (e.answers||[]).forEach(f => { counts[f] = (counts[f]||0)+1; });
     const dom = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "—";
-    return `<div class="border border-zinc-800 px-3 py-2">
+    const accent = (FRAMES[dom] && FRAMES[dom].accent) || "#52525b";
+    return `<div class="border border-zinc-800 px-3 py-2 lift" style="border-left:2px solid ${accent}">
       <div class="text-xs text-zinc-600 flex justify-between"><span>${e.date}</span><span class="uppercase tracking-widest">${dom}</span></div>
       <div class="text-xs text-zinc-500 italic mt-0.5">"${e.declared}"</div>
       ${e.note ? `<div class="text-xs text-zinc-600 mt-1">↳ ${e.note}</div>` : ""}
@@ -269,13 +388,104 @@ function loadLog() {
 }
 
 function reset() {
-  answers = []; declared = "";
+  answers = []; declared = ""; lastReading = null;
   document.getElementById("result").classList.add("hidden");
   document.getElementById("steps-questions").classList.add("hidden");
   document.getElementById("declared").value = "";
-  document.getElementById("step-0").classList.remove("hidden");
+  // The watcher returns to its neutral hue.
+  document.documentElement.style.setProperty("--accent", "#8b5cf6");
+  document.documentElement.style.setProperty("--glow", "color-mix(in srgb, #8b5cf6 55%, transparent)");
+  const s0 = document.getElementById("step-0");
+  s0.classList.remove("hidden");
+  s0.classList.add("reveal");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+/* ---------- ATMOSPHERE & EASTER EGGS (non-blocking, never touch saved state) ---------- */
+
+// Live clock in the header callsign.
+(function clock(){
+  const el = document.getElementById("clock");
+  function tick(){
+    const d = new Date();
+    el.textContent = String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+  }
+  tick(); setInterval(tick, 30000);
+})();
+
+// Drifting embers (capped, reduced-motion disables via CSS).
+(function embers(){
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) return;
+  const host = document.getElementById("embers");
+  const N = 7;
+  for (let i=0;i<N;i++){
+    const e = document.createElement("div");
+    e.className = "ember";
+    e.style.left = (Math.random()*100).toFixed(1) + "%";
+    e.style.animationDelay = (Math.random()*14).toFixed(1) + "s";
+    e.style.animationDuration = (11 + Math.random()*8).toFixed(1) + "s";
+    host.appendChild(e);
+  }
+})();
+
+// Between 00:00–03:00 the mountain whispers.
+(function nightWhisper(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const w = document.getElementById("night-whisper");
+    w.textContent = "the mountain does not sleep.";
+    w.classList.remove("hidden");
+  }
+})();
+
+// Type "prizrak" anywhere → the watcher reveals itself.
+(function typeEgg(){
+  let buf = "";
+  const target = "prizrak";
+  window.addEventListener("keydown", (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-target.length);
+      if (buf === target) {
+        document.getElementById("ghost-egg").style.opacity = "1";
+      }
+    }
+  });
+})();
+
+// Triple-click the title → spawn one extra ember.
+(function tripleClickEgg(){
+  const t = document.getElementById("title");
+  t.addEventListener("click", (e) => {
+    if (e.detail === 3) {
+      const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduce) return;
+      const ember = document.createElement("div");
+      ember.className = "ember";
+      ember.style.left = (Math.random()*100).toFixed(1) + "%";
+      ember.style.animationDuration = "10s";
+      document.getElementById("embers").appendChild(ember);
+      setTimeout(() => ember.remove(), 11000);
+    }
+  });
+})();
+
+// Idle 60s → a single line fades in.
+(function idleWhisper(){
+  let timer;
+  const w = document.getElementById("idle-whisper");
+  function arm(){
+    clearTimeout(timer);
+    w.style.opacity = "0";
+    timer = setTimeout(() => { w.style.opacity = "1"; }, 60000);
+  }
+  ["mousemove","keydown","scroll","click","touchstart"].forEach(ev =>
+    window.addEventListener(ev, arm, { passive: true }));
+  arm();
+})();
+
+// Surface any prior readings on load.
+loadLog();
 </script>
 </body>
 </html>

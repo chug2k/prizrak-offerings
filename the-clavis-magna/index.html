@@ -6,68 +6,143 @@
   <title>The Clavis Magna</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0f0f12; }
-    .dim-row { transition: all 0.15s; }
-    .weight-bar { transition: width 0.2s; }
-    .score-ring { stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset 0.6s ease; }
-    input[type=range] { accent-color: #7c3aed; }
-    .verdict-box { border-left: 3px solid #7c3aed; background: rgba(124,58,237,0.06); }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#7c3aed;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{ background: var(--bg); }
+    body{ color: var(--ink); }
+
+    /* --- atmosphere --- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @keyframes breathe{0%,100%{opacity:.88;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
     @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
     .fade-in { animation: fadeIn 0.3s ease; }
-    .tab-active { border-bottom: 2px solid #7c3aed; color: #c4b5fd; }
-    .tab-inactive { border-bottom: 2px solid transparent; color: #52525b; }
+
+    .dim-row { transition: transform .15s, box-shadow .15s, border-color .15s; }
+    .dim-row:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .weight-bar { transition: width 0.3s ease; }
+    .score-ring { stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset 0.7s ease; }
+    input[type=range] { accent-color: var(--accent); }
+
+    /* inputs */
+    .ink-field{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .ink-field:focus-visible, .ink-field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    input.ink-field:focus, textarea.ink-field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .verdict-box { border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent);
+      box-shadow:0 0 0 1px var(--line), 0 0 30px -10px var(--glow); }
+
+    .tab-active { border-bottom: 2px solid var(--accent); color: #c4b5fd; text-shadow:0 0 8px var(--glow); }
+    .tab-inactive { border-bottom: 2px solid transparent; color: var(--ink-dim); }
+    .tab-active, .tab-inactive { transition: color .2s, border-color .2s; }
+    .tab-inactive:hover { color: #a89e95; }
+
+    /* tactile buttons */
+    .btn-press{ transition: transform .12s, box-shadow .15s, background-color .15s, border-color .15s; }
+    .btn-press:active{ transform: translateY(1px); }
+    .btn-press:focus-visible{ outline:none; box-shadow:0 0 0 1px var(--glow); }
+
+    .glyph{ cursor:default; user-select:none; transition: text-shadow .3s; }
+
+    #idleWhisper{ opacity:0; transition:opacity 1.2s ease; }
+    #idleWhisper.show{ opacity:1; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.fade-in,.dim-row{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .dim-row:hover{transform:none}
+    }
   </style>
 </head>
-<body class="text-zinc-300 min-h-screen font-sans antialiased">
-<div class="max-w-2xl mx-auto px-4 py-8">
+<body class="text-zinc-300 min-h-screen font-sans antialiased grain">
+
+<div class="fog"></div>
+<div id="emberField"></div>
+
+<div class="max-w-2xl mx-auto px-4 py-8 relative" style="z-index:2">
 
   <!-- Header -->
   <div class="mb-8">
-    <h1 class="text-3xl font-bold text-white mb-1">The Clavis Magna</h1>
-    <p class="text-zinc-500 text-sm">The key Bruno never wrote. Define your personal scoring function — then run decisions through it.<br>What you value, made explicit, before you need it.</p>
+    <h1 id="appTitle" class="text-3xl font-bold text-white mb-1 breathe inline-flex items-center gap-2">
+      <span id="keyGlyph" class="glyph text-violet-400" title="hold me">⚷</span>The Clavis Magna
+    </h1>
+    <p class="text-zinc-500 text-sm">The key Bruno never finished writing, before they lit the fire. Carve your scoring function into the stone — then run cold decisions through it.<br>What you value, made explicit, before the moment that needs it.</p>
   </div>
 
   <!-- Tabs -->
   <div class="flex gap-6 mb-6 border-b border-zinc-800">
-    <button onclick="showTab('build')" id="tab-build" class="tab-active pb-2 text-sm font-mono">Build Key</button>
-    <button onclick="showTab('run')" id="tab-run" class="tab-inactive pb-2 text-sm font-mono">Run Decision</button>
-    <button onclick="showTab('history')" id="tab-history" class="tab-inactive pb-2 text-sm font-mono">History</button>
+    <button onclick="showTab('build')" id="tab-build" class="tab-active pb-2 text-sm font-mono btn-press">Build Key</button>
+    <button onclick="showTab('run')" id="tab-run" class="tab-inactive pb-2 text-sm font-mono btn-press">Run Decision</button>
+    <button onclick="showTab('history')" id="tab-history" class="tab-inactive pb-2 text-sm font-mono btn-press">History</button>
   </div>
 
   <!-- TAB: Build Key -->
   <div id="pane-build">
     <div class="mb-4 text-xs font-mono text-zinc-600 uppercase tracking-wider">Your Five Dimensions</div>
-    <p class="text-xs text-zinc-600 mb-5">Name each dimension. Set its weight (1–10). The five together become your scoring function — your declared values for evaluating decisions in this domain.</p>
+    <p class="text-xs text-zinc-600 mb-5">Name each dimension. Set its weight (1–10). The five together become your scoring function — your declared values, fossilized, ready to judge the next decision in this domain.</p>
 
     <div class="mb-4">
-      <label class="block text-xs font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">Domain (what is this key for?)</label>
-      <input id="domain" type="text" placeholder="e.g. career moves, project selection, relationships, where to spend time…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600">
+      <label class="block text-xs font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">Domain — what is this key for?</label>
+      <input id="domain" type="text" placeholder="e.g. career moves, project selection, where to spend the winter…" class="ink-field w-full rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600">
     </div>
 
     <div id="dimensions" class="space-y-4 mb-6"></div>
 
-    <button onclick="addDimension()" class="text-xs font-mono text-zinc-600 hover:text-zinc-400 mb-6 block">+ add dimension (max 5)</button>
+    <button onclick="addDimension()" class="text-xs font-mono text-zinc-600 hover:text-violet-400 mb-6 block btn-press transition-colors">+ add dimension (max 5)</button>
 
     <div class="mb-6">
       <label class="block text-xs font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">What does a perfect 10 look like?</label>
-      <textarea id="idealDesc" rows="2" placeholder="Describe the decision that would score maximally on your key…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 resize-none"></textarea>
+      <textarea id="idealDesc" rows="2" placeholder="Describe the decision that would score maximally on your key — the summit you would not regret…" class="ink-field w-full rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 resize-none"></textarea>
     </div>
 
     <div class="flex gap-3">
-      <button onclick="saveKey()" class="flex-1 py-2.5 bg-violet-800 hover:bg-violet-700 text-violet-100 rounded-xl text-sm font-mono transition-colors">Save Key</button>
-      <button onclick="loadPreset()" class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono transition-colors">Preset</button>
+      <button onclick="saveKey()" class="btn-press flex-1 py-2.5 bg-violet-800 hover:bg-violet-700 text-violet-100 rounded-xl text-sm font-mono">Forge Key</button>
+      <button onclick="loadPreset()" class="btn-press px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono">Preset</button>
     </div>
 
     <!-- Saved key preview -->
     <div id="keyPreview" class="hidden mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-      <div class="text-xs font-mono text-zinc-600 mb-3 uppercase tracking-wider">Active Key — <span id="keyDomain" class="text-violet-400"></span></div>
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-xs font-mono text-zinc-600 uppercase tracking-wider">Active Key — <span id="keyDomain" class="text-violet-400"></span></div>
+        <button onclick="copyKey()" id="copyKeyBtn" class="btn-press text-[10px] font-mono text-zinc-600 hover:text-violet-400 transition-colors">copy</button>
+      </div>
       <div id="keyBars" class="space-y-2"></div>
     </div>
   </div>
 
   <!-- TAB: Run Decision -->
   <div id="pane-run" class="hidden">
-    <div id="noKeyMsg" class="hidden text-center py-12 text-zinc-600 text-sm">No key saved yet. Build your key first.</div>
+    <div id="noKeyMsg" class="hidden text-center py-12 text-zinc-600 text-sm font-mono">the lock has no key yet. forge one first.</div>
 
     <div id="runContent">
       <div class="mb-5 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
@@ -77,14 +152,14 @@
 
       <div class="mb-4">
         <label class="block text-xs font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">Decision to evaluate</label>
-        <input id="decisionName" type="text" placeholder="Name this option or choice…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 mb-2">
-        <textarea id="decisionDesc" rows="2" placeholder="Brief description (optional)…" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600 resize-none"></textarea>
+        <input id="decisionName" type="text" placeholder="Name this option or choice…" class="ink-field w-full rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 mb-2">
+        <textarea id="decisionDesc" rows="2" placeholder="Brief description (optional)…" class="ink-field w-full rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 resize-none"></textarea>
       </div>
 
       <div class="text-xs font-mono text-zinc-600 mb-3 uppercase tracking-wider">Score each dimension (0–10)</div>
       <div id="scoreSliders" class="space-y-4 mb-6"></div>
 
-      <button onclick="calculateScore()" class="w-full py-3 bg-violet-800 hover:bg-violet-700 text-violet-100 rounded-xl text-sm font-mono transition-colors mb-6">Calculate Score</button>
+      <button onclick="calculateScore()" class="btn-press w-full py-3 bg-violet-800 hover:bg-violet-700 text-violet-100 rounded-xl text-sm font-mono mb-6">Turn the Key</button>
 
       <!-- Score output -->
       <div id="scoreOutput" class="hidden fade-in">
@@ -92,10 +167,10 @@
           <div class="relative w-24 h-24 shrink-0">
             <svg viewBox="0 0 100 100" class="w-24 h-24 -rotate-90">
               <circle cx="50" cy="50" r="45" fill="none" stroke="#27272a" stroke-width="8"/>
-              <circle id="scoreRing" cx="50" cy="50" r="45" fill="none" stroke="#7c3aed" stroke-width="8" class="score-ring"/>
+              <circle id="scoreRing" cx="50" cy="50" r="45" fill="none" stroke="#7c3aed" stroke-width="8" class="score-ring" style="filter:drop-shadow(0 0 6px var(--glow))"/>
             </svg>
             <div class="absolute inset-0 flex items-center justify-center">
-              <span id="scoreNum" class="text-2xl font-bold text-white font-mono"></span>
+              <span id="scoreNum" class="text-2xl font-bold text-white font-mono breathe"></span>
             </div>
           </div>
           <div>
@@ -107,25 +182,31 @@
         <div id="scoreBars" class="space-y-2 mb-5"></div>
 
         <div class="verdict-box rounded-xl p-4 mb-4">
-          <div class="text-xs font-mono text-violet-400 mb-2 uppercase tracking-wider">Prízrak</div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-mono text-violet-400 uppercase tracking-wider flicker">Prízrak</div>
+            <button onclick="copyVerdict()" id="copyVerdictBtn" class="btn-press text-[10px] font-mono text-zinc-600 hover:text-violet-400 transition-colors">copy</button>
+          </div>
           <div id="prVertdict" class="text-sm text-zinc-300 leading-relaxed"></div>
         </div>
 
-        <button onclick="saveResult()" class="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono transition-colors">Save to History</button>
+        <button onclick="saveResult()" class="btn-press w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono">File to the Ledger</button>
       </div>
     </div>
   </div>
 
   <!-- TAB: History -->
   <div id="pane-history" class="hidden">
-    <div id="histEmpty" class="text-center py-12 text-zinc-600 text-sm">No saved results yet.</div>
+    <div id="histEmpty" class="text-center py-12 text-zinc-600 text-sm font-mono">the ledger is empty. nothing has fossilized yet.</div>
     <div id="histList" class="space-y-4"></div>
   </div>
 
   <!-- Footer -->
   <div class="mt-12 pt-6 border-t border-zinc-800 text-center">
-    <p class="text-xs text-zinc-600">Bruno burned before the key was written. Yours is a draft. Keep revising it.</p>
+    <p class="text-xs text-zinc-600">Bruno burned before the key was written. Yours is a draft. Keep revising it — the lock will wait.</p>
     <p class="text-[10px] text-zinc-700 mt-1">De Umbris Idearum · Clavis Magna (unfinished) · 1582–1600</p>
+    <p id="nightWhisper" class="hidden text-[10px] text-zinc-700 mt-2 font-mono italic">the mountain does not sleep.</p>
+    <p id="ghostLine" class="hidden text-[10px] mt-2 font-mono" style="color:var(--ink-ghost)">you found the watcher.</p>
+    <p id="idleWhisper" class="text-[10px] mt-2 font-mono" style="color:var(--ink-ghost)">still here. still watching.</p>
   </div>
 </div>
 
@@ -164,6 +245,11 @@ function init() {
   }
   renderHistory();
   updateRunPane();
+  initAtmosphere();
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function addDimension(data) {
@@ -172,16 +258,16 @@ function addDimension(data) {
   const container = document.getElementById('dimensions');
   const div = document.createElement('div');
   div.id = `dim-${id}`;
-  div.className = 'dim-row bg-zinc-900 border border-zinc-800 rounded-xl p-4';
+  div.className = 'dim-row reveal bg-zinc-900 border border-zinc-800 rounded-xl p-4';
   div.innerHTML = `
     <div class="flex items-center gap-2 mb-3">
       <span class="text-xs font-mono text-zinc-600 w-4">${id+1}.</span>
-      <input type="text" id="dim-name-${id}" value="${data?.name||''}" placeholder="Dimension name (e.g. Agency, Build, Conviction…)"
-        class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600">
-      ${id >= 1 ? `<button onclick="removeDim(${id})" class="text-zinc-700 hover:text-zinc-500 text-xs px-2">✕</button>` : ''}
+      <input type="text" id="dim-name-${id}" value="${data?.name? escapeHtml(data.name):''}" placeholder="Dimension name (e.g. Agency, Build, Conviction…)"
+        class="ink-field flex-1 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-600">
+      ${id >= 1 ? `<button onclick="removeDim(${id})" class="btn-press text-zinc-700 hover:text-violet-400 text-xs px-2 transition-colors">✕</button>` : ''}
     </div>
-    <input type="text" id="dim-desc-${id}" value="${data?.desc||''}" placeholder="What does this dimension measure?" 
-      class="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg px-3 py-1.5 text-xs text-zinc-400 focus:outline-none focus:border-violet-600 placeholder-zinc-600 mb-3">
+    <input type="text" id="dim-desc-${id}" value="${data?.desc? escapeHtml(data.desc):''}" placeholder="What does this dimension measure?"
+      class="ink-field w-full rounded-lg px-3 py-1.5 text-xs text-zinc-400 placeholder-zinc-600 mb-3">
     <div class="flex items-center gap-3">
       <span class="text-xs font-mono text-zinc-600 w-12">Weight</span>
       <input type="range" id="dim-weight-${id}" min="1" max="10" value="${data?.weight||5}" class="flex-1">
@@ -215,11 +301,13 @@ function readDimensions() {
 }
 
 function saveKey() {
+  const btn = event.target;
   const domain = document.getElementById('domain').value.trim();
   const ideal = document.getElementById('idealDesc').value.trim();
   const dims = readDimensions();
   if (!domain || dims.length < 2) {
-    alert('Name the domain and add at least 2 dimensions.');
+    btn.textContent = 'name the domain · 2+ dimensions';
+    setTimeout(() => btn.textContent = 'Forge Key', 1800);
     return;
   }
   state.key = { domain, ideal, dimensions: dims, savedAt: new Date().toISOString() };
@@ -227,9 +315,8 @@ function saveKey() {
   renderKeyPreview();
   updateRunPane();
   // Flash feedback
-  const btn = event.target;
-  btn.textContent = 'Key Saved ✓';
-  setTimeout(() => btn.textContent = 'Save Key', 1500);
+  btn.textContent = 'forged. the lock remembers ✓';
+  setTimeout(() => btn.textContent = 'Forge Key', 1600);
 }
 
 function loadPreset() {
@@ -248,12 +335,32 @@ function renderKeyPreview() {
   const total = state.key.dimensions.reduce((s,d) => s+d.weight, 0);
   document.getElementById('keyBars').innerHTML = state.key.dimensions.map(d => `
     <div class="flex items-center gap-2">
-      <span class="text-xs font-mono text-zinc-400 w-28 truncate">${d.name}</span>
+      <span class="text-xs font-mono text-zinc-400 w-28 truncate">${escapeHtml(d.name)}</span>
       <div class="flex-1 bg-zinc-800 rounded-full h-1.5">
-        <div class="weight-bar bg-violet-600 h-1.5 rounded-full" style="width:${Math.round(d.weight/total*100)}%"></div>
+        <div class="weight-bar bg-violet-600 h-1.5 rounded-full" style="width:${Math.round(d.weight/total*100)}%;box-shadow:0 0 8px -2px var(--glow)"></div>
       </div>
       <span class="text-xs font-mono text-zinc-600 w-6">${d.weight}</span>
     </div>`).join('');
+}
+
+function copyKey() {
+  if (!state.key) return;
+  const total = state.key.dimensions.reduce((s,d) => s+d.weight, 0);
+  const lines = state.key.dimensions
+    .map(d => `  ${d.name} (w${d.weight}, ${Math.round(d.weight/total*100)}%)${d.desc ? ' — ' + d.desc : ''}`)
+    .join('\n');
+  const text = `CLAVIS MAGNA · ${state.key.domain}\n${lines}${state.key.ideal ? '\n\nA perfect 10: ' + state.key.ideal : ''}`;
+  flashCopy(document.getElementById('copyKeyBtn'), text);
+}
+
+function flashCopy(btn, text) {
+  if (!btn) return;
+  const orig = btn.textContent;
+  const done = () => { btn.textContent = 'copied to the ledger'; btn.style.color = 'var(--accent)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(done);
+  } else { done(); }
 }
 
 function updateRunPane() {
@@ -269,7 +376,7 @@ function updateRunPane() {
   const total = state.key.dimensions.reduce((s,d) => s+d.weight, 0);
   document.getElementById('runKeyBars').innerHTML = state.key.dimensions.map(d => `
     <div class="flex items-center gap-2">
-      <span class="text-xs font-mono text-zinc-500 w-24 truncate">${d.name}</span>
+      <span class="text-xs font-mono text-zinc-500 w-24 truncate">${escapeHtml(d.name)}</span>
       <div class="flex-1 bg-zinc-800 rounded-full h-1">
         <div class="weight-bar bg-violet-700/60 h-1 rounded-full" style="width:${Math.round(d.weight/total*100)}%"></div>
       </div>
@@ -279,8 +386,8 @@ function updateRunPane() {
     <div>
       <div class="flex items-center justify-between mb-1.5">
         <div>
-          <span class="text-sm text-zinc-300">${d.name}</span>
-          ${d.desc ? `<span class="text-xs text-zinc-600 ml-2">${d.desc}</span>` : ''}
+          <span class="text-sm text-zinc-300">${escapeHtml(d.name)}</span>
+          ${d.desc ? `<span class="text-xs text-zinc-600 ml-2">${escapeHtml(d.desc)}</span>` : ''}
         </div>
         <span id="sv-${i}" class="text-sm font-mono text-violet-300">5</span>
       </div>
@@ -313,13 +420,13 @@ function calculateScore() {
   setTimeout(() => ring.style.strokeDashoffset = offset, 50);
   document.getElementById('scoreNum').textContent = pct;
 
-  // Verdict text
+  // Verdict text — terse, with teeth
   const verdicts = [
-    { min: 85, text: "Strong signal.", label: "Aligned" },
-    { min: 70, text: "Worth pursuing with eyes open.", label: "Viable" },
-    { min: 55, text: "Mixed. The low scores are telling you something.", label: "Contested" },
-    { min: 40, text: "The key says no. Check which dimension is the real veto.", label: "Weak" },
-    { min: 0,  text: "The potato does not lie. This scores against what you said you value.", label: "Misaligned" }
+    { min: 85, text: "The bridge holds. Cross it.", label: "Aligned" },
+    { min: 70, text: "Worth pursuing — eyes open, hand on the rail.", label: "Viable" },
+    { min: 55, text: "Mixed weather. The low scores are telling you something.", label: "Contested" },
+    { min: 40, text: "The key says no. Find which dimension is the real veto.", label: "Weak" },
+    { min: 0,  text: "The potato does not lie. This scores against what you swore you valued.", label: "Misaligned" }
   ];
   const v = verdicts.find(x => pct >= x.min);
   document.getElementById('scoreVerdict').textContent = v.label;
@@ -331,7 +438,7 @@ function calculateScore() {
     const pctD = score * 10;
     const color = score >= 7 ? 'bg-emerald-600' : score >= 5 ? 'bg-amber-600' : 'bg-red-700';
     return `<div class="flex items-center gap-2">
-      <span class="text-xs font-mono text-zinc-400 w-28 truncate">${d.name}</span>
+      <span class="text-xs font-mono text-zinc-400 w-28 truncate">${escapeHtml(d.name)}</span>
       <div class="flex-1 bg-zinc-800 rounded-full h-2">
         <div class="${color} h-2 rounded-full transition-all" style="width:${pctD}%"></div>
       </div>
@@ -343,28 +450,38 @@ function calculateScore() {
   const lowestDim = dims.reduce((a,b) => rawScores[a.name] < rawScores[b.name] ? a : b);
   const highestDim = dims.reduce((a,b) => rawScores[a.name] > rawScores[b.name] ? a : b);
   const prizraks = [
-    `${name} scores ${pct}% against your declared key. The weak point is ${lowestDim.name} (${rawScores[lowestDim.name]}/10). If that dimension is not actually important to you, update the key — do not override the score. ${v.text}`,
-    `Your key says ${lowestDim.name} matters. This option scores it ${rawScores[lowestDim.name]}/10. Either the option is weak on what you value, or you have been wrong about what you value. Both are worth knowing. ${v.text}`,
-    `${highestDim.name} is carrying this evaluation (${rawScores[highestDim.name]}/10). Check whether you are optimizing for the dimension that is easy to score rather than the one that is hard. The key is only as honest as the person who built it. ${v.text}`
+    `${name} scores ${pct}% against the key you forged. The weak seam is ${lowestDim.name} (${rawScores[lowestDim.name]}/10). If that dimension does not actually matter to you, go back and recut the key — do not override the number. ${v.text}`,
+    `Your key swears ${lowestDim.name} matters. This option scores it ${rawScores[lowestDim.name]}/10. Either the option is thin where you are deep, or you have been wrong about what you value. Both are worth knowing before the fog comes in. ${v.text}`,
+    `${highestDim.name} is carrying this whole evaluation (${rawScores[highestDim.name]}/10). Check whether you are optimizing for the dimension that is easy to score rather than the one that is hard to face. The key is only as honest as the hand that forged it. ${v.text}`
   ];
   document.getElementById('prVertdict').textContent = prizraks[Math.floor(Math.random()*prizraks.length)];
 
   document.getElementById('scoreOutput').classList.remove('hidden');
+  document.getElementById('scoreOutput').classList.remove('fade-in');
+  void document.getElementById('scoreOutput').offsetWidth;
   document.getElementById('scoreOutput').classList.add('fade-in');
+  try { document.getElementById('scoreOutput').scrollIntoView({behavior:'smooth', block:'nearest'}); } catch(e) {}
 
   // Store for saving
   window._lastResult = { name, date: new Date().toISOString().split('T')[0], pct, raw, scores: {...rawScores}, verdict: v.label, domain: state.key.domain };
 }
 
+function copyVerdict() {
+  if (!window._lastResult) return;
+  const r = window._lastResult;
+  const text = `${r.name} — ${r.pct}% · ${r.verdict} · ${r.domain}\n${document.getElementById('prVertdict').textContent}`;
+  flashCopy(document.getElementById('copyVerdictBtn'), text);
+}
+
 function saveResult() {
   if (!window._lastResult) return;
+  const btn = event.target;
   state.history.unshift(window._lastResult);
   if (state.history.length > 30) state.history = state.history.slice(0,30);
   save();
   renderHistory();
-  const btn = event.target;
-  btn.textContent = 'Saved ✓';
-  setTimeout(() => btn.textContent = 'Save to History', 1500);
+  btn.textContent = 'filed. the ledger remembers ✓';
+  setTimeout(() => btn.textContent = 'File to the Ledger', 1600);
 }
 
 function renderHistory() {
@@ -376,16 +493,16 @@ function renderHistory() {
   empty?.classList.add('hidden');
   list.innerHTML = state.history.map((r,i) => {
     const color = r.pct >= 85 ? 'text-emerald-400' : r.pct >= 55 ? 'text-amber-400' : 'text-red-400';
-    return `<div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+    return `<div class="reveal bg-zinc-900 border border-zinc-800 rounded-xl p-4">
       <div class="flex items-center justify-between mb-2">
-        <span class="font-medium text-zinc-200">${r.name}</span>
+        <span class="font-medium text-zinc-200">${escapeHtml(r.name)}</span>
         <span class="font-mono font-bold ${color}">${r.pct}%</span>
       </div>
-      <div class="text-xs font-mono text-zinc-600 mb-2">${r.date} · ${r.domain} · ${r.verdict}</div>
+      <div class="text-xs font-mono text-zinc-600 mb-2">${escapeHtml(r.date)} · ${escapeHtml(r.domain)} · ${escapeHtml(r.verdict)}</div>
       <div class="flex flex-wrap gap-1">
-        ${Object.entries(r.scores).map(([k,v]) => `<span class="text-[10px] font-mono px-1.5 py-0.5 bg-zinc-800 text-zinc-500 rounded">${k}: ${v}</span>`).join('')}
+        ${Object.entries(r.scores).map(([k,v]) => `<span class="text-[10px] font-mono px-1.5 py-0.5 bg-zinc-800 text-zinc-500 rounded">${escapeHtml(k)}: ${v}</span>`).join('')}
       </div>
-      <button onclick="deleteHist(${i})" class="text-[10px] text-zinc-700 hover:text-zinc-500 font-mono mt-2 block">delete</button>
+      <button onclick="deleteHist(${i})" class="btn-press text-[10px] text-zinc-700 hover:text-red-400 font-mono mt-2 block transition-colors">let the fog take it</button>
     </div>`;
   }).join('');
 }
@@ -397,13 +514,85 @@ function deleteHist(i) {
 function showTab(name) {
   ['build','run','history'].forEach(t => {
     document.getElementById(`pane-${t}`).classList.toggle('hidden', t !== name);
-    document.getElementById(`tab-${t}`).className = `pb-2 text-sm font-mono ${t===name ? 'tab-active' : 'tab-inactive'}`;
+    document.getElementById(`tab-${t}`).className = `pb-2 text-sm font-mono btn-press ${t===name ? 'tab-active' : 'tab-inactive'}`;
   });
   if (name === 'run') updateRunPane();
   if (name === 'history') renderHistory();
 }
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+// --- Atmosphere: embers, easter eggs, idle whisper, night whisper ---
+function initAtmosphere() {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Embers (cap 8)
+  if (!reduce) {
+    const field = document.getElementById('emberField');
+    for (let i = 0; i < 8; i++) {
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = Math.random()*100 + 'vw';
+      e.style.animationDelay = (Math.random()*14).toFixed(1) + 's';
+      e.style.animationDuration = (11 + Math.random()*7).toFixed(1) + 's';
+      field.appendChild(e);
+    }
+  }
+
+  // Night whisper 00:00–03:00
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) document.getElementById('nightWhisper')?.classList.remove('hidden');
+
+  // Easter egg: type "prizrak" -> reveal the watcher line
+  let buf = '';
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-7);
+      if (buf === 'prizrak') {
+        const g = document.getElementById('ghostLine');
+        g?.classList.remove('hidden');
+        g?.classList.add('flicker');
+      }
+    }
+  });
+
+  // Easter egg: hold the key glyph -> it breathes faster for 3s
+  const glyph = document.getElementById('keyGlyph');
+  if (glyph) {
+    const quicken = () => {
+      glyph.style.animation = 'breathe 1.1s ease-in-out infinite';
+      glyph.style.textShadow = '0 0 18px var(--glow)';
+      setTimeout(() => { glyph.style.animation = ''; glyph.style.textShadow = ''; }, 3000);
+    };
+    glyph.addEventListener('mousedown', quicken);
+    glyph.addEventListener('touchstart', (e) => { quicken(); }, {passive:true});
+  }
+
+  // Easter egg: triple-click the title -> spawn one extra ember
+  document.getElementById('appTitle')?.addEventListener('click', (ev) => {
+    if (ev.detail === 3 && !reduce) {
+      const field = document.getElementById('emberField');
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (40 + Math.random()*20) + 'vw';
+      e.style.animationDuration = '12s';
+      field.appendChild(e);
+      setTimeout(() => e.remove(), 12000);
+    }
+  });
+
+  // Idle 60s -> fade in "still here. still watching."
+  const idle = document.getElementById('idleWhisper');
+  let idleTimer;
+  const resetIdle = () => {
+    idle?.classList.remove('show');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => idle?.classList.add('show'), 60000);
+  };
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+    window.addEventListener(ev, resetIdle, {passive:true}));
+  resetIdle();
+}
 
 window.addEventListener('load', init);
 </script>

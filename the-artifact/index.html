@@ -38,6 +38,7 @@
 
     @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
     .breathe{animation:breathe 4.5s ease-in-out infinite}
+    .breathe-fast{animation-duration:1.1s !important}
 
     @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .reveal{animation:reveal .35s ease-out both}
@@ -52,6 +53,17 @@
     .artifact-row { animation: reveal 0.4s ease-out both; }
     .locked-icon { opacity: 0.4; transition: opacity 0.2s, text-shadow 0.2s; }
     .artifact-row:hover .locked-icon { opacity: 0.9; text-shadow:0 0 8px var(--glow); }
+
+    /* the moment stone closes over a fresh artifact */
+    @keyframes sealing{
+      0%{box-shadow:0 0 0 1px var(--accent), 0 0 32px -4px var(--glow); background:rgba(167,139,250,0.10);}
+      100%{box-shadow:0 0 0 0 transparent; background:transparent;}
+    }
+    .sealing{ animation: sealing 1.1s ease-out 1; }
+
+    /* the verdict the ghost passes on the streak */
+    @keyframes appraise{from{opacity:0;transform:translateY(4px)}to{opacity:.9;transform:translateY(0)}}
+    #streakVerdict{ color:var(--ink-dim); animation: appraise .5s ease-out both; }
 
     .input-field { background: var(--bg-sunk); border: 1px solid var(--line); transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; }
     .input-field:focus-visible { border-color: var(--accent); box-shadow:0 0 0 1px var(--glow); background: rgba(167,139,250,0.04); outline: none; }
@@ -75,9 +87,17 @@
 
     .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow); }
 
-    /* lift on history rows */
-    .hist-week{ transition: transform .15s; }
-    .hist-week:hover{ transform:translateX(2px); }
+    /* lift on history rows + geological depth: older strata sink */
+    .hist-week{ transition: transform .15s, opacity .3s; }
+    .hist-week:hover{ transform:translateX(2px); opacity:1 !important; }
+    .hist-week .week-header{ position:relative; }
+
+    /* the live week breathes when it holds something fossilized */
+    #thisWeekList.has-artifacts{
+      box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow);
+      border-radius:12px; padding:6px;
+      transition: box-shadow .4s ease;
+    }
 
     #ghostWatcher{ color:var(--ink-ghost); }
     #idleWhisper{ color:var(--ink-ghost); }
@@ -87,8 +107,8 @@
     .copy-btn:hover{ color:var(--accent); text-shadow:0 0 8px var(--glow); }
 
     @media (prefers-reduced-motion:reduce){
-      .fog,.ember,.breathe,.reveal,.flicker,.artifact-row,.povitrulya{animation:none!important}
-      .ember{display:none} .breathe,.flicker,.povitrulya{opacity:1!important}
+      .fog,.ember,.breathe,.reveal,.flicker,.artifact-row,.povitrulya,.sealing,#streakVerdict{animation:none!important}
+      .ember{display:none} .breathe,.flicker,.povitrulya,#streakVerdict{opacity:1!important}
     }
   </style>
 </head>
@@ -108,6 +128,7 @@
         <div id="streakDisplay" class="text-right hidden">
           <div class="mono text-xs" style="color:var(--ink-dim);">consecutive weeks</div>
           <div id="streakCount" class="mono text-2xl font-medium breathe" style="color:var(--accent);">0</div>
+          <div id="streakVerdict" class="mono text-[10px] mt-0.5 max-w-[140px] ml-auto leading-snug"></div>
         </div>
       </div>
       <p class="text-xs leading-relaxed pl-3 mt-4" style="color:var(--ink-dim);border-left:1px solid var(--line);">
@@ -315,10 +336,12 @@
       if (thisWeekItems.length === 0) {
         thisWeekHeader.className = 'week-header empty';
         thisWeekList.innerHTML = '<p class="text-xs px-3 py-2 italic" style="color:var(--ink-ghost);">Nothing locked yet this week. The week is still soft.</p>';
+        thisWeekList.classList.remove('has-artifacts');
         povitrulya.classList.remove('hidden');
       } else {
         thisWeekHeader.className = 'week-header';
         thisWeekList.innerHTML = [...thisWeekItems].reverse().map(a => renderArtifact(a)).join('');
+        thisWeekList.classList.add('has-artifacts');
         povitrulya.classList.add('hidden');
       }
 
@@ -334,11 +357,13 @@
         emptyHistory.classList.add('hidden');
       }
 
-      historyList.innerHTML = historyWeeks.map(wk => {
+      historyList.innerHTML = historyWeeks.map((wk, depth) => {
         const items = weeks[wk] || [];
         const n = items.length;
+        // older strata sink: each layer deeper fades a touch toward the bedrock
+        const sink = Math.max(0.55, 1 - depth * 0.08).toFixed(2);
         return `
-          <div class="hist-week">
+          <div class="hist-week" style="opacity:${sink};" title="strata ${depth + 1} — deeper is older">
             <div class="flex items-center justify-between mb-2">
               <div class="week-header ${n === 0 ? 'empty' : ''}">
                 <div class="text-xs mono" style="color:var(--ink-dim);">${getWeekLabel(wk)}</div>
@@ -363,12 +388,30 @@
       if (thisWeekItems.length > 0) streak++;
       const streakDisplay = document.getElementById('streakDisplay');
       const streakCount = document.getElementById('streakCount');
+      const streakVerdict = document.getElementById('streakVerdict');
       if (streak > 0) {
         streakDisplay.classList.remove('hidden');
         streakCount.textContent = streak;
+        const v = streakVerdict;
+        const verdict = streakVerdictFor(streak, thisWeekItems.length);
+        if (v.textContent !== verdict) {
+          v.textContent = verdict;
+          // re-trigger the fade so the appraisal feels freshly passed
+          v.style.animation = 'none'; void v.offsetWidth; v.style.animation = '';
+        }
       } else {
         streakDisplay.classList.add('hidden');
       }
+    }
+
+    // the ghost appraises the streak. terse, escalating, never bubbly.
+    function streakVerdictFor(streak, liveCount) {
+      if (streak === 1) return 'one week stands. the bridge is new. it will be tested.';
+      if (streak < 4)   return 'the strata are forming. the mountain is watching.';
+      if (streak < 9)   return 'the bridge holds. for now. do not look down.';
+      if (streak < 17)  return 'a season of stone. you are becoming hard to erase.';
+      if (streak < 27)  return 'half a year of permanence. the cave knows your name.';
+      return 'the karst remembers you now. few earn this. fewer keep it.';
     }
 
     function addArtifact() {
@@ -382,6 +425,14 @@
       input.value = '';
       document.getElementById('charCount').textContent = '0/200';
       render();
+      // stone closes over the freshest artifact — first row in the live week
+      if (!reduceMotion) {
+        const fresh = document.querySelector('#thisWeekList .artifact-row');
+        if (fresh) {
+          fresh.classList.add('sealing');
+          fresh.addEventListener('animationend', () => fresh.classList.remove('sealing'), { once: true });
+        }
+      }
       spawnEmber(); // one ember rises for each thing made permanent
       input.focus();
     }
@@ -486,6 +537,25 @@
       document.getElementById('title').addEventListener('click', (ev) => {
         if (ev.detail === 3) spawnEmber(true);
       });
+
+      // Egg 5: hold the streak number -> the heartbeat quickens for 3s (touches no state)
+      const streakEl = document.getElementById('streakCount');
+      let holdTimer;
+      const quicken = () => {
+        if (reduceMotion) return;
+        streakEl.classList.add('breathe-fast');
+        spawnEmber(true);
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => streakEl.classList.remove('breathe-fast'), 3000);
+      };
+      const cancelHold = () => clearTimeout(pressTimer);
+      let pressTimer;
+      const armHold = () => { pressTimer = setTimeout(quicken, 450); };
+      streakEl.style.cursor = 'pointer';
+      streakEl.addEventListener('mousedown', armHold);
+      streakEl.addEventListener('touchstart', armHold, { passive: true });
+      ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev =>
+        streakEl.addEventListener(ev, cancelHold));
 
       // Egg 3: between 00:00–03:00 local, a faint footer whisper
       const h = new Date().getHours();

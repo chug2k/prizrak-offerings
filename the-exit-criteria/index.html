@@ -6,114 +6,178 @@
     <title>The Exit Criteria — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
-        textarea { resize: none; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#f59e0b;            /* amber — the threshold color, the lead glow */
+            --stay:#34d399;              /* emerald — semantic "stay" only, never glow */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        body{ background:var(--bg); color:var(--ink); }
+
+        /* ── atmosphere ─────────────────────────────── */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .4s ease-out both}
+        .fade-in{animation:reveal .4s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* ── interaction ───────────────────────────── */
+        textarea, input{ resize:none; transition:border-color .15s, box-shadow .15s, background-color .15s; }
+        textarea:focus-visible, input:focus-visible{
+            outline:none; border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+        .panel{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+        .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+        #generate-btn{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s; }
+        #generate-btn:hover{ transform:translateY(-2px); border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow); }
+        #generate-btn:active{ transform:translateY(1px); }
+        .copy-btn:active, #edit-btn:active{ transform:translateY(1px); }
+
+        .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+        ::selection{ background:color-mix(in srgb,var(--accent) 30%, transparent); color:var(--ink); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.fade-in,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
+
         @media print {
-            body { background: white; color: black; }
-            .no-print { display: none; }
-            .print-card { border: 1px solid #ccc; }
+            body { background:white; color:black; }
+            .fog,.ember,.grain::after,.no-print { display:none !important; }
+            .grain::after{ content:none; }
+            .print-card { border:1px solid #ccc; box-shadow:none; }
         }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
-<div class="max-w-xl mx-auto">
+<body class="grain text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
+<div class="max-w-xl mx-auto relative" style="z-index:2">
 
     <!-- Header -->
     <div class="text-center mb-10">
-        <div class="text-4xl mb-3">🚪</div>
-        <h1 class="text-2xl font-bold text-white mb-2">The Exit Criteria</h1>
+        <div id="threshold" class="text-4xl mb-3 breathe select-none cursor-default" title="the threshold">🚪</div>
+        <h1 id="title" class="text-2xl font-bold text-white mb-2 select-none">The Exit Criteria</h1>
         <p class="text-sm text-zinc-500 leading-relaxed max-w-md mx-auto">Define the conditions that would make staying or leaving the clear answer — before you are in the moment that requires the decision.</p>
-        <p class="text-xs text-zinc-700 mt-2">Written now, when the emotions are manageable. Read later, when they are not.</p>
+        <p class="text-xs text-zinc-700 mt-2">Written now, while the cold is measurable. Read later, when the fog is in the room.</p>
     </div>
 
     <!-- Context -->
     <div id="form-section" class="space-y-6">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">What situation are you defining criteria for?</label>
+        <div class="panel lift rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
+            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">The Situation / 00</label>
             <input id="situation" type="text" placeholder="The current job. This relationship. The project. The city I'm living in..."
-                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700">
+                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700">
         </div>
 
         <!-- Stay criteria -->
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-            <label class="text-xs text-emerald-700 uppercase tracking-widest mb-1 block">Criteria to stay</label>
-            <p class="text-xs text-zinc-600 mb-4">What would have to be true — what would have to change, improve, or remain stable — for staying to be the clear answer? Be specific. Vague criteria are not criteria.</p>
-            
+        <div class="panel lift rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
+            <label class="text-xs uppercase tracking-widest mb-1 block" style="color:var(--stay)">Criteria To Stay / 01</label>
+            <p class="text-xs text-zinc-600 mb-4">What would have to hold — change, improve, or stay stable — for staying to be the clear answer? Be specific. Vague criteria are not criteria; they are wishes wearing a coat.</p>
+
             <div class="space-y-3">
                 <div>
                     <label class="text-xs text-zinc-500 mb-1 block">The thing that must happen by when:</label>
                     <textarea id="stay-must" rows="2" placeholder="The project scope clarifies in the next 60 days. I get one piece of real ownership..."
-                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700"></textarea>
                 </div>
                 <div>
                     <label class="text-xs text-zinc-500 mb-1 block">The thing that must not deteriorate:</label>
                     <textarea id="stay-must-not" rows="2" placeholder="The relationship with the team. My ability to do the actual work. The ability to speak honestly..."
-                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700"></textarea>
                 </div>
                 <div>
                     <label class="text-xs text-zinc-500 mb-1 block">What staying would mean you're building toward:</label>
                     <textarea id="stay-building" rows="2" placeholder="A credible path to X. A specific skill I don't have yet. Evidence that the bet was worth making..."
-                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700"></textarea>
                 </div>
             </div>
         </div>
 
         <!-- Leave criteria -->
-        <div class="rounded-lg border border-amber-950/50 bg-amber-950/10 p-5">
-            <label class="text-xs text-amber-700 uppercase tracking-widest mb-1 block">Criteria to leave</label>
-            <p class="text-xs text-zinc-600 mb-4">What would have to happen — or fail to happen — for leaving to be the clear answer? Not "if I feel bad." Specific, observable conditions.</p>
-            
+        <div class="panel lift rounded-lg border border-amber-950/50 bg-amber-950/10 p-5">
+            <label class="text-xs uppercase tracking-widest mb-1 block" style="color:var(--accent)">Criteria To Leave / 02</label>
+            <p class="text-xs text-zinc-600 mb-4">What would have to happen — or fail to happen — for leaving to be the clear answer? Not "if I feel bad." Specific, observable conditions. The bell, not the dread before it.</p>
+
             <div class="space-y-3">
                 <div>
                     <label class="text-xs text-zinc-500 mb-1 block">If this happens, the decision is made:</label>
                     <textarea id="leave-trigger" rows="2" placeholder="If I'm still doing the same work with no change in scope after 90 days. If the thing I said I needed doesn't materialize..."
-                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700"></textarea>
                 </div>
                 <div>
                     <label class="text-xs text-zinc-500 mb-1 block">The thing I would not be able to explain staying past:</label>
                     <textarea id="leave-explain" rows="2" placeholder="If I'm still here in X months and nothing has changed, I cannot honestly say why I stayed..."
-                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700"></textarea>
                 </div>
                 <div>
                     <label class="text-xs text-zinc-500 mb-1 block">The cost I'm not willing to pay:</label>
                     <textarea id="leave-cost" rows="2" placeholder="Spending another year building something I won't own. Doing work I'm not proud of. Not building anything real..."
-                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                        class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700"></textarea>
                 </div>
             </div>
         </div>
 
         <!-- Review date -->
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">Review date</label>
-            <p class="text-xs text-zinc-600 mb-3">When will you come back and check against these criteria? Set a specific date — not "when it feels right."</p>
-            <input id="review-date" type="date" 
-                class="bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500">
-            <p class="text-xs text-zinc-700 mt-2">At that date: do the stay criteria hold? Have any leave triggers fired?</p>
+        <div class="panel lift rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
+            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">Review Date / 03</label>
+            <p class="text-xs text-zinc-600 mb-3">When do you return to read what the calmer version of you wrote? Set a specific date — not "when it feels right." Fog does not keep appointments. You must.</p>
+            <input id="review-date" type="date"
+                class="bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300">
+            <p id="countdown" class="text-xs text-zinc-700 mt-2">At that date: do the stay criteria hold? Has any leave trigger fired?</p>
         </div>
 
-        <button id="generate-btn" class="w-full py-3 rounded-lg border border-zinc-600 bg-zinc-900/60 hover:bg-zinc-800 text-sm text-zinc-300 font-bold transition-all">
+        <button id="generate-btn" class="w-full py-3 rounded-lg border border-zinc-600 bg-zinc-900/60 text-sm text-zinc-300 font-bold">
             Lock in the criteria →
         </button>
     </div>
 
     <!-- Output -->
     <div id="output-section" class="hidden fade-in mt-2 print-card">
-        <div class="rounded-xl border border-zinc-700 bg-zinc-900/50 p-6 space-y-5">
-            <div class="flex justify-between items-start">
+        <div class="rounded-xl border border-zinc-700 bg-zinc-900/50 p-6 space-y-5 result-glow">
+            <div class="flex justify-between items-start gap-4">
                 <div>
-                    <p class="text-xs text-zinc-600 uppercase tracking-widest">Exit Criteria</p>
-                    <p id="out-situation" class="text-white font-bold text-lg mt-1"></p>
+                    <p class="text-xs text-zinc-600 uppercase tracking-widest">Exit Criteria · sealed</p>
+                    <p id="out-situation" class="text-white font-bold text-lg mt-1 breathe"></p>
                 </div>
-                <div class="text-right">
+                <div class="text-right shrink-0">
                     <p class="text-xs text-zinc-600 uppercase tracking-widest">Review by</p>
-                    <p id="out-review" class="text-amber-400 font-bold text-sm mt-1"></p>
+                    <p id="out-review" class="font-bold text-sm mt-1" style="color:var(--accent)"></p>
+                    <p id="out-review-days" class="text-[10px] text-zinc-600 mt-0.5"></p>
                 </div>
             </div>
 
             <div class="border-t border-zinc-800 pt-4">
-                <p class="text-xs text-emerald-700 uppercase tracking-widest mb-3">To stay</p>
+                <p class="text-xs uppercase tracking-widest mb-3" style="color:var(--stay)">To stay</p>
                 <div class="space-y-3">
                     <div>
                         <p class="text-[10px] text-zinc-600 mb-1">Must happen:</p>
@@ -131,7 +195,7 @@
             </div>
 
             <div class="border-t border-zinc-800 pt-4">
-                <p class="text-xs text-amber-700 uppercase tracking-widest mb-3">To leave</p>
+                <p class="text-xs uppercase tracking-widest mb-3" style="color:var(--accent)">To leave</p>
                 <div class="space-y-3">
                     <div>
                         <p class="text-[10px] text-zinc-600 mb-1">Trigger:</p>
@@ -149,12 +213,13 @@
             </div>
 
             <div class="border-t border-zinc-800 pt-4">
-                <p class="text-xs text-zinc-600 italic leading-relaxed">These criteria were written before the moment required them. At the review date, the question is not how you feel. The question is whether the criteria have been met. The criteria are the decision; the emotion is the signal that the moment has arrived.</p>
+                <p class="text-xs text-zinc-600 italic leading-relaxed">These criteria were written before the moment required them. At the review date, the question is not how you feel. The question is whether the criteria have been met. The criteria are the decision; the emotion is only the signal that the moment has arrived.</p>
             </div>
         </div>
 
-        <div class="mt-4 flex gap-2 no-print">
+        <div class="mt-4 flex flex-wrap gap-2 no-print">
             <button id="edit-btn" class="flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-all">Edit</button>
+            <button id="copy-btn" class="copy-btn flex-1 py-2 rounded border border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-all">Copy to the ledger</button>
             <button onclick="window.print()" class="flex-1 py-2 rounded border border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-all">Print / Save PDF</button>
         </div>
     </div>
@@ -162,48 +227,221 @@
     <div class="mt-12 text-center no-print">
         <p class="text-xs text-zinc-700 italic">The decision you cannot make in the moment, you must make in the quiet.</p>
         <p class="text-[10px] text-zinc-800 mt-1">The mountain does not decide at noon. It decides at night, before the Poludnica arrives.</p>
+        <p id="night-whisper" class="text-[10px] mt-2 hidden flicker" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+        <p id="idle-whisper" class="text-[10px] mt-1 hidden" style="color:var(--ink-ghost)">still here. still watching.</p>
+        <p id="egg-whisper" class="text-[10px] mt-1 hidden" style="color:var(--ink-ghost)">you found the watcher.</p>
     </div>
 </div>
 
 <script>
-document.getElementById('generate-btn').addEventListener('click', () => {
-    const situation = document.getElementById('situation').value.trim();
-    if (!situation) {
-        document.getElementById('situation').style.borderColor = '#7f1d1d';
-        setTimeout(() => document.getElementById('situation').style.borderColor = '', 1500);
-        return;
+(function(){
+    "use strict";
+    const $ = id => document.getElementById(id);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const STORAGE_KEY = 'exit-criteria-v1';
+
+    const FIELDS = ['situation','stay-must','stay-must-not','stay-building','leave-trigger','leave-explain','leave-cost','review-date'];
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    /* ── embers (≤10, staggered) ───────────────────── */
+    if (!reduceMotion) {
+        const field = $('ember-field');
+        for (let i = 0; i < 7; i++) {
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (6 + Math.random() * 88) + '%';
+            e.style.animationDelay = (Math.random() * 14) + 's';
+            e.style.animationDuration = (12 + Math.random() * 8) + 's';
+            field.appendChild(e);
+        }
+    }
+    function spawnEmber() {
+        if (reduceMotion) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random() * 88) + '%';
+        e.style.animationDuration = '6s';
+        $('ember-field').appendChild(e);
+        setTimeout(() => e.remove(), 6500);
     }
 
-    document.getElementById('out-situation').textContent = situation;
-    
-    const reviewDate = document.getElementById('review-date').value;
-    if (reviewDate) {
-        const d = new Date(reviewDate + 'T00:00:00');
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        document.getElementById('out-review').textContent = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-    } else {
-        document.getElementById('out-review').textContent = 'Not set';
+    /* ── persistence (additive; nothing pre-existing to break) ── */
+    function save() {
+        try {
+            const data = {};
+            FIELDS.forEach(f => { data[f] = $(f).value; });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) { /* the cave is sealed; carry on */ }
+    }
+    function load() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return false;
+            const data = JSON.parse(raw);
+            let any = false;
+            FIELDS.forEach(f => {
+                if (data[f] != null && data[f] !== '') { $(f).value = data[f]; any = true; }
+            });
+            return any;
+        } catch (e) { return false; }
+    }
+    const hadSaved = load();
+    FIELDS.forEach(f => $(f).addEventListener('input', save));
+
+    /* default review date only if none restored */
+    if (!$('review-date').value) {
+        const d = new Date(); d.setDate(d.getDate() + 90);
+        $('review-date').value = d.toISOString().split('T')[0];
     }
 
-    document.getElementById('out-stay-must').textContent = document.getElementById('stay-must').value.trim() || '(not specified)';
-    document.getElementById('out-stay-not').textContent = document.getElementById('stay-must-not').value.trim() || '(not specified)';
-    document.getElementById('out-stay-build').textContent = document.getElementById('stay-building').value.trim() || '(not specified)';
-    document.getElementById('out-leave-trigger').textContent = document.getElementById('leave-trigger').value.trim() || '(not specified)';
-    document.getElementById('out-leave-explain').textContent = document.getElementById('leave-explain').value.trim() || '(not specified)';
-    document.getElementById('out-leave-cost').textContent = document.getElementById('leave-cost').value.trim() || '(not specified)';
+    /* ── live countdown under the review date ──────── */
+    function daysUntil(dateStr) {
+        if (!dateStr) return null;
+        const target = new Date(dateStr + 'T00:00:00');
+        const now = new Date(); now.setHours(0,0,0,0);
+        return Math.round((target - now) / 86400000);
+    }
+    function updateCountdown() {
+        const n = daysUntil($('review-date').value);
+        const el = $('countdown');
+        if (n == null) { el.textContent = 'No date set. The fog keeps no appointments.'; return; }
+        if (n > 1)  el.textContent = `${n} nights until you must read this again.`;
+        else if (n === 1) el.textContent = 'One night until the reckoning.';
+        else if (n === 0) el.textContent = 'The review is today. Read what the calm version of you wrote.';
+        else el.textContent = `${Math.abs(n)} nights past due. The mountain noticed.`;
+    }
+    $('review-date').addEventListener('input', updateCountdown);
+    updateCountdown();
 
-    document.getElementById('form-section').classList.add('hidden');
-    document.getElementById('output-section').classList.remove('hidden');
-});
+    /* ── lock in ───────────────────────────────────── */
+    function render() {
+        const situation = $('situation').value.trim();
+        if (!situation) {
+            $('situation').style.borderColor = '#7f1d1d';
+            $('situation').focus();
+            setTimeout(() => $('situation').style.borderColor = '', 1500);
+            return;
+        }
 
-document.getElementById('edit-btn').addEventListener('click', () => {
-    document.getElementById('output-section').classList.add('hidden');
-    document.getElementById('form-section').classList.remove('hidden');
-});
+        $('out-situation').textContent = situation;
 
-// Default review date to 90 days from now
-const d = new Date(); d.setDate(d.getDate() + 90);
-document.getElementById('review-date').value = d.toISOString().split('T')[0];
+        const reviewDate = $('review-date').value;
+        if (reviewDate) {
+            const d = new Date(reviewDate + 'T00:00:00');
+            $('out-review').textContent = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+            const n = daysUntil(reviewDate);
+            $('out-review-days').textContent = n > 0 ? `${n} nights out`
+                : n === 0 ? 'today'
+                : `${Math.abs(n)} nights past`;
+        } else {
+            $('out-review').textContent = 'Not set';
+            $('out-review-days').textContent = '';
+        }
+
+        const blank = '(left to the fog)';
+        $('out-stay-must').textContent    = $('stay-must').value.trim()     || blank;
+        $('out-stay-not').textContent     = $('stay-must-not').value.trim() || blank;
+        $('out-stay-build').textContent   = $('stay-building').value.trim() || blank;
+        $('out-leave-trigger').textContent= $('leave-trigger').value.trim() || blank;
+        $('out-leave-explain').textContent= $('leave-explain').value.trim() || blank;
+        $('out-leave-cost').textContent   = $('leave-cost').value.trim()    || blank;
+
+        save();
+
+        $('form-section').classList.add('hidden');
+        const out = $('output-section');
+        out.classList.remove('hidden');
+        out.classList.remove('fade-in'); void out.offsetWidth; out.classList.add('fade-in');
+        spawnEmber();
+        out.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
+    $('generate-btn').addEventListener('click', render);
+
+    $('edit-btn').addEventListener('click', () => {
+        $('output-section').classList.add('hidden');
+        $('form-section').classList.remove('hidden');
+        $('form-section').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
+    });
+
+    /* ── copy to the ledger ────────────────────────── */
+    $('copy-btn').addEventListener('click', () => {
+        const lines = [
+            'EXIT CRITERIA — ' + $('out-situation').textContent,
+            'Review by: ' + $('out-review').textContent,
+            '',
+            'TO STAY',
+            '  Must happen: ' + $('out-stay-must').textContent,
+            '  Must not deteriorate: ' + $('out-stay-not').textContent,
+            '  Building toward: ' + $('out-stay-build').textContent,
+            '',
+            'TO LEAVE',
+            '  Trigger: ' + $('out-leave-trigger').textContent,
+            '  Cannot explain staying past: ' + $('out-leave-explain').textContent,
+            '  Cost not willing to pay: ' + $('out-leave-cost').textContent,
+            '',
+            'The criteria are the decision; the emotion is only the signal that the moment has arrived.'
+        ].join('\n');
+        const btn = $('copy-btn');
+        const done = () => {
+            const prev = btn.textContent;
+            btn.textContent = 'copied to the ledger';
+            btn.style.color = 'var(--accent)';
+            btn.style.borderColor = 'var(--accent)';
+            setTimeout(() => { btn.textContent = prev; btn.style.color = ''; btn.style.borderColor = ''; }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(lines).then(done).catch(() => fallbackCopy(lines, done));
+        } else { fallbackCopy(lines, done); }
+    });
+    function fallbackCopy(text, cb) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta); cb();
+    }
+
+    /* ── easter eggs (quiet, never touch saved state) ─ */
+    // (a) type "prizrak" → the watcher line
+    let buffer = '';
+    window.addEventListener('keydown', e => {
+        if (e.target.matches('input, textarea')) return;
+        if (e.key && e.key.length === 1) {
+            buffer = (buffer + e.key.toLowerCase()).slice(-7);
+            if (buffer === 'prizrak') { $('egg-whisper').classList.remove('hidden'); spawnEmber(); }
+        }
+    });
+
+    // (b) triple-click the title → one extra ember
+    $('title').addEventListener('click', e => { if (e.detail === 3) spawnEmber(); });
+
+    // (c) 00:00–03:00 local → faint footer whisper
+    const hr = new Date().getHours();
+    if (hr >= 0 && hr < 3) $('night-whisper').classList.remove('hidden');
+
+    // (d) hold the threshold glyph → it breathes faster for 3s
+    let holdT;
+    const glyph = $('threshold');
+    const holdOn = () => {
+        glyph.style.animationDuration = '1.1s';
+        clearTimeout(holdT);
+        holdT = setTimeout(() => { glyph.style.animationDuration = ''; }, 3000);
+    };
+    glyph.addEventListener('mousedown', holdOn);
+    glyph.addEventListener('touchstart', holdOn, { passive: true });
+
+    // (e) idle 60s → "still here. still watching."
+    let idleT;
+    const idle = $('idle-whisper');
+    function resetIdle() {
+        idle.classList.add('hidden');
+        clearTimeout(idleT);
+        idleT = setTimeout(() => idle.classList.remove('hidden'), 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, resetIdle, { passive: true }));
+    resetIdle();
+})();
 </script>
 </body>
 </html>

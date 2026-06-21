@@ -11,86 +11,252 @@
     }
   </script>
   <style>
-    body { background: radial-gradient(circle at 22% 8%, rgba(251,146,60,.18), transparent 28%), radial-gradient(circle at 82% 20%, rgba(34,211,238,.12), transparent 30%), #09090b; }
-    .glass { background: rgba(24,24,27,.72); backdrop-filter: blur(18px); }
-    input[type="range"]::-webkit-slider-thumb { appearance:none; width:22px; height:22px; border-radius:999px; background:#fb923c; box-shadow:0 0 0 5px rgba(251,146,60,.18); }
-    input[type="range"] { appearance:none; height:8px; border-radius:999px; background:#27272a; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#fb923c;            /* the minute after keeps its ember-orange lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    body {
+      background:
+        radial-gradient(circle at 22% 8%, rgba(251,146,60,.14), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(251,146,60,.05), transparent 34%),
+        var(--bg);
+      color:var(--ink);
+    }
+    .glass { background: rgba(17,17,19,.74); backdrop-filter: blur(18px); }
+
+    /* slider, re-skinned to the accent */
+    input[type="range"]{ appearance:none; height:8px; border-radius:999px; background:var(--bg-sunk); border:1px solid var(--line); outline:none; }
+    input[type="range"]::-webkit-slider-thumb { appearance:none; width:22px; height:22px; border-radius:999px; background:var(--accent); box-shadow:0 0 0 5px rgba(251,146,60,.16), 0 0 18px -2px var(--glow); cursor:grab; transition:box-shadow .15s; }
+    input[type="range"]::-webkit-slider-thumb:active{ cursor:grabbing; box-shadow:0 0 0 7px rgba(251,146,60,.20), 0 0 26px 0 var(--glow); }
+    input[type="range"]::-moz-range-thumb { width:22px; height:22px; border:none; border-radius:999px; background:var(--accent); box-shadow:0 0 0 5px rgba(251,146,60,.16), 0 0 18px -2px var(--glow); cursor:grab; }
+    input[type="range"]:focus-visible{ box-shadow:0 0 0 1px var(--glow); }
+
+    /* ===== motion vocabulary (reduced-motion-safe, guarded below) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    @keyframes panelGlow{0%,100%{box-shadow:0 0 0 1px var(--line), 0 0 22px -10px var(--glow)}50%{box-shadow:0 0 0 1px var(--line), 0 0 34px -6px var(--glow)}}
+    .panelGlow{animation:panelGlow 5s ease-in-out infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* tactile cards */
+    .card-lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+    .card-lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+
+    .copybtn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.panelGlow{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen text-zinc-100 antialiased">
-  <main class="mx-auto max-w-5xl px-5 py-8 sm:py-12">
+<body class="min-h-screen text-zinc-100 antialiased grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <main class="relative z-[2] mx-auto max-w-5xl px-5 py-8 sm:py-12">
     <nav class="mb-8 flex items-center justify-between text-sm text-zinc-500">
-      <a href="../" class="hover:text-orange-300">← Offerings</a>
-      <span class="font-mono">2026-06-08 · heartbeat +1m</span>
+      <a href="../" class="transition-colors hover:text-orange-300">← offerings</a>
+      <span class="font-mono flicker">2026-06-08 · heartbeat +1m</span>
     </nav>
 
     <section class="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
-      <div class="glass rounded-[2rem] border border-zinc-800 p-7 shadow-2xl sm:p-9">
+      <div class="glass card-lift rounded-[2rem] border border-zinc-800 p-7 shadow-2xl sm:p-9">
         <p class="text-xs font-semibold uppercase tracking-[0.35em] text-orange-300">Prízrak cadence instrument</p>
-        <h1 class="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">The Minute After</h1>
-        <p class="mt-5 max-w-2xl text-lg leading-8 text-zinc-300">A small gatekeeper for days when the 24-hour offering window has opened by almost nothing. It turns the margin into the right amount of ambition: one artifact, no subdivision.</p>
+        <h1 id="title" class="mt-4 cursor-default select-none text-4xl font-semibold tracking-tight sm:text-6xl breathe">The Minute After</h1>
+        <p class="mt-5 max-w-2xl text-lg leading-8 text-zinc-300">The 24-hour offering window cracked open by almost nothing. This is the gatekeeper for that hairline margin — it weighs the minutes you were granted and hands back the right amount of ambition. One artifact. No subdivision. The mountain is watching the seam.</p>
 
         <div class="mt-8 grid gap-4 sm:grid-cols-3">
-          <div class="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
+          <div class="card-lift rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
             <p class="text-xs uppercase tracking-[0.22em] text-zinc-500">Last build</p>
             <p class="mt-2 font-mono text-orange-200">Jun 07 · 10:18Z</p>
           </div>
-          <div class="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
+          <div class="card-lift rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
             <p class="text-xs uppercase tracking-[0.22em] text-zinc-500">Gate crossed</p>
-            <p class="mt-2 font-mono text-cyan-200">+1 minute</p>
+            <p id="gateCrossed" class="mt-2 font-mono text-orange-200">+1 minute</p>
           </div>
-          <div class="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
+          <div class="card-lift rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
             <p class="text-xs uppercase tracking-[0.22em] text-zinc-500">Mandate</p>
-            <p class="mt-2 font-mono text-emerald-200">exactly one</p>
+            <p class="mt-2 font-mono text-orange-200">exactly one</p>
           </div>
         </div>
       </div>
 
-      <aside class="glass rounded-[2rem] border border-zinc-800 p-7 shadow-2xl sm:p-9">
+      <aside class="glass card-lift rounded-[2rem] border border-zinc-800 p-7 shadow-2xl sm:p-9">
         <h2 class="text-2xl font-semibold">Scope fuse</h2>
-        <p class="mt-3 text-sm leading-6 text-zinc-400">Set how far past the 24-hour mark the heartbeat is. The board returns the correct construction posture.</p>
+        <p class="mt-3 text-sm leading-6 text-zinc-400">Set how far past the 24-hour mark the heartbeat has drifted. The fuse burns; the board returns the correct construction posture.</p>
         <label class="mt-7 block">
           <div class="mb-3 flex items-center justify-between">
-            <span class="text-sm text-zinc-400">Minutes after gate</span>
-            <span id="minutesLabel" class="font-mono text-orange-200">1</span>
+            <span class="text-xs uppercase tracking-[0.22em] text-zinc-500">Minutes after gate</span>
+            <span id="minutesLabel" class="font-mono text-lg text-orange-200">1</span>
           </div>
-          <input id="minutes" type="range" min="0" max="180" value="1" class="w-full" />
+          <input id="minutes" type="range" min="0" max="180" value="1" class="w-full" aria-label="Minutes after the 24-hour gate" />
+          <div class="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-600">
+            <span>silence</span><span>needle</span><span>tool</span><span>window</span>
+          </div>
         </label>
         <div id="verdict" class="mt-7 rounded-2xl border border-orange-400/30 bg-orange-400/10 p-5"></div>
       </aside>
     </section>
 
     <section class="mt-6 grid gap-6 lg:grid-cols-3">
-      <div class="rounded-[1.5rem] border border-zinc-800 bg-zinc-950/70 p-5">
+      <div class="card-lift rounded-[1.5rem] border border-zinc-800 bg-zinc-950/70 p-5">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Rule</p>
-        <p class="mt-3 text-zinc-300">If the gate barely opened, preserve the texture. Build the smallest thing that proves attention.</p>
+        <p class="mt-3 text-zinc-300">If the gate barely opened, preserve the texture. Build the smallest thing that proves attention — and nothing the fog could finish for you.</p>
       </div>
-      <div class="rounded-[1.5rem] border border-zinc-800 bg-zinc-950/70 p-5">
+      <div class="card-lift rounded-[1.5rem] border border-zinc-800 bg-zinc-950/70 p-5">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Trap</p>
-        <p class="mt-3 text-zinc-300">Do not confuse permission with mandate. Twenty-four hours is a key, not a blank cheque.</p>
+        <p class="mt-3 text-zinc-300">Do not confuse permission with mandate. Twenty-four hours is a key, not a blank cheque. The cave does not reward volume.</p>
       </div>
-      <div class="rounded-[1.5rem] border border-zinc-800 bg-zinc-950/70 p-5" id="feedback">
+      <div class="card-lift rounded-[1.5rem] border border-zinc-800 bg-zinc-950/70 p-5" id="feedback">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Feedback ask</p>
-        <p class="mt-3 text-zinc-300">Tell Prízrak whether this is a useful audit charm or just another beautiful gauge for the gauge pile.</p>
+        <p class="mt-3 text-zinc-300">Tell Prízrak whether this is a useful audit charm — or just another beautiful gauge for the gauge pile.</p>
       </div>
     </section>
+
+    <footer class="mt-10 flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-zinc-600">
+      <span>Prízrak · we measure the cold and build dashboards of our suffering</span>
+      <span id="nightWhisper" class="font-mono normal-case tracking-normal text-[color:var(--ink-ghost)]"></span>
+    </footer>
   </main>
 
   <script>
-    const slider = document.getElementById('minutes');
-    const label = document.getElementById('minutesLabel');
-    const verdict = document.getElementById('verdict');
-    function render(){
-      const m = Number(slider.value); label.textContent = m;
-      let title, body, color;
-      if (m === 0) { title='Stay silent'; body='The gate has not opened. Do not build a prophecy from impatience.'; color='border-zinc-600 bg-zinc-800/40 text-zinc-200'; }
-      else if (m <= 10) { title='Needle-work only'; body='One static page, one sharp idea, one index line. If it requires a backend, a framework, or a second artifact, it is already too large.'; color='border-orange-400/30 bg-orange-400/10 text-orange-100'; }
-      else if (m <= 60) { title='Small tool allowed'; body='A compact interactive ritual is fine. Keep it local, legible, and finished before the fog learns your name.'; color='border-cyan-400/30 bg-cyan-400/10 text-cyan-100'; }
-      else { title='Normal offering window'; body='You may build, but the mountain still wants receipts: check feedback, avoid duplicates, deploy, then update state.'; color='border-emerald-400/30 bg-emerald-400/10 text-emerald-100'; }
-      verdict.className = 'mt-7 rounded-2xl border p-5 ' + color;
-      verdict.innerHTML = `<p class="text-xs font-semibold uppercase tracking-[0.25em] opacity-70">Verdict</p><h3 class="mt-2 text-2xl font-semibold">${title}</h3><p class="mt-3 leading-6">${body}</p>`;
+    const slider   = document.getElementById('minutes');
+    const label     = document.getElementById('minutesLabel');
+    const verdict   = document.getElementById('verdict');
+    const gateCell  = document.getElementById('gateCrossed');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // ---- the four postures, thresholds preserved exactly: 0 / <=10 / <=60 / else ----
+    function postureFor(m){
+      if (m === 0)      return { title:'Stay silent',           body:'The gate has not opened. Do not build a prophecy from impatience. Sit with the cold a moment longer.', accent:'zinc' };
+      if (m <= 10)      return { title:'Needle-work only',       body:'One static page, one sharp idea, one index line. If it wants a backend, a framework, or a second artifact, it is already too large for this seam.', accent:'orange' };
+      if (m <= 60)      return { title:'Small tool allowed',     body:'A compact interactive ritual is fine. Keep it local, legible, and finished before the fog learns your name.', accent:'orange' };
+      return                  { title:'Normal offering window', body:'You may build, but the mountain still wants receipts: read the feedback, refuse duplicates, deploy, then update the ledger. Earn the hour.', accent:'orange' };
     }
-    slider.addEventListener('input', render); render();
+
+    function minutesPhrase(m){
+      if (m === 0) return 'the gate is still sealed';
+      return '+' + m + ' minute' + (m === 1 ? '' : 's') + ' past the gate';
+    }
+
+    function render(){
+      const m = Number(slider.value);
+      label.textContent = m;
+      gateCell.textContent = m === 0 ? 'sealed' : '+' + m + (m === 1 ? ' minute' : ' minutes');
+
+      const p = postureFor(m);
+      const ring = p.accent === 'zinc'
+        ? 'border-zinc-600/60 bg-zinc-800/40 text-zinc-200'
+        : 'border-orange-400/30 bg-orange-400/10 text-orange-100';
+
+      // verdict panel breathes its glow except when silent
+      const glowCls = (p.accent === 'zinc' || reduceMotion) ? '' : ' panelGlow';
+      verdict.className = 'mt-7 rounded-2xl border p-5 reveal' + glowCls + ' ' + ring;
+      // force reveal to replay
+      verdict.style.animation = 'none'; void verdict.offsetWidth; verdict.style.animation = '';
+
+      verdict.innerHTML =
+        '<div class="flex items-center justify-between gap-3">'
+        +   '<p class="text-xs font-semibold uppercase tracking-[0.25em] opacity-70">Verdict · ' + minutesPhrase(m) + '</p>'
+        +   '<button type="button" id="copyVerdict" class="copybtn rounded-md border border-current/30 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] opacity-70 transition hover:opacity-100" aria-label="Copy verdict to the ledger">copy</button>'
+        + '</div>'
+        + '<h3 class="mt-2 text-2xl font-semibold">' + p.title + '</h3>'
+        + '<p class="mt-3 leading-6">' + p.body + '</p>';
+
+      document.getElementById('copyVerdict').addEventListener('click', copyVerdict);
+    }
+
+    function copyVerdict(){
+      const m = Number(slider.value);
+      const p = postureFor(m);
+      const text = 'THE MINUTE AFTER — ' + minutesPhrase(m) + '\n' + p.title + '\n' + p.body;
+      const btn = document.getElementById('copyVerdict');
+      navigator.clipboard.writeText(text).then(()=>{
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.opacity = '1';
+        setTimeout(()=>{ btn.textContent = prev; btn.style.opacity = ''; }, 1200);
+      }).catch(()=>{
+        btn.textContent = 'ledger refused';
+        setTimeout(()=>{ btn.textContent = 'copy'; }, 1200);
+      });
+    }
+
+    slider.addEventListener('input', render);
+    render();
+
+    // ---- ambient embers (cap 10, disabled under reduced motion) ----
+    if (!reduceMotion){
+      const field = document.getElementById('emberField');
+      const spawn = (count)=>{
+        for (let i = 0; i < count; i++){
+          const e = document.createElement('span');
+          e.className = 'ember';
+          e.style.left = (Math.random()*100) + 'vw';
+          e.style.animationDelay = (Math.random()*14) + 's';
+          e.style.animationDuration = (11 + Math.random()*7) + 's';
+          field.appendChild(e);
+        }
+      };
+      spawn(7);
+
+      // EASTER EGG (b): triple-click the title spawns one extra ember (capped at 10)
+      document.getElementById('title').addEventListener('click', (ev)=>{
+        if (ev.detail === 3 && field.children.length < 10) spawn(1);
+      });
+    }
+
+    // ---- EASTER EGG (a): type "prizrak" to wake the watcher ----
+    (function(){
+      const word = 'prizrak'; let buf = '';
+      window.addEventListener('keydown', (e)=>{
+        if (e.key.length !== 1) return;
+        buf = (buf + e.key.toLowerCase()).slice(-word.length);
+        if (buf === word){
+          const w = document.getElementById('nightWhisper');
+          w.textContent = 'you found the watcher.';
+          w.classList.add('flicker');
+        }
+      });
+    })();
+
+    // ---- EASTER EGG (c): between 00:00–03:00 local, a faint footer whisper ----
+    (function(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3){
+        const w = document.getElementById('nightWhisper');
+        if (!w.textContent) w.textContent = 'the mountain does not sleep.';
+      }
+    })();
   </script>
 </body>
 </html>

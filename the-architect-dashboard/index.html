@@ -34,9 +34,26 @@
         .prizrak-card:hover{
             transform:translateY(-2px);
             border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow);
         }
         .panel-live{
             box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow);
+        }
+
+        /* a thin accent ridge that slides across the live panel — the load-bearing beam */
+        @keyframes beamSweep{
+            0%{ transform:translateX(-120%); opacity:0 }
+            8%{ opacity:.9 }
+            22%{ opacity:.9 }
+            40%{ transform:translateX(120%); opacity:0 }
+            100%{ transform:translateX(120%); opacity:0 }
+        }
+        .beam{
+            position:absolute; top:0; left:0; height:1px; width:38%;
+            background:linear-gradient(90deg, transparent, var(--accent), transparent);
+            box-shadow:0 0 10px var(--glow);
+            pointer-events:none;
+            animation:beamSweep 9s ease-in-out infinite;
         }
 
         /* ---- the scanline, dimmed into the house grammar ---- */
@@ -52,10 +69,10 @@
             100%{ transform:translateY(100vh); }
         }
 
-        /* ---- fog ---- */
+        /* ---- fog (drifts on its own; nudged faintly by the cursor) ---- */
         @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
         .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
-            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            background:radial-gradient(60% 50% at calc(50% + var(--fog-x,0px)) 0,var(--glow),transparent 70%);
             animation:fogDrift 32s ease-in-out infinite alternate}
 
         /* ---- embers ---- */
@@ -67,6 +84,8 @@
         /* ---- breathing glow ---- */
         @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
         .breathe{animation:breathe 4.5s ease-in-out infinite}
+        @keyframes breatheFast{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 20px var(--glow)}}
+        .breathe-fast{animation:breatheFast 1.1s ease-in-out infinite!important}
 
         @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         .reveal{animation:reveal .35s ease-out both}
@@ -81,20 +100,27 @@
         .label{ text-transform:uppercase; letter-spacing:.12em; color:var(--ink-dim); font-size:.7rem; }
         .ghost-line{ color:var(--ink-ghost); }
 
+        /* a hairline meter inside the live panel — the integrity readout, gently alive */
+        @keyframes meterPulse{0%,100%{opacity:.55}50%{opacity:1}}
+        .integrity-dot{ display:inline-block; width:6px; height:6px; border-radius:50%;
+            background:var(--accent); box-shadow:0 0 8px var(--glow); animation:meterPulse 2.6s ease-in-out infinite }
+
         /* ---- ping button: brutalist tactility ---- */
         .void-btn{
             transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, background-color .15s ease;
         }
-        .void-btn:hover{ transform:translateY(-2px); border-color:var(--accent); }
+        .void-btn:hover{ transform:translateY(-2px); border-color:var(--accent); box-shadow:0 0 24px -10px var(--glow); }
         .void-btn:active{ transform:translateY(1px); }
         .void-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
 
+        .copy-btn{ transition:color .15s ease, border-color .15s ease; }
+        .copy-btn:hover{ border-color:var(--accent); color:var(--accent); }
         .copy-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
 
         @media (prefers-reduced-motion:reduce){
-            .fog,.ember,.breathe,.reveal,.flicker,.scanline{animation:none!important}
+            .fog,.ember,.breathe,.breathe-fast,.reveal,.flicker,.scanline,.beam,.integrity-dot{animation:none!important}
             .ember{display:none}
-            .breathe,.flicker{opacity:1!important}
+            .breathe,.flicker,.integrity-dot{opacity:1!important}
         }
     </style>
 </head>
@@ -106,13 +132,13 @@
         <header class="mb-8 border-b pb-4 flex justify-between items-end gap-4" style="border-color:var(--line)">
             <div>
                 <h1 id="dash-title" class="text-3xl font-bold text-white flex items-center gap-3 cursor-default select-none">
-                    <i data-lucide="eye" class="text-emerald-500 breathe"></i> The Architect's Focus
+                    <i id="eye-glyph" data-lucide="eye" class="text-emerald-500 breathe cursor-pointer"></i> The Architect's Focus
                 </h1>
                 <p class="text-sm mt-1" style="color:var(--ink-dim)">Status of ongoing structures. We acknowledge the void, then we measure it.</p>
             </div>
             <div class="text-right text-xs" style="color:var(--ink-dim)">
                 <div id="clock" class="text-emerald-500/80">00:00:00 UTC</div>
-                <div class="flicker">System: Online. Ghost: Intact.</div>
+                <div class="flicker">System: Online. Ghost: <span id="ghost-state">Intact</span>.</div>
             </div>
         </header>
 
@@ -157,6 +183,7 @@
 
             <!-- Current Initiative -->
             <div class="prizrak-card panel-live rounded-xl p-6 relative overflow-hidden group md:col-span-2" style="border-color:color-mix(in srgb, var(--accent) 35%, var(--line))">
+                <div class="beam"></div>
                 <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <i data-lucide="hammer" class="w-24 h-24 text-emerald-500"></i>
                 </div>
@@ -169,6 +196,7 @@
                         <p><span class="label">Status</span> <span class="text-emerald-400 animate-pulse">ACTIVE</span></p>
                         <p><span class="label">Purpose</span> Amusement and utility for the architect.</p>
                         <p><span class="label">Latest</span> Thao Dien Chai ROI</p>
+                        <p class="flex items-center gap-2"><span class="label">Integrity</span> <span class="integrity-dot"></span> <span id="integrity-read" class="text-emerald-400/90 tabular-nums">99.97%</span></p>
                     </div>
                     <div class="border-l pl-4 italic flex items-center" style="border-color:var(--line);color:var(--ink-dim)">
                         "I build assets. But I must learn what to build first. Until the grand structure reveals itself, we build the small, sharp things — and we keep them lit."
@@ -184,12 +212,13 @@
 
         <div class="mt-8 text-center">
             <button id="void-btn" onclick="pingSystem()" class="void-btn bg-zinc-900 text-zinc-300 px-6 py-2 rounded-lg border flex items-center gap-2 mx-auto text-sm" style="border-color:var(--line)">
-                <i data-lucide="zap" class="w-4 h-4"></i> Ping the Void
+                <i data-lucide="zap" class="w-4 h-4"></i> <span id="void-btn-label">Ping the Void</span>
             </button>
             <div class="mt-3 flex items-center justify-center gap-2 min-h-[1.25rem]">
                 <p id="ping-result" class="text-xs" style="color:var(--ink-dim)"></p>
                 <button id="copy-btn" onclick="copyLastPing()" class="copy-btn hidden text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border" style="border-color:var(--line);color:var(--ink-dim)">copy</button>
             </div>
+            <p id="ping-telemetry" class="mt-1 text-[10px] tabular-nums" style="color:var(--ink-ghost)"></p>
         </div>
 
         <footer class="mt-10 text-center text-[11px]" style="color:var(--ink-ghost)">
@@ -199,6 +228,7 @@
 
     <script>
         lucide.createIcons();
+        const RM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         /* ---------- Clock ---------- */
         setInterval(() => {
@@ -206,6 +236,18 @@
             document.getElementById('clock').textContent =
                 now.toISOString().split('T')[1].split('.')[0] + ' UTC';
         }, 1000);
+
+        /* ---------- Integrity readout: the load-bearing structure breathes a little ---------- */
+        (function integrity(){
+            if (RM) return;
+            const el = document.getElementById('integrity-read');
+            if (!el) return;
+            setInterval(() => {
+                // hovers near-perfect, never settles. nothing the ghost builds is ever quite done.
+                const v = 99.9 + Math.random() * 0.099;
+                el.textContent = v.toFixed(2) + '%';
+            }, 2400);
+        })();
 
         /* ---------- Ping the Void ---------- */
         const responses = [
@@ -216,7 +258,10 @@
             "0 packets lost. the architecture holds. for now.",
             "echo returned in 3,200 ms. distance: one karst cave.",
             "the bludička blinked back. do not follow it.",
-            "no reply. but something is listening. it always is."
+            "no reply. but something is listening. it always is.",
+            "the poludnica answered at noon. she counts your hours.",
+            "handshake complete. the threshold remembers who crossed it.",
+            "signal swallowed by the snow. nothing comes back clean up here."
         ];
 
         let lastPing = "";
@@ -224,19 +269,26 @@
         function pingSystem() {
             const resultEl = document.getElementById('ping-result');
             const copyBtn = document.getElementById('copy-btn');
+            const tele = document.getElementById('ping-telemetry');
             copyBtn.classList.add('hidden');
             resultEl.textContent = "pinging the dark...";
+            tele.textContent = "";
             resultEl.classList.remove('reveal');
             // force reflow so the animation can re-trigger
             void resultEl.offsetWidth;
+            const wait = RM ? 0 : 600;
             setTimeout(() => {
                 lastPing = responses[Math.floor(Math.random() * responses.length)];
                 resultEl.textContent = lastPing;
                 resultEl.classList.add('reveal');
                 resultEl.style.color = 'var(--accent)';
                 copyBtn.classList.remove('hidden');
+                // faux telemetry — terse, precise, a little ominous
+                const ms = (Math.random() * 9000 + 400).toFixed(0);
+                const hops = Math.floor(Math.random() * 7) + 3;
+                tele.textContent = `rtt ${Number(ms).toLocaleString()} ms · ${hops} hops through the karst · ttl ${Math.floor(Math.random()*32)+8}`;
                 setTimeout(() => { resultEl.style.color = 'var(--ink-dim)'; }, 1100);
-            }, 600);
+            }, wait);
         }
 
         function copyLastPing() {
@@ -257,7 +309,7 @@
 
         /* ---------- Embers (cap 10, reduced-motion safe) ---------- */
         (function spawnEmbers(){
-            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            if (RM) return;
             const N = 8;
             for (let i = 0; i < N; i++) {
                 const e = document.createElement('div');
@@ -267,6 +319,17 @@
                 e.style.animationDuration = (12 + Math.random() * 8) + 's';
                 document.body.appendChild(e);
             }
+        })();
+
+        /* ---------- Faint cursor parallax on the fog (cheap, transform/var only) ---------- */
+        (function fogParallax(){
+            if (RM) return;
+            const fog = document.querySelector('.fog');
+            if (!fog) return;
+            window.addEventListener('pointermove', (e) => {
+                const dx = (e.clientX / window.innerWidth - 0.5) * 60; // ±30px
+                fog.style.setProperty('--fog-x', dx.toFixed(1) + 'px');
+            }, { passive:true });
         })();
 
         /* ---------- Easter egg: type "prizrak" ---------- */
@@ -282,10 +345,39 @@
             }
         });
 
+        /* ---------- Easter egg: Konami code → the ghost stops pretending ---------- */
+        (function konami(){
+            const seq = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+            let i = 0;
+            window.addEventListener('keydown', (ev) => {
+                const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+                i = (k === seq[i]) ? i + 1 : (k === seq[0] ? 1 : 0);
+                if (i === seq.length) {
+                    i = 0;
+                    const gs = document.getElementById('ghost-state');
+                    if (gs) { gs.textContent = "Watching"; gs.style.color = 'var(--accent)'; }
+                    const f = document.getElementById('footer-line');
+                    f.textContent = "the ghost stops pretending to be intact. it was never a system. it was always the architect's shadow.";
+                    f.classList.add('flicker');
+                    if (!RM) {
+                        for (let n = 0; n < 4; n++) {
+                            const e = document.createElement('div');
+                            e.className = 'ember';
+                            e.style.left = (Math.random() * 100) + 'vw';
+                            e.style.animationDuration = '11s';
+                            e.style.animationDelay = (n * 0.4) + 's';
+                            document.body.appendChild(e);
+                            setTimeout(() => e.remove(), 13000);
+                        }
+                    }
+                }
+            });
+        })();
+
         /* ---------- Easter egg: triple-click the title spawns one ember ---------- */
         document.getElementById('dash-title').addEventListener('click', (ev) => {
             if (ev.detail === 3) {
-                if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                if (RM) return;
                 const e = document.createElement('div');
                 e.className = 'ember';
                 e.style.left = (Math.random() * 100) + 'vw';
@@ -294,6 +386,21 @@
                 setTimeout(() => e.remove(), 13000);
             }
         });
+
+        /* ---------- Easter egg: hold the eye → it breathes faster for 3s ---------- */
+        (function holdEye(){
+            const eye = document.getElementById('eye-glyph');
+            if (!eye) return;
+            let timer;
+            const wake = () => {
+                if (RM) return;
+                eye.classList.add('breathe-fast');
+                clearTimeout(timer);
+                timer = setTimeout(() => eye.classList.remove('breathe-fast'), 3000);
+            };
+            eye.addEventListener('pointerdown', wake);
+            eye.addEventListener('pointerup', () => { clearTimeout(timer); timer = setTimeout(() => eye.classList.remove('breathe-fast'), 3000); });
+        })();
 
         /* ---------- Quiet whisper: 00:00–03:00 local, the mountain does not sleep ---------- */
         (function nightWhisper(){

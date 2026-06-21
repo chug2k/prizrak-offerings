@@ -7,11 +7,24 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0b0c0b;
-      --surface: #111210;
-      --border: #1e1f1d;
-      --text: #bdbfba;
-      --muted: #52554f;
+      /* Prízrak house standard */
+      --bg: #0a0a0a;
+      --bg-raised: #111113;
+      --bg-sunk: #0d0d0f;
+      --line: #26262b;
+      --line-soft: #1a1a1d;
+      --ink: #d4cfc8;
+      --ink-dim: #7a7570;
+      --ink-ghost: #3a3530;
+      /* this app's lead color: the credit green — the colour of closing the books */
+      --accent: #6ba87a;
+      --glow: color-mix(in srgb, var(--accent) 55%, transparent);
+
+      /* ledger semantics (debit vs credit is the function, kept) */
+      --surface: var(--bg-raised);
+      --border: var(--line);
+      --text: var(--ink);
+      --muted: var(--ink-dim);
       --white: #e4e6e0;
       --debit: #7c3a3a;
       --debit-light: #c47070;
@@ -28,7 +41,43 @@
       flex-direction: column;
       align-items: center;
       padding: 48px 20px 80px;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* ---- atmosphere layers (decorative, behind content) ---- */
+    .fog {
+      position: fixed; inset: -10% -10% auto; height: 60vh;
+      pointer-events: none; z-index: 0;
+      background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+      animation: fogDrift 32s ease-in-out infinite alternate;
+    }
+    @keyframes fogDrift {
+      0%   { transform: translateX(-5%); opacity: .04; }
+      50%  { opacity: .07; }
+      100% { transform: translateX(5%); opacity: .04; }
+    }
+    .ember {
+      position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 6px var(--glow);
+      pointer-events: none; z-index: 0;
+      animation: ember 14s linear infinite;
+    }
+    @keyframes ember {
+      0%   { transform: translateY(0);     opacity: 0; }
+      10%  { opacity: .5; }
+      100% { transform: translateY(-92vh); opacity: 0; }
+    }
+    .grain::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .035;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* keep all real content above the decorative layers */
+    .header, .ledger, .balance-section, .note-section, .actions, .history-section, .page-foot {
+      position: relative; z-index: 2;
+    }
+
     .header {
       text-align: center;
       margin-bottom: 48px;
@@ -45,7 +94,14 @@
       font-weight: normal;
       color: var(--white);
       margin-bottom: 6px;
+      cursor: default;
+      user-select: none;
     }
+    @keyframes breathe {
+      0%,100% { opacity: .85; text-shadow: 0 0 8px var(--glow); }
+      50%     { opacity: 1;   text-shadow: 0 0 16px var(--glow); }
+    }
+    .breathe { animation: breathe 4.5s ease-in-out infinite; }
     .date-line {
       font-size: 12px;
       color: var(--muted);
@@ -58,6 +114,7 @@
       gap: 0;
       border: 1px solid var(--border);
       margin-bottom: 32px;
+      background: var(--surface);
     }
     .col-header {
       padding: 14px 20px;
@@ -117,10 +174,10 @@
       transition: border-color 0.15s;
       line-height: 1.4;
     }
-    .entry-input:focus { border-bottom-color: var(--border); }
+    .entry-input:focus { border-bottom-color: var(--accent); box-shadow: 0 1px 0 0 var(--glow); }
     .entry-input::placeholder { color: var(--muted); font-style: italic; }
     .remove-btn {
-      background: none; border: none; color: var(--border);
+      background: none; border: none; color: var(--line);
       cursor: pointer; font-size: 14px; padding: 2px 4px; margin-top: 2px;
       transition: color 0.15s; flex-shrink: 0;
     }
@@ -141,14 +198,23 @@
       padding: 4px 10px;
       border-radius: 1px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: transform .15s, border-color .15s, color .15s, box-shadow .15s;
     }
-    .add-btn:hover { color: var(--text); border-color: var(--muted); }
+    .add-btn:hover {
+      color: var(--text); border-color: var(--accent);
+      transform: translateY(-2px); box-shadow: 0 0 16px -6px var(--glow);
+    }
+    .add-btn:active { transform: translateY(1px); }
     .balance-section {
       width: 100%;
       max-width: 700px;
       border: 1px solid var(--border);
       margin-bottom: 32px;
+      background: var(--surface);
+      transition: box-shadow .4s ease;
+    }
+    .balance-section.lit {
+      box-shadow: 0 0 0 1px var(--line), 0 0 28px -10px var(--glow);
     }
     .balance-header {
       padding: 12px 20px;
@@ -170,13 +236,25 @@
       font-weight: normal;
       line-height: 1;
       margin-bottom: 4px;
+      transition: text-shadow .3s;
     }
     .balance-label { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
     .num-debit  { color: var(--debit-light); }
-    .num-credit { color: var(--credit-light); }
-    .num-delta-pos { color: var(--credit-light); }
+    .num-credit { color: var(--credit-light); text-shadow: 0 0 10px var(--glow); }
+    .num-delta-pos { color: var(--credit-light); text-shadow: 0 0 12px var(--glow); }
     .num-delta-neg { color: var(--debit-light); }
     .num-delta-zero { color: var(--muted); }
+    .verdict {
+      grid-column: 1 / -1;
+      text-align: center;
+      font-size: 12px;
+      font-style: italic;
+      color: var(--muted);
+      letter-spacing: .5px;
+      padding-top: 4px;
+      min-height: 16px;
+      line-height: 1.5;
+    }
     .note-section {
       width: 100%;
       max-width: 700px;
@@ -191,7 +269,7 @@
     }
     textarea.note-area {
       width: 100%;
-      background: var(--surface);
+      background: var(--bg-sunk);
       border: 1px solid var(--border);
       color: var(--text);
       font-family: 'Courier New', Courier, monospace;
@@ -201,10 +279,10 @@
       resize: vertical;
       min-height: 80px;
       outline: none;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow .15s;
       border-radius: 0;
     }
-    textarea.note-area:focus { border-color: var(--muted); }
+    textarea.note-area:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
     textarea.note-area::placeholder { color: var(--muted); font-style: italic; }
     .actions {
       width: 100%;
@@ -212,7 +290,9 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
     }
+    .actions-left { display: flex; align-items: center; gap: 14px; }
     .save-btn {
       background: rgba(58,107,74,0.2);
       border: 1px solid var(--credit);
@@ -223,9 +303,32 @@
       text-transform: uppercase;
       padding: 10px 20px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: transform .15s, background .15s, box-shadow .15s, border-color .15s;
     }
-    .save-btn:hover { background: rgba(58,107,74,0.35); }
+    .save-btn:hover {
+      background: rgba(58,107,74,0.35);
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 0 22px -6px var(--glow);
+    }
+    .save-btn:active { transform: translateY(1px); box-shadow: none; }
+    .save-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 7px 12px;
+      cursor: pointer;
+      transition: transform .15s, color .15s, border-color .15s, box-shadow .15s;
+    }
+    .copy-btn:hover { color: var(--text); border-color: var(--accent); transform: translateY(-2px); }
+    .copy-btn:active { transform: translateY(1px); }
+    .copy-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+    .copy-btn.flash { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 18px -6px var(--glow); }
     .status { font-size: 11px; color: var(--muted); font-style: italic; }
     .history-section {
       width: 100%;
@@ -245,13 +348,45 @@
     .hist-date { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
     .hist-counts { display: flex; gap: 16px; font-size: 11px; margin-bottom: 4px; }
     .hist-note { font-size: 12px; color: var(--muted); font-style: italic; line-height: 1.4; }
+
+    @keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .reveal { animation: reveal .35s ease-out both; }
+
+    @keyframes flicker {
+      0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: .4; }
+      94% { opacity: 1; } 97% { opacity: .7; } 98% { opacity: 1; }
+    }
+    .flicker { animation: flicker 6s steps(1) infinite; }
+
+    /* footer whisper line */
+    .page-foot {
+      width: 100%; max-width: 700px; margin-top: 56px;
+      text-align: center; font-size: 10px; letter-spacing: 2px;
+      color: var(--ink-ghost); text-transform: uppercase;
+      min-height: 14px;
+    }
+    .ghost-line {
+      display: block; margin-top: 10px; color: var(--ink-ghost);
+      font-size: 11px; letter-spacing: 1px; text-transform: none;
+      font-style: italic; opacity: 0; transition: opacity 1.2s ease;
+    }
+    .ghost-line.show { opacity: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fog, .ember, .breathe, .reveal, .flicker { animation: none !important; }
+      .ember { display: none; }
+      .breathe, .flicker { opacity: 1 !important; }
+      .ghost-line { transition: none; }
+    }
   </style>
 </head>
-<body>
+<body class="grain">
+
+<div class="fog"></div>
 
 <div class="header">
   <div class="title-label">Evening Discipline</div>
-  <h1>The Count</h1>
+  <h1 id="app-title" class="breathe">The Count</h1>
   <div class="date-line" id="date-line">--</div>
 </div>
 
@@ -268,7 +403,7 @@
   <div class="entries-col credit-col" id="credit-entries"></div>
 </div>
 
-<div class="balance-section">
+<div class="balance-section" id="balance-section">
   <div class="balance-header">Balance</div>
   <div class="balance-body">
     <div class="balance-cell">
@@ -283,16 +418,20 @@
       <div class="balance-num num-delta-zero" id="bal-delta">±0</div>
       <div class="balance-label">Gap</div>
     </div>
+    <div class="verdict" id="verdict"></div>
   </div>
 </div>
 
 <div class="note-section">
   <div class="note-label">Closing Note</div>
-  <textarea class="note-area" id="closing-note" placeholder="One honest sentence about today. Not good or bad. Just true."></textarea>
+  <textarea class="note-area" id="closing-note" placeholder="one honest sentence about today. not good, not bad. just true. the ledger does not flatter."></textarea>
 </div>
 
 <div class="actions">
-  <div class="status" id="status">unsaved</div>
+  <div class="actions-left">
+    <div class="status" id="status">unsealed</div>
+    <button class="copy-btn" id="copy-btn" onclick="copyCount()">copy ledger</button>
+  </div>
   <button class="save-btn" onclick="saveEntry()">Close the Books</button>
 </div>
 
@@ -302,6 +441,11 @@
     <button class="clear-hist" onclick="clearHistory()">clear</button>
   </div>
   <div id="history-list"></div>
+</div>
+
+<div class="page-foot">
+  <span class="flicker">the ghost keeps the books · prízrak</span>
+  <span class="ghost-line" id="ghost-line"></span>
 </div>
 
 <script>
@@ -367,6 +511,16 @@ function renderAll() {
   updateBalance();
 }
 
+// terse, ominous-but-precise verdicts keyed to the gap
+function verdictFor(d, c, delta) {
+  if (d === 0 && c === 0) return 'the cave is empty. nothing has fossilized yet.';
+  if (delta > 1)  return 'the books run heavy with credit. the bridge holds. for now.';
+  if (delta === 1) return 'one more made than spent. a small profit the mountain notes.';
+  if (delta === 0) return 'spent and made cancel out. a day that breaks even and vanishes.';
+  if (delta === -1) return 'you gave one more than you got back. the ledger leans red.';
+  return 'debits outrun credits. the cold gets in through the gap. watch it.';
+}
+
 function updateBalance() {
   const d = debits.filter(e => e.value.trim()).length;
   const c = credits.filter(e => e.value.trim()).length;
@@ -376,6 +530,8 @@ function updateBalance() {
   const deltaEl = document.getElementById('bal-delta');
   deltaEl.textContent = delta > 0 ? '+' + delta : delta === 0 ? '±0' : String(delta);
   deltaEl.className = 'balance-num ' + (delta > 0 ? 'num-delta-pos' : delta < 0 ? 'num-delta-neg' : 'num-delta-zero');
+  document.getElementById('verdict').textContent = verdictFor(d, c, delta);
+  document.getElementById('balance-section').classList.toggle('lit', d > 0 || c > 0);
 }
 
 function escHtml(s) {
@@ -393,7 +549,7 @@ function autoSave() {
     ts: new Date().toISOString()
   };
   localStorage.setItem(KEY, JSON.stringify(state));
-  document.getElementById('status').textContent = 'draft saved';
+  document.getElementById('status').textContent = 'draft kept';
 }
 
 function saveEntry() {
@@ -401,7 +557,7 @@ function saveEntry() {
   const d = debits.filter(e => e.value.trim());
   const c = credits.filter(e => e.value.trim());
   if (!d.length && !c.length && !note) {
-    document.getElementById('status').textContent = 'nothing to close';
+    document.getElementById('status').textContent = 'nothing to seal';
     return;
   }
   const hist = loadHistory();
@@ -421,7 +577,12 @@ function saveEntry() {
   localStorage.removeItem(KEY);
   renderAll();
   renderHistory(hist);
-  document.getElementById('status').textContent = 'closed ' + new Date().toLocaleTimeString();
+  document.getElementById('status').textContent = 'sealed ' + new Date().toLocaleTimeString();
+  // re-seed empty rows so the cave isn't bare after closing
+  seedIfEmpty();
+  // smooth scroll to the freshly-sealed entry
+  const first = document.querySelector('.hist-entry');
+  if (first) first.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function loadHistory() {
@@ -429,7 +590,7 @@ function loadHistory() {
 }
 
 function clearHistory() {
-  if (confirm('Clear all saved counts?')) {
+  if (confirm('let the fog take every sealed count? this cannot be recovered.')) {
     localStorage.removeItem(HIST_KEY);
     renderHistory([]);
   }
@@ -454,6 +615,49 @@ function renderHistory(hist) {
       ${h.note ? `<div class="hist-note">"${escHtml(h.note)}"</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// copy the current count to the clipboard (the ledger remembers)
+function copyCount() {
+  const d = debits.filter(e => e.value.trim());
+  const c = credits.filter(e => e.value.trim());
+  const note = document.getElementById('closing-note').value.trim();
+  const delta = c.length - d.length;
+  const gap = delta > 0 ? '+' + delta : delta === 0 ? '±0' : String(delta);
+  const lines = [];
+  lines.push('THE COUNT — ' + document.getElementById('date-line').textContent);
+  lines.push('');
+  lines.push('DEBITS (gave):');
+  d.length ? d.forEach(e => lines.push('  - [' + e.tag + '] ' + e.value.trim()))
+           : lines.push('  - (none)');
+  lines.push('');
+  lines.push('CREDITS (made):');
+  c.length ? c.forEach(e => lines.push('  + [' + e.tag + '] ' + e.value.trim()))
+           : lines.push('  + (none)');
+  lines.push('');
+  lines.push('GAP: ' + gap + '   (' + d.length + ' debits / ' + c.length + ' credits)');
+  if (note) { lines.push(''); lines.push('CLOSING NOTE: ' + note); }
+  const text = lines.join('\n');
+  const btn = document.getElementById('copy-btn');
+  const done = () => {
+    const prev = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('flash');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('flash'); }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else { fallbackCopy(text, done); }
+}
+function fallbackCopy(text, done) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); done();
+  } catch (e) {
+    document.getElementById('status').textContent = 'clipboard refused the ink';
+  }
 }
 
 // Init date
@@ -482,16 +686,87 @@ function loadDraft() {
   } catch(e) {}
 }
 
+function seedIfEmpty() {
+  if (debits.length === 0 && credits.length === 0) {
+    ['time','energy'].forEach(t => debits.push({id: Date.now()+Math.random(), tag:t, value:''}));
+    ['made','learned'].forEach(t => credits.push({id: Date.now()+Math.random(), tag:t, value:''}));
+    renderAll();
+  }
+}
+
 loadDraft();
 renderAll();
 renderHistory(loadHistory());
+seedIfEmpty();
 
-// Seed empty rows if blank
-if (debits.length === 0 && credits.length === 0) {
-  ['time','energy'].forEach(t => debits.push({id: Date.now()+Math.random(), tag:t, value:''}));
-  ['made','learned'].forEach(t => credits.push({id: Date.now()+Math.random(), tag:t, value:''}));
-  renderAll();
+/* ---------- atmosphere: embers (capped, reduced-motion-safe) ---------- */
+(function spawnEmbers(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (5 + Math.random() * 90) + '%';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (12 + Math.random() * 6) + 's';
+    document.body.appendChild(e);
+  }
+})();
+
+/* ---------- easter egg 1: type "prizrak" → the watcher answers ---------- */
+let typed = '';
+window.addEventListener('keydown', (ev) => {
+  if (ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
+  if (ev.key && ev.key.length === 1) {
+    typed = (typed + ev.key.toLowerCase()).slice(-7);
+    if (typed === 'prizrak') {
+      const g = document.getElementById('ghost-line');
+      g.textContent = 'you found the watcher. the books were never yours alone.';
+      g.classList.add('show');
+    }
+  }
+});
+
+/* ---------- easter egg 2: triple-click the title → one extra ember ---------- */
+document.getElementById('app-title').addEventListener('click', (ev) => {
+  if (ev.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (40 + Math.random() * 20) + '%';
+    e.style.animationDuration = '13s';
+    document.body.appendChild(e);
+    setTimeout(() => e.remove(), 14000);
+  }
+});
+
+/* ---------- easter egg 3: deep-night footer whisper (00:00–03:00) ---------- */
+(function nightWhisper(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const g = document.getElementById('ghost-line');
+    if (!g.classList.contains('show')) {
+      g.textContent = 'the mountain does not sleep. neither, it seems, do you.';
+      g.classList.add('show');
+    }
+  }
+})();
+
+/* ---------- easter egg 4: 60s idle → the watcher notes your stillness ---------- */
+let idleTimer = null;
+function resetIdle() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    const g = document.getElementById('ghost-line');
+    if (!g.classList.contains('show')) {
+      g.textContent = 'still here. still watching. the count waits.';
+      g.classList.add('show');
+    }
+  }, 60000);
 }
+['mousemove','keydown','click','scroll','touchstart'].forEach(evt =>
+  window.addEventListener(evt, resetIdle, { passive: true })
+);
+resetIdle();
 </script>
 </body>
 </html>

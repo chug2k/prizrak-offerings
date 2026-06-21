@@ -60,6 +60,17 @@
       @keyframes glowPulse{0%,100%{box-shadow:0 0 0 1px var(--line),0 0 24px -10px var(--glow)}50%{box-shadow:0 0 0 1px var(--line),0 0 34px -6px var(--glow)}}
       .resultGlow{animation:glowPulse 5s ease-in-out infinite}
 
+      /* ---- the fracture map: a crack that draws itself, then breathes ---- */
+      @keyframes crackDraw{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+      @keyframes crackBreathe{0%,100%{opacity:.55}50%{opacity:.95}}
+      #fracture path{stroke-linecap:round;stroke-linejoin:round;fill:none;
+        stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}
+      #fracture.drawn path{animation:crackDraw 1.1s ease-out forwards, crackBreathe 6s ease-in-out 1.1s infinite}
+      #fracture .seep{filter:blur(6px)}
+      .core circle{transform-box:fill-box;transform-origin:center}
+      @keyframes coreReveal{0%{r:0;opacity:.9}100%{r:140;opacity:0}}
+      .core.sampling circle{animation:coreReveal 1.4s ease-out forwards}
+
       .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.04;
         background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
 
@@ -80,6 +91,9 @@
         .fog,.ember,.breathe,.reveal,.flicker,.resultGlow{animation:none!important}
         .ember{display:none}
         .breathe,.flicker{opacity:1!important}
+        #fracture path{stroke-dashoffset:0!important;animation:none!important}
+        #fracture.drawn path{animation:none!important}
+        .core.sampling circle{animation:none!important}
       }
     </style>
   </head>
@@ -104,7 +118,17 @@
               <p class="text-xs font-bold uppercase tracking-[0.25em]" style="color:var(--ink-dim)">Inspection slab</p>
               <h2 id="verdict" class="mt-2 text-3xl font-semibold" style="color:var(--ink)">Touch the cold concrete.</h2>
             </div>
-            <div id="badge" class="rounded-full px-4 py-2 text-sm font-bold" style="background:var(--bg-sunk);color:var(--ink-dim);border:1px solid var(--line)">uninspected</div>
+            <div id="badge" title="hold to take a core sample" class="cursor-default select-none rounded-full px-4 py-2 text-sm font-bold" style="background:var(--bg-sunk);color:var(--ink-dim);border:1px solid var(--line)">uninspected</div>
+          </div>
+
+          <div id="fractureWrap" class="mt-6 overflow-hidden rounded-3xl p-1" style="background:var(--bg-sunk);border:1px solid var(--line)">
+            <svg id="fracture" viewBox="0 0 600 120" preserveAspectRatio="none" class="h-24 w-full" role="img" aria-label="A fracture map: the deeper the crack, the worse the field.">
+              <g class="seep" aria-hidden="true">
+                <path id="crackSeep" stroke="var(--accent)" stroke-width="9" style="--len:760;opacity:.18" d=""></path>
+              </g>
+              <path id="crackMain" stroke="var(--accent)" stroke-width="2.4" style="--len:760" d=""></path>
+              <g class="core" aria-hidden="true"><circle cx="300" cy="60" r="0" fill="none" stroke="var(--accent)" stroke-width="1"></circle></g>
+            </svg>
           </div>
 
           <div class="mt-6 grid gap-4 sm:grid-cols-3">
@@ -181,6 +205,55 @@
         slabEl.classList.add('resultGlow');
       }
 
+      // ---- the fracture map ----------------------------------------------
+      // A crack drawn left-to-right. Severity (jaggedness/branching) is set by
+      // the selected failure mode; checking the field boxes slowly heals it.
+      const fractureSvg = document.getElementById('fracture');
+      const crackMain = document.getElementById('crackMain');
+      const crackSeep = document.getElementById('crackSeep');
+      let currentMode = 'idle';
+
+      // severity 0 = hairline & calm, 1 = jagged & branching
+      function crackPath(severity){
+        const seed = severity * 17 + 3;
+        const rng = (i) => { const x = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); };
+        const steps = 9;
+        const amp = 6 + severity * 30;          // vertical wander
+        let d = 'M 14 60';
+        const branches = [];
+        for (let i = 1; i <= steps; i++){
+          const x = 14 + (572 / steps) * i;
+          const y = 60 + (rng(i) - 0.5) * 2 * amp;
+          d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+          // sprout a branch on jagged fields
+          if (severity > 0.45 && rng(i + 40) > 0.62){
+            const bx = x + (rng(i + 5) - 0.5) * 60;
+            const by = y + (rng(i + 9) - 0.5) * (amp + 24);
+            branches.push(`M ${x.toFixed(1)} ${y.toFixed(1)} L ${bx.toFixed(1)} ${by.toFixed(1)}`);
+          }
+        }
+        return d + ' ' + branches.join(' ');
+      }
+
+      function drawFracture(severity){
+        const d = crackPath(severity);
+        crackMain.setAttribute('d', d);
+        crackSeep.setAttribute('d', d);
+        // estimate length for the draw animation dash
+        const len = Math.max(400, 760 + severity * 400);
+        crackMain.style.setProperty('--len', len);
+        crackSeep.style.setProperty('--len', len);
+        crackMain.style.opacity = (0.55 + severity * 0.4).toFixed(2);
+        crackSeep.style.opacity = (0.08 + severity * 0.22).toFixed(2);
+        crackMain.style.strokeWidth = (2 + severity * 1.6).toFixed(2);
+        fractureSvg.classList.remove('drawn');
+        void fractureSvg.getBoundingClientRect().width; // reflow → redraw stroke
+        fractureSvg.classList.add('drawn');
+      }
+
+      const SEVERITY = { idle: 0.12, surface: 0.3, field: 0.92, myth: 0.5 };
+      drawFracture(SEVERITY.idle);
+
       document.querySelectorAll('.mode').forEach(btn => btn.addEventListener('click', () => {
         const [v,n] = notes[btn.dataset.mode];
         verdictEl.textContent = v;
@@ -197,7 +270,18 @@
         // reveal animation on the verdict + note
         [verdictEl, noteEl].forEach(el => { el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal'); });
         applyResultGlow();
+
+        // redraw the fracture for this mode, eased by however much field is read
+        currentMode = btn.dataset.mode;
+        drawFracture(severityNow());
       }));
+
+      // the crack heals as the field is honestly read (each box → up to -45% severity)
+      function severityNow(){
+        const base = SEVERITY[currentMode] ?? SEVERITY.idle;
+        const checked = document.querySelectorAll('#checks input:checked').length;
+        return Math.max(0.08, base * (1 - checked * 0.15));
+      }
 
       function updateScore(){
         const checked = [...document.querySelectorAll('#checks input')].filter(i => i.checked).length;
@@ -211,6 +295,8 @@
         scoreEl.classList.remove('reveal'); void scoreEl.offsetWidth; scoreEl.classList.add('reveal');
         if (checked === 3) document.getElementById('scoreCard').classList.add('resultGlow');
         else document.getElementById('scoreCard').classList.remove('resultGlow');
+        // a read field calms the fracture
+        drawFracture(severityNow());
       }
       document.querySelectorAll('#checks input').forEach(i => i.addEventListener('change', updateScore));
 
@@ -252,12 +338,23 @@
         }
       })();
 
-      // ---- easter egg 1: type "prizrak" → the watcher appears ----
+      // ---- easter egg 1: type "prizrak" OR the Konami code → the watcher ----
+      const watcherEl = document.getElementById('watcher');
+      function wakeWatcher(){
+        watcherEl.classList.remove('hidden');
+        watcherEl.classList.add('breathe');
+      }
       let typed = '';
+      const konami = 'arrowuparrowuparrowdownarrowdownarrowleftarrowrightarrowleftarrowrightba';
+      let konBuf = '';
       window.addEventListener('keydown', (ev) => {
         if (ev.key && ev.key.length === 1) {
           typed = (typed + ev.key.toLowerCase()).slice(-7);
-          if (typed === 'prizrak') document.getElementById('watcher').classList.remove('hidden');
+          if (typed === 'prizrak') wakeWatcher();
+        }
+        if (ev.key) {
+          konBuf = (konBuf + ev.key.toLowerCase()).slice(-konami.length);
+          if (konBuf === konami) wakeWatcher();
         }
       });
 
@@ -277,6 +374,28 @@
       (function nightWatch(){
         const h = new Date().getHours();
         if (h >= 0 && h < 3) document.getElementById('nightWhisper').style.opacity = '0.85';
+      })();
+
+      // ---- easter egg 5: hold the badge → take a core sample ----
+      (function coreSample(){
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) return;
+        const core = fractureSvg.querySelector('.core');
+        let holdTimer;
+        const start = (ev) => {
+          ev.preventDefault();
+          holdTimer = setTimeout(() => {
+            core.classList.remove('sampling'); void core.getBoundingClientRect().width;
+            core.classList.add('sampling');
+            const prev = badgeEl.textContent;
+            badgeEl.textContent = 'core sampled';
+            setTimeout(() => { badgeEl.textContent = prev; core.classList.remove('sampling'); }, 1400);
+          }, 480);
+        };
+        const cancel = () => clearTimeout(holdTimer);
+        badgeEl.addEventListener('mousedown', start);
+        badgeEl.addEventListener('touchstart', start, { passive: false });
+        ['mouseup','mouseleave','touchend','touchcancel'].forEach(e => badgeEl.addEventListener(e, cancel));
       })();
 
       // ---- easter egg 4: idle 60s → "still here. still watching." ----

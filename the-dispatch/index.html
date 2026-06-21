@@ -6,164 +6,253 @@
   <title>The Dispatch</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
-    body { font-family: 'Libre Baskerville', Georgia, serif; }
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#d99b3c;      /* foreign-desk amber — ink under a single lamp */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'Libre Baskerville', Georgia, serif; background:var(--bg); color:var(--ink); }
     .mono { font-family: 'JetBrains Mono', monospace; }
     textarea { font-family: 'Libre Baskerville', Georgia, serif; }
-    .fade-in { animation: fadeIn 0.5s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ---- atmosphere layers ---- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* ---- motion vocabulary ---- */
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+
+    .reveal{animation:reveal .35s ease-out both}
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+    .flicker{animation:flicker 6s steps(1) infinite}
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+
+    .fade-in { animation: reveal 0.5s ease-out both; }
+
+    /* ---- interaction ---- */
+    textarea{ background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink);
+      transition:border-color .15s, box-shadow .15s; }
+    textarea::placeholder{ color:var(--ink-ghost); }
+    textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .tactile{transition:transform .15s, box-shadow .15s, border-color .15s, color .15s, background-color .15s}
+    .tactile:hover{transform:translateY(-2px)}
+    .tactile:active{transform:translateY(1px)}
+
+    .file-btn{ background:var(--accent); color:#0a0a0a; box-shadow:0 0 24px -10px var(--glow); }
+    .file-btn:hover{ box-shadow:0 0 28px -6px var(--glow); }
+
+    .panel{ background:var(--bg-raised); }
+    .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow)}
+
+    .label-dim{ color:var(--ink-dim); }
+    .ghost-line{ color:var(--ink-ghost); }
+
+    /* meter bars */
+    #ratio-bar{ transition:width 1s ease-out; background:linear-gradient(90deg, transparent, var(--accent)); box-shadow:0 0 12px -2px var(--glow); }
+    #clarity-bar{ transition:width 1s ease-out; background:linear-gradient(90deg, transparent, var(--accent)); box-shadow:0 0 12px -2px var(--glow); }
+
+    /* copy flash */
+    .copy-flash{ color:var(--accent)!important; border-color:var(--accent)!important; }
+
+    /* a faint paper-stamp on the filed dispatch */
+    .stamp{ color:var(--accent); border:1px solid var(--accent); opacity:.55;
+      transform:rotate(-7deg); letter-spacing:.18em; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.fade-in{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      #ratio-bar,#clarity-bar{transition:none!important}
+    }
   </style>
 </head>
-<body class="bg-zinc-50 text-zinc-800 min-h-screen">
+<body class="min-h-screen grain">
+
+  <!-- atmosphere -->
+  <div class="fog"></div>
+  <div id="ember-field"></div>
 
   <!-- Masthead -->
-  <div class="border-b-2 border-zinc-800 px-6 py-4 bg-white">
+  <div class="border-b px-6 py-5 relative" style="z-index:2; border-color:var(--line); background:var(--bg-raised)">
     <div class="max-w-2xl mx-auto text-center">
-      <div class="mono text-xs text-zinc-400 tracking-widest uppercase mb-1">Field Report</div>
-      <h1 class="text-2xl font-bold tracking-tight">THE DISPATCH</h1>
-      <div class="mono text-xs text-zinc-400 tracking-widest mt-1" id="dateline">Loading dateline...</div>
+      <div class="mono text-[10px] tracking-[0.35em] uppercase mb-2 flicker label-dim">Foreign Desk / Field Report</div>
+      <h1 id="masthead" class="text-2xl font-bold tracking-tight cursor-default select-none breathe" style="color:var(--ink)">THE DISPATCH</h1>
+      <div class="mono text-[11px] tracking-widest mt-2 label-dim" id="dateline">Loading dateline...</div>
     </div>
   </div>
 
-  <div class="max-w-2xl mx-auto px-6 py-8">
+  <div class="max-w-2xl mx-auto px-6 py-8 relative" style="z-index:2">
 
     <!-- Correspondent note -->
-    <div class="border border-zinc-300 bg-amber-50 rounded p-4 mb-8 text-sm text-zinc-600 italic">
+    <div class="border rounded p-4 mb-8 text-sm italic fade-in" style="border-color:var(--line); background:var(--bg-sunk); color:var(--ink-dim)">
       You are a foreign correspondent filing a dispatch about today. You have no stake in the outcome.
       No spin. No framing. Just what happened, what it cost, and what it produced.
-      Write it to someone who has never met you and will never grade you on it.
+      Write it to someone who has never met you, will never grade you, and is only watching the record.
     </div>
 
     <!-- Fields -->
-    <div id="form" class="space-y-6">
+    <div id="form" class="space-y-6 fade-in">
 
       <div>
-        <label class="block mono text-xs text-zinc-400 uppercase tracking-wide mb-2">LOCATION & CONDITIONS</label>
-        <p class="text-xs text-zinc-500 mb-2">Where were you today. What was the weather of the room.</p>
+        <label class="block mono text-xs uppercase tracking-wide mb-2 label-dim">DISPATCH 01 / LOCATION &amp; CONDITIONS</label>
+        <p class="text-xs mb-2" style="color:var(--ink-dim)">Where you stood today. What was the weather of the room.</p>
         <textarea id="location" rows="2"
-          class="w-full border border-zinc-300 rounded px-4 py-3 text-sm bg-white focus:outline-none focus:border-zinc-500 resize-none"
+          class="w-full rounded px-4 py-3 text-sm resize-none"
           placeholder="Thursday, 1:36 PM. VC office. Saigon. Post-lunch stillness..."
         ></textarea>
       </div>
 
       <div>
-        <label class="block mono text-xs text-zinc-400 uppercase tracking-wide mb-2">EVENTS OF NOTE</label>
-        <p class="text-xs text-zinc-500 mb-2">What actually happened. No editorializing. What occurred.</p>
+        <label class="block mono text-xs uppercase tracking-wide mb-2 label-dim">DISPATCH 02 / EVENTS OF NOTE</label>
+        <p class="text-xs mb-2" style="color:var(--ink-dim)">What actually happened. No editorializing. What occurred.</p>
         <textarea id="events" rows="4"
-          class="w-full border border-zinc-300 rounded px-4 py-3 text-sm bg-white focus:outline-none focus:border-zinc-500 resize-none"
+          class="w-full rounded px-4 py-3 text-sm resize-none"
           placeholder="Two meetings. One email thread. A decision deferred to next week..."
         ></textarea>
       </div>
 
       <div>
-        <label class="block mono text-xs text-zinc-400 uppercase tracking-wide mb-2">SOURCES CONSULTED</label>
-        <p class="text-xs text-zinc-500 mb-2">Who or what drove today's decisions. Be specific about the actual influence.</p>
+        <label class="block mono text-xs uppercase tracking-wide mb-2 label-dim">DISPATCH 03 / SOURCES CONSULTED</label>
+        <p class="text-xs mb-2" style="color:var(--ink-dim)">Who or what drove today's decisions. Be specific about the actual influence.</p>
         <textarea id="sources" rows="3"
-          class="w-full border border-zinc-300 rounded px-4 py-3 text-sm bg-white focus:outline-none focus:border-zinc-500 resize-none"
+          class="w-full rounded px-4 py-3 text-sm resize-none"
           placeholder="The meeting agenda. A colleague's opinion. The feeling that someone was watching..."
         ></textarea>
       </div>
 
       <div>
-        <label class="block mono text-xs text-zinc-400 uppercase tracking-wide mb-2">WHAT WAS PRODUCED</label>
-        <p class="text-xs text-zinc-500 mb-2">What exists now that did not exist this morning. Be honest about this. Impressions are not production.</p>
+        <label class="block mono text-xs uppercase tracking-wide mb-2 label-dim">DISPATCH 04 / WHAT WAS PRODUCED</label>
+        <p class="text-xs mb-2" style="color:var(--ink-dim)">What exists now that did not exist this morning. Be honest. Impressions are not production.</p>
         <textarea id="produced" rows="3"
-          class="w-full border border-zinc-300 rounded px-4 py-3 text-sm bg-white focus:outline-none focus:border-zinc-500 resize-none"
+          class="w-full rounded px-4 py-3 text-sm resize-none"
           placeholder="One decision made. One email that won't be remembered. Forty minutes of court time..."
         ></textarea>
       </div>
 
       <div>
-        <label class="block mono text-xs text-zinc-400 uppercase tracking-wide mb-2">CORRESPONDENT'S ASSESSMENT</label>
-        <p class="text-xs text-zinc-500 mb-2">One honest sentence from the outside. No consolation, no self-criticism. Just what the record shows.</p>
+        <label class="block mono text-xs uppercase tracking-wide mb-2 label-dim">DISPATCH 05 / CORRESPONDENT'S ASSESSMENT</label>
+        <p class="text-xs mb-2" style="color:var(--ink-dim)">One honest sentence from the outside. No consolation, no self-criticism. Just what the record shows.</p>
         <textarea id="assessment" rows="2"
-          class="w-full border border-zinc-300 rounded px-4 py-3 text-sm bg-white focus:outline-none focus:border-zinc-500 resize-none"
+          class="w-full rounded px-4 py-3 text-sm resize-none"
           placeholder="The subject operated within expected parameters and produced nothing that will require a follow-up dispatch..."
         ></textarea>
       </div>
 
       <button onclick="file()"
-        class="w-full bg-zinc-800 hover:bg-zinc-700 text-white mono text-xs py-3 rounded tracking-wide uppercase transition-colors">
+        class="file-btn tactile w-full mono text-xs py-3 rounded tracking-wide uppercase font-bold">
         FILE DISPATCH →
       </button>
     </div>
 
     <!-- Dispatch output -->
-    <div id="dispatch" class="hidden fade-in">
-      <div class="border-2 border-zinc-800 rounded bg-white">
+    <div id="dispatch" class="hidden">
+      <div class="border rounded panel result-glow reveal relative overflow-hidden" style="border-color:var(--accent)">
         <!-- Dispatch header -->
-        <div class="border-b border-zinc-300 px-6 py-4 bg-zinc-50">
-          <div class="mono text-xs text-zinc-400 uppercase tracking-widest">FIELD DISPATCH — CLASSIFIED: PERSONAL</div>
-          <div id="dispatch-dateline" class="mono text-xs text-zinc-500 mt-1"></div>
+        <div class="border-b px-6 py-4 flex items-start justify-between gap-4" style="border-color:var(--line); background:var(--bg-sunk)">
+          <div>
+            <div class="mono text-[10px] uppercase tracking-[0.25em] label-dim">FIELD DISPATCH — CLASSIFIED: PERSONAL</div>
+            <div id="dispatch-dateline" class="mono text-xs mt-1" style="color:var(--ink-dim)"></div>
+          </div>
+          <div class="stamp mono text-[9px] uppercase px-2 py-1 rounded shrink-0 mt-0.5">FILED</div>
         </div>
 
         <!-- Body -->
         <div class="px-6 py-6 space-y-5">
 
           <div>
-            <div class="mono text-xs text-zinc-400 uppercase tracking-wide mb-1">FROM THE FIELD</div>
-            <div id="out-location" class="text-sm leading-relaxed text-zinc-700 italic"></div>
+            <div class="mono text-xs uppercase tracking-wide mb-1 label-dim">FROM THE FIELD</div>
+            <div id="out-location" class="text-sm leading-relaxed italic" style="color:var(--ink)"></div>
           </div>
 
-          <div class="border-t border-zinc-100 pt-4">
-            <div class="mono text-xs text-zinc-400 uppercase tracking-wide mb-1">EVENTS</div>
-            <div id="out-events" class="text-sm leading-relaxed text-zinc-700"></div>
+          <div class="border-t pt-4" style="border-color:var(--line-soft)">
+            <div class="mono text-xs uppercase tracking-wide mb-1 label-dim">EVENTS</div>
+            <div id="out-events" class="text-sm leading-relaxed" style="color:var(--ink)"></div>
           </div>
 
-          <div class="border-t border-zinc-100 pt-4">
-            <div class="mono text-xs text-zinc-400 uppercase tracking-wide mb-1">SOURCES</div>
-            <div id="out-sources" class="text-sm leading-relaxed text-zinc-700"></div>
+          <div class="border-t pt-4" style="border-color:var(--line-soft)">
+            <div class="mono text-xs uppercase tracking-wide mb-1 label-dim">SOURCES</div>
+            <div id="out-sources" class="text-sm leading-relaxed" style="color:var(--ink)"></div>
           </div>
 
-          <div class="border-t border-zinc-100 pt-4">
-            <div class="mono text-xs text-zinc-400 uppercase tracking-wide mb-1">PRODUCED</div>
-            <div id="out-produced" class="text-sm leading-relaxed text-zinc-700"></div>
+          <div class="border-t pt-4" style="border-color:var(--line-soft)">
+            <div class="mono text-xs uppercase tracking-wide mb-1 label-dim">PRODUCED</div>
+            <div id="out-produced" class="text-sm leading-relaxed" style="color:var(--ink)"></div>
           </div>
 
-          <div class="border-t-2 border-zinc-800 pt-4">
-            <div class="mono text-xs text-zinc-400 uppercase tracking-wide mb-2">CORRESPONDENT'S ASSESSMENT</div>
-            <div id="out-assessment" class="text-sm leading-relaxed text-zinc-800 font-bold"></div>
+          <div class="border-t pt-4" style="border-color:var(--accent)">
+            <div class="mono text-xs uppercase tracking-wide mb-2 label-dim">CORRESPONDENT'S ASSESSMENT</div>
+            <div id="out-assessment" class="text-sm leading-relaxed font-bold breathe" style="color:var(--ink)"></div>
           </div>
         </div>
 
         <!-- Signal meter -->
-        <div class="border-t border-zinc-200 px-6 py-4 bg-zinc-50">
-          <div class="mono text-xs text-zinc-400 uppercase tracking-wide mb-2">DISPATCH ANALYSIS</div>
+        <div class="border-t px-6 py-4" style="border-color:var(--line); background:var(--bg-sunk)">
+          <div class="mono text-xs uppercase tracking-wide mb-3 label-dim">DISPATCH ANALYSIS</div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <div class="text-xs text-zinc-500 mb-1">production vs. impression ratio</div>
-              <div class="h-2 bg-zinc-200 rounded-full overflow-hidden">
-                <div id="ratio-bar" class="h-full bg-zinc-700 rounded-full transition-all duration-1000" style="width:0%"></div>
+              <div class="text-xs mb-1" style="color:var(--ink-dim)">production vs. impression</div>
+              <div class="h-2 rounded-full overflow-hidden" style="background:var(--line)">
+                <div id="ratio-bar" class="h-full rounded-full" style="width:0%"></div>
               </div>
-              <div id="ratio-label" class="mono text-xs text-zinc-500 mt-1"></div>
+              <div id="ratio-label" class="mono text-xs mt-1" style="color:var(--ink-dim)"></div>
             </div>
             <div>
-              <div class="text-xs text-zinc-500 mb-1">source clarity</div>
-              <div class="h-2 bg-zinc-200 rounded-full overflow-hidden">
-                <div id="clarity-bar" class="h-full bg-amber-500 rounded-full transition-all duration-1000" style="width:0%"></div>
+              <div class="text-xs mb-1" style="color:var(--ink-dim)">source clarity</div>
+              <div class="h-2 rounded-full overflow-hidden" style="background:var(--line)">
+                <div id="clarity-bar" class="h-full rounded-full" style="width:0%"></div>
               </div>
-              <div id="clarity-label" class="mono text-xs text-zinc-500 mt-1"></div>
+              <div id="clarity-label" class="mono text-xs mt-1" style="color:var(--ink-dim)"></div>
             </div>
           </div>
+          <div id="verdict" class="mono text-xs mt-4 pt-3 border-t" style="border-color:var(--line-soft); color:var(--ink-dim)"></div>
         </div>
       </div>
 
       <!-- Actions -->
       <div class="flex gap-3 mt-4">
         <button onclick="reset()"
-          class="flex-1 border border-zinc-300 text-zinc-600 mono text-xs py-2 rounded hover:bg-zinc-100 transition-colors uppercase tracking-wide">
+          class="tactile flex-1 border mono text-xs py-2 rounded uppercase tracking-wide" style="border-color:var(--line); color:var(--ink-dim); background:var(--bg-raised)">
           New Dispatch
         </button>
         <button onclick="copyDispatch()"
           id="copy-btn"
-          class="flex-1 border border-zinc-300 text-zinc-600 mono text-xs py-2 rounded hover:bg-zinc-100 transition-colors uppercase tracking-wide">
+          class="tactile flex-1 border mono text-xs py-2 rounded uppercase tracking-wide" style="border-color:var(--line); color:var(--ink-dim); background:var(--bg-raised)">
           Copy
         </button>
       </div>
 
-      <p class="text-xs text-zinc-400 text-center mt-4 italic">
+      <p class="text-xs text-center mt-4 italic" style="color:var(--ink-dim)">
         The mountain does not spin its own weather reports.
       </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-10 pt-5 border-t flex items-center justify-between mono text-[10px] uppercase tracking-widest" style="border-color:var(--line-soft); color:var(--ink-ghost)">
+      <span>prízrak / the dispatch</span>
+      <span id="footer-whisper"></span>
     </div>
   </div>
 
@@ -183,13 +272,13 @@
       const ass = document.getElementById('assessment').value.trim();
 
       if (!loc || !evt || !prd || !ass) {
-        alert('A dispatch requires all fields. The correspondent does not file partial reports.');
+        alert('A dispatch requires all fields. The correspondent does not file partial reports. The mountain is watching.');
         return;
       }
 
       document.getElementById('out-location').textContent = loc;
       document.getElementById('out-events').textContent = evt;
-      document.getElementById('out-sources').textContent = src || '(no sources cited)';
+      document.getElementById('out-sources').textContent = src || '(no sources cited — the correspondent stood alone)';
       document.getElementById('out-produced').textContent = prd;
       document.getElementById('out-assessment').textContent = ass;
       document.getElementById('dispatch-dateline').textContent = 'Filed: ' + dl;
@@ -201,6 +290,10 @@
       const hits = approvalWords.filter(w => (src + evt).toLowerCase().includes(w)).length;
       const clarity = Math.max(15, 85 - hits * 15);
 
+      // Verdict with teeth — terse, ominous-but-precise
+      const verdict = composeVerdict(prodRatio, clarity);
+      document.getElementById('verdict').textContent = verdict;
+
       setTimeout(() => {
         document.getElementById('ratio-bar').style.width = prodRatio + '%';
         document.getElementById('ratio-label').textContent = Math.round(prodRatio) + '% production';
@@ -209,7 +302,22 @@
       }, 300);
 
       document.getElementById('form').classList.add('hidden');
-      document.getElementById('dispatch').classList.remove('hidden');
+      const out = document.getElementById('dispatch');
+      out.classList.remove('hidden');
+      out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function composeVerdict(prod, clarity) {
+      let p, c;
+      if (prod >= 70) p = 'the record shows weight. something fossilized today.';
+      else if (prod >= 45) p = 'modest tonnage. the record will hold it, barely.';
+      else p = 'thin on the ground. impression outweighed production.';
+
+      if (clarity >= 70) c = 'the sources are clean. you moved on your own signal.';
+      else if (clarity >= 40) c = 'the sources are clouded. some hand was on the wheel.';
+      else c = 'the sources are murky. someone was watching, and you knew it.';
+
+      return 'VERDICT — ' + p + ' ' + c;
     }
 
     function reset() {
@@ -220,6 +328,7 @@
       document.getElementById('clarity-bar').style.width = '0%';
       document.getElementById('form').classList.remove('hidden');
       document.getElementById('dispatch').classList.add('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function copyDispatch() {
@@ -231,10 +340,66 @@
       const text = `FIELD DISPATCH — ${dl}\n\nFROM THE FIELD: ${loc}\n\nEVENTS: ${evt}\n\nSOURCES: ${src}\n\nPRODUCED: ${prd}\n\nASSESSMENT: ${ass}`;
       navigator.clipboard.writeText(text).then(() => {
         const btn = document.getElementById('copy-btn');
-        btn.textContent = 'Copied';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        btn.textContent = 'copied to the ledger';
+        btn.classList.add('copy-flash');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copy-flash'); }, 1200);
       });
     }
+
+    /* ---------- atmosphere: drifting embers (capped at 8) ---------- */
+    (function spawnEmbers(){
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const field = document.getElementById('ember-field');
+      const N = 8;
+      for (let i = 0; i < N; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    /* ---------- easter egg (a): type "prizrak" → the watcher answers ---------- */
+    let typed = '';
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'textarea' || tag === 'input') return;
+      if (e.key.length === 1) {
+        typed = (typed + e.key.toLowerCase()).slice(-7);
+        if (typed === 'prizrak') {
+          const w = document.getElementById('footer-whisper');
+          w.textContent = 'you found the watcher.';
+          w.classList.add('flicker');
+        }
+      }
+    });
+
+    /* ---------- easter egg (b): triple-click the masthead → one extra ember ---------- */
+    document.getElementById('masthead').addEventListener('click', (e) => {
+      if (e.detail === 3) {
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) return;
+        const field = document.getElementById('ember-field');
+        const ex = document.createElement('div');
+        ex.className = 'ember';
+        ex.style.left = (Math.random() * 100) + 'vw';
+        ex.style.animationDuration = '10s';
+        field.appendChild(ex);
+        setTimeout(() => ex.remove(), 11000);
+      }
+    });
+
+    /* ---------- easter egg (c): 00:00–03:00 local → footer whisper ---------- */
+    (function nightWhisper(){
+      const h = now.getHours();
+      if (h >= 0 && h < 3) {
+        const w = document.getElementById('footer-whisper');
+        if (!w.textContent) w.textContent = 'the mountain does not sleep.';
+      }
+    })();
   </script>
 </body>
 </html>

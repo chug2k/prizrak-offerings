@@ -27,7 +27,15 @@
             transition: transform .12s ease-out;
         }
         #score.bump { transform: scale(1.35); }
+        #score-unit { font-size: 10px; color: var(--ink-dim); letter-spacing: 2px; text-transform: uppercase; }
         #high { position: fixed; top: 20px; right: 16px; color: var(--ink-dim); font-size: 11px; z-index: 10; text-align: right; letter-spacing: 1px; text-transform: uppercase; }
+        /* a thin altitude milestone that fades in over the climb */
+        #altcall {
+            position: fixed; top: 50px; left: 16px; z-index: 10; pointer-events: none;
+            font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent);
+            text-shadow: 0 0 10px var(--glow); opacity: 0; transition: opacity .5s ease;
+        }
+        #altcall.show { opacity: .9; }
 
         /* Ambient layers ----------------------------------------------------*/
         .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
@@ -59,11 +67,16 @@
             backdrop-filter: blur(8px); pointer-events: auto;
         }
         #death-screen { display: none; }
-        .screen-title { font-size: 30px; letter-spacing: 6px; margin-bottom: 8px; color: var(--ink); }
+        .screen-title { font-size: 30px; letter-spacing: 6px; margin-bottom: 8px; color: var(--ink); cursor: pointer; }
         .screen-sub { font-size: 12px; color: var(--ink-dim); margin-bottom: 24px; max-width: 290px; text-align: center; line-height: 1.7; }
         .screen-score { font-size: 56px; color: var(--accent); margin-bottom: 6px; font-variant-numeric: tabular-nums; }
         .screen-label { font-size: 10px; color: var(--ink-dim); margin-bottom: 6px; letter-spacing: 3px; text-transform: uppercase; }
-        .screen-pb { font-size: 11px; color: var(--accent); margin-bottom: 22px; letter-spacing: 2px; min-height: 14px; text-transform: uppercase; }
+        .screen-pb { font-size: 11px; color: var(--accent); margin-bottom: 22px; letter-spacing: 2px; min-height: 14px; text-transform: uppercase; text-align:center; }
+        /* small spoils ledger on the death screen */
+        .spoils { display:flex; gap:22px; margin-bottom:22px; font-variant-numeric:tabular-nums; }
+        .spoils > div { text-align:center; }
+        .spoils .n { font-size:20px; color:var(--ink); text-shadow:0 0 10px var(--glow); }
+        .spoils .l { font-size:9px; color:var(--ink-dim); letter-spacing:2px; text-transform:uppercase; margin-top:3px; }
         .btn {
             padding: 14px 40px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 8px;
             background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); font-family: inherit;
@@ -73,6 +86,7 @@
         .btn:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 0 24px -6px var(--glow); }
         .btn:active { transform: translateY(1px); background: color-mix(in srgb, var(--accent) 24%, transparent); }
         .btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+        .hint { margin-top:18px; font-size:10px; letter-spacing:2px; color:var(--ink-ghost); text-transform:uppercase; }
 
         .footer-whisper {
             position: fixed; bottom: 14px; left: 0; width: 100%; text-align: center;
@@ -97,13 +111,15 @@
 <body class="grain">
     <div class="fog"></div>
     <canvas id="c"></canvas>
-    <div id="score">0</div>
+    <div id="score">0<span id="score-unit"> m</span></div>
+    <div id="altcall"></div>
     <div id="high"></div>
 
     <div id="start-screen" class="overlay-on">
         <div class="screen-title breathe">TATRA CLIMBER</div>
-        <div class="screen-sub">Tap left or right to leap between ledges. Gather edelweiss from the frost. Mind the loosed rock. The mountain has no summit — only how far you climbed before it took you.</div>
+        <div class="screen-sub">Tap left or right to leap between ledges. Gather edelweiss from the frost. Mind the loosed rock, and the ice that will not hold you. There is no summit — only how high the mountain lets you climb before it takes you back.</div>
         <button class="btn" onclick="startGame()">BEGIN ASCENT</button>
+        <div class="hint">left · right — that is all you are given</div>
         <div class="egg-line" id="egg-start"></div>
     </div>
 
@@ -112,6 +128,10 @@
         <div class="screen-score" id="final-score">0</div>
         <div class="screen-label">altitude reached</div>
         <div class="screen-pb" id="pb-line"></div>
+        <div class="spoils">
+            <div><div class="n" id="spoil-edel">0</div><div class="l">edelweiss</div></div>
+            <div><div class="n" id="spoil-best">0</div><div class="l">high mark</div></div>
+        </div>
         <div class="screen-sub" id="death-quote"></div>
         <button class="btn" onclick="startGame()">CLIMB AGAIN</button>
     </div>
@@ -138,6 +158,19 @@
         "The mountain remains. You did not.",
         "The poludnica counted your last step.",
         "Cold keeps the ledger. The ledger is full.",
+        "The bludička led you out, then let you go.",
+        "Stone is patient. It waited the whole climb.",
+    ];
+
+    // Altitude milestones — the watcher narrates the ascent (m, line)
+    const MILESTONES = [
+        [50,  'TREELINE'],
+        [120, 'THE KARST'],
+        [220, 'WHERE THE WIND LIVES'],
+        [350, 'ABOVE THE FOG'],
+        [500, 'THIN AIR'],
+        [700, 'THE WATCHER NODS'],
+        [1000,'NO MAP REACHES HERE'],
     ];
 
     // Game state
@@ -151,9 +184,6 @@
     const GRAVITY = 0.45;
     const JUMP_VY = -11;
     const JUMP_VX = 6;
-
-    // Easter egg: hold-the-glow makes embers surge for a moment
-    let emberSurge = 0;
 
     function resize() {
         W = canvas.width = window.innerWidth;
@@ -176,11 +206,16 @@
                 vx: 0, vy: 0,
                 onGround: true,
                 facing: 1,
+                trail: [],
             },
             ledges,
             rocks: [],
             flowers: [],
             particles: [],
+            snow: [],
+            mountains: [],
+            wisp: null,
+            wispTimer: 0,
             camera: 0,
             score: 0,
             maxHeight: 0,
@@ -189,6 +224,8 @@
             bgStars: [],
             flowersCollected: 0,
             shake: 0,
+            milestoneIdx: 0,
+            wispsCaught: 0,
         };
 
         // Background stars
@@ -200,6 +237,33 @@
                 a: Math.random() * 0.5 + 0.1,
                 tw: Math.random() * Math.PI * 2,
             });
+        }
+
+        // Distant Tatra ridgelines — two parallax layers of jagged peaks
+        for (let layer = 0; layer < 2; layer++) {
+            const pts = [];
+            const n = 7 + layer * 3;
+            for (let i = 0; i <= n; i++) {
+                pts.push({
+                    x: (i / n) * W,
+                    h: (0.18 + Math.random() * 0.22) * H * (1 - layer * 0.3),
+                });
+            }
+            game.mountains.push({ pts, depth: layer === 0 ? 0.04 : 0.09, tone: layer === 0 ? '20,22,42' : '14,15,32', baseY: H });
+        }
+
+        // Drifting snow (canvas, parallax with camera)
+        if (!reduceMotion) {
+            for (let i = 0; i < 70; i++) {
+                game.snow.push({
+                    x: Math.random() * W,
+                    y: Math.random() * H,
+                    r: Math.random() * 1.6 + 0.4,
+                    vy: 0.3 + Math.random() * 0.8,
+                    sway: Math.random() * Math.PI * 2,
+                    a: 0.15 + Math.random() * 0.35,
+                });
+            }
         }
 
         // Place some initial flowers
@@ -255,9 +319,26 @@
         }
     }
 
+    // Dust on landing — atmosphere, a small thud of presence
+    function landDust(x, y, w, tone) {
+        const n = 7;
+        for (let i = 0; i < n; i++) {
+            game.particles.push({
+                x: x + Math.random() * w,
+                y: y,
+                vx: (Math.random() - 0.5) * 2.5,
+                vy: -(Math.random() * 1.5),
+                life: 1,
+                color: tone || '200,205,220',
+            });
+        }
+    }
+
     function update() {
         if (!game || !running) return;
         const p = game.player;
+
+        const prevOnGround = p.onGround;
 
         // Physics
         p.vy += GRAVITY;
@@ -271,16 +352,32 @@
         if (p.x < 0) { p.x = 0; p.vx *= -0.5; }
         if (p.x + PLAYER_W > W) { p.x = W - PLAYER_W; p.vx *= -0.5; }
 
+        // Ascent trail — a faint glow ribbon when leaping upward
+        if (!reduceMotion && p.vy < -3) {
+            p.trail.push({ x: p.x + PLAYER_W / 2, y: p.y + PLAYER_H / 2, life: 1 });
+            if (p.trail.length > 14) p.trail.shift();
+        }
+        p.trail.forEach(t => t.life -= 0.06);
+        p.trail = p.trail.filter(t => t.life > 0);
+
         // Landing on ledges
         if (p.vy > 0) {
             game.ledges.forEach(l => {
                 if (l.gone) return;
                 if (p.x + PLAYER_W > l.x && p.x < l.x + l.w &&
                     p.y + PLAYER_H >= l.y && p.y + PLAYER_H <= l.y + LEDGE_H + p.vy + 2) {
+                    const wasAir = !prevOnGround;
+                    const impact = p.vy;
                     p.y = l.y - PLAYER_H;
                     p.vy = 0;
                     p.vx *= 0.7;
                     p.onGround = true;
+
+                    if (wasAir && impact > 4) {
+                        const tone = l.type === 'ice' ? '170,210,240' : '200,205,220';
+                        landDust(l.x, l.y, l.w, tone);
+                        if (!reduceMotion) game.shake = Math.min(5, impact * 0.4);
+                    }
 
                     if (l.type === 'crumble') {
                         l.crumbleTimer += 0.05;
@@ -315,8 +412,14 @@
         const height = Math.floor(Math.max(0, (H - 80 - p.y) / 10));
         if (height > game.maxHeight) {
             game.maxHeight = height;
-            game.score = height;
+            game.score = Math.max(game.score, height + game.flowersCollected * 25 + game.wispsCaught * 60);
             game.difficulty = 1 + height / 50;
+
+            // Milestone narration
+            while (game.milestoneIdx < MILESTONES.length && game.maxHeight >= MILESTONES[game.milestoneIdx][0]) {
+                showAltCall(MILESTONES[game.milestoneIdx][1]);
+                game.milestoneIdx++;
+            }
         }
 
         // Generate more ledges above
@@ -366,10 +469,54 @@
             const dx = (p.x + PLAYER_W/2) - r.x;
             const dy = (p.y + PLAYER_H/2) - r.y;
             if (dx*dx + dy*dy < (r.r + 8) * (r.r + 8)) {
-                die();
+                die('rock');
             }
         });
         game.rocks = game.rocks.filter(r => r.y < game.camera + H + 50);
+
+        // Bludička — a rare will-o'-the-wisp that drifts in from above.
+        // Catch it for a surge of altitude. It rewards the watchful.
+        game.wispTimer += 0.016;
+        if (!game.wisp && game.maxHeight > 40 && game.wispTimer > 9 + Math.random() * 6) {
+            game.wispTimer = 0;
+            game.wisp = {
+                x: 40 + Math.random() * (W - 80),
+                y: game.camera - 20,
+                phase: Math.random() * Math.PI * 2,
+                vy: 0.9 + Math.random() * 0.6,
+                drift: (Math.random() - 0.5) * 0.6,
+                taken: false,
+            };
+        }
+        if (game.wisp) {
+            const wsp = game.wisp;
+            wsp.phase += 0.05;
+            wsp.y += wsp.vy;
+            wsp.x += Math.sin(wsp.phase) * 1.4 + wsp.drift;
+            if (wsp.x < 20 || wsp.x > W - 20) wsp.drift *= -1;
+            const dx = (p.x + PLAYER_W/2) - wsp.x;
+            const dy = (p.y + PLAYER_H/2) - wsp.y;
+            if (!wsp.taken && dx*dx + dy*dy < 28*28) {
+                wsp.taken = true;
+                game.wispsCaught++;
+                game.score += 60;
+                game.player.vy = JUMP_VY * 1.25; // a gift of lift
+                bumpScore();
+                showAltCall('THE BLUDIČKA LIFTS YOU');
+                for (let i = 0; i < 16; i++) {
+                    game.particles.push({
+                        x: wsp.x, y: wsp.y,
+                        vx: (Math.random() - 0.5) * 5,
+                        vy: (Math.random() - 0.5) * 5,
+                        life: 1,
+                        color: '167,139,250',
+                    });
+                }
+                game.wisp = null;
+            } else if (wsp.y > game.camera + H + 40) {
+                game.wisp = null;
+            }
+        }
 
         // Collect flowers
         game.flowers.forEach(f => {
@@ -403,11 +550,19 @@
         });
         game.particles = game.particles.filter(pt => pt.life > 0);
 
+        // Snow drift (screen-space, gentle parallax with camera velocity)
+        game.snow.forEach(s => {
+            s.sway += 0.02;
+            s.y += s.vy;
+            s.x += Math.sin(s.sway) * 0.4;
+            if (s.y > H) { s.y = -4; s.x = Math.random() * W; }
+        });
+
         // Screen shake decay
         if (game.shake > 0) game.shake *= 0.86;
 
         // Fell off bottom
-        if (p.y > game.camera + H + 50) die();
+        if (p.y > game.camera + H + 50) die('fall');
     }
 
     function bumpScore() {
@@ -420,18 +575,33 @@
         setTimeout(() => el.classList.remove('bump'), 130);
     }
 
-    function die() {
+    let altCallTimer = null;
+    function showAltCall(text) {
+        const el = document.getElementById('altcall');
+        el.textContent = text;
+        el.classList.add('show');
+        clearTimeout(altCallTimer);
+        altCallTimer = setTimeout(() => el.classList.remove('show'), 2600);
+    }
+
+    function die(cause) {
+        if (!running) return;
         running = false;
         if (game) game.shake = 16;
+        document.getElementById('altcall').classList.remove('show');
         const beatBest = game.score > highScore;
         if (beatBest) {
             highScore = game.score;
             localStorage.setItem(HS_KEY, String(highScore));
         }
         document.getElementById('final-score').textContent = game.score;
+        document.getElementById('spoil-edel').textContent = game.flowersCollected;
+        document.getElementById('spoil-best').textContent = highScore;
         const pb = document.getElementById('pb-line');
         if (beatBest && game.score > 0) {
             pb.textContent = 'a new high mark — the ledger remembers';
+        } else if (game.wispsCaught > 0) {
+            pb.textContent = 'you walked with the bludička and lived';
         } else if (game.flowersCollected >= 5) {
             pb.textContent = game.flowersCollected + ' edelweiss, frozen in the cave';
         } else {
@@ -439,6 +609,7 @@
         }
         document.getElementById('death-quote').textContent = DEATH_QUOTES[Math.floor(Math.random() * DEATH_QUOTES.length)];
         document.getElementById('death-screen').style.display = 'flex';
+        resetIdle();
     }
 
     function render() {
@@ -472,8 +643,26 @@
             ctx.fill();
         });
 
+        // Distant Tatra ridgelines — parallax silhouettes anchored to the descent
+        game.mountains.forEach(m => {
+            const offset = (game.camera * m.depth) % H;
+            // draw the ridge twice so it tiles as the world scrolls
+            for (let rep = -1; rep <= 1; rep++) {
+                const baseY = m.baseY * 0.92 + offset + rep * (H * 0.5) - H * 0.1;
+                ctx.beginPath();
+                ctx.moveTo(0, H);
+                ctx.lineTo(0, baseY - m.pts[0].h);
+                m.pts.forEach(pt => ctx.lineTo(pt.x, baseY - pt.h));
+                ctx.lineTo(W, baseY - m.pts[m.pts.length - 1].h);
+                ctx.lineTo(W, H);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(${m.tone},0.55)`;
+                ctx.fill();
+            }
+        });
+
         ctx.save();
-        // screen shake on death-impact
+        // screen shake on death-impact / hard landings
         if (game.shake > 0.5) {
             ctx.translate((Math.random() - 0.5) * game.shake, (Math.random() - 0.5) * game.shake);
         }
@@ -505,12 +694,34 @@
                 ctx.fillRect(l.x + 4, l.y - 1, l.w - 8, 2);
             }
 
+            // Crumble warning: a faint accent crack when it's about to give
+            if (l.type === 'crumble' && l.crumbleTimer > 0) {
+                ctx.fillStyle = `rgba(167,139,250,${0.15 + l.crumbleTimer * 0.4})`;
+                ctx.fillRect(l.x + l.w * 0.3, l.y, 1.5, LEDGE_H);
+                ctx.fillRect(l.x + l.w * 0.65, l.y, 1.5, LEDGE_H);
+            }
+
             // Ice shimmer
             if (l.type === 'ice') {
                 ctx.fillStyle = `rgba(200,230,255,${0.1 + Math.sin(Date.now() * 0.003 + l.x) * 0.05})`;
                 ctx.fillRect(l.x, l.y, l.w, LEDGE_H);
             }
         });
+
+        // Bludička (will-o'-the-wisp)
+        if (game.wisp) {
+            const wsp = game.wisp;
+            const pulse = 0.6 + 0.4 * Math.sin(wsp.phase * 2);
+            const halo = ctx.createRadialGradient(wsp.x, wsp.y, 0, wsp.x, wsp.y, 22);
+            halo.addColorStop(0, `rgba(167,139,250,${0.35 * pulse})`);
+            halo.addColorStop(1, 'rgba(167,139,250,0)');
+            ctx.fillStyle = halo;
+            ctx.fillRect(wsp.x - 22, wsp.y - 22, 44, 44);
+            ctx.beginPath();
+            ctx.arc(wsp.x, wsp.y, 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(220,210,255,${0.7 + 0.3 * pulse})`;
+            ctx.fill();
+        }
 
         // Flowers
         game.flowers.forEach(f => {
@@ -566,8 +777,18 @@
             ctx.restore();
         });
 
-        // Player
+        // Player ascent trail
         const p = game.player;
+        if (p.trail.length) {
+            p.trail.forEach(t => {
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, 3.5 * t.life, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(167,139,250,${0.18 * t.life})`;
+                ctx.fill();
+            });
+        }
+
+        // Player
         // Body
         ctx.fillStyle = 'rgba(200,180,140,0.9)';
         ctx.beginPath();
@@ -596,8 +817,16 @@
 
         ctx.restore();
 
+        // Snow (screen-space, drawn over the world, under the HUD)
+        game.snow.forEach(s => {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(225,230,245,${s.a})`;
+            ctx.fill();
+        });
+
         // HUD
-        document.getElementById('score').textContent = game.score;
+        document.getElementById('score').firstChild.textContent = game.score;
         document.getElementById('high').textContent = `best · ${highScore}`;
     }
 

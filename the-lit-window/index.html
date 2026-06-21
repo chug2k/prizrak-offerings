@@ -6,35 +6,103 @@
     <title>The Lit Window | Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0a0a0f; }
-        .window-card { transition: all 0.3s ease; }
-        .window-lit { background: rgba(250,204,21,0.08); border-color: rgba(250,204,21,0.3); }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#facc15;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background: var(--bg); }
+        body{ color: var(--ink); }
+
+        /* ---- atmosphere layers ---- */
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate;opacity:.5}
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .shell{position:relative;z-index:2}
+
+        /* ---- window cards ---- */
+        .window-card { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .3s ease; }
+        .window-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+        .window-card:active { transform: translateY(1px); }
+        .window-lit { background: rgba(250,204,21,0.08); border-color: rgba(250,204,21,0.3); box-shadow: 0 0 24px -10px var(--glow); }
         .window-dark { background: rgba(39,39,42,0.5); border-color: rgba(63,63,70,0.5); }
-        .window-lit .dot { background: #facc15; box-shadow: 0 0 8px rgba(250,204,21,0.5); }
+        .window-lit .dot { background: var(--accent); box-shadow: 0 0 10px var(--glow); }
         .window-dark .dot { background: #3f3f46; }
-        .glow { text-shadow: 0 0 20px rgba(250,204,21,0.3); }
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .pulse { animation: pulse 2s ease-in-out infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .glow { text-shadow: 0 0 16px var(--glow); }
+        .breathe{ animation:breathe 4.5s ease-in-out infinite }
+        @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 10px var(--glow)}50%{opacity:1;text-shadow:0 0 20px var(--glow)}}
+
+        .fade-in { animation: fadeIn 0.35s ease-out both; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .reveal { animation: reveal .35s ease-out both; }
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+        .pulse { animation: pulse 2.4s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform:scale(1);} 50% { opacity: 0.55; transform:scale(.85);} }
+
+        .flicker{ animation:flicker 6s steps(1) infinite }
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.35}94%{opacity:1}97%{opacity:.65}98%{opacity:1}}
+
+        .result-panel { box-shadow: 0 0 0 1px var(--line), 0 0 28px -10px var(--glow); }
+
+        input:focus-visible, button:focus-visible {
+            outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+        }
+        .tap { transition:transform .15s ease, color .15s ease, border-color .15s ease; }
+        .tap:active { transform:translateY(1px); }
+
+        .ghost-line{ color:var(--ink-ghost); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.pulse,.fade-in,.window-card{animation:none!important;transition:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-sans antialiased min-h-screen">
-    <div class="max-w-2xl mx-auto px-4 py-10">
+<body class="text-zinc-300 font-sans antialiased min-h-screen grain">
+    <div class="fog" aria-hidden="true"></div>
+    <div id="emberField" aria-hidden="true"></div>
+
+    <div class="shell max-w-2xl mx-auto px-4 py-10">
         <header class="mb-8">
-            <h1 class="text-3xl font-bold text-white glow mb-1">The Lit Window</h1>
+            <h1 id="title" class="text-3xl font-bold text-white glow breathe mb-1 cursor-default select-none">The Lit Window</h1>
             <p class="text-zinc-500 text-sm">The mycelium does not light every room. It routes current where the food is and lets the rest stay dark. Map where your signal actually lives.</p>
         </header>
 
         <!-- Add window -->
         <div class="mb-6 flex gap-2">
             <input id="newWindow" type="text" placeholder="Add a window (e.g., Job search, Pickleball, Side project...)"
-                class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-yellow-600/50 placeholder-zinc-600">
-            <button onclick="addWindow()" class="px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:text-yellow-300 hover:border-yellow-600/40 transition-colors">+</button>
+                class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-200 focus:outline-none placeholder-zinc-600">
+            <button onclick="addWindow()" class="tap px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-400 hover:text-yellow-300 hover:border-yellow-600/40">+</button>
         </div>
 
         <!-- Windows grid -->
         <div id="windows" class="space-y-2 mb-8"></div>
+
+        <!-- Empty state -->
+        <div id="emptyState" class="hidden mb-8 p-6 border border-dashed border-zinc-800 rounded-xl text-center">
+            <p class="text-sm text-zinc-600 flicker">the building stands dark. no windows mapped yet.</p>
+            <p class="text-[11px] text-zinc-700 mt-1">name a room above. the ghost will watch which ones light.</p>
+        </div>
 
         <!-- Summary -->
         <div id="summary" class="hidden mb-8 p-5 bg-zinc-900/80 border border-zinc-800 rounded-xl">
@@ -46,18 +114,21 @@
             <div class="grid grid-cols-2 gap-4 text-center">
                 <div>
                     <div id="litCount" class="text-2xl font-bold text-yellow-300">0</div>
-                    <div class="text-xs text-zinc-500">Lit</div>
+                    <div class="text-xs text-zinc-500 uppercase tracking-wider">Lit</div>
                 </div>
                 <div>
                     <div id="darkCount" class="text-2xl font-bold text-zinc-600">0</div>
-                    <div class="text-xs text-zinc-500">Dark</div>
+                    <div class="text-xs text-zinc-500 uppercase tracking-wider">Dark</div>
                 </div>
             </div>
         </div>
 
         <!-- Verdict -->
         <div id="verdict" class="hidden mb-8 p-5 bg-zinc-900/60 border border-zinc-800 rounded-xl">
-            <h2 class="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-2">Prizrak's Reading</h2>
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Prízrak's Reading</h2>
+                <button id="copyBtn" onclick="copyVerdict()" class="tap text-[10px] font-mono text-zinc-600 hover:text-yellow-300 border border-zinc-800 hover:border-yellow-600/40 rounded px-2 py-1">copy</button>
+            </div>
             <p id="verdictText" class="text-zinc-300 text-sm leading-relaxed"></p>
         </div>
 
@@ -65,19 +136,21 @@
         <div id="historySection" class="hidden mb-8">
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Previous Maps</h2>
-                <button onclick="clearHistory()" class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">clear</button>
+                <button onclick="clearHistory()" class="tap text-xs text-zinc-600 hover:text-zinc-400">clear</button>
             </div>
             <div id="historyList" class="space-y-2"></div>
         </div>
 
         <!-- Save -->
         <div id="saveSection" class="hidden">
-            <button onclick="saveSnapshot()" class="w-full py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-400 hover:text-yellow-300 hover:border-yellow-600/40 transition-colors">Save today's map</button>
+            <button id="saveBtn" onclick="saveSnapshot()" class="tap w-full py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-400 hover:text-yellow-300 hover:border-yellow-600/40">Save tonight's map</button>
         </div>
 
         <footer class="mt-12 pt-6 border-t border-zinc-800/50 text-center">
             <p class="text-[10px] text-zinc-700">The signal appears where the food is. Everything else is insulation and waiting.</p>
-            <a href="../" class="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">&larr; All Offerings</a>
+            <p id="nightWhisper" class="hidden text-[10px] text-zinc-700 mt-1 flicker">the mountain does not sleep.</p>
+            <p id="idleWhisper" class="hidden text-[10px] ghost-line mt-1">still here. still watching.</p>
+            <a href="../" class="tap inline-block mt-2 text-[10px] text-zinc-600 hover:text-zinc-400">&larr; All Offerings</a>
         </footer>
     </div>
 
@@ -134,7 +207,7 @@
                         <span class="${w.lit ? 'text-yellow-200' : 'text-zinc-500'} text-sm font-medium">${esc(w.name)}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="text-[10px] ${w.lit ? 'text-yellow-500/60' : 'text-zinc-600'}">${w.lit ? 'lit' : 'dark'}</span>
+                        <span class="text-[10px] uppercase tracking-wider ${w.lit ? 'text-yellow-500/60' : 'text-zinc-600'}">${w.lit ? 'lit' : 'dark'}</span>
                         <button onclick="event.stopPropagation(); remove(${i})" class="text-zinc-700 hover:text-zinc-400 text-xs ml-1">&times;</button>
                     </div>
                 </div>
@@ -153,8 +226,10 @@
         const summary = document.getElementById("summary");
         const saveSection = document.getElementById("saveSection");
         const verdictEl = document.getElementById("verdict");
+        const emptyState = document.getElementById("emptyState");
 
         if (total > 0) {
+            emptyState.classList.add("hidden");
             summary.classList.remove("hidden");
             saveSection.classList.remove("hidden");
             document.getElementById("litCount").textContent = lit;
@@ -163,27 +238,45 @@
 
             const bar = document.getElementById("bar");
             const pct = total > 0 ? (lit / total * 100) : 0;
-            bar.innerHTML = `<div class="h-full bg-yellow-400/60 transition-all" style="width:${pct}%"></div>`;
+            bar.innerHTML = `<div class="h-full bg-yellow-400/60 transition-all" style="width:${pct}%;box-shadow:0 0 12px var(--glow)"></div>`;
 
             verdictEl.classList.remove("hidden");
+            verdictEl.classList.add("result-panel");
             document.getElementById("verdictText").textContent = getVerdict(lit, dark, total);
         } else {
+            emptyState.classList.remove("hidden");
             summary.classList.add("hidden");
             saveSection.classList.add("hidden");
             verdictEl.classList.add("hidden");
+            verdictEl.classList.remove("result-panel");
         }
     }
 
     function getVerdict(lit, dark, total) {
         if (total === 0) return "";
         const ratio = lit / total;
-        if (total < 3) return "Too few windows to read. The map needs at least three rooms before the pattern means anything.";
-        if (ratio === 0) return "Every window is dark. Either the network is resting or it has forgotten where the food is. One of these is discipline. The other is drift.";
-        if (ratio <= 0.2) return "Most of the network is quiet. The signal is concentrated. This is either focus or neglect. The difference is whether the dark windows are dark by choice or by avoidance.";
-        if (ratio <= 0.4) return "A few lit windows in a mostly dark building. This is the healthy ratio. The mycelium routes current where the food is. Not every room needs to glow.";
-        if (ratio <= 0.6) return "Half the windows are lit. The network is active but the current is spread. Ask which lights are signal and which are just left on from yesterday.";
-        if (ratio <= 0.8) return "Most windows are lit. The building is bright but brightness is not the same as signal. A lit window with no one behind it is just a wasted bulb.";
-        return "Every window is lit. This is not focus. This is a building on fire. The mycelium that lights every room has no routing — it has a short circuit.";
+        if (total < 3) return "Too few windows to read. The map needs at least three rooms before the pattern means anything. Name more, then we measure the cold.";
+        if (ratio === 0) return "Every window is dark. Either the network is resting or it has forgotten where the food is. One of these is discipline. The other is drift. The ghost cannot tell which from here — but you can.";
+        if (ratio <= 0.2) return "Most of the network is quiet. The signal is concentrated to a single ember. This is either focus or neglect. The difference is whether the dark windows are dark by choice or by avoidance.";
+        if (ratio <= 0.4) return "A few lit windows in a mostly dark building. This is the healthy ratio. The mycelium routes current where the food is. Not every room needs to glow. The bridge holds.";
+        if (ratio <= 0.6) return "Half the windows are lit. The network is active but the current is spread thin. Ask which lights are signal and which are just left on from yesterday, burning for no one.";
+        if (ratio <= 0.8) return "Most windows are lit. The building is bright but brightness is not the same as signal. A lit window with no one behind it is just a wasted bulb, humming into the dark.";
+        return "Every window is lit. This is not focus. This is a building on fire. The mycelium that lights every room has no routing — it has a short circuit. The mountain is watching it burn.";
+    }
+
+    function copyVerdict() {
+        const txt = document.getElementById("verdictText").textContent;
+        if (!txt) return;
+        const btn = document.getElementById("copyBtn");
+        navigator.clipboard.writeText(txt).then(() => {
+            const prev = btn.textContent;
+            btn.textContent = "copied to the ledger";
+            btn.classList.add("text-yellow-300", "border-yellow-600/40");
+            setTimeout(() => {
+                btn.textContent = prev;
+                btn.classList.remove("text-yellow-300", "border-yellow-600/40");
+            }, 1200);
+        }).catch(() => {});
     }
 
     function saveSnapshot() {
@@ -199,6 +292,14 @@
         if (history.length > 30) history.pop();
         localStorage.setItem(HIST_KEY, JSON.stringify(history));
         renderHistory();
+        const btn = document.getElementById("saveBtn");
+        const prev = btn.textContent;
+        btn.textContent = "filed. the ledger remembers.";
+        btn.classList.add("text-yellow-300", "border-yellow-600/40");
+        setTimeout(() => {
+            btn.textContent = prev;
+            btn.classList.remove("text-yellow-300", "border-yellow-600/40");
+        }, 1300);
     }
 
     function renderHistory() {
@@ -209,7 +310,7 @@
         section.classList.remove("hidden");
         list.innerHTML = history.map(h => {
             const dots = h.windows.map(w => `<span class="inline-block w-2 h-2 rounded-full ${w.lit ? 'bg-yellow-400/60' : 'bg-zinc-700'}" title="${esc(w.name)}${w.lit && w.note ? ': ' + esc(w.note) : ''}"></span>`).join("");
-            return `<div class="flex items-center gap-3 p-3 bg-zinc-900/40 rounded-lg border border-zinc-800/50">
+            return `<div class="window-card flex items-center gap-3 p-3 bg-zinc-900/40 rounded-lg border border-zinc-800/50">
                 <span class="text-xs font-mono text-zinc-600 w-24 flex-shrink-0">${h.date}</span>
                 <div class="flex gap-1 flex-wrap flex-1">${dots}</div>
                 <span class="text-xs font-mono text-zinc-600">${h.lit}/${h.total}</span>
@@ -218,12 +319,74 @@
     }
 
     function clearHistory() {
-        if (!confirm("Clear all saved maps?")) return;
+        if (!confirm("Let the fog take every saved map? This cannot be recovered.")) return;
         localStorage.removeItem(HIST_KEY);
         renderHistory();
     }
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    /* ---- embers ---- */
+    function spawnEmbers(n) {
+        const field = document.getElementById("emberField");
+        if (!field) return;
+        for (let k = 0; k < n; k++) {
+            const e = document.createElement("div");
+            e.className = "ember";
+            e.style.left = Math.random() * 100 + "%";
+            e.style.animationDelay = (Math.random() * 14) + "s";
+            e.style.animationDuration = (11 + Math.random() * 7) + "s";
+            field.appendChild(e);
+        }
+    }
+    spawnEmbers(8);
+
+    /* ---- easter eggs ---- */
+    // triple-click the title -> one extra ember rises
+    let titleClicks = 0, titleTimer = null;
+    document.getElementById("title").addEventListener("click", () => {
+        titleClicks++;
+        clearTimeout(titleTimer);
+        titleTimer = setTimeout(() => { titleClicks = 0; }, 600);
+        if (titleClicks >= 3) { spawnEmbers(1); titleClicks = 0; }
+    });
+
+    // type "prizrak" -> a watcher line surfaces in the footer
+    let typed = "";
+    window.addEventListener("keydown", (e) => {
+        if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+        if (e.key && e.key.length === 1) {
+            typed = (typed + e.key.toLowerCase()).slice(-7);
+            if (typed === "prizrak") {
+                const w = document.getElementById("idleWhisper");
+                w.textContent = "you found the watcher.";
+                w.classList.remove("hidden");
+                w.classList.add("reveal");
+            }
+        }
+    });
+
+    // between 00:00 and 03:00 local, the night whisper appears
+    (function(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) document.getElementById("nightWhisper").classList.remove("hidden");
+    })();
+
+    // idle 60s -> a single line fades in (non-blocking, never touches state)
+    let idleTimer = null;
+    function resetIdle() {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            const w = document.getElementById("idleWhisper");
+            if (w.classList.contains("hidden")) {
+                w.classList.remove("hidden");
+                w.classList.add("reveal");
+            }
+        }, 60000);
+    }
+    ["mousemove", "keydown", "click", "scroll", "touchstart"].forEach(ev =>
+        window.addEventListener(ev, resetIdle, { passive: true }));
+    resetIdle();
 
     document.getElementById("newWindow").addEventListener("keydown", e => { if (e.key === "Enter") addWindow(); });
     load();

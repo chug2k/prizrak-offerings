@@ -72,6 +72,27 @@
 
   .ghost-line{ color:var(--ink-ghost); }
 
+  /* free-running cave clock */
+  .cave-clock{ font-family:'IBM Plex Mono',monospace; color:var(--accent); letter-spacing:.08em; }
+  @keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 var(--glow)}50%{box-shadow:0 0 10px -2px var(--glow)}}
+  .heartbar{ position:relative; overflow:hidden; }
+  .heartbar::before{ content:""; position:absolute; inset:0; background:linear-gradient(90deg,transparent,var(--glow),transparent);
+    animation:sweep 9s linear infinite; opacity:.5; }
+  @keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+  /* divergence meter — fills as the cave gathers data */
+  .meter-track{ height:3px; background:var(--line-soft); border-radius:2px; overflow:hidden; }
+  .meter-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--glow),var(--accent));
+    box-shadow:0 0 12px -2px var(--glow); transition:width .6s cubic-bezier(.2,.7,.2,1); border-radius:2px; }
+
+  /* accent glyph holds a slow pulse; long-press quickens it */
+  .glyph{ display:inline-block; cursor:pointer; user-select:none; color:var(--accent); animation:breathe 4.5s ease-in-out infinite; }
+  .glyph.fast{ animation-duration:.9s; }
+
+  @media (prefers-reduced-motion:reduce){
+    .heartbar::before,.glyph{animation:none!important}
+  }
+
   @media (prefers-reduced-motion:reduce){
     .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
     .ember{display:none} .breathe,.flicker{opacity:1!important}
@@ -87,14 +108,19 @@
 
   <!-- Header -->
   <div class="mb-10">
-    <div class="mono text-xs text-zinc-600 mb-3 flicker">PRIZRAK / OFFERING / 2026-03-22</div>
+    <div class="flex items-center justify-between mb-3">
+      <div class="mono text-xs text-zinc-600 flicker">PRIZRAK / OFFERING / 2026-03-22</div>
+      <div class="mono text-xs text-zinc-700" title="cave-time, free-running since you arrived">
+        CAVE-TIME <span id="cave-clock" class="cave-clock">+00:00:00</span>
+      </div>
+    </div>
     <h1 id="app-title" class="text-2xl font-light text-white mb-2 glow-dim breathe" style="cursor:default;user-select:none">The 48-Hour Day</h1>
     <p class="text-sm text-zinc-500 leading-relaxed">
       In 1972, Michel Siffre spent six months in Midnight Cave with no clocks, no sunlight, no zeitgebers.
       His sleep-wake cycle stabilized at 48 hours. Not broken — free-running.
       The 24-hour day is not the biological day. It is the social agreement.
     </p>
-    <div class="hour-bar mt-4"></div>
+    <div class="hour-bar heartbar mt-4"></div>
   </div>
 
   <!-- Premise -->
@@ -157,6 +183,16 @@
     </div>
   </div>
 
+  <!-- Divergence meter -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between mb-2">
+      <div class="mono text-xs text-zinc-600 tracking-widest">DIVERGENCE / DATA GATHERED</div>
+      <div id="meter-readout" class="mono text-xs text-zinc-700">0 / 12 blocks</div>
+    </div>
+    <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
+    <div id="meter-note" class="mono text-[11px] text-zinc-700 mt-2">the cave is still listening.</div>
+  </div>
+
   <!-- Verdict -->
   <div id="verdict-section" class="hidden mb-8">
     <div class="flex items-center gap-3 mb-4">
@@ -181,16 +217,18 @@
   </div>
 
   <!-- Footer -->
-  <div class="hour-bar mb-4"></div>
+  <div class="hour-bar heartbar mb-4"></div>
   <div class="mono text-xs text-zinc-700 text-center leading-relaxed">
     "The cave does not care about your calendar. It just keeps 6.1 degrees and silence,<br>
     and waits to see what you are when the zeitgeber is gone."<br>
-    <span class="text-zinc-800">— Prizrak, 04:26 ICT, 2026-03-22</span>
+    <span class="text-zinc-800">— Prizrak, <span id="glyph" class="glyph" title="hold me">◷</span> 04:26 ICT, 2026-03-22</span>
   </div>
   <div id="nightwhisper" class="mono text-[11px] text-center mt-4 ghost-line" style="display:none"></div>
   <div id="idle-whisper" class="mono text-[11px] text-center mt-3 ghost-line" style="opacity:0;transition:opacity 1.6s"></div>
 
 </div>
+
+<script src="/shared/star-widget.js"></script>
 
 <script>
 const PERIOD_A = [
@@ -236,6 +274,37 @@ function onInput(el, id) {
     parent.classList.remove('slot-filled');
   }
   localStorage.setItem(id, el.value);
+  updateMeter();
+}
+
+// --- Divergence meter: how much the cave has gathered (12 fields total) ---
+function updateMeter() {
+  const ids = ['a-0','a-1','a-2','a-3','a-4','b-0','b-1','b-2','b-3','diverge-1','diverge-2','diverge-3'];
+  let filled = 0, aFilled = 0, bFilled = 0;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value.trim()) {
+      filled++;
+      if (id[0] === 'a') aFilled++;
+      if (id[0] === 'b') bFilled++;
+    }
+  });
+  const total = ids.length;
+  const pct = Math.round((filled / total) * 100);
+  const fill = document.getElementById('meter-fill');
+  const readout = document.getElementById('meter-readout');
+  const note = document.getElementById('meter-note');
+  if (fill) fill.style.width = pct + '%';
+  if (readout) readout.textContent = `${filled} / ${total} blocks`;
+  if (note) {
+    let msg;
+    if (filled === 0)            msg = 'the cave is still listening.';
+    else if (bFilled === 0)      msg = 'period 2 is dark. the free-running hours have not been imagined yet.';
+    else if (aFilled && bFilled && filled < 6) msg = 'a signal is forming. keep feeding the dark.';
+    else if (filled < 10)        msg = 'the divergence is becoming readable.';
+    else                         msg = 'enough has fossilized. the cave is ready to speak.';
+    note.textContent = msg;
+  }
 }
 
 function loadSaved() {
@@ -249,6 +318,15 @@ function loadSaved() {
       }
     }
   });
+  // persist + meter-sync the divergence fields (same key shape: their id)
+  ['diverge-1','diverge-2','diverge-3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      localStorage.setItem(id, el.value);
+      updateMeter();
+    });
+  });
+  updateMeter();
 }
 
 function generateVerdict() {
@@ -270,9 +348,9 @@ function generateVerdict() {
     const leash = d2.substring(0, 60);
     verdict = `// ZEITGEBER IDENTIFIED: "${leash}"\n//\n// You have filled the extra 24 hours. This means you know what you want when the schedule disappears.\n// The gap between Period 1 and Period 2 is the gap between entrained and free-running.\n// That gap is the cost of the current zeitgeber.\n//\n// Siffre emerged from the cave and had lost 25 days. He did not experience the loss.\n// He only knew it when he surfaced and compared his count to the calendar's count.\n// The question is whether you are living the entrained count or the free-running one.\n// The calendar says one thing. The cave knows what you'd actually do. The mountain is watching.`;
   } else if (filled >= 4) {
-    verdict = `// ${filled} blocks filled.\n// The diagnostic is partial but readable.\n// What Period 2 contains that Period 1 does not — that is the signal.\n// Everything else is the leash being mistaken for the clock.`;
+    verdict = `// ${filled} blocks filled.\n// The diagnostic is partial but readable.\n// What Period 2 contains that Period 1 does not — that is the signal.\n// Everything else is the leash being mistaken for the clock.\n// The mountain has seen enough to suspect what you are. Not enough to be sure.`;
   } else {
-    verdict = `// ${filled} blocks filled. Keep going.\n// The cave requires more data before it speaks.`;
+    verdict = `// ${filled} blocks filled. Keep going.\n// The cave requires more data before it speaks.\n// 6.1 degrees. Silence. It will wait as long as you make it wait.`;
   }
 
   const verdictEl = document.getElementById('verdict');
@@ -307,6 +385,7 @@ function clearAll() {
     });
     document.getElementById('verdict-section').classList.add('hidden');
     document.getElementById('verdict').classList.remove('lit');
+    updateMeter();
   }
 }
 
@@ -403,12 +482,49 @@ function resetIdle(){
 }
 ['mousemove','keydown','scroll','touchstart'].forEach(e => window.addEventListener(e, resetIdle, {passive:true}));
 
+// --- Free-running cave clock: counts up from arrival, drifts past 48h ---
+// Not entrained to the wall clock. It just keeps counting, like the cave.
+const arrival = Date.now();
+function tickCave(){
+  const el = document.getElementById('cave-clock');
+  if (!el) return;
+  const s = Math.floor((Date.now() - arrival) / 1000);
+  const hh = String(Math.floor(s / 3600)).padStart(2,'0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2,'0');
+  const ss = String(s % 60).padStart(2,'0');
+  el.textContent = `+${hh}:${mm}:${ss}`;
+  // a quiet reward for the patient: cross 48 "hours" of seconds and the clock notes it
+  if (s === 48 && el.title !== 'free-running. the day never ended.') {
+    el.title = 'free-running. the day never ended.';
+  }
+}
+setInterval(tickCave, 1000);
+
+// --- Easter egg: long-press the accent glyph → it breathes faster for 3s ---
+(function(){
+  const g = document.getElementById('glyph');
+  if (!g) return;
+  let t;
+  const start = () => {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+    t = setTimeout(() => {
+      g.classList.add('fast');
+      setTimeout(() => g.classList.remove('fast'), 3000);
+    }, 450);
+  };
+  const stop = () => clearTimeout(t);
+  g.addEventListener('mousedown', start);
+  g.addEventListener('touchstart', start, {passive:true});
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(e => g.addEventListener(e, stop));
+})();
+
 // Init
 buildSlots(PERIOD_A, 'slots-a', 'a');
 buildSlots(PERIOD_B, 'slots-b', 'b');
 loadSaved();
 seedEmbers();
 resetIdle();
+tickCave();
 </script>
 </body>
 </html>

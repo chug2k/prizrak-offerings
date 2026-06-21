@@ -41,6 +41,18 @@
         @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
         .flicker{animation:flicker 6s steps(1) infinite}
 
+        /* decode flicker for the verdict label as the machine "resolves" it */
+        @keyframes decode{0%{opacity:.15;filter:blur(2px)}20%{opacity:.6}30%{opacity:.25}45%{opacity:.9;filter:blur(.5px)}55%{opacity:.4}70%{opacity:1;filter:blur(0)}80%{opacity:.7}100%{opacity:1;filter:blur(0)}}
+        .decode{animation:decode .9s steps(1,end) 1}
+
+        /* faster-breathing burst (long-press easter egg on the clock) */
+        @keyframes breatheFast{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 22px var(--glow)}}
+        .breathe-fast{animation:breatheFast 0.9s ease-in-out infinite!important}
+
+        /* probe-progress scanline pulse */
+        @keyframes scanPulse{0%,100%{opacity:.25}50%{opacity:.8}}
+        .scan-live{animation:scanPulse 1.6s ease-in-out infinite}
+
         .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
             background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
 
@@ -69,9 +81,9 @@
         #content{ position:relative; z-index:2; }
 
         @media (prefers-reduced-motion:reduce){
-            .fog,.ember,.breathe,.reveal,.flicker,.pulse,.fade-in{animation:none!important}
+            .fog,.ember,.breathe,.reveal,.flicker,.pulse,.fade-in,.decode,.breathe-fast,.scan-live{animation:none!important}
             .ember{display:none}
-            .breathe,.flicker,.pulse{opacity:1!important}
+            .breathe,.flicker,.pulse,.decode,.scan-live{opacity:1!important}
         }
     </style>
 </head>
@@ -94,6 +106,17 @@
             <p class="text-sm text-zinc-500 leading-relaxed">you are awake at an hour when most things are not.<br>five questions. the machine will tell you what this means.</p>
         </div>
 
+        <!-- Probe progress / diagnostic readout -->
+        <div id="probe-meter" class="mb-5 select-none">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] uppercase tracking-[0.2em] text-zinc-600">DIAGNOSTIC IN PROGRESS</span>
+                <span id="probe-count" class="text-[10px] tracking-[0.2em] tabular-nums" style="color:var(--ink-dim)">0 / 5 PROBES</span>
+            </div>
+            <div class="h-px w-full bg-zinc-800 overflow-hidden">
+                <div id="probe-fill" class="h-px scan-live" style="width:0%;background:var(--accent);box-shadow:0 0 8px var(--glow);transition:width .5s ease"></div>
+            </div>
+        </div>
+
         <!-- Quiz -->
         <div id="quiz" class="space-y-6"></div>
 
@@ -103,7 +126,10 @@
         <!-- Log -->
         <div id="log-section" class="hidden mt-10">
             <div class="border-t border-zinc-800 pt-6">
-                <p class="text-[11px] text-zinc-600 mb-3 uppercase tracking-[0.2em]">THE LEDGER / PREVIOUS READINGS</p>
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-[11px] text-zinc-600 uppercase tracking-[0.2em]">THE LEDGER / PREVIOUS READINGS</p>
+                    <button id="clear-ledger" class="opt-btn hidden text-[10px] tracking-[0.15em] text-zinc-700 hover:text-zinc-400 px-1">let the fog take it</button>
+                </div>
                 <div id="log-entries" class="space-y-2"></div>
             </div>
         </div>
@@ -331,7 +357,22 @@
     let answers = {};
     let currentQ = 0;
 
+    function updateProbeMeter() {
+        const done = Object.keys(answers).length;
+        const total = QUESTIONS.length;
+        const fill = document.getElementById('probe-fill');
+        const count = document.getElementById('probe-count');
+        const meter = document.getElementById('probe-meter');
+        if (fill) fill.style.width = Math.round((done / total) * 100) + '%';
+        if (count) count.textContent = `${done} / ${total} PROBES`;
+        // hide the live scan pulse once every probe has landed
+        if (fill) fill.classList.toggle('scan-live', done < total);
+        if (meter) meter.style.display = ''; // shown while diagnosing
+    }
+
     function renderQuiz() {
+        document.getElementById('probe-meter').style.display = '';
+        updateProbeMeter();
         const container = document.getElementById('quiz');
         container.innerHTML = '';
         for (let i = 0; i <= Math.min(currentQ, QUESTIONS.length - 1); i++) {
@@ -378,6 +419,7 @@
                 if (isActive) {
                     btn.addEventListener('click', () => {
                         answers[q.id] = opt.value;
+                        updateProbeMeter();
                         if (currentQ < QUESTIONS.length - 1) {
                             currentQ++;
                             renderQuiz();
@@ -399,16 +441,30 @@
 
     function showResult() {
         document.getElementById('quiz').innerHTML = '';
+        document.getElementById('probe-meter').style.display = 'none';
         const { type, scores } = diagnose(answers);
         const diag = DIAGNOSES[type];
         const rgb = TYPE_RGB[type] || '251,191,36';
+
+        // confidence: how cleanly the winner separates from the field (cosmetic only)
+        const vals = Object.values(scores).sort((a,b)=>b-a);
+        const total = vals.reduce((a,b)=>a+b,0) || 1;
+        const conf = Math.round((vals[0] / total) * 100);
+        const margin = vals[0] - (vals[1] || 0);
+        const certainty = margin >= 3 ? 'high certainty'
+                        : margin >= 1 ? 'probable'
+                        : 'contested — the readings overlap';
+
         const res = document.getElementById('result');
         res.classList.remove('hidden');
         res.innerHTML = `
             <div class="result-panel rounded-lg border ${diag.border} ${diag.bg} p-5 space-y-4" style="box-shadow:0 0 0 1px rgba(${rgb},0.18), 0 0 30px -8px rgba(${rgb},0.45)">
                 <div>
-                    <p class="text-[10px] text-zinc-600 uppercase tracking-[0.2em] mb-1">DIAGNOSIS / THE MACHINE HAS DECIDED</p>
-                    <h2 class="text-2xl font-bold ${diag.color} ${diag.glow} breathe">${diag.label}</h2>
+                    <div class="flex items-center justify-between mb-1">
+                        <p class="text-[10px] text-zinc-600 uppercase tracking-[0.2em]">DIAGNOSIS / THE MACHINE HAS DECIDED</p>
+                        <p class="text-[10px] tabular-nums tracking-[0.2em]" style="color:rgba(${rgb},0.85)">${conf}% · ${certainty}</p>
+                    </div>
+                    <h2 class="text-2xl font-bold ${diag.color} ${diag.glow} breathe decode">${diag.label}</h2>
                     <p class="text-sm text-zinc-300 mt-2">${diag.summary}</p>
                 </div>
                 <div>
@@ -426,8 +482,8 @@
                 </div>
             </div>
             <div class="mt-4 flex gap-2">
-                <button id="copy-verdict" class="opt-btn text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300">Copy to the ledger</button>
-                <button id="restart" class="opt-btn text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300">Run again</button>
+                <button id="copy-verdict" class="opt-btn text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300">copy to the ledger</button>
+                <button id="restart" class="opt-btn text-xs px-3 py-2 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300">probe again</button>
             </div>
         `;
         document.getElementById('restart').addEventListener('click', () => {
@@ -442,13 +498,13 @@
         const copyBtn = document.getElementById('copy-verdict');
         copyBtn.addEventListener('click', () => {
             const stamp = document.getElementById('clock').textContent;
-            const text = `THE 4AM DIAGNOSTIC — ${stamp}\n${diag.label}\n${diag.summary}\n\nVERDICT: ${diag.verdict}`;
+            const text = `THE 4AM DIAGNOSTIC — ${stamp}\n${diag.label}  (${conf}% · ${certainty})\n${diag.summary}\n\nVERDICT: ${diag.verdict}`;
             const flash = () => {
                 copyBtn.textContent = 'copied to the ledger';
                 copyBtn.style.borderColor = 'var(--accent)';
                 copyBtn.style.color = 'var(--accent)';
                 setTimeout(() => {
-                    copyBtn.textContent = 'Copy to the ledger';
+                    copyBtn.textContent = 'copy to the ledger';
                     copyBtn.style.borderColor = '';
                     copyBtn.style.color = '';
                 }, 1200);
@@ -490,20 +546,61 @@
         const log = getLog();
         const section = document.getElementById('log-section');
         const entries = document.getElementById('log-entries');
+        const clearBtn = document.getElementById('clear-ledger');
         if (!log.length) {
             section.classList.remove('hidden');
+            if (clearBtn) clearBtn.classList.add('hidden');
             entries.innerHTML = `<p class="text-xs italic" style="color:var(--ink-ghost)">the cave is empty. nothing has fossilized yet.</p>`;
             return;
         }
         section.classList.remove('hidden');
+        if (clearBtn) clearBtn.classList.remove('hidden');
         const TYPE_COLORS = { SIGNAL: 'text-amber-400', LOOP: 'text-red-400', BIOLOGY: 'text-indigo-400', SHIFT: 'text-violet-400' };
-        entries.innerHTML = log.map(e => `
+
+        // recurring strata: which reading the dark keeps returning (cosmetic, no new state)
+        const tally = {};
+        log.forEach(e => { tally[e.type] = (tally[e.type] || 0) + 1; });
+        let dominant = null, dn = 0;
+        for (const [k,v] of Object.entries(tally)) { if (v > dn) { dn = v; dominant = k; } }
+        const domLabel = (DIAGNOSES[dominant] && DIAGNOSES[dominant].label) || '';
+        const strata = (log.length >= 3 && dn / log.length >= 0.5)
+            ? `<p class="text-[10px] tracking-[0.15em] mb-3" style="color:var(--ink-dim)">RECURRING STRATUM · the dark keeps returning ${dn}× to <span class="${TYPE_COLORS[dominant]}">${domLabel}</span></p>`
+            : '';
+
+        entries.innerHTML = strata + log.map(e => `
             <div class="flex items-center justify-between text-xs">
                 <span class="text-zinc-600">${e.display}</span>
                 <span class="${TYPE_COLORS[e.type] || 'text-zinc-400'}">${e.label}</span>
             </div>
         `).join('');
     }
+
+    // ---------- clear the ledger (two-step, fog-take voice) ----------
+    (function wireClearLedger(){
+        const clearBtn = document.getElementById('clear-ledger');
+        if (!clearBtn) return;
+        let armed = false, armTimer = null;
+        clearBtn.addEventListener('click', () => {
+            if (!armed) {
+                armed = true;
+                clearBtn.textContent = 'let the fog take it? this cannot be recovered.';
+                clearBtn.style.color = 'var(--accent)';
+                clearTimeout(armTimer);
+                armTimer = setTimeout(() => {
+                    armed = false;
+                    clearBtn.textContent = 'let the fog take it';
+                    clearBtn.style.color = '';
+                }, 4000);
+                return;
+            }
+            clearTimeout(armTimer);
+            armed = false;
+            localStorage.removeItem(LOG_KEY);
+            clearBtn.textContent = 'let the fog take it';
+            clearBtn.style.color = '';
+            renderLog();
+        });
+    })();
 
     // ---------- Easter eggs (non-blocking, never touch saved state) ----------
     // 1) type "prizrak" -> reveal the watcher line
@@ -531,7 +628,26 @@
         }
     });
 
-    // 3) idle 60s -> a single ghost line fades in
+    // 3) long-press the clock glyph -> it breathes faster for 3s
+    (function clockHold(){
+        const clock = document.getElementById('clock');
+        if (!clock) return;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        let holdTimer = null;
+        const start = () => {
+            holdTimer = setTimeout(() => {
+                clock.classList.add('breathe-fast');
+                setTimeout(() => clock.classList.remove('breathe-fast'), 3000);
+            }, 550);
+        };
+        const cancel = () => clearTimeout(holdTimer);
+        clock.style.cursor = 'default';
+        clock.addEventListener('mousedown', start);
+        clock.addEventListener('touchstart', start, {passive:true});
+        ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => clock.addEventListener(ev, cancel));
+    })();
+
+    // 4) idle 60s -> a single ghost line fades in
     let idleTimer = null;
     function armIdle(){
         clearTimeout(idleTimer);

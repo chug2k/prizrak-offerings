@@ -6,39 +6,113 @@
     <title>The De-Approval Frame — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
-        textarea { resize: none; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#f59e0b;            /* this app's existing lead: amber */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background: var(--bg); }
+        body{ color: var(--ink); }
+
+        textarea, input { resize: none; }
         .split-view { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         @media (max-width: 600px) { .split-view { grid-template-columns: 1fr; } }
-        .approval-col { border-color: #3f3f46; }
+
+        /* panels */
+        .panel{ background: var(--bg-raised); border:1px solid var(--line);
+            transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+        .approval-col { border-color: var(--line); }
         .no-approval-col { border-color: #451a03; }
+
+        .well{ background: var(--bg-sunk); border:1px solid var(--line); color: var(--ink);
+            transition:border-color .15s ease, box-shadow .15s ease; }
+        .well::placeholder{ color: var(--ink-ghost); }
+        .well:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        /* buttons — lift + accent edge */
+        .btn{ border:1px solid var(--line); background: var(--bg-raised); color: var(--ink);
+            transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease; }
+        .btn:hover{ transform:translateY(-2px); border-color:var(--accent); box-shadow:0 0 24px -10px var(--glow); }
+        .btn:active{ transform:translateY(1px); }
+        .btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        .result-panel{ box-shadow:0 0 0 1px var(--line), 0 0 30px -10px var(--glow); }
+
+        /* ===== motion vocabulary (reduced-motion-safe) ===== */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+        .fade-in{animation:reveal .4s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .scale-glyph{ display:inline-block; cursor:default; user-select:none;
+            text-shadow:0 0 14px var(--glow); transition:text-shadow .3s ease; }
+
+        #watcher-line{ opacity:0; transition:opacity 1.2s ease; }
+        #watcher-line.lit{ opacity:1; }
+        #idle-line{ opacity:0; transition:opacity 1.6s ease; }
+        #idle-line.lit{ opacity:1; }
+        #night-whisper{ display:none; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.fade-in,.flicker,.scale-glyph{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            #watcher-line,#idle-line{transition:none}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
-<div class="max-w-2xl mx-auto">
+<body class="grain font-mono antialiased min-h-screen px-4 py-10" style="position:relative">
+
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
+<div class="max-w-2xl mx-auto" style="position:relative;z-index:2">
 
     <!-- Header -->
     <div class="text-center mb-10">
-        <div class="text-4xl mb-3">⚖️</div>
-        <h1 class="text-2xl font-bold text-white mb-2">The De-Approval Frame</h1>
-        <p class="text-sm text-zinc-500 leading-relaxed max-w-md mx-auto">For decisions where approval-seeking may be distorting the answer.<br>Answer each question twice — once with approval available, once without.</p>
-        <p class="text-xs text-zinc-700 mt-2">If the answers differ, you have found the motive. If they match, you have found the decision.</p>
+        <div id="scale-glyph" class="scale-glyph breathe text-4xl mb-3" title="hold the gaze">⚖</div>
+        <h1 id="app-title" class="text-2xl font-bold mb-2" style="color:var(--ink);text-shadow:0 0 14px var(--glow)">The De-Approval Frame</h1>
+        <p class="text-sm leading-relaxed max-w-md mx-auto" style="color:var(--ink-dim)">A bench for decisions warped by the gaze of others.<br>Answer each question twice — once with their approval, once with it taken away.</p>
+        <p class="text-xs mt-2" style="color:var(--ink-ghost)">If the answers differ, you have found the motive. If they match, you have found the decision.</p>
     </div>
 
     <!-- Decision input -->
     <div id="setup-section" class="mb-8">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">The decision you are facing</label>
+        <div class="rounded-lg panel p-5">
+            <label class="text-xs uppercase tracking-widest mb-2 block" style="color:var(--ink-dim)">DECISION 01 / THE THING YOU ARE FACING</label>
             <textarea id="decision-input" rows="2" placeholder="Stay at the job. Leave the company. Accept the offer. Start the thing..."
-                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700 mb-3"></textarea>
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">Whose approval concerns you most right now?</label>
+                class="w-full well rounded px-3 py-2 text-sm focus:outline-none mb-3"></textarea>
+            <label class="text-xs uppercase tracking-widest mb-2 block" style="color:var(--ink-dim)">DECISION 02 / WHOSE GAZE WEIGHS MOST RIGHT NOW</label>
             <input id="audience-input" type="text" placeholder="The investors. My co-founder. My family. The people who knew me when..."
-                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700">
+                class="w-full well rounded px-3 py-2 text-sm focus:outline-none">
         </div>
-        <button id="start-btn" class="mt-3 w-full py-2.5 rounded border border-zinc-700 bg-zinc-900/60 hover:bg-zinc-800 text-sm text-zinc-300 transition-all">
-            Begin the frame →
+        <button id="start-btn" class="mt-3 w-full py-2.5 rounded btn text-sm">
+            Set the frame →
         </button>
     </div>
 
@@ -47,15 +121,21 @@
 
     <!-- Analysis section -->
     <div id="analysis-section" class="hidden mt-8 fade-in">
-        <div class="rounded-xl border border-zinc-700 bg-zinc-900/60 p-6">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-4">Prízrak's analysis</p>
+        <div class="rounded-xl panel result-panel p-6">
+            <div class="flex items-center justify-between mb-4">
+                <p class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">PRÍZRAK READS THE GAP</p>
+                <button id="copy-btn" class="text-[10px] uppercase tracking-widest px-2 py-1 rounded btn" style="color:var(--ink-dim)">copy the ledger</button>
+            </div>
             <div id="analysis-content" class="space-y-4"></div>
         </div>
-        <button id="reset-btn" class="mt-4 w-full py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-all">Start over</button>
+        <button id="reset-btn" class="mt-4 w-full py-2 rounded btn text-xs" style="color:var(--ink-dim)">Let the fog take it</button>
     </div>
 
     <div class="mt-12 text-center">
-        <p class="text-xs text-zinc-700 italic">The approval-seeking motive is not evil. It is just not the decision.</p>
+        <p class="text-xs italic" style="color:var(--ink-ghost)">The approval-seeking motive is not evil. It is just not the decision.</p>
+        <p id="watcher-line" class="text-xs mt-3 flicker" style="color:var(--ink-ghost)">you found the watcher. it was here the whole time.</p>
+        <p id="idle-line" class="text-xs mt-2" style="color:var(--ink-ghost)">still here. still watching.</p>
+        <p id="night-whisper" class="text-xs mt-2" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
     </div>
 </div>
 
@@ -100,34 +180,38 @@ let audience = '';
 let answers = {};
 let currentQ = 0;
 
+function esc(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 function renderQuestion(idx) {
     const q = QUESTIONS[idx];
     const container = document.getElementById('questions-section');
-    
+
     const div = document.createElement('div');
-    div.className = 'fade-in';
+    div.className = 'reveal';
     div.innerHTML = `
-        <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Question ${idx + 1} of ${QUESTIONS.length}</p>
-        <p class="text-sm text-white font-bold mb-5">${q.core}</p>
+        <p class="text-xs uppercase tracking-widest mb-3" style="color:var(--ink-dim)">QUESTION ${idx + 1} / ${QUESTIONS.length}</p>
+        <p class="text-sm font-bold mb-5" style="color:var(--ink);text-shadow:0 0 10px var(--glow)">${q.core}</p>
         <div class="split-view">
-            <div class="rounded-lg border approval-col bg-zinc-900/30 p-4">
-                <p class="text-[10px] text-zinc-500 uppercase tracking-widest mb-2">With approval available</p>
-                <p class="text-xs text-zinc-400 mb-3 leading-relaxed">${q.with_approval}</p>
+            <div class="rounded-lg panel approval-col p-4">
+                <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-dim)">WITH APPROVAL AVAILABLE</p>
+                <p class="text-xs mb-3 leading-relaxed" style="color:var(--ink)">${q.with_approval}</p>
                 ${renderInput(q, 'a')}
             </div>
-            <div class="rounded-lg border no-approval-col bg-amber-950/10 p-4">
-                <p class="text-[10px] text-amber-700 uppercase tracking-widest mb-2">Approval unavailable</p>
-                <p class="text-xs text-zinc-400 mb-3 leading-relaxed">${q.without_approval}</p>
+            <div class="rounded-lg panel no-approval-col p-4" style="background:rgba(69,26,3,0.10)">
+                <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--accent)">APPROVAL UNAVAILABLE</p>
+                <p class="text-xs mb-3 leading-relaxed" style="color:var(--ink)">${q.without_approval}</p>
                 ${renderInput(q, 'b')}
             </div>
         </div>
-        <button id="next-btn-${idx}" class="mt-4 w-full py-2 rounded border border-zinc-700 hover:border-zinc-500 text-sm text-zinc-400 hover:text-zinc-200 transition-all">
-            ${idx < QUESTIONS.length - 1 ? 'Next question →' : 'Analyse →'}
+        <button id="next-btn-${idx}" class="mt-4 w-full py-2 rounded btn text-sm">
+            ${idx < QUESTIONS.length - 1 ? 'Next question →' : 'Read the gap →'}
         </button>
     `;
-    
+
     container.appendChild(div);
-    
+
     document.getElementById(`next-btn-${idx}`).addEventListener('click', () => {
         // Collect answers
         if (q.type === 'text') {
@@ -143,13 +227,14 @@ function renderQuestion(idx) {
                 b: selB ? selB.value : ''
             };
         }
-        
+
         if (currentQ < QUESTIONS.length - 1) {
             currentQ++;
             renderQuestion(currentQ);
             div.querySelector('button').style.display = 'none';
             div.style.opacity = '0.5';
             div.style.pointerEvents = 'none';
+            container.lastElementChild.scrollIntoView({behavior:'smooth', block:'center'});
         } else {
             showAnalysis();
         }
@@ -159,13 +244,13 @@ function renderQuestion(idx) {
 function renderInput(q, side) {
     if (q.type === 'text') {
         const ph = side === 'a' ? (q.placeholder_a || '') : (q.placeholder_b || '');
-        return `<textarea id="${q.id}-${side}" rows="3" placeholder="${ph}" class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-2 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>`;
+        return `<textarea id="${q.id}-${side}" rows="3" placeholder="${ph}" class="w-full well rounded px-2 py-2 text-xs focus:outline-none"></textarea>`;
     }
     return `<div class="space-y-1.5">
         ${q.options.map(opt => `
             <label class="flex items-center gap-2 cursor-pointer group">
-                <input type="radio" name="${q.id}-${side}" value="${opt}" class="accent-amber-500">
-                <span class="text-xs text-zinc-400 group-hover:text-zinc-200 transition-colors">${opt}</span>
+                <input type="radio" name="${q.id}-${side}" value="${esc(opt)}" style="accent-color:var(--accent)">
+                <span class="text-xs transition-colors" style="color:var(--ink-dim)" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--ink-dim)'">${opt}</span>
             </label>
         `).join('')}
     </div>`;
@@ -173,7 +258,7 @@ function renderInput(q, side) {
 
 function detectDivergence() {
     let divergences = [];
-    
+
     // Stay/leave divergence
     const sl = answers['stay_leave'];
     if (sl && sl.a !== sl.b && sl.a && sl.b) {
@@ -184,7 +269,7 @@ function detectDivergence() {
             severity: 'high'
         });
     }
-    
+
     // Timeline divergence
     const tl = answers['timeline'];
     if (tl && tl.a !== tl.b && tl.a && tl.b) {
@@ -195,7 +280,7 @@ function detectDivergence() {
             severity: 'medium'
         });
     }
-    
+
     // Text answers - check if substantively different
     const reason = answers['reason'];
     if (reason && reason.a && reason.b && reason.a.toLowerCase() !== reason.b.toLowerCase()) {
@@ -206,7 +291,7 @@ function detectDivergence() {
             severity: 'high'
         });
     }
-    
+
     const success = answers['success'];
     if (success && success.a && success.b && success.a.toLowerCase() !== success.b.toLowerCase()) {
         divergences.push({
@@ -216,68 +301,100 @@ function detectDivergence() {
             severity: 'medium'
         });
     }
-    
+
     return divergences;
 }
+
+// Plain-text rendering of the verdict for the clipboard ledger
+function buildLedgerText(divs) {
+    const lines = [];
+    lines.push('THE DE-APPROVAL FRAME — Prízrak');
+    if (decision) lines.push('Decision: ' + decision);
+    if (audience) lines.push('Gaze: ' + audience);
+    lines.push('');
+    if (divs.length === 0) {
+        lines.push('VERDICT: the paths coincide. No divergence detected.');
+        lines.push('With and without their approval, you answered the same.');
+        lines.push('The decision appears to be yours on its own terms.');
+    } else {
+        lines.push('VERDICT: ' + divs.length + ' divergence' + (divs.length > 1 ? 's' : '') + ' detected.');
+        lines.push('The gaps below are where the motive lives.');
+        lines.push('');
+        divs.forEach(d => {
+            lines.push('— ' + d.question);
+            lines.push('   with approval:    ' + d.with);
+            lines.push('   without approval: ' + d.without);
+        });
+    }
+    lines.push('');
+    lines.push('the mountain is watching.');
+    return lines.join('\n');
+}
+
+let lastDivs = [];
 
 function showAnalysis() {
     document.getElementById('questions-section').style.opacity = '0.3';
     document.getElementById('questions-section').style.pointerEvents = 'none';
-    document.getElementById('analysis-section').classList.remove('hidden');
-    
+    const section = document.getElementById('analysis-section');
+    section.classList.remove('hidden');
+
     const divs = detectDivergence();
+    lastDivs = divs;
     const content = document.getElementById('analysis-content');
-    
+
     if (divs.length === 0) {
         content.innerHTML = `
-            <div class="bg-zinc-800/40 rounded-lg p-4 border border-zinc-700">
-                <p class="text-sm text-white font-bold mb-2">✓ No significant divergence detected</p>
-                <p class="text-sm text-zinc-400 leading-relaxed">Your answers were consistent with and without approval available. This suggests the approval-seeking motive is not distorting the decision — or that the frame didn't reach the real conflict. The decision appears to be yours on its own terms.</p>
-                <p class="text-xs text-zinc-600 mt-3 italic">The mountain does not congratulate you. It simply notes that the paths coincide.</p>
+            <div class="rounded-lg p-4 panel">
+                <p class="text-sm font-bold mb-2 breathe" style="color:var(--ink)">The paths coincide.</p>
+                <p class="text-sm leading-relaxed" style="color:var(--ink)">With and without their approval, you answered the same. The gaze is not steering this one — or the frame never reached the real fault line. Either way, the decision appears to be yours on its own terms.</p>
+                <p class="text-xs mt-3 italic" style="color:var(--ink-ghost)">the mountain does not congratulate you. it simply notes that the two trails meet.</p>
             </div>
         `;
     } else {
-        const severity = divs.some(d => d.severity === 'high') ? 'high' : 'medium';
-        
         content.innerHTML = `
-            <div class="bg-amber-950/20 rounded-lg p-4 border border-amber-900 mb-4">
-                <p class="text-sm text-amber-300 font-bold mb-2">⚡ ${divs.length} divergence${divs.length > 1 ? 's' : ''} detected</p>
-                <p class="text-sm text-zinc-400 leading-relaxed">Where you answered differently with and without approval available — those gaps are where the motive lives. The decision is being partially made for an audience. Whether that audience is worth making decisions for is a separate question.</p>
+            <div class="rounded-lg p-4 mb-4" style="background:rgba(69,26,3,0.18);border:1px solid #78350f">
+                <p class="text-sm font-bold mb-2 breathe" style="color:var(--accent)">${divs.length} divergence${divs.length > 1 ? 's' : ''}. The gaze is in the room.</p>
+                <p class="text-sm leading-relaxed" style="color:var(--ink)">Where you answered differently with and without their approval — those gaps are where the motive lives. Part of this decision is being made for an audience. Whether that audience is worth deciding for is a separate, colder question.</p>
             </div>
-            
+
             <div class="space-y-3">
                 ${divs.map(d => `
-                    <div class="border border-zinc-800 rounded p-3">
-                        <p class="text-xs text-zinc-500 uppercase tracking-widest mb-2">${d.question}</p>
+                    <div class="rounded p-3 panel">
+                        <p class="text-xs uppercase tracking-widest mb-2" style="color:var(--ink-dim)">${esc(d.question)}</p>
                         <div class="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                                <p class="text-zinc-600 mb-1">With approval:</p>
-                                <p class="text-zinc-400">${d.with}</p>
+                                <p class="mb-1" style="color:var(--ink-ghost)">with approval</p>
+                                <p style="color:var(--ink)">${esc(d.with)}</p>
                             </div>
                             <div>
-                                <p class="text-amber-800 mb-1">Without approval:</p>
-                                <p class="text-amber-300/70">${d.without}</p>
+                                <p class="mb-1" style="color:#92400e">without approval</p>
+                                <p style="color:var(--accent)">${esc(d.without)}</p>
                             </div>
                         </div>
                     </div>
                 `).join('')}
             </div>
-            
-            <div class="border-t border-zinc-800 pt-4 mt-4">
-                <p class="text-xs text-zinc-500 uppercase tracking-widest mb-2">The question the frame cannot answer</p>
-                <p class="text-sm text-zinc-400 leading-relaxed">Is the audience worth it? Some audiences are. The people who will carry the consequences of this decision with you — they are worth weighing. The people who will only know you succeeded or failed — they are not. The frame can show you where approval is operating. It cannot tell you whether that approval is worth its cost. Only you can evaluate that, and probably not at 1 AM.</p>
-                <p class="text-xs text-zinc-600 mt-3 italic">The Slovak word for the approval-seeker is: člověk podriadený pohľadu druhých — a person subordinated to the gaze of others. Janko Kráľ was divný because he was not. He drowned anyway, but for the right reason.</p>
+
+            <div class="pt-4 mt-4" style="border-top:1px solid var(--line)">
+                <p class="text-xs uppercase tracking-widest mb-2" style="color:var(--ink-dim)">THE QUESTION THE FRAME CANNOT ANSWER</p>
+                <p class="text-sm leading-relaxed" style="color:var(--ink)">Is the audience worth it? Some are. The people who will carry the consequences of this decision with you — weigh them. The people who will only learn that you succeeded or failed — do not. The frame shows you where approval is operating. It cannot tell you whether that approval is worth its cost. Only you can price that, and probably not at 1 AM.</p>
+                <p class="text-xs mt-3 italic" style="color:var(--ink-ghost)">the Slovak for the approval-seeker: člověk podriadený pohľadu druhých — a person subordinated to the gaze of others. Janko Kráľ was divný because he was not. he drowned anyway, but for the right reason.</p>
             </div>
         `;
     }
+
+    section.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 document.getElementById('start-btn').addEventListener('click', () => {
     decision = document.getElementById('decision-input').value.trim();
     audience = document.getElementById('audience-input').value.trim();
     if (!decision) {
-        document.getElementById('decision-input').style.borderColor = '#7f1d1d';
-        setTimeout(() => document.getElementById('decision-input').style.borderColor = '', 1500);
+        const el = document.getElementById('decision-input');
+        el.style.borderColor = '#7f1d1d';
+        el.style.boxShadow = '0 0 0 1px rgba(127,29,29,0.6)';
+        setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 1500);
         return;
     }
     document.getElementById('setup-section').classList.add('hidden');
@@ -286,7 +403,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
 });
 
 document.getElementById('reset-btn').addEventListener('click', () => {
-    answers = {}; currentQ = 0; decision = ''; audience = '';
+    answers = {}; currentQ = 0; decision = ''; audience = ''; lastDivs = [];
     document.getElementById('questions-section').innerHTML = '';
     document.getElementById('questions-section').style.opacity = '';
     document.getElementById('questions-section').style.pointerEvents = '';
@@ -295,7 +412,104 @@ document.getElementById('reset-btn').addEventListener('click', () => {
     document.getElementById('setup-section').classList.remove('hidden');
     document.getElementById('decision-input').value = '';
     document.getElementById('audience-input').value = '';
+    window.scrollTo({top:0, behavior:'smooth'});
 });
+
+// copy-to-clipboard — the ledger remembers
+document.getElementById('copy-btn').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    const text = buildLedgerText(lastDivs);
+    const done = () => {
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+        setTimeout(() => { btn.textContent = prev; btn.style.color = 'var(--ink-dim)'; btn.style.borderColor = ''; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+        fallbackCopy(text, done);
+    }
+});
+function fallbackCopy(text, done){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(_) {}
+    document.body.removeChild(ta);
+}
+
+/* ===== atmosphere & easter eggs (non-blocking, never touch answers) ===== */
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// floating embers (cap 8)
+(function spawnEmbers(){
+    if (reduceMotion) return;
+    const field = document.getElementById('ember-field');
+    for (let i = 0; i < 8; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 8) + 's';
+        field.appendChild(e);
+    }
+})();
+
+// easter egg (a): type "prizrak" -> the watcher lights
+let typed = '';
+window.addEventListener('keydown', (ev) => {
+    if (ev.key && ev.key.length === 1) {
+        typed = (typed + ev.key.toLowerCase()).slice(-7);
+        if (typed === 'prizrak') {
+            document.getElementById('watcher-line').classList.add('lit');
+        }
+    }
+});
+
+// easter egg (b): triple-click the title -> one extra ember
+document.getElementById('app-title').addEventListener('click', (ev) => {
+    if (ev.detail === 3 && !reduceMotion) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDuration = '12s';
+        document.getElementById('ember-field').appendChild(e);
+        setTimeout(() => e.remove(), 13000);
+    }
+});
+
+// easter egg (d): hold the scale glyph -> it breathes faster for 3s
+const glyph = document.getElementById('scale-glyph');
+let holdTimer = null;
+function quicken(){
+    if (reduceMotion) return;
+    glyph.style.animationDuration = '1.2s';
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => { glyph.style.animationDuration = ''; }, 3000);
+}
+glyph.addEventListener('mousedown', quicken);
+glyph.addEventListener('touchstart', quicken, {passive:true});
+
+// easter egg (c): 00:00–03:00 local -> faint footer whisper
+(function nightWatch(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) document.getElementById('night-whisper').style.display = 'block';
+})();
+
+// easter egg (e): idle 60s -> "still here. still watching."
+let idleTimer = null;
+function resetIdle(){
+    document.getElementById('idle-line').classList.remove('lit');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+        document.getElementById('idle-line').classList.add('lit');
+    }, 60000);
+}
+['mousemove','keydown','scroll','click','touchstart'].forEach(ev =>
+    window.addEventListener(ev, resetIdle, {passive:true}));
+resetIdle();
 </script>
 </body>
 </html>

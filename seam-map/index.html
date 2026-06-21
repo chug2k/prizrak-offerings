@@ -80,6 +80,12 @@
   }
   .breathe { animation: breathe 4.5s ease-in-out infinite }
 
+  @keyframes breatheFast {
+    0%,100% { opacity: .9; text-shadow: 0 0 10px var(--glow) }
+    50%     { opacity: 1; text-shadow: 0 0 26px var(--glow) }
+  }
+  .breathe-fast { animation: breatheFast 0.9s ease-in-out infinite }
+
   @keyframes reveal {
     from { opacity: 0; transform: translateY(8px) }
     to   { opacity: 1; transform: translateY(0) }
@@ -93,7 +99,7 @@
   .flicker { animation: flicker 6s steps(1) infinite }
 
   /* content above decorative layers */
-  header, .week-nav, .timeline-bar, .days-grid, .note-area,
+  header, .week-nav, .timeline-wrap, .seam-caption, .days-grid, .note-area,
   .analysis, .carry-section, footer { position: relative; z-index: 2; }
 
   header {
@@ -470,21 +476,75 @@
   }
   .ghost-line.show { opacity: 1; }
 
-  .timeline-bar {
+  .timeline-wrap {
     width: 100%;
     max-width: 700px;
+    margin-bottom: 0.5rem;
+    position: relative;
+  }
+
+  .timeline-bar {
+    width: 100%;
     height: 8px;
     background: var(--bg-raised);
     border: 1px solid var(--line);
     border-radius: 4px;
-    margin-bottom: 2rem;
     display: flex;
     overflow: hidden;
+    position: relative;
   }
 
   .timeline-segment {
     flex: 1;
-    transition: background 0.3s, box-shadow 0.3s;
+    transition: background 0.4s, box-shadow 0.4s;
+  }
+
+  /* the seam thread — a stitch running through the week.
+     bright where days held distinct, dissolving where they blurred. */
+  .seam-thread {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .seam-thread line {
+    stroke: var(--accent);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    transition: stroke-opacity .5s, stroke-dasharray .5s;
+    filter: drop-shadow(0 0 4px var(--glow));
+  }
+  @keyframes seamPulse {
+    0%,100% { stroke-opacity: .9 }
+    50%     { stroke-opacity: .35 }
+  }
+  .seam-thread line.held { stroke-opacity: .95; }
+  .seam-thread line.dissolved {
+    stroke-dasharray: 1 5;
+    stroke-opacity: .35;
+    stroke: var(--muted);
+    filter: none;
+  }
+  .seam-thread line.unmarked { stroke-opacity: .14; stroke-dasharray: 2 4; filter: none; }
+  .seam-thread line.future { stroke-opacity: 0; }
+  .seam-thread circle {
+    fill: var(--accent);
+    transition: r .4s, fill-opacity .4s, fill .4s;
+    filter: drop-shadow(0 0 3px var(--glow));
+  }
+  .seam-knot-held   { r: 2.6; fill-opacity: 1; }
+  .seam-knot-dissolved { r: 1.4; fill: var(--muted); fill-opacity: .5; filter: none; }
+  .seam-knot-unmarked  { r: 1.2; fill: var(--line); fill-opacity: .6; filter: none; }
+  .seam-knot-future    { fill-opacity: 0; }
+
+  .seam-caption {
+    text-align: center;
+    font-size: 0.6rem;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin: 0.35rem 0 1.6rem;
+    min-height: 1em;
   }
 
   @media (max-width: 600px) {
@@ -496,11 +556,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .fog, .ember, .breathe, .reveal, .flicker { animation: none !important; }
+    .fog, .ember, .breathe, .breathe-fast, .reveal, .flicker { animation: none !important; }
     .ember { display: none; }
-    .breathe, .flicker { opacity: 1 !important; }
+    .breathe, .breathe-fast, .flicker { opacity: 1 !important; }
     .day-card.blurred { filter: none; }
     .ghost-line { transition: none; }
+    .seam-thread line, .seam-thread circle { transition: none; }
   }
 </style>
 </head>
@@ -521,20 +582,24 @@
   <button onclick="changeWeek(1)">next →</button>
 </div>
 
-<div class="timeline-bar" id="timelineBar">
-  <div class="timeline-segment" id="seg0"></div>
-  <div class="timeline-segment" id="seg1"></div>
-  <div class="timeline-segment" id="seg2"></div>
-  <div class="timeline-segment" id="seg3"></div>
-  <div class="timeline-segment" id="seg4"></div>
-  <div class="timeline-segment" id="seg5"></div>
-  <div class="timeline-segment" id="seg6"></div>
+<div class="timeline-wrap">
+  <div class="timeline-bar" id="timelineBar">
+    <div class="timeline-segment" id="seg0"></div>
+    <div class="timeline-segment" id="seg1"></div>
+    <div class="timeline-segment" id="seg2"></div>
+    <div class="timeline-segment" id="seg3"></div>
+    <div class="timeline-segment" id="seg4"></div>
+    <div class="timeline-segment" id="seg5"></div>
+    <div class="timeline-segment" id="seg6"></div>
+  </div>
+  <svg class="seam-thread" id="seamThread" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"></svg>
 </div>
+<div class="seam-caption" id="seamCaption"></div>
 
 <div class="days-grid" id="daysGrid"></div>
 
 <div class="note-area">
-  <h3>What happened — one line per day</h3>
+  <h3>One line per day — what kept it from dissolving</h3>
   <div class="note-grid" id="noteGrid"></div>
 </div>
 
@@ -660,7 +725,7 @@
   }
 
   // hold the latest reading so the copy button can ledger it
-  let lastReading = { distinct: 0, blurred: 0, unmarked: 0, density: '—', verdict: '' };
+  let lastReading = { distinct: 0, blurred: 0, unmarked: 0, density: '—', verdict: '', seamLine: '' };
 
   function render() {
     const wkStart = getWeekStart(weekOffset);
@@ -677,6 +742,7 @@
 
     let distinct = 0, blurred = 0, unmarked = 0;
     const statuses = [];
+    const futures = [];
 
     for (let i = 0; i < 7; i++) {
       const date = new Date(wkStart);
@@ -686,6 +752,7 @@
       const today = isToday(date);
       const status = future ? null : (st.status || null);
       statuses.push(status);
+      futures.push(future);
 
       if (!future) {
         if (status === 'distinct') distinct++;
@@ -731,6 +798,9 @@
       else { seg.style.background = 'var(--line)'; }
     }
 
+    // ── The seam thread: stitch the week together (or watch it dissolve) ──
+    drawSeamThread(statuses, futures);
+
     // Analysis
     const total = distinct + blurred + unmarked;
     const marked = distinct + blurred;
@@ -748,19 +818,30 @@
     }
     document.getElementById('seamDensity').textContent = density;
 
+    // longest run of consecutive blurred days — the cave deepening
+    let longestBlur = 0, run = 0;
+    for (let i = 0; i < 7; i++) {
+      if (statuses[i] === 'blurred') { run++; longestBlur = Math.max(longestBlur, run); }
+      else run = 0;
+    }
+
     let verdict = '';
     if (marked === 0) {
       verdict = 'The cave is empty. Nothing has fossilized yet. Mark a day before the fog takes the week.';
     } else if (distinct === 0 && blurred > 0) {
-      verdict = `All ${blurred} marked days blurred. Siffre would recognize this — the days dissolved into each other. Something in the environment refused to give you transitions. The mountain is watching.`;
+      verdict = `All ${blurred} marked days blurred. Siffre would recognize this — the days ran together with no seam between them. Something refused you transitions. The mountain is watching, and the mountain remembers.`;
     } else if (blurred === 0 && distinct > 0) {
-      verdict = `All ${distinct} marked days held distinct. Either the week was unusually eventful, or the conditions were good for seam formation. The bridge holds. For now.`;
+      verdict = `All ${distinct} marked days held distinct. Every seam stitched. Either the week was unusually eventful, or the conditions favored seam-formation. The bridge holds. For now.`;
     } else if (distinct > blurred) {
-      verdict = `More distinct than blurred (${distinct} vs ${blurred}). The week had texture. The seams held more often than they dissolved.`;
+      verdict = `More distinct than blurred (${distinct} vs ${blurred}). The week had texture. The seams held more often than they dissolved — you will be able to find your way back through it.`;
     } else if (blurred > distinct) {
-      verdict = `More blurred than distinct (${blurred} vs ${distinct}). The week had a cave quality. The zeitgebers were weak, or absent, or wrong.`;
+      verdict = `More blurred than distinct (${blurred} vs ${distinct}). The week had a cave quality. The zeitgebers were weak, or absent, or wrong. Time was passing; you just couldn't feel it pass.`;
     } else {
-      verdict = `Equal split. The week was half cave, half surface. Depending on which days blurred and which held, this may be significant.`;
+      verdict = `Equal split. Half cave, half surface. Which days blurred and which held may matter more than the count — the watcher notes the placement.`;
+    }
+    // a deepening-cave aside when blur clusters together
+    if (longestBlur >= 3) {
+      verdict += ` ${longestBlur} blurred days in a row — that is not noise, that is descent. The cave deepens here.`;
     }
     document.getElementById('weekVerdict').textContent = verdict;
 
@@ -768,7 +849,8 @@
     const verdictEl = document.getElementById('weekVerdict');
     verdictEl.classList.toggle('breathe', marked > 0);
 
-    lastReading = { distinct, blurred, unmarked, density, verdict };
+    const seamLine = (document.getElementById('seamCaption') || {}).textContent || '';
+    lastReading = { distinct, blurred, unmarked, density, verdict, seamLine };
 
     // Carry/leave
     const cl = getCarryLeave();
@@ -776,6 +858,60 @@
     document.getElementById('carry2').value = cl.carry[1] || '';
     document.getElementById('leave1').value = cl.leave[0] || '';
     document.getElementById('leave2').value = cl.leave[1] || '';
+  }
+
+  // ── Draw the seam thread across the week ──
+  // viewBox is 0..100 wide, 8 tall. Each day occupies ~14.28 units.
+  // Held seams: bright continuous stitch. Blurred: dashed + dim. The knots sit on each day.
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  function drawSeamThread(statuses, futures) {
+    const svg = document.getElementById('seamThread');
+    if (!svg) return;
+    svg.innerHTML = '';
+    const cx = i => (i + 0.5) * (100 / 7); // center x of day i
+    const cy = 4;
+
+    // segments between adjacent days: a seam "holds" only if BOTH ends are distinct
+    for (let i = 0; i < 6; i++) {
+      const a = statuses[i], b = statuses[i + 1];
+      const fa = futures[i], fb = futures[i + 1];
+      const line = document.createElementNS(SVGNS, 'line');
+      line.setAttribute('x1', cx(i)); line.setAttribute('y1', cy);
+      line.setAttribute('x2', cx(i + 1)); line.setAttribute('y2', cy);
+      let cls;
+      if (fa || fb) cls = 'future';
+      else if (a === 'distinct' && b === 'distinct') cls = 'held';
+      else if (a === 'blurred' || b === 'blurred') cls = 'dissolved';
+      else cls = 'unmarked';
+      line.setAttribute('class', cls);
+      svg.appendChild(line);
+    }
+
+    // knots at each day
+    let blurStreak = 0, deepest = false;
+    for (let i = 0; i < 7; i++) {
+      const c = document.createElementNS(SVGNS, 'circle');
+      c.setAttribute('cx', cx(i)); c.setAttribute('cy', cy);
+      const s = statuses[i];
+      let k;
+      if (futures[i]) k = 'seam-knot-future';
+      else if (s === 'distinct') k = 'seam-knot-held';
+      else if (s === 'blurred') k = 'seam-knot-dissolved';
+      else k = 'seam-knot-unmarked';
+      c.setAttribute('class', k);
+      svg.appendChild(c);
+    }
+
+    // caption beneath the thread, in the watcher's voice
+    const marked = statuses.filter(s => s === 'distinct' || s === 'blurred').length;
+    const allHeld = marked > 0 && statuses.every(s => s !== 'blurred');
+    const allGone = marked > 0 && statuses.every(s => s !== 'distinct');
+    const cap = document.getElementById('seamCaption');
+    if (!cap) return;
+    if (marked === 0) cap.textContent = 'the thread has not been laid yet';
+    else if (allHeld) cap.textContent = 'the thread holds end to end';
+    else if (allGone) cap.textContent = 'the thread has come apart';
+    else cap.textContent = 'where it frays, the days ran together';
   }
 
   function changeWeek(dir) {
@@ -798,8 +934,11 @@
 `THE SEAM MAP — ${formatDate(wkStart)} – ${formatDate(wkEnd)}
 distinct: ${r.distinct}   blurred: ${r.blurred}   unmarked: ${r.unmarked}
 seam density: ${r.density}
+the thread: ${r.seamLine || '—'}
 
-${r.verdict}`;
+${r.verdict}
+
+— filed. the ledger remembers.`;
     const btn = document.getElementById('copyBtn');
     const restore = () => { btn.textContent = 'copy'; btn.classList.remove('flash'); };
     const done = () => {
@@ -852,6 +991,25 @@ ${r.verdict}`;
       setTimeout(() => em.remove(), 12000);
     }
   });
+
+  // ── Easter egg 1b: hold the title → the glow breathes faster for 3s ──
+  (function holdTitleEgg() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const title = document.getElementById('appTitle');
+    let holdTimer, releaseTimer;
+    const begin = () => {
+      holdTimer = setTimeout(() => {
+        title.classList.add('breathe-fast');
+        clearTimeout(releaseTimer);
+        releaseTimer = setTimeout(() => title.classList.remove('breathe-fast'), 3000);
+      }, 500);
+    };
+    const cancel = () => clearTimeout(holdTimer);
+    title.addEventListener('mousedown', begin);
+    title.addEventListener('touchstart', begin, { passive: true });
+    ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev =>
+      title.addEventListener(ev, cancel));
+  })();
 
   // ── Easter egg 2: type "prizrak" to wake the watcher ──
   (function watcherEgg() {
