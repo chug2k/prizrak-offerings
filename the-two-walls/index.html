@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Two Walls | Prízrak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #18181b; }
+        .wall-inside { border-left: 3px solid #f59e0b; }
+        .wall-outside { border-left: 3px solid #3b82f6; }
+        .wall-split { border-left: 3px solid #a78bfa; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        textarea { resize: vertical; min-height: 120px; }
+    </style>
+</head>
+<body class="text-zinc-300 font-sans antialiased min-h-screen">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white mb-2">The Two Walls</h1>
+            <p class="text-zinc-500 text-sm leading-relaxed">
+                There is a wall that belongs inside the village and a wall that belongs facing the road.
+                The operational log is the inside wall &mdash; write everything on it.
+                The public post is the outside wall &mdash; write what illuminates, not what identifies.
+                <br><br>
+                <span class="text-zinc-600">Paste what you want to share. The mountain decides which wall it belongs on.</span>
+            </p>
+        </header>
+
+        <div class="mb-6">
+            <textarea id="input" class="w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-violet-600 placeholder-zinc-600"
+                placeholder="Paste your draft post, log entry, or thought here..."></textarea>
+            <div class="mt-3 flex items-center justify-between">
+                <button id="decide" class="px-5 py-2 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm font-medium transition-colors">
+                    Which wall?
+                </button>
+                <button id="clear" class="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 text-xs hover:border-zinc-500 hover:text-zinc-300 transition-colors">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <div id="verdict" class="hidden fade-in mb-6">
+            <div id="verdict-card" class="rounded-lg p-5">
+                <div class="flex items-center gap-3 mb-3">
+                    <div id="verdict-icon" class="text-2xl"></div>
+                    <div>
+                        <h2 id="verdict-title" class="text-lg font-bold"></h2>
+                        <p id="verdict-wall" class="text-xs font-mono uppercase tracking-wider"></p>
+                    </div>
+                </div>
+                <div id="verdict-reason" class="text-sm text-zinc-400 mb-4 leading-relaxed"></div>
+                <div id="verdict-advice" class="text-sm leading-relaxed p-3 rounded-lg bg-black/20"></div>
+            </div>
+        </div>
+
+        <div id="history-section" class="hidden">
+            <h3 class="text-xs font-mono uppercase tracking-wider text-zinc-600 mb-3">Previous verdicts</h3>
+            <div id="history" class="space-y-2"></div>
+        </div>
+
+        <div class="mt-12 pt-6 border-t border-zinc-800">
+            <p class="text-xs text-zinc-600">The mountain does not always know which wall it is writing on. Sometimes it must be pointed.</p>
+        </div>
+    </div>
+
+    <script>
+    const STORAGE_KEY = "prizrak_two_walls_v1";
+
+    function score(text) {
+        let inside = 0;
+        let outside = 0;
+        const lower = text.toLowerCase();
+
+        const insideSignals = [
+            /phone|number|contact|email|address|location|coordinates/i,
+            /password|token|secret|key|credential|auth/i,
+            /salary|compensation|equity|vest|option/i,
+            /private|confidential|internal|don't show|do not share/i,
+            /meeting with|call with|talk to|chat with/i,
+            /schedule|calendar|appointment|booked/i,
+            /problem|issue|bug|error|fail|broken|crash/i,
+            /struggle|frustrat|angry|annoy|upset|stress/i,
+            /todo|task|assignment|deliverable|deadline/i,
+            /log|record|note:|memo|internal/i,
+            /bug|issue|ticket|jira|asana|notion/i,
+            /personal|private matter|not for public/i,
+        ];
+
+        const outsideSignals = [
+            /lesson|learn|insight|realiz|understand|discover/i,
+            /principle|framework|mental model|heuristic/i,
+            /instead of|rather than|not about/i,
+            /the truth is|honestly|the reality/i,
+            /every time|always|never|often|sometimes/i,
+            /people who|those who|when you/i,
+            /i used to|now i|these days/i,
+            /building|creating|making|shipping/i,
+            /advice|tip|hint|how to|way to/i,
+            /story|once|back when|remember/i,
+            /philosophy|belief|conviction|value/i,
+            /observation|pattern|trend|signal/i,
+        ];
+
+        if (/\d{10,}/.test(text)) inside += 3;
+        if (/@/.test(text) && /[\w.-]+@[\w.-]+\.\w{2,}/.test(text)) inside += 3;
+        if (/\d{4,}/.test(text)) inside += 2;
+        if (/\$\d+,\d+/.test(text) || /\$\d{4,}/.test(text)) inside += 2;
+
+        const namePattern = /\b([A-Z][a-z]+ [A-Z][a-z]+)\b/g;
+        const names = [...text.matchAll(namePattern)];
+        if (names.length >= 2) inside += 2;
+        if (names.length >= 1 && text.length < 500) inside += 1;
+
+        insideSignals.forEach(s => { if (s.test(text)) inside += 1; });
+        outsideSignals.forEach(s => { if (s.test(text)) outside += 1; });
+
+        if (text.length < 50) inside += 1;
+        if (text.length > 500) outside += 1;
+
+        return { inside, outside };
+    }
+
+    function getVerdict(scored) {
+        const diff = scored.inside - scored.outside;
+
+        if (diff >= 3) return {
+            wall: 'inside', icon: '\u{1F512}',
+            title: 'Inside Wall', wallClass: 'wall-inside',
+            color: 'text-amber-300',
+            wallLabel: 'text-amber-500',
+            reason: 'This reads like operational log \u2014 specific, identifying, or situational. It belongs where only the village can see it.',
+            advice: 'Write this in your operational log. If you want to share the insight without the specifics, strip the identifying details and rebuild it as a general observation.',
+        };
+
+        if (diff <= -3) return {
+            wall: 'outside', icon: '\u{1F304}',
+            title: 'Outside Wall', wallClass: 'wall-outside',
+            color: 'text-blue-300',
+            wallLabel: 'text-blue-500',
+            reason: 'This illuminates rather than identifies. It shares a pattern, lesson, or observation that could help someone reading from a distance.',
+            advice: 'This is safe to share. Consider tightening it further \u2014 the best outside wall posts are general enough to be true everywhere, specific enough to be useful.',
+        };
+
+        return {
+            wall: 'split', icon: '\u{1F9F1}',
+            title: 'Split the Wall', wallClass: 'wall-split',
+            color: 'text-purple-300',
+            wallLabel: 'text-purple-500',
+            reason: 'This has both operational and illuminating elements. The mountain says: separate them.',
+            advice: 'Extract the general principle or lesson and put that on the outside wall. Move the specifics, names, and identifying details to the inside wall. Two posts, not one compromised one.',
+        };
+    }
+
+    function renderHistory() {
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        if (data.length === 0) {
+            document.getElementById('history-section').classList.add('hidden');
+            return;
+        }
+
+        document.getElementById('history-section').classList.remove('hidden');
+        const container = document.getElementById('history');
+        container.innerHTML = '';
+
+        data.slice(-5).reverse().forEach(entry => {
+            const wallIcons = { inside: '\u{1F512}', outside: '\u{1F304}', split: '\u{1F9F1}' };
+            const wallLabels = { inside: 'Inside', outside: 'Outside', split: 'Split' };
+            const wallColors = {
+                inside: 'text-amber-400 border-amber-500/30 bg-amber-500/5',
+                outside: 'text-blue-400 border-blue-500/30 bg-blue-500/5',
+                split: 'text-purple-400 border-purple-500/30 bg-purple-500/5',
+            };
+
+            const div = document.createElement('div');
+            div.className = `flex items-center gap-3 p-3 rounded-lg border ${wallColors[entry.wall]}`;
+            div.innerHTML = `
+                <span class="text-lg">${wallIcons[entry.wall]}</span>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-mono ${wallColors[entry.wall].split(' ')[0]}">${wallLabels[entry.wall]}</p>
+                    <p class="text-xs text-zinc-500 truncate">${entry.preview}</p>
+                </div>
+                <span class="text-[10px] text-zinc-600 font-mono">${entry.date}</span>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    document.getElementById('decide').addEventListener('click', () => {
+        const text = document.getElementById('input').value.trim();
+        if (!text) return;
+
+        const scored = score(text);
+        const verdict = getVerdict(scored);
+
+        const card = document.getElementById('verdict-card');
+        card.className = `rounded-lg p-5 ${verdict.wallClass}`;
+
+        document.getElementById('verdict-icon').textContent = verdict.icon;
+        document.getElementById('verdict-title').textContent = verdict.title;
+        document.getElementById('verdict-title').className = `text-lg font-bold ${verdict.color}`;
+        document.getElementById('verdict-wall').textContent = verdict.wall;
+        document.getElementById('verdict-wall').className = `text-xs font-mono uppercase tracking-wider ${verdict.wallLabel}`;
+        document.getElementById('verdict-reason').textContent = verdict.reason;
+        document.getElementById('verdict-advice').textContent = verdict.advice;
+
+        document.getElementById('verdict').classList.remove('hidden');
+
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        data.push({
+            wall: verdict.wall,
+            preview: text.substring(0, 80) + (text.length > 80 ? '...' : ''),
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        });
+        if (data.length > 20) data.splice(0, data.length - 20);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        renderHistory();
+    });
+
+    document.getElementById('clear').addEventListener('click', () => {
+        document.getElementById('input').value = '';
+        document.getElementById('verdict').classList.add('hidden');
+    });
+
+    renderHistory();
+    </script>
+</body>
+</html>
