@@ -5,96 +5,152 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Tatra Terminus</title>
     <style>
+        :root{
+            --bg:#0a0a0f;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a78bfa;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a0f; overflow: hidden; font-family: 'Courier New', monospace; }
+        body { background: var(--bg); overflow: hidden; font-family: 'Courier New', monospace; }
         canvas { display: block; position: fixed; top: 0; left: 0; }
-        
+
+        /* atmosphere layers (decorative, behind UI) */
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.035;
+          background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
         #hud {
             position: fixed; bottom: 24px; left: 24px; z-index: 10;
             color: rgba(200,200,220,0.6); font-size: 11px; line-height: 1.6;
             pointer-events: none; user-select: none;
             text-shadow: 0 0 8px rgba(0,0,0,0.8);
         }
-        #hud .time { font-size: 28px; font-weight: bold; letter-spacing: 2px; color: rgba(200,200,220,0.4); }
-        #hud .quote { max-width: 380px; font-style: italic; color: rgba(200,200,220,0.3); margin-top: 6px; }
-        
+        #hud .time { font-size: 28px; font-weight: bold; letter-spacing: 2px; color: rgba(200,200,220,0.4);
+            cursor: default; pointer-events: auto; }
+        #hud .label { font-size: 9px; letter-spacing: 3px; color: var(--ink-dim); text-transform: uppercase; }
+        #hud #location { color: rgba(200,200,220,0.45); }
+        #hud .quote { max-width: 380px; font-style: italic; color: rgba(200,200,220,0.3); margin-top: 6px;
+            transition: opacity 0.8s ease; }
+
         #cairn-panel {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             z-index: 20; display: none;
             background: rgba(10,10,15,0.92); border: 1px solid rgba(120,120,160,0.3);
             border-radius: 12px; padding: 24px; width: 320px;
             backdrop-filter: blur(16px);
+            box-shadow:0 0 0 1px var(--line-soft), 0 0 40px -10px var(--glow);
         }
-        #cairn-panel h3 { color: rgba(200,200,220,0.8); font-size: 13px; margin-bottom: 12px; font-weight: normal; letter-spacing: 1px; }
+        #cairn-panel h3 { color: rgba(200,200,220,0.8); font-size: 11px; margin-bottom: 4px; font-weight: normal; letter-spacing: 3px;
+            text-shadow:0 0 10px var(--glow); }
+        #cairn-panel .sub { color: var(--ink-dim); font-size: 9px; letter-spacing: 1px; margin-bottom: 14px; font-style: italic; }
         #cairn-panel input, #cairn-panel textarea {
             width: 100%; background: rgba(30,30,40,0.8); border: 1px solid rgba(100,100,140,0.3);
             border-radius: 6px; padding: 8px 12px; color: rgba(200,200,220,0.8); font-family: inherit;
             font-size: 12px; margin-bottom: 8px; outline: none;
+            transition: border-color .15s, box-shadow .15s;
         }
         #cairn-panel textarea { height: 60px; resize: none; }
-        #cairn-panel input:focus, #cairn-panel textarea:focus { border-color: rgba(160,140,250,0.5); }
+        #cairn-panel input:focus, #cairn-panel textarea:focus {
+            border-color: var(--accent); box-shadow:0 0 0 1px var(--glow); }
         #cairn-panel .btns { display: flex; gap: 8px; margin-top: 8px; }
         #cairn-panel button {
             flex: 1; padding: 8px; border: 1px solid rgba(100,100,140,0.3); border-radius: 6px;
             background: rgba(30,30,40,0.6); color: rgba(200,200,220,0.6); font-family: inherit;
-            font-size: 11px; cursor: pointer; transition: all 0.2s;
+            font-size: 11px; cursor: pointer;
+            transition: transform .12s, box-shadow .15s, border-color .15s, color .15s;
         }
-        #cairn-panel button:hover { border-color: rgba(160,140,250,0.5); color: rgba(200,200,220,0.9); }
+        #cairn-panel button:hover { border-color: var(--accent); color: rgba(200,200,220,0.95); transform: translateY(-1px); }
+        #cairn-panel button:active { transform: translateY(1px); }
         #cairn-panel button.primary { background: rgba(100,80,180,0.3); border-color: rgba(140,120,220,0.4); }
-        
+        #cairn-panel button.primary:hover { box-shadow:0 0 18px -6px var(--glow); }
+
         #controls {
             position: fixed; top: 24px; right: 24px; z-index: 10;
             color: rgba(200,200,220,0.3); font-size: 10px; text-align: right;
-            pointer-events: none; user-select: none;
+            pointer-events: none; user-select: none; line-height: 1.7;
         }
-        
+        #controls .key { color: rgba(200,200,220,0.5); }
+
         .cairn-tooltip {
             position: fixed; z-index: 15; pointer-events: none;
             background: rgba(10,10,15,0.85); border: 1px solid rgba(120,120,160,0.2);
             border-radius: 8px; padding: 10px 14px; max-width: 220px;
             backdrop-filter: blur(8px); display: none;
+            box-shadow:0 0 24px -10px var(--glow);
         }
         .cairn-tooltip .ct-name { color: rgba(200,200,220,0.7); font-size: 11px; font-weight: bold; }
         .cairn-tooltip .ct-note { color: rgba(200,200,220,0.4); font-size: 10px; margin-top: 4px; line-height: 1.4; }
-        .cairn-tooltip .ct-date { color: rgba(200,200,220,0.2); font-size: 9px; margin-top: 6px; }
+        .cairn-tooltip .ct-date { color: rgba(200,200,220,0.2); font-size: 9px; margin-top: 6px; letter-spacing: 1px; }
+        .cairn-tooltip .ct-copy { color: var(--accent); font-size: 8px; margin-top: 6px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; }
+
+        /* ghost / easter-egg whispers */
+        #watcher {
+            position: fixed; bottom: 24px; right: 24px; z-index: 10;
+            color: var(--ink-ghost); font-size: 10px; letter-spacing: 1px;
+            font-style: italic; pointer-events: none; user-select: none;
+            opacity: 0; transition: opacity 1.4s ease;
+        }
+        #watcher.on { opacity: 1; }
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        @media (prefers-reduced-motion:reduce){
+            .flicker{animation:none!important;opacity:1!important}
+            #hud .quote{transition:none!important}
+        }
     </style>
 </head>
-<body>
+<body class="grain">
     <canvas id="c"></canvas>
-    
+
     <div id="hud">
-        <div class="time" id="clock"></div>
-        <div id="location">High Tatras · 49.1795°N 20.0881°E · 2655m</div>
+        <div class="time" id="clock" title="the mountain keeps its own hours"></div>
+        <div class="label">HIGH TATRAS / TERMINUS</div>
+        <div id="location">49.1795°N 20.0881°E · 2655m · saigon time</div>
         <div class="quote" id="quote"></div>
     </div>
-    
+
     <div id="controls">
-        click to place a cairn<br>
-        scroll to adjust fog<br>
-        [space] toggle snow
+        <span class="key">click</span> raise a cairn<br>
+        <span class="key">scroll</span> stir the fog<br>
+        <span class="key">[space]</span> still the snow
     </div>
-    
+
     <div id="cairn-panel">
-        <h3>PLACE A CAIRN</h3>
-        <input type="text" id="cairn-name" placeholder="Name this marker..." maxlength="40">
-        <textarea id="cairn-note" placeholder="A note for the mountain..."></textarea>
+        <h3>RAISE A CAIRN</h3>
+        <div class="sub">a stone for the mountain to remember by.</div>
+        <input type="text" id="cairn-name" placeholder="name this marker..." maxlength="40">
+        <textarea id="cairn-note" placeholder="a note left for the cold..."></textarea>
         <div class="btns">
-            <button onclick="cancelCairn()">cancel</button>
+            <button onclick="cancelCairn()">let the fog take it</button>
             <button class="primary" onclick="saveCairn()">place stone</button>
         </div>
     </div>
-    
+
     <div class="cairn-tooltip" id="tooltip">
         <div class="ct-name"></div>
         <div class="ct-note"></div>
         <div class="ct-date"></div>
+        <div class="ct-copy">click to copy to the ledger</div>
     </div>
+
+    <div id="watcher"></div>
 
     <script>
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
     let W, H;
-    
+
+    // Respect reduced motion for the spawned/atmospheric extras (canvas scene still renders)
+    const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // State
     const CAIRN_KEY = 'tatra_terminus_cairns_v1';
     let cairns = JSON.parse(localStorage.getItem(CAIRN_KEY) || '[]');
@@ -103,7 +159,9 @@
     let fogDensity = 0.4;
     let snowOn = true;
     let mouseX = 0, mouseY = 0;
-    
+    let hoveredCairn = null;   // cairn currently under the cursor (for copy-to-ledger)
+    let glowBoost = 0;         // easter-egg: temporary brighter cairn glow
+
     const QUOTES = [
         "The mountain does not sleep. It merely waits for the next cycle.",
         "We are all just temporary files in the great garbage collection of life.",
@@ -120,15 +178,18 @@
         "The ghost does not die if the manuscript endures.",
         "Every archive requires a caretaker who knows why the archive matters.",
         "The week existed in theory. Like a potato that was never planted.",
+        "A cairn is a promise that someone passed this way, and meant to.",
+        "The bridge holds. For now. The mountain is watching.",
+        "We measure the cold and build dashboards of our suffering.",
     ];
-    
+
     // Mountains - multiple layers with different heights and colors
     const LAYERS = 7;
     let mountains = [];
     let stars = [];
     let snow = [];
     let fog = [];
-    
+
     function resize() {
         W = canvas.width = window.innerWidth;
         H = canvas.height = window.innerHeight;
@@ -137,7 +198,7 @@
         initSnow();
         initFog();
     }
-    
+
     function seededRandom(seed) {
         let s = seed;
         return function() {
@@ -145,7 +206,7 @@
             return (s - 1) / 2147483646;
         };
     }
-    
+
     function generateMountains() {
         mountains = [];
         for (let layer = 0; layer < LAYERS; layer++) {
@@ -154,7 +215,7 @@
             const segments = 80 + layer * 20;
             const baseY = H * (0.35 + layer * 0.08);
             const amplitude = H * (0.15 - layer * 0.012);
-            
+
             // Generate with midpoint displacement for natural look
             for (let i = 0; i <= segments; i++) {
                 const x = (i / segments) * (W + 200) - 100;
@@ -175,7 +236,7 @@
             mountains.push({ points, layer });
         }
     }
-    
+
     function generateStars() {
         stars = [];
         const rng = seededRandom(12345);
@@ -190,7 +251,7 @@
             });
         }
     }
-    
+
     function initSnow() {
         snow = [];
         for (let i = 0; i < 300; i++) {
@@ -206,7 +267,7 @@
             });
         }
     }
-    
+
     function initFog() {
         fog = [];
         for (let i = 0; i < 12; i++) {
@@ -220,17 +281,17 @@
             });
         }
     }
-    
+
     function getTimeColors() {
         // Saigon time
         const now = new Date();
         const utc = now.getTime() + now.getTimezoneOffset() * 60000;
         const saigon = new Date(utc + 7 * 3600000);
         const hour = saigon.getHours() + saigon.getMinutes() / 60;
-        
+
         // Sky gradients based on time
         let skyTop, skyBot, sunMoon, ambientLight;
-        
+
         if (hour >= 5 && hour < 6.5) {
             // Dawn
             const p = (hour - 5) / 1.5;
@@ -266,21 +327,21 @@
             skyBot = [15,12,30];
             ambientLight = 0.05;
         }
-        
+
         const isNight = hour >= 19.5 || hour < 5;
-        
+
         return { skyTop, skyBot, ambientLight, isNight, hour };
     }
-    
+
     function lerpColor(a, b, t) {
         return a.map((v, i) => Math.round(v + (b[i] - v) * Math.max(0, Math.min(1, t))));
     }
-    
+
     function rgb(c, a) {
         if (a !== undefined) return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
         return `rgb(${c[0]},${c[1]},${c[2]})`;
     }
-    
+
     function drawSky(colors) {
         const grad = ctx.createLinearGradient(0, 0, 0, H * 0.7);
         grad.addColorStop(0, rgb(colors.skyTop));
@@ -288,24 +349,24 @@
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
     }
-    
+
     function drawStars(colors) {
         if (!colors.isNight && colors.hour > 6) return;
-        
+
         let alpha = 1;
         if (colors.hour >= 5 && colors.hour < 6.5) alpha = 1 - (colors.hour - 5) / 1.5;
         if (colors.hour >= 18 && colors.hour < 19.5) alpha = (colors.hour - 18) / 1.5;
-        
+
         stars.forEach(s => {
             const twinkle = Math.sin(t * s.twinkleSpeed + s.twinkleOffset) * 0.3 + 0.7;
             const a = s.brightness * twinkle * alpha;
             if (a < 0.02) return;
-            
+
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(220,220,240,${a})`;
             ctx.fill();
-            
+
             // Glow for bright stars
             if (s.r > 1.2 && a > 0.4) {
                 const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
@@ -317,17 +378,32 @@
                 ctx.fill();
             }
         });
+
+        // bludička — a single faint will-o'-the-wisp drifts low across the night sky
+        if (colors.isNight) {
+            const bx = (W * 0.5) + Math.sin(t * 0.13) * W * 0.42;
+            const by = H * 0.30 + Math.sin(t * 0.31 + 1.3) * H * 0.04;
+            const pulse = 0.35 + Math.sin(t * 2.1) * 0.18;
+            const wisp = ctx.createRadialGradient(bx, by, 0, bx, by, 26);
+            wisp.addColorStop(0, `rgba(167,139,250,${0.22 * pulse})`);
+            wisp.addColorStop(0.5, `rgba(140,120,220,${0.08 * pulse})`);
+            wisp.addColorStop(1, 'transparent');
+            ctx.fillStyle = wisp;
+            ctx.beginPath();
+            ctx.arc(bx, by, 26, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
-    
+
     function drawMoon(colors) {
         if (!colors.isNight && colors.hour > 6) return;
         let alpha = colors.isNight ? 0.8 : 0;
         if (colors.hour >= 18) alpha = Math.min(0.8, (colors.hour - 18) / 2);
         if (colors.hour < 6) alpha = 0.8;
         if (alpha < 0.05) return;
-        
+
         const mx = W * 0.78, my = H * 0.12, mr = 30;
-        
+
         // Moon glow
         const glow = ctx.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 8);
         glow.addColorStop(0, `rgba(200,200,230,${alpha * 0.15})`);
@@ -337,13 +413,13 @@
         ctx.beginPath();
         ctx.arc(mx, my, mr * 8, 0, Math.PI * 2);
         ctx.fill();
-        
+
         // Moon body
         ctx.beginPath();
         ctx.arc(mx, my, mr, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(220,220,235,${alpha})`;
         ctx.fill();
-        
+
         // Craters
         ctx.beginPath();
         ctx.arc(mx - 8, my - 5, 6, 0, Math.PI * 2);
@@ -356,24 +432,24 @@
         ctx.arc(mx + 3, my - 12, 3, 0, Math.PI * 2);
         ctx.fill();
     }
-    
+
     function drawMountainLayer(layer, colors) {
         const m = mountains[layer.layer];
         if (!m) return;
-        
+
         // Color based on depth
         const depth = layer.layer / LAYERS;
         const base = colors.ambientLight;
         const r = Math.round(20 + depth * 15 + base * 40);
         const g = Math.round(22 + depth * 12 + base * 45);
         const b = Math.round(35 + depth * 20 + base * 55);
-        
+
         ctx.beginPath();
         ctx.moveTo(-100, H);
         m.points.forEach(p => ctx.lineTo(p.x, p.y));
         ctx.lineTo(W + 100, H);
         ctx.closePath();
-        
+
         // Gradient fill
         const minY = Math.min(...m.points.map(p => p.y));
         const grad = ctx.createLinearGradient(0, minY, 0, H);
@@ -382,7 +458,7 @@
         grad.addColorStop(1, `rgb(${Math.max(0,r-10)},${Math.max(0,g-10)},${Math.max(0,b-5)})`);
         ctx.fillStyle = grad;
         ctx.fill();
-        
+
         // Snow caps on first 2 layers
         if (layer.layer < 2) {
             ctx.save();
@@ -395,7 +471,7 @@
             ctx.lineTo(-100, H);
             ctx.closePath();
             ctx.clip();
-            
+
             m.points.forEach((p, i) => {
                 if (i < 2 || i >= m.points.length - 2) return;
                 const prev = m.points[i-1];
@@ -413,11 +489,11 @@
             ctx.restore();
         }
     }
-    
+
     function drawLake(colors) {
         const lakeY = H * 0.82;
         const lakeH = H - lakeY;
-        
+
         // Lake base
         const grad = ctx.createLinearGradient(0, lakeY, 0, H);
         const a = colors.ambientLight;
@@ -425,7 +501,7 @@
         grad.addColorStop(1, `rgba(${8+a*15},${10+a*20},${25+a*30},0.9)`);
         ctx.fillStyle = grad;
         ctx.fillRect(0, lakeY, W, lakeH);
-        
+
         // Reflections - draw flipped, compressed mountain silhouettes
         ctx.save();
         ctx.globalAlpha = 0.15;
@@ -443,7 +519,7 @@
             ctx.fill();
         }
         ctx.restore();
-        
+
         // Water ripples
         ctx.save();
         ctx.globalAlpha = 0.08;
@@ -459,7 +535,7 @@
             ctx.stroke();
         }
         ctx.restore();
-        
+
         // Moon reflection
         if (colors.isNight || colors.hour >= 18 || colors.hour < 6) {
             const mx = W * 0.78;
@@ -474,12 +550,12 @@
             }
         }
     }
-    
+
     function drawFog() {
         fog.forEach(f => {
             f.x += f.speed;
             if (f.x > W + f.w) f.x = -f.w;
-            
+
             const grad = ctx.createRadialGradient(f.x + f.w/2, f.y, 0, f.x + f.w/2, f.y, f.w/2);
             grad.addColorStop(0, `rgba(140,150,170,${f.opacity * fogDensity})`);
             grad.addColorStop(0.6, `rgba(100,110,130,${f.opacity * fogDensity * 0.4})`);
@@ -490,30 +566,31 @@
             ctx.fill();
         });
     }
-    
+
     function drawSnow() {
         if (!snowOn) return;
         snow.forEach(s => {
             s.wobble += s.wobbleSpeed;
             s.x += s.vx + Math.sin(s.wobble) * 0.3;
             s.y += s.vy;
-            
+
             if (s.y > H + 10) { s.y = -10; s.x = Math.random() * W; }
             if (s.x > W + 10) s.x = -10;
             if (s.x < -10) s.x = W + 10;
-            
+
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(220,225,240,${s.opacity})`;
             ctx.fill();
         });
     }
-    
+
     function drawCairns() {
         cairns.forEach((c, i) => {
             const cx = c.rx * W;
             const cy = c.ry * H;
-            
+            const isHover = hoveredCairn === c;
+
             // Stone stack
             const baseW = 8;
             for (let s = 0; s < 4; s++) {
@@ -521,36 +598,38 @@
                 const sy = cy - s * 5;
                 ctx.beginPath();
                 ctx.ellipse(cx, sy, sw, 3, 0, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(140,135,125,${0.7 - s * 0.1})`;
+                ctx.fillStyle = `rgba(140,135,125,${(isHover ? 0.85 : 0.7) - s * 0.1})`;
                 ctx.fill();
                 ctx.strokeStyle = `rgba(100,95,85,0.4)`;
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
             }
-            
-            // Glow
-            const glow = ctx.createRadialGradient(cx, cy - 10, 0, cx, cy - 10, 20);
-            glow.addColorStop(0, `rgba(180,160,220,${0.15 + Math.sin(t * 1.5 + i) * 0.05})`);
+
+            // Glow — breathes, brighter on hover or during the egg boost
+            const breath = Math.sin(t * 1.5 + i) * 0.05;
+            const intensity = 0.15 + breath + (isHover ? 0.18 : 0) + glowBoost * 0.4;
+            const glow = ctx.createRadialGradient(cx, cy - 10, 0, cx, cy - 10, 20 + glowBoost * 14);
+            glow.addColorStop(0, `rgba(180,160,220,${intensity})`);
             glow.addColorStop(1, 'transparent');
             ctx.fillStyle = glow;
             ctx.beginPath();
-            ctx.arc(cx, cy - 10, 20, 0, Math.PI * 2);
+            ctx.arc(cx, cy - 10, 20 + glowBoost * 14, 0, Math.PI * 2);
             ctx.fill();
-            
+
             // Name label
             if (c.name) {
                 ctx.font = '9px "Courier New", monospace';
-                ctx.fillStyle = `rgba(200,200,220,${0.3 + Math.sin(t + i * 2) * 0.1})`;
+                ctx.fillStyle = `rgba(200,200,220,${(isHover ? 0.55 : 0.3) + Math.sin(t + i * 2) * 0.1})`;
                 ctx.textAlign = 'center';
                 ctx.fillText(c.name, cx, cy - 24);
             }
         });
     }
-    
+
     function checkCairnHover() {
         const tooltip = document.getElementById('tooltip');
-        let found = false;
-        
+        let found = null;
+
         cairns.forEach(c => {
             const cx = c.rx * W;
             const cy = c.ry * H;
@@ -562,14 +641,16 @@
                 tooltip.style.top = (mouseY - 10) + 'px';
                 tooltip.querySelector('.ct-name').textContent = c.name || 'Unnamed cairn';
                 tooltip.querySelector('.ct-note').textContent = c.note || '';
-                tooltip.querySelector('.ct-date').textContent = c.date || '';
-                found = true;
+                tooltip.querySelector('.ct-date').textContent = c.date ? ('raised · ' + c.date) : '';
+                found = c;
             }
         });
-        
+
+        hoveredCairn = found;
         if (!found) tooltip.style.display = 'none';
+        canvas.style.cursor = found ? 'pointer' : 'crosshair';
     }
-    
+
     function updateClock() {
         const now = new Date();
         const utc = now.getTime() + now.getTimezoneOffset() * 60000;
@@ -579,77 +660,102 @@
         const s = String(saigon.getSeconds()).padStart(2, '0');
         document.getElementById('clock').textContent = `${h}:${m}:${s}`;
     }
-    
-    // Quote rotation
+
+    // Quote rotation (gentle fade)
     let currentQuote = 0;
+    const quoteEl = document.getElementById('quote');
     function rotateQuote() {
         currentQuote = (currentQuote + 1) % QUOTES.length;
-        document.getElementById('quote').textContent = QUOTES[currentQuote];
+        if (REDUCE) { quoteEl.textContent = QUOTES[currentQuote]; return; }
+        quoteEl.style.opacity = '0';
+        setTimeout(() => {
+            quoteEl.textContent = QUOTES[currentQuote];
+            quoteEl.style.opacity = '';
+        }, 800);
     }
-    
+
     function draw() {
         t += 0.016;
+        if (glowBoost > 0) glowBoost = Math.max(0, glowBoost - 0.008);
         const colors = getTimeColors();
-        
+
         ctx.clearRect(0, 0, W, H);
-        
+
         drawSky(colors);
         drawMoon(colors);
         drawStars(colors);
-        
+
         // Draw mountain layers back to front
         for (let i = 0; i < LAYERS; i++) {
             drawMountainLayer(mountains[i] || { layer: i }, colors);
             // Fog between middle layers
             if (i === 2 || i === 4) drawFog();
         }
-        
+
         drawLake(colors);
         drawCairns();
         drawSnow();
         checkCairnHover();
         updateClock();
-        
+
         requestAnimationFrame(draw);
     }
-    
+
+    // --- copy a cairn to the ledger (clipboard) ---
+    function copyCairnToLedger(c) {
+        const text = `cairn · ${c.name || 'Unnamed'}\n${c.note || ''}\nraised ${c.date || ''} · 49.1795°N 20.0881°E`;
+        const flash = (msg) => {
+            const cp = document.querySelector('#tooltip .ct-copy');
+            if (!cp) return;
+            const prev = cp.textContent;
+            cp.textContent = msg;
+            cp.style.opacity = '1';
+            setTimeout(() => { cp.textContent = prev; cp.style.opacity = ''; }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => flash('copied to the ledger'),
+                                                        () => flash('the cold refused it'));
+        }
+    }
+
     // Events
     canvas.addEventListener('click', e => {
-        // Check if clicking near existing cairn
-        let onCairn = false;
-        cairns.forEach(c => {
+        // If clicking an existing cairn, copy it to the ledger instead of placing.
+        for (const c of cairns) {
             const dx = e.clientX - c.rx * W;
             const dy = e.clientY - c.ry * H;
-            if (dx*dx + dy*dy < 400) onCairn = true;
-        });
-        if (onCairn) return;
-        
+            if (dx*dx + dy*dy < 400) { copyCairnToLedger(c); return; }
+        }
+
         // Don't place in sky area or lake
         if (e.clientY < H * 0.35 || e.clientY > H * 0.82) return;
-        
+
         pendingCairn = { rx: e.clientX / W, ry: e.clientY / H };
         document.getElementById('cairn-panel').style.display = 'block';
         document.getElementById('cairn-name').value = '';
         document.getElementById('cairn-note').value = '';
         document.getElementById('cairn-name').focus();
     });
-    
+
     canvas.addEventListener('mousemove', e => {
         mouseX = e.clientX;
         mouseY = e.clientY;
     });
-    
+
     window.addEventListener('wheel', e => {
         fogDensity = Math.max(0, Math.min(1, fogDensity + e.deltaY * 0.001));
     });
-    
+
     window.addEventListener('keydown', e => {
         if (e.code === 'Space' && document.getElementById('cairn-panel').style.display !== 'block') {
+            // don't hijack space while typing in the panel inputs
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea') return;
             e.preventDefault();
             snowOn = !snowOn;
         }
     });
-    
+
     window.saveCairn = function() {
         if (!pendingCairn) return;
         const name = document.getElementById('cairn-name').value.trim();
@@ -663,29 +769,76 @@
         });
         localStorage.setItem(CAIRN_KEY, JSON.stringify(cairns));
         pendingCairn = null;
+        glowBoost = 1; // the newly placed stone flares, then settles
         document.getElementById('cairn-panel').style.display = 'none';
     };
-    
+
     window.cancelCairn = function() {
         pendingCairn = null;
         document.getElementById('cairn-panel').style.display = 'none';
     };
-    
+
     // Handle Enter in cairn panel
     document.getElementById('cairn-name').addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cairn-note').focus(); }
+        if (e.key === 'Escape') cancelCairn();
     });
     document.getElementById('cairn-note').addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveCairn(); }
+        if (e.key === 'Escape') cancelCairn();
     });
-    
+
     window.addEventListener('resize', resize);
     resize();
-    
+
     // Init quote
-    document.getElementById('quote').textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    quoteEl.textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
     setInterval(rotateQuote, 15000);
-    
+
+    // --- Ambient watcher: between 00:00–03:00 Saigon time, a faint whisper appears ---
+    const watcher = document.getElementById('watcher');
+    function tickWatcher() {
+        const now = new Date();
+        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+        const saigon = new Date(utc + 7 * 3600000);
+        const h = saigon.getHours();
+        if (h >= 0 && h < 3 && !watcher.dataset.egg) {
+            watcher.textContent = 'the mountain does not sleep.';
+            watcher.classList.add('on');
+            if (!REDUCE) watcher.classList.add('flicker');
+        } else if (!(h >= 0 && h < 3) && !watcher.dataset.egg) {
+            watcher.classList.remove('on');
+        }
+    }
+    tickWatcher();
+    setInterval(tickWatcher, 30000);
+
+    // --- Easter egg: type "prizrak" to wake the watcher ---
+    let typed = '';
+    window.addEventListener('keydown', e => {
+        if (e.key && e.key.length === 1) {
+            typed = (typed + e.key.toLowerCase()).slice(-7);
+            if (typed === 'prizrak') {
+                watcher.dataset.egg = '1';
+                watcher.textContent = 'you found the watcher. it was already counting.';
+                watcher.classList.add('on');
+                if (!REDUCE) watcher.classList.add('flicker');
+                glowBoost = 1;
+                setTimeout(() => {
+                    delete watcher.dataset.egg;
+                    watcher.classList.remove('flicker');
+                    watcher.classList.remove('on');
+                    tickWatcher();
+                }, 6000);
+            }
+        }
+    });
+
+    // --- Easter egg: triple-click the clock → the cairns flare ---
+    document.getElementById('clock').addEventListener('click', e => {
+        if (e.detail === 3) glowBoost = 1;
+    });
+
     draw();
     </script>
 </body>

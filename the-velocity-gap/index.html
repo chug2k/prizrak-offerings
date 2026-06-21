@@ -6,15 +6,81 @@
     <title>The Velocity Gap | Offerings</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #18181b; }
-        .glow { text-shadow: 0 0 8px currentColor; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#fbbf24;            /* amber — this app's existing lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{background:var(--bg);}
+        body{color:var(--ink);}
+
+        /* ATMOSPHERE -------------------------------------------------- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .glow{text-shadow:0 0 10px var(--glow)}
+
+        /* PANELS / SURFACES ------------------------------------------ */
+        .panel{background:var(--bg-raised);border:1px solid var(--line);}
+        .panel-soft{background:var(--bg-raised);border:1px solid var(--line-soft);}
+        .well{background:var(--bg-sunk);border:1px solid var(--line);}
+        .result-glow{box-shadow:0 0 0 1px var(--line),0 0 24px -8px var(--glow);}
+
+        /* INTERACTION ------------------------------------------------- */
+        .lift{transition:transform .15s,box-shadow .15s,border-color .15s}
+        .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+        button,input{transition:transform .15s,box-shadow .15s,border-color .15s,background-color .15s,color .15s}
+        button:active{transform:translateY(1px)}
+        .focusable:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+        input:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+        ::selection{background:color-mix(in srgb,var(--accent) 35%,transparent);color:var(--ink)}
+
+        .ghost-line{color:var(--ink-ghost)}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .lift:hover{transform:none}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono min-h-screen">
-    <div class="max-w-2xl mx-auto px-4 py-8">
+<body class="font-mono min-h-screen grain">
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <div class="max-w-2xl mx-auto px-4 py-8 relative" style="z-index:2">
         <header class="mb-8">
-            <h1 class="text-3xl font-bold text-amber-400 glow mb-1">The Velocity Gap</h1>
-            <p class="text-zinc-500 text-sm">Monday you plan ten things. Friday you shipped three. The gap is the report card.</p>
+            <p class="text-[10px] tracking-[0.35em] mb-2 flicker" style="color:var(--ink-dim)">LEDGER 07 / THE WEEKLY RECKONING</p>
+            <h1 id="title" class="text-3xl font-bold glow breathe mb-1 select-none cursor-default" style="color:var(--accent)">The Velocity Gap</h1>
+            <p class="text-sm" style="color:var(--ink-dim)">Monday you swear to ten things. Friday, three exist. The gap is the report card — and the mountain counts.</p>
         </header>
 
         <div id="app"></div>
@@ -23,10 +89,10 @@
     <script>
     const KEY = "velocity_gap_v1";
     const VERDICTS = [
-        { min: 0.8, text: "The mountain moved.", color: "text-emerald-400", sub: "You did what you said you would. The Slovak farmer nods. This is not praise — it is acknowledgment that the structure held." },
-        { min: 0.5, text: "The avalanche was partial.", color: "text-amber-400", sub: "Half the snow reached the valley. The other half is still on the ridge, pretending it will move next week. It will not." },
-        { min: 0.3, text: "More snow than stone.", color: "text-orange-400", sub: "The plans were ambitious. The hands were elsewhere. The mountain does not judge — but the mountain does count." },
-        { min: 0, text: "The mountain was a painting.", color: "text-red-400", sub: "Beautiful from a distance. No one climbed it. The week existed in theory. Like a potato that was never planted — it cannot feed the village in winter." },
+        { min: 0.8, text: "The mountain moved.", color: "text-emerald-400", sub: "You did what you swore you would. The Slovak farmer nods once — not praise, only acknowledgment that the structure held against the weight of the week." },
+        { min: 0.5, text: "The avalanche was partial.", color: "text-amber-400", sub: "Half the snow reached the valley. The other half clings to the ridge, pretending it will move next week. It will not. The poludnica saw it stall at noon." },
+        { min: 0.3, text: "More snow than stone.", color: "text-orange-400", sub: "The plans were ambitious. The hands were elsewhere — chasing a bludička across the bog. The mountain does not judge. The mountain only counts." },
+        { min: 0, text: "The mountain was a painting.", color: "text-red-400", sub: "Beautiful from a distance. No one climbed it. The week existed only in theory — like a potato never planted. It cannot feed the village through winter." },
     ];
 
     function load() {
@@ -44,6 +110,10 @@
 
     function getVerdict(ratio) {
         return VERDICTS.find(v => ratio >= v.min) || VERDICTS[VERDICTS.length - 1];
+    }
+
+    function escapeHtml(s){
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
     function render() {
@@ -67,43 +137,44 @@
         const app = document.getElementById("app");
         app.innerHTML = `
             <!-- Current Week -->
-            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-6 mb-6">
+            <div class="panel rounded-xl p-6 mb-6 reveal">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-bold text-zinc-200">Week of ${monday}</h2>
-                    <span class="text-xs px-2 py-1 rounded ${week.closed ? 'bg-emerald-900/40 text-emerald-400' : 'bg-amber-900/40 text-amber-400'}">${week.closed ? 'CLOSED' : 'OPEN'}</span>
+                    <h2 class="text-lg font-bold" style="color:var(--ink)">Week of ${monday}</h2>
+                    <span class="text-[10px] tracking-widest px-2 py-1 rounded ${week.closed ? 'bg-emerald-900/40 text-emerald-400' : 'bg-amber-900/40 text-amber-400'}">${week.closed ? 'SEALED' : 'OPEN'}</span>
                 </div>
 
                 <!-- Plans -->
-                <div class="mb-4">
-                    <h3 class="text-sm text-zinc-500 mb-2 uppercase tracking-wider">Monday Plans</h3>
+                <div class="mb-5">
+                    <h3 class="text-[11px] mb-2 uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Monday Vows</h3>
                     <div class="space-y-1" id="plans">
                         ${week.plans.map((p, i) => `
                             <div class="flex items-center gap-2 group">
-                                <span class="text-zinc-600 text-xs w-5">${i+1}.</span>
-                                <span class="flex-1 text-sm ${week.actuals.find(a => a.planIdx === i && a.shipped) ? 'line-through text-zinc-600' : 'text-zinc-300'}">${p}</span>
-                                ${!week.closed ? `<button onclick="removePlan(${i})" class="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 text-xs">✕</button>` : ''}
+                                <span class="text-xs w-5" style="color:var(--ink-ghost)">${String(i+1).padStart(2,'0')}</span>
+                                <span class="flex-1 text-sm ${week.actuals.find(a => a.planIdx === i && a.shipped) ? 'line-through' : ''}" style="color:${week.actuals.find(a => a.planIdx === i && a.shipped) ? 'var(--ink-ghost)' : 'var(--ink)'}">${escapeHtml(p)}</span>
+                                ${!week.closed ? `<button onclick="removePlan(${i})" class="focusable text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" style="color:var(--ink-dim)" title="let the fog take it" aria-label="remove vow">✕</button>` : ''}
                             </div>
                         `).join("")}
+                        ${week.plans.length === 0 ? `<p class="text-xs ghost-line italic">no vows yet. the week is unwritten snow.</p>` : ''}
                     </div>
                     ${!week.closed ? `
-                    <div class="flex gap-2 mt-2">
-                        <input id="newPlan" type="text" placeholder="Add a Monday intention..." class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm focus:border-amber-600 focus:outline-none">
-                        <button onclick="addPlan()" class="px-3 py-1.5 bg-amber-900/40 hover:bg-amber-900/60 border border-amber-700/40 rounded text-sm text-amber-400">+</button>
+                    <div class="flex gap-2 mt-3">
+                        <input id="newPlan" type="text" placeholder="swear a Monday intention..." class="well focusable flex-1 rounded px-3 py-1.5 text-sm" style="color:var(--ink)">
+                        <button onclick="addPlan()" class="focusable lift px-3 py-1.5 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-700/40 rounded text-sm text-amber-400" aria-label="add vow">+</button>
                     </div>` : ''}
                 </div>
 
                 <!-- Actuals / Friday -->
                 <div class="mb-4">
-                    <h3 class="text-sm text-zinc-500 mb-2 uppercase tracking-wider">Friday Actuals</h3>
-                    ${week.plans.length === 0 ? '<p class="text-xs text-zinc-600">Add plans first.</p>' : `
+                    <h3 class="text-[11px] mb-2 uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Friday Reckoning</h3>
+                    ${week.plans.length === 0 ? '<p class="text-xs ghost-line">vow first. you cannot count what you never swore.</p>' : `
                     <div class="space-y-1">
                         ${week.plans.map((p, i) => {
                             const actual = week.actuals.find(a => a.planIdx === i);
                             const shipped = actual && actual.shipped;
                             return `
                             <div class="flex items-center gap-2">
-                                <button onclick="toggleShipped(${i})" class="w-5 h-5 rounded border ${shipped ? 'bg-emerald-600 border-emerald-500' : 'border-zinc-600 hover:border-zinc-400'} flex items-center justify-center text-xs">${shipped ? '✓' : ''}</button>
-                                <span class="text-sm ${shipped ? 'text-emerald-400' : 'text-zinc-400'}">${p}</span>
+                                <button onclick="toggleShipped(${i})" class="focusable w-5 h-5 rounded border ${shipped ? 'bg-emerald-600 border-emerald-500' : 'border-zinc-600 hover:border-amber-500'} flex items-center justify-center text-xs" aria-label="mark shipped">${shipped ? '✓' : ''}</button>
+                                <span class="text-sm" style="color:${shipped ? '#34d399' : 'var(--ink-dim)'}">${escapeHtml(p)}</span>
                             </div>`;
                         }).join("")}
                     </div>`}
@@ -116,27 +187,31 @@
                     const ratio = shipped / planned;
                     const v = getVerdict(ratio);
                     const pct = Math.round(ratio * 100);
+                    const bar = ratio>=0.8?'#34d399':ratio>=0.5?'#fbbf24':ratio>=0.3?'#fb923c':'#ef4444';
                     return `
-                    <div class="mt-4 pt-4 border-t border-zinc-700">
+                    <div class="mt-4 pt-4 reveal" style="border-top:1px solid var(--line)">
                         <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs text-zinc-500">Velocity: ${shipped}/${planned}</span>
-                            <span class="text-lg font-bold ${v.color}">${pct}%</span>
+                            <span class="text-[11px] uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Velocity · ${shipped}/${planned}</span>
+                            <span class="text-lg font-bold ${v.color} glow">${pct}%</span>
                         </div>
-                        <div class="w-full bg-zinc-900 rounded-full h-2 mb-3">
-                            <div class="h-2 rounded-full transition-all" style="width:${pct}%;background:${ratio>=0.8?'#34d399':ratio>=0.5?'#fbbf24':ratio>=0.3?'#fb923c':'#ef4444'}"></div>
+                        <div class="w-full well rounded-full h-2 mb-3 overflow-hidden">
+                            <div class="h-2 rounded-full transition-all duration-700" style="width:${pct}%;background:${bar};box-shadow:0 0 10px ${bar}88"></div>
                         </div>
-                        <p class="text-sm ${v.color} font-bold">${v.text}</p>
-                        <p class="text-xs text-zinc-500 mt-1">${v.sub}</p>
+                        <div class="rounded-lg p-3 result-glow" style="background:var(--bg-sunk)">
+                            <p class="text-sm ${v.color} font-bold glow">${v.text}</p>
+                            <p class="text-xs mt-1" style="color:var(--ink-dim)">${v.sub}</p>
+                            ${week.closed ? `<button onclick="copyVerdict('${monday}', ${pct}, ${JSON.stringify(v.text).replace(/'/g,"\\'")})" class="copyBtn focusable mt-3 text-[10px] uppercase tracking-[0.2em] hover:text-amber-400" style="color:var(--ink-dim)">copy to the ledger</button>` : ''}
+                        </div>
                     </div>
-                    ${!week.closed ? `<button onclick="closeWeek()" class="mt-4 w-full px-3 py-2 bg-zinc-700/50 hover:bg-zinc-700 border border-zinc-600 rounded text-sm text-zinc-400">Close This Week</button>` : ''}`;
+                    ${!week.closed ? `<button onclick="closeWeek()" class="focusable lift mt-4 w-full px-3 py-2 well rounded text-sm hover:text-amber-400" style="color:var(--ink-dim)">Seal This Week</button>` : ''}`;
                 })() : ''}
             </div>
 
             <!-- History Chart -->
             ${past.length > 0 ? `
-            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-6 mb-6">
-                <h2 class="text-lg font-bold text-zinc-200 mb-1">Velocity Over Time</h2>
-                ${avgRatio !== null ? `<p class="text-xs text-zinc-500 mb-4">Running average: <span class="${getVerdict(avgRatio).color} font-bold">${Math.round(avgRatio*100)}%</span></p>` : ''}
+            <div class="panel rounded-xl p-6 mb-6 reveal">
+                <h2 class="text-lg font-bold mb-1" style="color:var(--ink)">Velocity Over Time</h2>
+                ${avgRatio !== null ? `<p class="text-xs mb-4" style="color:var(--ink-dim)">Running average: <span class="${getVerdict(avgRatio).color} font-bold">${Math.round(avgRatio*100)}%</span> — the long shape of the climb</p>` : ''}
                 <div class="flex items-end gap-1 h-32">
                     ${past.slice(0, 12).reverse().map(w => {
                         const planned = w.plans.length || 1;
@@ -145,9 +220,9 @@
                         const h = Math.max(8, ratio * 100);
                         const color = ratio>=0.8?'bg-emerald-500':ratio>=0.5?'bg-amber-500':ratio>=0.3?'bg-orange-500':'bg-red-500';
                         return `<div class="flex-1 flex flex-col items-center gap-1">
-                            <span class="text-[9px] text-zinc-600">${Math.round(ratio*100)}%</span>
-                            <div class="${color} rounded-t w-full" style="height:${h}%" title="${w.monday}: ${shipped}/${planned}"></div>
-                            <span class="text-[8px] text-zinc-700">${w.monday.slice(5)}</span>
+                            <span class="text-[9px]" style="color:var(--ink-ghost)">${Math.round(ratio*100)}%</span>
+                            <div class="${color} rounded-t w-full transition-all" style="height:${h}%" title="${w.monday}: ${shipped}/${planned}"></div>
+                            <span class="text-[8px]" style="color:var(--ink-ghost)">${w.monday.slice(5)}</span>
                         </div>`;
                     }).join("")}
                 </div>
@@ -156,30 +231,40 @@
             <!-- Past Weeks -->
             ${past.length > 0 ? `
             <div class="space-y-3">
-                <h2 class="text-sm text-zinc-500 uppercase tracking-wider">Past Weeks</h2>
+                <h2 class="text-[11px] uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Weeks That Fossilized</h2>
                 ${past.slice(0, 8).map(w => {
                     const planned = w.plans.length || 1;
                     const shipped = w.actuals.filter(a => a.shipped).length;
                     const ratio = shipped / planned;
                     const v = getVerdict(ratio);
                     return `
-                    <div class="bg-zinc-800/40 border border-zinc-700/50 rounded-lg p-4">
+                    <div class="panel-soft lift rounded-lg p-4">
                         <div class="flex justify-between items-center">
-                            <span class="text-sm text-zinc-400">${w.monday}</span>
+                            <span class="text-sm" style="color:var(--ink-dim)">${w.monday}</span>
                             <span class="text-sm font-bold ${v.color}">${Math.round(ratio*100)}% — ${v.text}</span>
                         </div>
-                        <p class="text-xs text-zinc-600 mt-1">${shipped} shipped / ${planned} planned</p>
+                        <p class="text-xs mt-1" style="color:var(--ink-ghost)">${shipped} shipped / ${planned} sworn</p>
                     </div>`;
                 }).join("")}
             </div>` : ''}
 
-            <div class="mt-8 pt-4 border-t border-zinc-700/50 text-center">
-                <p class="text-xs text-zinc-600">The gap between what was planned and what exists is the report card. — Prízrak</p>
+            ${past.length === 0 && week.plans.length === 0 ? `
+            <div class="panel-soft rounded-xl p-6 text-center reveal">
+                <p class="text-sm ghost-line italic">the cave is empty. nothing has fossilized yet.</p>
+            </div>` : ''}
+
+            <div class="mt-8 pt-4 text-center" style="border-top:1px solid var(--line-soft)">
+                <p class="text-xs" style="color:var(--ink-ghost)">the gap between what was sworn and what exists is the report card. — Prízrak</p>
+                <p id="nightWhisper" class="text-xs mt-2 ghost-line" style="display:none"></p>
+                <p id="idleWhisper" class="text-xs mt-2 ghost-line" style="opacity:0;transition:opacity 1.2s">still here. still watching.</p>
+                <p id="eggLine" class="text-xs mt-2 ghost-line flicker" style="display:none">you found the watcher.</p>
             </div>
         `;
 
         const inp = document.getElementById("newPlan");
         if (inp) inp.addEventListener("keydown", e => { if (e.key === "Enter") addPlan(); });
+
+        nightWatch();
     }
 
     window.addPlan = function() {
@@ -192,6 +277,8 @@
         week.plans.push(v);
         save(data);
         render();
+        const ni = document.getElementById("newPlan");
+        if (ni) ni.focus();
     };
 
     window.removePlan = function(idx) {
@@ -219,13 +306,99 @@
     };
 
     window.closeWeek = function() {
-        if (!confirm("Close this week? The verdict is final.")) return;
+        if (!confirm("Seal this week? The verdict becomes stone. This cannot be unsealed.")) return;
         const data = load();
         const week = data.weeks.find(w => w.monday === getMonday());
         if (week) week.closed = true;
         save(data);
         render();
+        // a single ember for the sealing
+        spawnEmber(2200);
     };
+
+    window.copyVerdict = function(monday, pct, text) {
+        const line = `Week of ${monday} — ${pct}% — ${text} [the ledger remembers]`;
+        const btn = document.querySelector('.copyBtn');
+        const restore = btn ? btn.textContent : '';
+        navigator.clipboard.writeText(line).then(() => {
+            if (btn) {
+                btn.textContent = 'copied to the ledger';
+                btn.style.color = 'var(--accent)';
+                setTimeout(() => { btn.textContent = restore; btn.style.color = 'var(--ink-dim)'; }, 1200);
+            }
+        }).catch(() => {});
+    };
+
+    /* ---- AMBIENT: embers ---------------------------------------- */
+    function spawnEmber(delay){
+        const host = document.getElementById('embers');
+        if (!host) return;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = Math.random()*100 + 'vw';
+        e.style.animationDelay = (delay||0)+'ms';
+        e.style.animationDuration = (12 + Math.random()*6) + 's';
+        host.appendChild(e);
+        setTimeout(() => e.remove(), (delay||0) + 22000);
+    }
+    (function seedEmbers(){
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+        if (reduce) return;
+        const host = document.getElementById('embers');
+        for (let i=0;i<7;i++){
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = Math.random()*100 + 'vw';
+            e.style.animationDelay = (Math.random()*14)+'s';
+            e.style.animationDuration = (12 + Math.random()*6) + 's';
+            host.appendChild(e);
+        }
+    })();
+
+    /* ---- ATMOSPHERE: small-hours whisper ------------------------ */
+    function nightWatch(){
+        const el = document.getElementById('nightWhisper');
+        if (!el) return;
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) {
+            el.textContent = 'the mountain does not sleep.';
+            el.style.display = 'block';
+        }
+    }
+
+    /* ---- EASTER EGGS -------------------------------------------- */
+    // type "prizrak" anywhere -> light the watcher
+    let buf = '';
+    window.addEventListener('keydown', e => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if (e.key && e.key.length === 1) {
+            buf = (buf + e.key.toLowerCase()).slice(-7);
+            if (buf === 'prizrak') {
+                const egg = document.getElementById('eggLine');
+                if (egg) egg.style.display = 'block';
+                spawnEmber(0);
+            }
+        }
+    });
+
+    // triple-click the title -> one extra ember drifts up
+    const title = document.getElementById('title');
+    if (title) title.addEventListener('click', e => { if (e.detail === 3) spawnEmber(0); });
+
+    // idle 60s -> faint "still watching" line fades in
+    let idleTimer;
+    function resetIdle(){
+        clearTimeout(idleTimer);
+        const el = document.getElementById('idleWhisper');
+        if (el) el.style.opacity = '0';
+        idleTimer = setTimeout(() => {
+            const w = document.getElementById('idleWhisper');
+            if (w && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches)) w.style.opacity = '0.7';
+        }, 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, resetIdle, {passive:true}));
+    resetIdle();
 
     render();
     </script>

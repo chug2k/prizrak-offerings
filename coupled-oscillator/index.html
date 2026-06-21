@@ -7,8 +7,22 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap');
+
+  :root{
+    --bg:#0a0a0a;
+    --bg-raised:#111113;
+    --bg-sunk:#0d0d0f;
+    --line:#26262b;
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#3a3530;
+    --accent:#4ade80;            /* existing lead green stays the accent */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
   * { font-family: 'JetBrains Mono', monospace; }
-  body { background: #070707; }
+  body { background: var(--bg); }
 
   canvas { display: block; }
 
@@ -16,8 +30,31 @@
     font-size: 0.6rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #52525b;
+    color: var(--ink-dim);
   }
+
+  /* ---- spec motion vocabulary (reduced-motion-safe) ---- */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
 
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(12px); }
@@ -38,15 +75,21 @@
     text-transform: uppercase;
     font-weight: 600;
   }
-  .phase-sync { background: #14532d; color: #4ade80; }
+  .phase-sync { background: #14532d; color: #4ade80; box-shadow:0 0 14px -4px var(--glow); }
   .phase-lag { background: #451a03; color: #fb923c; }
   .phase-drift { background: #3b0764; color: #c084fc; }
 
   .oscillator-box {
-    border: 1px solid #18181b;
+    border: 1px solid var(--line-soft);
     border-radius: 8px;
     padding: 16px;
-    background: #0d0d0d;
+    background: var(--bg-sunk);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+  .oscillator-box:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 0 24px -10px var(--glow);
   }
 
   .wave-container {
@@ -54,26 +97,61 @@
     position: relative;
     overflow: hidden;
   }
+
+  /* the live phase panel breathes */
+  .panel-live {
+    box-shadow: 0 0 0 1px var(--line), 0 0 24px -8px var(--glow);
+  }
+
+  /* copy-to-ledger button */
+  .copy-btn {
+    font-size: 0.55rem; letter-spacing:0.14em; text-transform:uppercase;
+    color: var(--ink-dim); border:1px solid var(--line-soft);
+    border-radius:4px; padding:3px 8px; background:transparent; cursor:pointer;
+    transition: border-color .15s, color .15s, box-shadow .15s, transform .1s;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--ink); }
+  .copy-btn:active { transform: translateY(1px); }
+  .copy-btn:focus-visible { outline:none; border-color: var(--accent); box-shadow:0 0 0 1px var(--glow); }
+  .copy-btn.flash { color: var(--accent); border-color: var(--accent); box-shadow:0 0 12px -2px var(--glow); }
+
+  /* hidden watcher line */
+  #watcher { color: var(--ink-ghost); opacity:0; transition:opacity 1.2s ease; }
+  #watcher.lit { opacity:1; }
+
+  #idle-whisper { color: var(--ink-ghost); opacity:0; transition:opacity 1.5s ease; }
+  #idle-whisper.lit { opacity:1; }
+
+  h1.title { cursor: default; }
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker,.fade-up{animation:none!important}
+    .ember{display:none}
+    .breathe,.flicker,.fade-up{opacity:1!important}
+    .oscillator-box:hover{transform:none}
+  }
 </style>
 </head>
-<body class="min-h-screen text-zinc-300">
+<body class="grain min-h-screen text-zinc-300" style="color:var(--ink)">
 
-<div class="max-w-sm mx-auto px-5 py-8">
+<div class="fog"></div>
+
+<div class="max-w-sm mx-auto px-5 py-8 relative" style="z-index:2">
 
   <!-- Header -->
   <div class="fade-up d1 mb-7">
-    <div class="label-xs mb-2">Prizrak / Sunday 10:33</div>
-    <h1 class="text-lg font-bold text-zinc-100">The Coupled Oscillator</h1>
-    <p class="text-zinc-600 text-xs mt-1 leading-relaxed">Two rhythms. One body. Synchronized or drifting.</p>
+    <div class="label-xs mb-2 flicker">Prízrak / the two clocks</div>
+    <h1 class="title text-lg font-bold text-zinc-100" id="title">The Coupled Oscillator</h1>
+    <p class="text-zinc-600 text-xs mt-1 leading-relaxed">Two rhythms. One body. Locked in step — or quietly coming apart.</p>
   </div>
 
   <!-- Live canvas -->
-  <div class="fade-up d2 oscillator-box mb-4">
+  <div class="fade-up d2 oscillator-box panel-live mb-4">
     <div class="label-xs mb-3">Phase Space — Body × Day</div>
     <canvas id="phase" width="280" height="160" class="w-full rounded"></canvas>
     <div class="flex justify-between items-center mt-3">
       <div>
-        <div id="phase-label" class="phase-badge phase-sync">in phase</div>
+        <div id="phase-label" class="phase-badge phase-sync breathe">in phase</div>
       </div>
       <div class="text-right">
         <div id="phase-angle" class="text-zinc-400 text-xs">Δφ = 0°</div>
@@ -116,7 +194,10 @@
 
   <!-- Today's window -->
   <div class="fade-up d3 oscillator-box mb-4">
-    <div class="label-xs mb-3">Today's Coupling Windows</div>
+    <div class="flex items-center justify-between mb-3">
+      <div class="label-xs">Today's Coupling Windows</div>
+      <button id="copy-verdict" class="copy-btn" type="button">copy verdict</button>
+    </div>
 
     <div class="space-y-2">
       <div class="flex items-center gap-3">
@@ -156,18 +237,18 @@
       </div>
     </div>
 
-    <div class="mt-3 pt-3 border-t border-zinc-900 text-xs text-zinc-600 leading-relaxed">
-      Battery 69 at 10:33 → oscillators coupling well.<br>
-      Peak sync window: 15–18h. Court then, not now.
+    <div id="verdict" class="mt-3 pt-3 border-t border-zinc-900 text-xs text-zinc-600 leading-relaxed">
+      Battery 69 at 10:33 — the two clocks are holding step.<br>
+      Peak coupling: 15–18h. Court the day then, not now. The mountain is watching.
     </div>
   </div>
 
   <!-- Quorum note -->
   <div class="fade-up d4 border-l-2 border-zinc-800 pl-4 py-2 mb-6">
     <div class="text-xs text-zinc-600 leading-relaxed italic">
-      "The individual has a clock. The network has a <em>stable</em> clock.<br>
+      "The individual keeps a clock. The network keeps a <em>stable</em> clock.<br>
       The bread mold, half a billion years old,<br>
-      still requires others to stay accurate."
+      still needs the others to stay accurate."
     </div>
     <div class="label-xs mt-2">— Prízrak, 2026-03-15</div>
   </div>
@@ -178,7 +259,14 @@
     Weekly avg HRV: <span class="text-zinc-400 font-semibold">46 ms</span><br>
     Resting HR: <span class="text-zinc-400">51 bpm</span><br>
     Stress avg: <span class="text-zinc-400">18</span><br>
-    <div class="mt-2 text-zinc-700">Low stress. Parasympathetic recovery confirmed.</div>
+    <div class="mt-2 text-zinc-700">Low stress. The parasympathetic tide came in. Recovery confirmed.</div>
+  </div>
+
+  <!-- footer / whispers -->
+  <div class="mt-6 text-center">
+    <div id="watcher" class="text-xs">you found the watcher.</div>
+    <div id="idle-whisper" class="text-xs">still here. still watching.</div>
+    <div id="footer-night" class="text-xs mt-2" style="color:var(--ink-ghost)"></div>
   </div>
 
 </div>
@@ -209,19 +297,24 @@ document.getElementById('phase-angle').textContent = 'Δφ = ' + phaseDeg + '°'
 const phaseLabel = document.getElementById('phase-label');
 if (phaseDeg < 40) {
   phaseLabel.textContent = 'in phase';
-  phaseLabel.className = 'phase-badge phase-sync';
+  phaseLabel.className = 'phase-badge phase-sync breathe';
 } else if (phaseDeg < 90) {
   phaseLabel.textContent = 'lagging';
-  phaseLabel.className = 'phase-badge phase-lag';
+  phaseLabel.className = 'phase-badge phase-lag breathe';
 } else {
   phaseLabel.textContent = 'drifting';
-  phaseLabel.className = 'phase-badge phase-drift';
+  phaseLabel.className = 'phase-badge phase-drift breathe';
 }
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// shared animation phase for the breathing dot
+let pulse = 0;
 
 function drawPhaseSpace() {
   const w = phaseCanvas.width, h = phaseCanvas.height;
   pCtx.clearRect(0, 0, w, h);
-  pCtx.fillStyle = '#0d0d0d';
+  pCtx.fillStyle = '#0d0d0f';
   pCtx.fillRect(0, 0, w, h);
 
   // Grid
@@ -262,13 +355,16 @@ function drawPhaseSpace() {
   const cx = (hourOfDay / 24) * w;
   const cy = (1 - bodyBattery / 100) * h;
 
+  // breathing factor (1.0 baseline, gentle swell unless reduced motion)
+  const swell = reduceMotion ? 1 : (1 + 0.35 * Math.sin(pulse));
+
   // Glow
-  const grad = pCtx.createRadialGradient(cx, cy, 0, cx, cy, 20);
-  grad.addColorStop(0, 'rgba(74, 222, 128, 0.3)');
+  const grad = pCtx.createRadialGradient(cx, cy, 0, cx, cy, 20 * swell);
+  grad.addColorStop(0, 'rgba(74, 222, 128, ' + (0.30 * swell) + ')');
   grad.addColorStop(1, 'rgba(74, 222, 128, 0)');
   pCtx.fillStyle = grad;
   pCtx.beginPath();
-  pCtx.arc(cx, cy, 20, 0, Math.PI * 2);
+  pCtx.arc(cx, cy, 20 * swell, 0, Math.PI * 2);
   pCtx.fill();
 
   pCtx.beginPath();
@@ -288,13 +384,27 @@ function drawPhaseSpace() {
 
 drawPhaseSpace();
 
+// gentle breathing of the live dot (CSS-cheap rAF, paused under reduced motion)
+if (!reduceMotion) {
+  let last = 0;
+  function loop(ts) {
+    if (ts - last > 60) {            // ~16fps, very cheap
+      pulse += 0.18;
+      drawPhaseSpace();
+      last = ts;
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
 // --- Wave canvases ---
 function drawWave(canvasId, phase, color, amplitude) {
   const c = document.getElementById(canvasId);
   const ctx = c.getContext('2d');
   const w = c.width, h = c.height;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#0d0d0d';
+  ctx.fillStyle = '#0d0d0f';
   ctx.fillRect(0, 0, w, h);
 
   ctx.beginPath();
@@ -332,6 +442,103 @@ function updateClock() {
 }
 updateClock();
 setInterval(updateClock, 30000);
+
+// ---- ambient embers (capped, reduced-motion-safe) ----
+(function spawnEmbers(){
+  if (reduceMotion) return;
+  const N = 7;
+  for (let i = 0; i < N; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + '%';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (12 + Math.random() * 6) + 's';
+    document.body.appendChild(e);
+  }
+})();
+
+// ---- copy verdict to the ledger ----
+(function(){
+  const btn = document.getElementById('copy-verdict');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const v = document.getElementById('verdict').innerText.replace(/\s+/g, ' ').trim();
+    const angle = document.getElementById('phase-angle').textContent;
+    const state = document.getElementById('phase-label').textContent;
+    const text = 'COUPLED OSCILLATOR — ' + state + ' (' + angle + ')\n' + v;
+    const done = () => {
+      const old = btn.textContent;
+      btn.textContent = 'copied to the ledger';
+      btn.classList.add('flash');
+      setTimeout(() => { btn.textContent = old; btn.classList.remove('flash'); }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(done);
+    } else { done(); }
+  });
+})();
+
+// ---- easter egg: type "prizrak" / Konami → light the watcher ----
+(function(){
+  const watcher = document.getElementById('watcher');
+  let buf = '';
+  const konami = [38,38,40,40,37,39,37,39,66,65];
+  let kIdx = 0;
+  function lightWatcher(){ if (watcher) watcher.classList.add('lit'); }
+  window.addEventListener('keydown', (ev) => {
+    // word trigger
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-7);
+      if (buf === 'prizrak' || buf.endsWith('prizrak')) lightWatcher();
+    }
+    // konami trigger
+    if (ev.keyCode === konami[kIdx]) {
+      kIdx++;
+      if (kIdx === konami.length) { lightWatcher(); kIdx = 0; }
+    } else {
+      kIdx = (ev.keyCode === konami[0]) ? 1 : 0;
+    }
+  });
+})();
+
+// ---- easter egg: triple-click the title → one extra ember ----
+(function(){
+  const title = document.getElementById('title');
+  if (!title) return;
+  title.addEventListener('click', (ev) => {
+    if (ev.detail === 3 && !reduceMotion) {
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (40 + Math.random() * 20) + '%';
+      e.style.animationDuration = '11s';
+      document.body.appendChild(e);
+      setTimeout(() => e.remove(), 11000);
+    }
+  });
+})();
+
+// ---- idle 60s → a single line fades in ----
+(function(){
+  const whisper = document.getElementById('idle-whisper');
+  if (!whisper) return;
+  let t;
+  function arm(){
+    clearTimeout(t);
+    whisper.classList.remove('lit');
+    t = setTimeout(() => whisper.classList.add('lit'), 60000);
+  }
+  ['mousemove','keydown','touchstart','scroll','click'].forEach(ev =>
+    window.addEventListener(ev, arm, { passive: true }));
+  arm();
+})();
+
+// ---- 00:00–03:00 local → faint footer whisper ----
+(function(){
+  const f = document.getElementById('footer-night');
+  if (!f) return;
+  const hr = new Date().getHours();
+  if (hr >= 0 && hr < 3) f.textContent = 'the mountain does not sleep.';
+})();
 </script>
 
 </body>

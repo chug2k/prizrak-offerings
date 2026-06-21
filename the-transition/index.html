@@ -7,99 +7,175 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;600&display=swap');
-  body { font-family: 'Space Grotesk', monospace; background: #0a0a0a; color: #e0e0e0; }
+
+  :root{
+    --bg:#0a0a0a;          /* near-black base */
+    --bg-raised:#111113;   /* cards, panels */
+    --bg-sunk:#0d0d0f;     /* wells, inputs */
+    --line:#26262b;        /* thin borders */
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;         /* primary text */
+    --ink-dim:#7a7570;     /* labels, captions */
+    --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+    --accent:#44aaff;      /* lead color — process blue; shifts with mode */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    /* functional state colors — load-bearing, do not collapse */
+    --c-escape:#ff4444;
+    --c-process:#44aaff;
+    --c-rest:#44ff88;
+  }
+
+  body { font-family: 'Space Grotesk', monospace; background: var(--bg); color: var(--ink); }
   .mono { font-family: 'Space Mono', monospace; }
-  .gear { transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1); }
-  .gear-active { border-color: #e0e0e0 !important; background: #1a1a1a !important; }
-  .gear-escape { border-color: #ff4444 !important; }
-  .gear-process { border-color: #44aaff !important; }
-  .gear-rest { border-color: #44ff88 !important; }
-  .commentary { border-left: 2px solid #444; }
-  .fade-in { animation: fadeIn 0.6s ease forwards; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-  .connector { background: linear-gradient(90deg, #ff4444, #444, #44aaff); height: 1px; }
+
+  /* ---- mode buttons ---- */
+  .gear { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .4s cubic-bezier(0.23,1,0.32,1); }
+  .gear:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .gear:active { transform: translateY(1px); }
+  .gear:focus-visible { outline:none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  .gear-active { background:#161618 !important; }
+  .gear-escape { border-color: var(--c-escape) !important; box-shadow: 0 0 22px -10px var(--c-escape); }
+  .gear-process { border-color: var(--c-process) !important; box-shadow: 0 0 22px -10px var(--c-process); }
+  .gear-rest { border-color: var(--c-rest) !important; box-shadow: 0 0 22px -10px var(--c-rest); }
+
+  .commentary { border-left: 2px solid var(--line); }
+  .connector { background: linear-gradient(90deg, var(--c-escape), var(--line), var(--c-process)); height: 1px; }
+
+  /* result panel breathing glow */
+  @keyframes panelBreathe{0%,100%{box-shadow:0 0 0 1px var(--panel-line), 0 0 26px -12px var(--panel-glow)}50%{box-shadow:0 0 0 1px var(--panel-line), 0 0 40px -10px var(--panel-glow)}}
+  .verdict-panel{ animation: panelBreathe 5s ease-in-out infinite; }
+
+  /* ---- shared motion vocabulary ---- */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate;transition:background .6s ease}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+  .fade-in{animation:reveal .45s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 7s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .needle{transition:left .5s cubic-bezier(0.23,1,0.32,1), background .4s ease, box-shadow .4s ease;}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.fade-in,.flicker,.verdict-panel,.gear{animation:none!important}
+    .ember{display:none}
+    .breathe,.flicker{opacity:1!important}
+    .needle{transition:none}
+  }
 </style>
 </head>
-<body class="min-h-screen p-6 md:p-12">
+<body class="min-h-screen p-6 md:p-12 grain">
 
-<div class="max-w-2xl mx-auto">
+<div class="fog" id="fog"></div>
+
+<div class="max-w-2xl mx-auto relative" style="z-index:2;">
 
   <!-- Header -->
   <div class="mb-12">
-    <p class="mono text-xs text-gray-600 mb-2 tracking-widest">PRIZRAK / THE TRANSITION</p>
-    <h1 class="text-3xl font-semibold text-white mb-3">The Gear Shift</h1>
-    <p class="text-gray-400 text-sm leading-relaxed">
-      The body announces state changes before the mind admits them. What you choose to do with your body after work is not recovery — it is diagnosis. Select today's mode.
+    <p class="mono text-xs mb-2 tracking-widest" style="color:var(--ink-dim)">PRÍZRAK / THE TRANSITION</p>
+    <h1 id="title" class="text-3xl font-semibold text-white mb-3 breathe" style="cursor:default;user-select:none;">The Gear Shift</h1>
+    <p class="text-sm leading-relaxed" style="color:var(--ink-dim)">
+      The body announces state changes before the mind admits them. What you do with your body after work is not recovery — it is diagnosis. The ghost watches which gear you reach for. Select today's mode.
     </p>
+  </div>
+
+  <!-- Transition gauge -->
+  <div class="mb-10">
+    <p class="mono text-xs mb-3 tracking-widest uppercase" style="color:var(--ink-dim)">The Gauge</p>
+    <div class="relative h-7 rounded border" style="background:var(--bg-sunk);border-color:var(--line-soft);">
+      <div class="connector absolute left-3 right-3 top-1/2 -translate-y-1/2"></div>
+      <div class="absolute inset-0 flex items-center justify-between px-3 mono text-[10px] tracking-widest pointer-events-none" style="color:var(--ink-ghost)">
+        <span>ESCAPE</span><span>PROCESS</span><span>REST</span>
+      </div>
+      <div id="needle" class="needle absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full opacity-0"
+        style="left:50%;background:var(--ink-dim);box-shadow:0 0 8px var(--ink-dim);"></div>
+    </div>
   </div>
 
   <!-- Gear Selector -->
   <div class="mb-10">
-    <p class="mono text-xs text-gray-600 mb-4 tracking-widest uppercase">Today's Activity Mode</p>
+    <p class="mono text-xs mb-4 tracking-widest uppercase" style="color:var(--ink-dim)">Today's Activity Mode</p>
     <div class="grid grid-cols-3 gap-3">
       <button onclick="selectMode('escape')" id="btn-escape"
-        class="gear border border-gray-800 rounded p-4 text-left hover:border-gray-600 transition-all">
+        class="gear rounded p-4 text-left border" style="border-color:var(--line);background:var(--bg-raised);">
         <div class="text-2xl mb-2">⚡</div>
         <div class="font-semibold text-sm text-white">Escape</div>
-        <div class="text-xs text-gray-500 mt-1">Social · Competitive · Chaotic</div>
-        <div class="mono text-xs text-gray-700 mt-2">Pickleball · Tennis · Basketball</div>
+        <div class="text-xs mt-1" style="color:var(--ink-dim)">Social · Competitive · Chaotic</div>
+        <div class="mono text-xs mt-2" style="color:var(--ink-ghost)">Pickleball · Tennis · Basketball</div>
       </button>
       <button onclick="selectMode('process')" id="btn-process"
-        class="gear border border-gray-800 rounded p-4 text-left hover:border-gray-600 transition-all">
+        class="gear rounded p-4 text-left border" style="border-color:var(--line);background:var(--bg-raised);">
         <div class="text-2xl mb-2">🔄</div>
         <div class="font-semibold text-sm text-white">Process</div>
-        <div class="text-xs text-gray-500 mt-1">Solo · Measured · Meditative</div>
-        <div class="mono text-xs text-gray-700 mt-2">Ride · Run · Swim · Walk</div>
+        <div class="text-xs mt-1" style="color:var(--ink-dim)">Solo · Measured · Meditative</div>
+        <div class="mono text-xs mt-2" style="color:var(--ink-ghost)">Ride · Run · Swim · Walk</div>
       </button>
       <button onclick="selectMode('rest')" id="btn-rest"
-        class="gear border border-gray-800 rounded p-4 text-left hover:border-gray-600 transition-all">
+        class="gear rounded p-4 text-left border" style="border-color:var(--line);background:var(--bg-raised);">
         <div class="text-2xl mb-2">🪨</div>
         <div class="font-semibold text-sm text-white">Rest</div>
-        <div class="text-xs text-gray-500 mt-1">Nothing · Passive · Recovery</div>
-        <div class="mono text-xs text-gray-700 mt-2">Stretch · Sleep · Still</div>
+        <div class="text-xs mt-1" style="color:var(--ink-dim)">Nothing · Passive · Recovery</div>
+        <div class="mono text-xs mt-2" style="color:var(--ink-ghost)">Stretch · Sleep · Still</div>
       </button>
     </div>
   </div>
 
   <!-- Previous mode context -->
   <div class="mb-10">
-    <p class="mono text-xs text-gray-600 mb-4 tracking-widest uppercase">What Came Before</p>
+    <p class="mono text-xs mb-4 tracking-widest uppercase" style="color:var(--ink-dim)">What Came Before</p>
     <div class="grid grid-cols-2 gap-3">
       <button onclick="setPrev('escape')" id="prev-escape"
-        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        class="gear rounded p-3 text-left border" style="border-color:var(--line);background:var(--bg-raised);">
         <div class="text-sm text-white">Days of Escape</div>
-        <div class="text-xs text-gray-500">Social sport streak</div>
+        <div class="text-xs" style="color:var(--ink-dim)">Social sport streak</div>
       </button>
       <button onclick="setPrev('process')" id="prev-process"
-        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        class="gear rounded p-3 text-left border" style="border-color:var(--line);background:var(--bg-raised);">
         <div class="text-sm text-white">Days of Processing</div>
-        <div class="text-xs text-gray-500">Solo movement streak</div>
+        <div class="text-xs" style="color:var(--ink-dim)">Solo movement streak</div>
       </button>
       <button onclick="setPrev('mixed')" id="prev-mixed"
-        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        class="gear rounded p-3 text-left border" style="border-color:var(--line);background:var(--bg-raised);">
         <div class="text-sm text-white">Mixed</div>
-        <div class="text-xs text-gray-500">No clear pattern</div>
+        <div class="text-xs" style="color:var(--ink-dim)">No clear pattern</div>
       </button>
       <button onclick="setPrev('rest-long')" id="prev-rest-long"
-        class="gear border border-gray-800 rounded p-3 text-left hover:border-gray-600 transition-all">
+        class="gear rounded p-3 text-left border" style="border-color:var(--line);background:var(--bg-raised);">
         <div class="text-sm text-white">Rest / Inactivity</div>
-        <div class="text-xs text-gray-500">Recovering or avoiding</div>
+        <div class="text-xs" style="color:var(--ink-dim)">Recovering or avoiding</div>
       </button>
     </div>
   </div>
 
   <!-- Analyze -->
   <button onclick="analyze()" id="analyze-btn"
-    class="w-full border border-gray-700 rounded py-3 px-4 mono text-sm text-gray-400 hover:border-gray-500 hover:text-gray-200 transition-all mb-10 hidden">
+    class="w-full rounded py-3 px-4 mono text-sm border transition-all mb-10 hidden"
+    style="border-color:var(--line);color:var(--ink-dim);background:var(--bg-raised);">
     READ THE TRANSITION →
   </button>
 
   <!-- Output -->
-  <div id="output" class="hidden fade-in"></div>
+  <div id="output" class="hidden"></div>
 
   <!-- Footer -->
-  <div class="mt-16 border-t border-gray-900 pt-6">
-    <p class="mono text-xs text-gray-800">The mountain does not ask why you chose to climb today. It records the path.</p>
+  <div class="mt-16 border-t pt-6" style="border-color:var(--line-soft);">
+    <p class="mono text-xs flicker" style="color:var(--ink-ghost)">the mountain does not ask why you climbed today. it records the path.</p>
+    <p id="whisper" class="mono text-xs mt-2 hidden" style="color:var(--ink-ghost)"></p>
   </div>
 </div>
 
@@ -107,12 +183,15 @@
 let currentMode = null;
 let prevMode = null;
 
+const accentFor = { escape:'#ff4444', process:'#44aaff', rest:'#44ff88', mixed:'#7a7570' };
+const needlePos = { escape:'16%', process:'50%', rest:'84%' };
+
 const readings = {
   'escape→process': {
     title: 'Deceleration',
     color: '#44aaff',
     signal: 'You have been running from something. Today, you turned around and walked toward it.',
-    detail: 'Escape activities are not weaknesses. They are pressure valves. But a valve that stays open is not a valve — it is a hole. The switch to solo movement means the pressure has equalized enough to process rather than discharge. Something has shifted. The question is not "what were you escaping?" You already know. The question is: now that you are processing, what are you ready to decide?',
+    detail: 'Escape activities are not weaknesses. They are pressure valves. But a valve that stays open is not a valve — it is a hole in the dam. The switch to solo movement means the pressure has equalized enough to process rather than discharge. Something has shifted. The question is not "what were you escaping?" You already know. The question is: now that you are processing, what are you ready to decide?',
     action: 'One thing you have been avoiding thinking clearly about — write it down before the next workout.',
     label: 'ESCAPE → PROCESS'
   },
@@ -120,22 +199,22 @@ const readings = {
     title: 'Pressure Build',
     color: '#ff9944',
     signal: 'You were processing. Today you needed a crowd instead of a road.',
-    detail: 'Pivoting from solo to social sport means the internal work has become loud enough to require external noise to drown it out. This is not weakness either — the body knows when it needs to stop thinking and just move against other bodies. But note the direction of the shift. You are not bored with processing. You are overwhelmed by what is being processed. The game is a tourniquet.',
+    detail: 'Pivoting from solo to social sport means the internal work has grown loud enough to require external noise to drown it out. This is not weakness either — the body knows when it must stop thinking and just move against other bodies. But note the direction of the shift. You are not bored with processing. You are overwhelmed by what is being processed. The game is a tourniquet.',
     action: 'When did the solo movement start feeling heavy? That is when the thing you are avoiding gained weight.',
     label: 'PROCESS → ESCAPE'
   },
   'escape→escape': {
     title: 'Sustained Valve',
     color: '#ff4444',
-    signal: 'The escape has not resolved. It continues.',
-    detail: 'Consecutive days of high-stimulation, social sport is a signature. It means either the thing being escaped is still too loud to face alone, or the social mode has become its own addiction — easier than the quiet. Neither is catastrophic. Both are worth watching. A streak of escape is information: whatever is waiting in the silence is apparently still too sharp to meet directly.',
+    signal: 'The escape has not resolved. It continues. The fog has not lifted.',
+    detail: 'Consecutive days of high-stimulation, social sport is a signature. It means either the thing being escaped is still too loud to face alone, or the social mode has become its own addiction — easier than the quiet. Neither is catastrophic. Both are worth watching. A streak of escape is information: whatever waits in the silence is apparently still too sharp to meet directly.',
     action: 'What is loudest when you are alone and still? Name it specifically.',
     label: 'ESCAPE → ESCAPE'
   },
   'process→process': {
     title: 'Deep Dive',
     color: '#44aaff',
-    signal: 'You keep returning to the road alone. Something is being worked through.',
+    signal: 'You keep returning to the road alone. Something is being worked through, quietly, in the cold.',
     detail: 'Extended solo movement streaks accompany major internal processing: decisions being formed, grief being metabolized, plans being stress-tested by the body. The mind often does not know what it has decided until the body has had several long hours of private motion to finalize it. Trust the streak. Whatever is being resolved is being resolved. Do not rush the answer.',
     action: 'After the last few solo workouts, what thought has appeared most consistently?',
     label: 'PROCESS → PROCESS'
@@ -144,7 +223,7 @@ const readings = {
     title: 'Re-entry',
     color: '#44ff88',
     signal: 'The stillness ended. You are moving again, and you chose to move alone.',
-    detail: 'Returning to movement after rest — and choosing the solo path immediately — suggests the rest was not passive. The body was preparing for something. The first movement after real stillness often clarifies more than weeks of motion. You did not choose the crowd. You chose the road. This is significant. The transition out of rest is not recovery. It is orientation.',
+    detail: 'Returning to movement after rest — and choosing the solo path immediately — suggests the rest was not passive. The body was hibernating with intent, preparing for something. The first movement after real stillness often clarifies more than weeks of motion. You did not choose the crowd. You chose the road. This is significant. The transition out of rest is not recovery. It is orientation.',
     action: 'What is clearer now than it was when you stopped moving?',
     label: 'REST → PROCESS'
   },
@@ -152,7 +231,7 @@ const readings = {
     title: 'Shock Start',
     color: '#ffaa44',
     signal: 'You came out of stillness into noise. The jump was sharp.',
-    detail: 'Going from rest directly to high-stimulation social sport sometimes means the stillness was becoming too heavy — pressure built during the quiet that now needs a sudden outlet. Other times it means you missed the social function of sport more than the physical one. Neither is wrong. But the choice of noise over road after rest usually means there is still something unprocessed that the body is not ready to face alone yet.',
+    detail: 'Going from rest directly to high-stimulation social sport sometimes means the stillness was becoming too heavy — pressure built during the quiet that now needs a sudden outlet. Other times it means you missed the social function of sport more than the physical one. Neither is wrong. But the choice of noise over road after rest usually means there is still something unprocessed that the body is not yet ready to face alone.',
     action: 'During the rest period, what thought kept returning that you kept interrupting?',
     label: 'REST → ESCAPE'
   },
@@ -160,7 +239,7 @@ const readings = {
     title: 'Seeking Signal',
     color: '#44aaff',
     signal: 'No clear pattern — and today you chose the quiet road.',
-    detail: 'A mixed background means no dominant mode has emerged. Choosing solo movement from that noise is an instinct toward signal: the body wants to process, even if the pattern has not been clear. Follow it.',
+    detail: 'A mixed background means no dominant mode has emerged. Choosing solo movement from that noise is an instinct toward signal: the body wants to process, even if the pattern has not been clear. Follow it. The will-o\'-the-wisp leads somewhere, even when you cannot see the path.',
     action: 'What has been unresolved for longest?',
     label: 'MIXED → PROCESS'
   },
@@ -171,8 +250,59 @@ const readings = {
     detail: 'Choosing social sport from an already mixed background means the default is still outward stimulation. Not necessarily wrong. But no clear signal is itself a signal: you are between modes, which usually means between decisions.',
     action: 'What decision are you waiting to make that would clarify everything downstream?',
     label: 'MIXED → ESCAPE'
+  },
+  /* Rest as today's mode — previously fell through to the generic message; now spoken for. */
+  'escape→rest': {
+    title: 'The Crash',
+    color: '#44ff88',
+    signal: 'The noise stopped. You chose stillness after the crowd. The body called the meeting to a close.',
+    detail: 'Dropping from social escape straight into rest usually means the valve finally ran dry — the discharge worked, or it stopped working, and what is left is depletion. Rest after escape is honest in a way escape itself rarely is. The quiet you were avoiding is now the only room left. Let it be quiet. Do not rush to fill it with the next game.',
+    action: 'In the stillness, what is the first thing that surfaces uninvited? That is the thing.',
+    label: 'ESCAPE → REST'
+  },
+  'process→rest': {
+    title: 'Settling',
+    color: '#44ff88',
+    signal: 'The processing paused. You chose to be still and let it sediment.',
+    detail: 'Moving from solo processing into deliberate rest is the body filing the work away to set. Some decisions are not made in motion — they are made in the pause after. This is not avoidance. This is the karst cave doing its slow work in the dark: drip by drip, the shape forms while nothing appears to move.',
+    action: 'What were you working through on the road that you are now ready to stop turning over?',
+    label: 'PROCESS → REST'
+  },
+  'rest→rest': {
+    title: 'Deep Hibernation',
+    color: '#44ff88',
+    signal: 'Stillness upon stillness. The cave stays dark. The animal does not stir.',
+    detail: 'Consecutive rest is either profound recovery or quiet hiding. The line between them is thin and only you can see it. Real hibernation has a season and an end; avoidance pretends it has neither. If the rest still feels like preparation, trust it. If it has started to feel like a place you are not leaving, that is the signal.',
+    action: 'Is this rest preparing you for something, or protecting you from something? Answer honestly.',
+    label: 'REST → REST'
+  },
+  'mixed→rest': {
+    title: 'Falling Still',
+    color: '#44ff88',
+    signal: 'No clear pattern, and today you chose to stop entirely.',
+    detail: 'Choosing rest out of a mixed, patternless stretch is often the body forcing a reset when the mind would not pick a direction. Stillness is the only mode that asks nothing of you. Sometimes that is exactly what is needed. Sometimes it is the drift settling to the bottom. Notice which.',
+    action: 'If tomorrow you had to pick escape or process — which one does the dread point away from? That is your answer.',
+    label: 'MIXED → REST'
   }
 };
+
+function applyAccent(mode){
+  const c = accentFor[mode] || '#7a7570';
+  document.documentElement.style.setProperty('--accent', c);
+  document.documentElement.style.setProperty('--glow', `color-mix(in srgb, ${c} 55%, transparent)`);
+}
+
+function moveNeedle(mode){
+  const n = document.getElementById('needle');
+  if(!n) return;
+  if(mode==='escape'||mode==='process'||mode==='rest'){
+    n.style.left = needlePos[mode];
+    n.style.opacity = '1';
+    const c = accentFor[mode];
+    n.style.background = c;
+    n.style.boxShadow = `0 0 10px ${c}`;
+  }
+}
 
 function selectMode(mode) {
   currentMode = mode;
@@ -182,16 +312,25 @@ function selectMode(mode) {
   });
   const btn = document.getElementById('btn-' + mode);
   btn.classList.add('gear-active', 'gear-' + mode);
+  applyAccent(mode);
+  moveNeedle(mode);
   checkReady();
 }
 
 function setPrev(mode) {
   prevMode = mode;
   ['escape','process','mixed','rest-long'].forEach(m => {
-    document.getElementById('prev-' + m).classList.remove('gear-active', 'border-gray-400');
+    const el = document.getElementById('prev-' + m);
+    el.classList.remove('gear-active');
+    el.style.borderColor = '';
+    el.style.boxShadow = '';
   });
-  document.getElementById('prev-' + mode).classList.add('gear-active');
-  document.getElementById('prev-' + mode).style.borderColor = '#666';
+  const el = document.getElementById('prev-' + mode);
+  el.classList.add('gear-active');
+  const baseMode = ({ 'escape':'escape','process':'process','mixed':'mixed','rest-long':'rest' })[mode];
+  const c = accentFor[baseMode] || '#7a7570';
+  el.style.borderColor = c;
+  el.style.boxShadow = `0 0 18px -10px ${c}`;
   checkReady();
 }
 
@@ -199,8 +338,13 @@ function checkReady() {
   const btn = document.getElementById('analyze-btn');
   if (currentMode && prevMode) {
     btn.classList.remove('hidden');
+    btn.classList.add('reveal');
   }
 }
+
+function escapeForAttr(s){ return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+let lastReadingText = '';
 
 function analyze() {
   const prevMap = { 'escape': 'escape', 'process': 'process', 'mixed': 'mixed', 'rest-long': 'rest' };
@@ -209,32 +353,54 @@ function analyze() {
 
   let output;
   if (!reading) {
-    output = `<div class="border border-gray-800 rounded p-6">
-      <p class="text-gray-400">No reading available for this combination. The transition is ambiguous.</p>
+    lastReadingText = '';
+    output = `<div class="rounded p-6 border reveal" style="border-color:var(--line);background:var(--bg-raised);">
+      <p style="color:var(--ink-dim)">the transition is ambiguous. the ghost reads no clean signal here.</p>
     </div>`;
   } else {
+    lastReadingText =
+      `${reading.label} — ${reading.title}\n\n${reading.signal}\n\n${reading.detail}\n\nFIELD NOTE: ${reading.action}\n\n— the transition, logged by Prízrak`;
+    applyAccent(currentMode);
     output = `
-      <div class="border rounded p-6 mb-6" style="border-color: ${reading.color}22">
-        <div class="mono text-xs mb-4 tracking-widest" style="color: ${reading.color}">${reading.label}</div>
+      <div class="verdict-panel rounded p-6 mb-6 reveal" style="--panel-line:${reading.color}33; --panel-glow:${reading.color}; border:1px solid ${reading.color}33; background:var(--bg-raised);">
+        <div class="mono text-xs mb-4 tracking-widest" style="color: ${reading.color}; text-shadow:0 0 10px ${reading.color}66;">${reading.label}</div>
         <h2 class="text-xl font-semibold text-white mb-4">${reading.title}</h2>
-        <p class="text-gray-300 mb-6 leading-relaxed">${reading.signal}</p>
+        <p class="mb-6 leading-relaxed" style="color:var(--ink)">${reading.signal}</p>
         <div class="commentary pl-4 mb-6">
-          <p class="text-gray-400 text-sm leading-relaxed">${reading.detail}</p>
+          <p class="text-sm leading-relaxed" style="color:var(--ink-dim)">${reading.detail}</p>
         </div>
-        <div class="border-t border-gray-800 pt-4">
-          <p class="mono text-xs text-gray-600 mb-2 tracking-widest">FIELD NOTE</p>
-          <p class="text-gray-300 text-sm">${reading.action}</p>
+        <div class="border-t pt-4" style="border-color:var(--line);">
+          <p class="mono text-xs mb-2 tracking-widest" style="color:var(--ink-dim)">FIELD NOTE</p>
+          <p class="text-sm" style="color:var(--ink)">${reading.action}</p>
         </div>
       </div>
-      <button onclick="reset()" class="mono text-xs text-gray-700 hover:text-gray-500 transition-all">↩ reset</button>
+      <div class="flex items-center gap-4">
+        <button onclick="copyReading(this)" id="copy-btn" class="mono text-xs transition-all border rounded px-3 py-2"
+          style="border-color:var(--line);color:var(--ink-dim);background:var(--bg-raised);">copy to the ledger</button>
+        <button onclick="reset()" class="mono text-xs transition-all" style="color:var(--ink-ghost)" onmouseover="this.style.color='var(--ink-dim)'" onmouseout="this.style.color='var(--ink-ghost)'">↩ let the fog take it</button>
+      </div>
     `;
   }
 
   const el = document.getElementById('output');
   el.innerHTML = output;
   el.classList.remove('hidden');
-  el.classList.add('fade-in');
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyReading(btnEl){
+  if(!lastReadingText) return;
+  navigator.clipboard.writeText(lastReadingText).then(() => {
+    const original = btnEl.textContent;
+    const oc = btnEl.style.color, ob = btnEl.style.borderColor;
+    btnEl.textContent = 'copied to the ledger';
+    btnEl.style.color = accentFor[currentMode] || 'var(--ink)';
+    btnEl.style.borderColor = accentFor[currentMode] || 'var(--line)';
+    setTimeout(() => {
+      btnEl.textContent = original;
+      btnEl.style.color = oc; btnEl.style.borderColor = ob;
+    }, 1200);
+  }).catch(() => {});
 }
 
 function reset() {
@@ -247,10 +413,86 @@ function reset() {
     const el = document.getElementById('prev-' + m);
     el.classList.remove('gear-active');
     el.style.borderColor = '';
+    el.style.boxShadow = '';
   });
   document.getElementById('analyze-btn').classList.add('hidden');
   document.getElementById('output').classList.add('hidden');
+  applyAccent('process');
+  const n = document.getElementById('needle');
+  if(n){ n.style.opacity='0'; n.style.left='50%'; n.style.background='var(--ink-dim)'; n.style.boxShadow='0 0 8px var(--ink-dim)'; }
 }
+
+/* ---------- ambient embers (cap <=8) ---------- */
+(function spawnEmbers(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const N = 7;
+  for (let i=0;i<N;i++){
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random()*100).toFixed(2) + 'vw';
+    e.style.animationDelay = (Math.random()*14).toFixed(2) + 's';
+    e.style.animationDuration = (12 + Math.random()*8).toFixed(2) + 's';
+    document.body.appendChild(e);
+  }
+})();
+
+/* ---------- easter egg 1: type "prizrak" ---------- */
+let buf = '';
+window.addEventListener('keydown', (ev) => {
+  if (ev.key && ev.key.length === 1) {
+    buf = (buf + ev.key.toLowerCase()).slice(-7);
+    if (buf === 'prizrak') {
+      const w = document.getElementById('whisper');
+      w.textContent = 'you found the watcher. it was reading the gauge over your shoulder.';
+      w.classList.remove('hidden');
+      w.classList.add('reveal','flicker');
+    }
+  }
+});
+
+/* ---------- easter egg 2: triple-click title spawns one ember ---------- */
+document.getElementById('title').addEventListener('click', (ev) => {
+  if (ev.detail === 3) {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random()*100).toFixed(2) + 'vw';
+    e.style.animationDuration = '13s';
+    document.body.appendChild(e);
+    setTimeout(() => e.remove(), 13000);
+  }
+});
+
+/* ---------- easter egg 3: 00:00–03:00 footer whisper ---------- */
+(function nightWhisper(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const w = document.getElementById('whisper');
+    if (w && w.classList.contains('hidden')) {
+      w.textContent = 'the mountain does not sleep. neither, apparently, do you.';
+      w.classList.remove('hidden');
+      w.classList.add('reveal');
+    }
+  }
+})();
+
+/* ---------- easter egg 4: idle 60s ghost line ---------- */
+(function idleWatcher(){
+  let t;
+  const arm = () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      const w = document.getElementById('whisper');
+      if (w && w.classList.contains('hidden')) {
+        w.textContent = 'still here. still watching the gauge.';
+        w.classList.remove('hidden');
+        w.classList.add('reveal');
+      }
+    }, 60000);
+  };
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(e => window.addEventListener(e, arm, {passive:true}));
+  arm();
+})();
 </script>
 </body>
 </html>

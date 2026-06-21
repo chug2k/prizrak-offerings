@@ -5,65 +5,207 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Moving Target</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#a78bfa;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;}
+
+    /* ---- motion vocabulary (reduced-motion-safe) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* ---- field / surface treatments ---- */
+    .panel{background:var(--bg-raised);border:1px solid var(--line);
+      transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
+    .panel:hover{border-color:var(--line);}
+    .result-live{box-shadow:0 0 0 1px var(--line),0 0 30px -8px var(--glow);}
+
+    .field{background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink);
+      transition:border-color .15s ease,box-shadow .15s ease;}
+    .field::placeholder{color:var(--ink-ghost);}
+    .field:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);}
+
+    .btn-primary{background:var(--accent);color:#0a0a0a;font-weight:700;
+      transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;
+      box-shadow:0 0 24px -10px var(--glow);}
+    .btn-primary:hover{transform:translateY(-2px);filter:brightness(1.08);box-shadow:0 0 30px -6px var(--glow);}
+    .btn-primary:active{transform:translateY(1px);}
+    .btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px var(--glow);}
+
+    .btn-ghost{border:1px solid var(--line);color:var(--ink-dim);
+      transition:transform .15s ease,border-color .15s ease,color .15s ease;}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--ink);transform:translateY(-2px);}
+    .btn-ghost:active{transform:translateY(1px);}
+    .btn-ghost:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);}
+
+    .stat{background:var(--bg-sunk);border:1px solid var(--line);
+      transition:transform .15s ease,border-color .15s ease;}
+    .stat:hover{transform:translateY(-2px);border-color:var(--accent);}
+
+    .hist-card{background:var(--bg-sunk);border:1px solid var(--line);
+      transition:transform .15s ease,border-color .15s ease;}
+    .hist-card:hover{transform:translateY(-2px);border-color:var(--accent);}
+
+    .copy-btn{border:1px solid var(--line);color:var(--ink-dim);
+      transition:border-color .15s ease,color .15s ease,box-shadow .15s ease;}
+    .copy-btn:hover{border-color:var(--accent);color:var(--ink);}
+    .copy-btn:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);}
+    .copy-flash{border-color:var(--accent)!important;color:var(--accent)!important;box-shadow:0 0 0 1px var(--glow);}
+
+    .label{color:var(--ink-dim);}
+    .ghost-line{color:var(--ink-ghost);}
+
+    /* ---- the moving target: a gauge whose needle actually swings ---- */
+    .gauge-wrap{position:relative;}
+    .gauge svg{display:block;width:100%;height:auto;overflow:visible;}
+    .gauge-track{fill:none;stroke:var(--line);stroke-width:6;stroke-linecap:round;}
+    .gauge-fill{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;
+      filter:drop-shadow(0 0 6px var(--glow));
+      transition:stroke-dasharray .9s cubic-bezier(.16,1,.3,1),stroke .6s ease;}
+    .gauge-needle{stroke:var(--ink);stroke-width:2.5;stroke-linecap:round;transform-origin:60px 56px;
+      transition:transform 1.1s cubic-bezier(.34,1.56,.64,1);}
+    .gauge-hub{fill:var(--accent);filter:drop-shadow(0 0 5px var(--glow));}
+    .gauge-tick{stroke:var(--line);stroke-width:1.5;}
+    .gauge-pct{fill:#fff;font-weight:700;}
+    .gauge-cap{fill:var(--ink-dim);}
+    /* needle idle drift, so the target never quite holds still */
+    @keyframes needleHunt{0%,100%{transform:rotate(var(--needle,0deg))}
+      50%{transform:rotate(calc(var(--needle,0deg) + 1.4deg))}}
+    .gauge-needle.hunting{animation:needleHunt 5.5s ease-in-out infinite;}
+
+    /* verdict reads in like a stamp pressed into the ledger */
+    @keyframes stamp{0%{transform:scale(1.18);opacity:0;filter:blur(2px)}
+      60%{transform:scale(.97);opacity:1;filter:blur(0)}100%{transform:scale(1)}}
+    .stamp{animation:stamp .4s cubic-bezier(.2,.9,.3,1.2) both;}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.stamp,.gauge-needle.hunting{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .gauge-fill,.gauge-needle{transition:none!important}
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-zinc-950 text-zinc-200 antialiased">
-  <main class="max-w-4xl mx-auto px-4 py-10">
+<body class="grain min-h-screen text-zinc-200 antialiased" style="background:var(--bg);color:var(--ink);">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <main class="relative max-w-4xl mx-auto px-4 py-10" style="z-index:2;">
     <div class="mb-8">
-      <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">Prízrak offering</p>
-      <h1 class="mt-2 text-4xl font-bold text-white">The Moving Target</h1>
-      <p class="mt-3 max-w-2xl text-zinc-400">A metric audit for when yesterday's ruler became today's shrine. Ask whether the number still belongs to the current life, or whether it only survives because it is easy to keep measuring.</p>
+      <p class="mono text-xs uppercase tracking-[0.3em] label flicker">PRÍZRAK OFFERING / AUDIT 14</p>
+      <h1 id="title" class="mt-2 text-4xl font-bold breathe select-none" style="color:#fff;cursor:default;">The Moving Target</h1>
+      <p class="mt-3 max-w-2xl" style="color:var(--ink-dim);">A metric audit for when yesterday's ruler became today's shrine. Ask whether the number still belongs to the current life — or whether it only survives because it is easy to keep measuring. The mountain remembers what you stopped using.</p>
     </div>
 
     <section class="grid gap-4 md:grid-cols-2">
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 space-y-4">
+      <div class="panel rounded-2xl p-5 space-y-4">
         <div>
-          <label class="block text-sm text-zinc-400 mb-1">Metric</label>
-          <input id="metric" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 focus:outline-none focus:border-violet-500" placeholder="e.g. weekly approval score, reply speed, battery" />
+          <label for="metric" class="mono block text-[11px] uppercase tracking-[0.2em] label mb-1">THE METRIC</label>
+          <input id="metric" class="field w-full rounded-lg px-3 py-2" placeholder="weekly approval score, reply speed, battery" />
         </div>
         <div>
-          <label class="block text-sm text-zinc-400 mb-1">Who asked for it?</label>
-          <input id="source" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 focus:outline-none focus:border-violet-500" placeholder="boss, client, self, spreadsheet, nobody" />
+          <label for="source" class="mono block text-[11px] uppercase tracking-[0.2em] label mb-1">WHO CARVED IT</label>
+          <input id="source" class="field w-full rounded-lg px-3 py-2" placeholder="boss, client, self, spreadsheet, nobody" />
         </div>
         <div>
-          <label class="block text-sm text-zinc-400 mb-1">What changed?</label>
-          <textarea id="context" rows="4" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 focus:outline-none focus:border-violet-500" placeholder="What is different now? What is the thing this metric used to protect?"></textarea>
+          <label for="context" class="mono block text-[11px] uppercase tracking-[0.2em] label mb-1">WHAT MOVED</label>
+          <textarea id="context" rows="4" class="field w-full rounded-lg px-3 py-2" placeholder="What is different now? What was this number built to protect, back when it still meant something?"></textarea>
         </div>
         <div class="flex gap-2 flex-wrap">
-          <button id="auditBtn" class="rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-500">Audit the target</button>
-          <button id="resetBtn" class="rounded-lg border border-zinc-700 px-4 py-2 font-medium text-zinc-300 hover:border-zinc-500">Reset</button>
+          <button id="auditBtn" class="btn-primary rounded-lg px-4 py-2">Audit the target</button>
+          <button id="resetBtn" class="btn-ghost rounded-lg px-4 py-2 font-medium">Clear</button>
         </div>
       </div>
 
-      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 space-y-4">
-        <div class="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-          <p class="text-xs uppercase tracking-[0.25em] text-zinc-500">Verdict</p>
-          <p id="verdict" class="mt-2 text-2xl font-semibold text-white">The mountain is waiting.</p>
-          <p id="summary" class="mt-2 text-zinc-400">Enter a metric and the mountain will tell you whether it is a compass or a shrine.</p>
+      <div id="resultPanel" class="panel rounded-2xl p-5 space-y-4">
+        <div class="rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line);">
+          <div class="flex items-center justify-between gap-2">
+            <p class="mono text-[11px] uppercase tracking-[0.25em] label">VERDICT</p>
+            <button id="copyBtn" class="copy-btn mono text-[10px] uppercase tracking-[0.15em] rounded px-2 py-1 hidden" type="button">copy to ledger</button>
+          </div>
+          <div class="mt-2 flex items-center gap-4">
+            <!-- the moving target, made literal: a swinging shrine-risk needle -->
+            <div class="gauge-wrap shrink-0" style="width:120px;">
+              <div class="gauge" aria-hidden="true">
+                <svg viewBox="0 0 120 74">
+                  <path class="gauge-track" d="M12 60 A48 48 0 0 1 108 60" />
+                  <path id="gaugeFill" class="gauge-fill" d="M12 60 A48 48 0 0 1 108 60" stroke-dasharray="0 999" />
+                  <line class="gauge-tick" x1="60" y1="12" x2="60" y2="18" />
+                  <line id="gaugeNeedle" class="gauge-needle" x1="60" y1="56" x2="60" y2="20" style="--needle:-90deg;transform:rotate(-90deg);" />
+                  <circle class="gauge-hub" cx="60" cy="56" r="4.5" />
+                  <text id="gaugePct" class="gauge-pct mono" x="60" y="50" text-anchor="middle" font-size="15">—</text>
+                  <text class="gauge-cap mono" x="60" y="70" text-anchor="middle" font-size="6" letter-spacing="1.5">SHRINE RISK</text>
+                </svg>
+              </div>
+            </div>
+            <div class="min-w-0">
+              <p id="verdict" class="text-2xl font-semibold" style="color:#fff;">The mountain is waiting.</p>
+              <p id="summary" class="mt-2" style="color:var(--ink-dim);">Name a metric and the mountain will tell you whether it is a compass or a shrine.</p>
+            </div>
+          </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-3">
-          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
-            <p class="text-xs text-zinc-500">Context fit</p>
-            <p id="fit" class="mt-1 text-lg font-semibold text-white">—</p>
+          <div class="stat rounded-xl p-3">
+            <p class="mono text-[10px] uppercase tracking-[0.15em]" style="color:var(--ink-dim);">CONTEXT FIT</p>
+            <p id="fit" class="mt-1 text-lg font-semibold" style="color:#fff;">—</p>
           </div>
-          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
-            <p class="text-xs text-zinc-500">Shrine risk</p>
-            <p id="risk" class="mt-1 text-lg font-semibold text-white">—</p>
+          <div class="stat rounded-xl p-3">
+            <p class="mono text-[10px] uppercase tracking-[0.15em]" style="color:var(--ink-dim);">SHRINE RISK</p>
+            <p id="risk" class="mt-1 text-lg font-semibold" style="color:#fff;">—</p>
           </div>
-          <div class="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
-            <p class="text-xs text-zinc-500">Current use</p>
-            <p id="use" class="mt-1 text-lg font-semibold text-white">—</p>
+          <div class="stat rounded-xl p-3">
+            <p class="mono text-[10px] uppercase tracking-[0.15em]" style="color:var(--ink-dim);">CURRENT USE</p>
+            <p id="use" class="mt-1 text-lg font-semibold" style="color:#fff;">—</p>
           </div>
         </div>
         <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-zinc-500 mb-2">Recent audits</p>
+          <p class="mono text-[11px] uppercase tracking-[0.25em] label mb-2">RECENT AUDITS</p>
           <div id="history" class="space-y-2 text-sm"></div>
         </div>
       </div>
     </section>
 
-    <section class="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-      <p class="text-sm text-zinc-400">Rules of the mountain: a metric is useful when it still changes what you do. If it only changes your mood, it has become ceremonial.</p>
+    <section class="mt-6 panel rounded-2xl p-5">
+      <p class="mono text-[10px] uppercase tracking-[0.2em] label mb-2">RULE OF THE MOUNTAIN</p>
+      <p style="color:var(--ink-dim);">A metric is alive only while it still changes what you <em>do</em>. The moment it changes only your <em>mood</em>, it has stopped being a compass and become ceremony — a candle you light for a god that already left the cave.</p>
     </section>
+
+    <footer class="mt-8 text-center">
+      <p id="footerWhisper" class="mono text-[10px] uppercase tracking-[0.25em] ghost-line">the watcher keeps a ledger of every shrine you wouldn't bury</p>
+    </footer>
   </main>
 
   <script>
@@ -78,6 +220,18 @@
       risk: document.getElementById('risk'),
       use: document.getElementById('use'),
       history: document.getElementById('history'),
+      gaugeFill: document.getElementById('gaugeFill'),
+      gaugeNeedle: document.getElementById('gaugeNeedle'),
+      gaugePct: document.getElementById('gaugePct'),
+    };
+
+    const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // verdict accent helpers — keep stored class strings intact for backward compat
+    const VERDICT_COLORS = {
+      'text-emerald-400': '#34d399',
+      'text-amber-400': '#fbbf24',
+      'text-rose-400': '#fb7185',
     };
 
     function loadHistory() {
@@ -91,29 +245,74 @@
     function renderHistory() {
       const rows = loadHistory();
       if (!rows.length) {
-        els.history.innerHTML = '<div class="text-zinc-600 text-sm">No audits yet. The shrine is still dark.</div>';
+        els.history.innerHTML = '<div class="mono text-xs ghost-line">the cave is empty. nothing has fossilized yet.</div>';
         return;
       }
-      els.history.innerHTML = rows.map(r => `
-        <div class="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+      els.history.innerHTML = rows.map(r => {
+        const hex = VERDICT_COLORS[r.verdictColor] || 'var(--ink)';
+        return `
+        <div class="hist-card rounded-lg p-3 reveal">
           <div class="flex items-center justify-between gap-2">
-            <p class="font-medium text-zinc-100">${escapeHtml(r.metric)}</p>
-            <span class="text-[10px] uppercase tracking-[0.2em] ${r.verdictColor}">${escapeHtml(r.verdict)}</span>
+            <p class="font-medium" style="color:var(--ink);">${escapeHtml(r.metric)}</p>
+            <span class="mono text-[10px] uppercase tracking-[0.2em]" style="color:${hex};text-shadow:0 0 8px ${hex}55;">${escapeHtml(r.verdict)}</span>
           </div>
-          <p class="mt-1 text-zinc-500 text-xs">${escapeHtml(r.summary)}</p>
-        </div>
-      `).join('');
+          <p class="mt-1 text-xs" style="color:var(--ink-dim);">${escapeHtml(r.summary)}</p>
+        </div>`;
+      }).join('');
     }
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"]+/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
     }
 
+    // ---- gauge geometry: semicircle arc r=48 from (12,60) to (108,60) ----
+    const ARC_LEN = Math.PI * 48; // ~150.8
+    function setGauge(pct, hex) {
+      const p = Math.max(0, Math.min(100, pct));
+      // fill arc proportional to risk
+      els.gaugeFill.setAttribute('stroke-dasharray', `${(p / 100) * ARC_LEN} 999`);
+      els.gaugeFill.style.stroke = hex;
+      // needle sweeps -90deg (left, 0%) → +90deg (right, 100%)
+      const deg = -90 + (p / 100) * 180;
+      els.gaugeNeedle.style.setProperty('--needle', deg + 'deg');
+      els.gaugeNeedle.style.transform = `rotate(${deg}deg)`;
+      els.gaugeNeedle.classList.add('hunting'); // the target never quite holds still
+    }
+    function resetGauge() {
+      els.gaugeFill.setAttribute('stroke-dasharray', '0 999');
+      els.gaugeFill.style.stroke = 'var(--accent)';
+      els.gaugeNeedle.style.setProperty('--needle', '-90deg');
+      els.gaugeNeedle.style.transform = 'rotate(-90deg)';
+      els.gaugeNeedle.classList.remove('hunting');
+      els.gaugePct.textContent = '—';
+    }
+
+    // count a number up; honors reduced-motion (snaps instantly)
+    function countTo(el, target, suffix) {
+      if (reduce()) { el.textContent = target + (suffix || ''); return; }
+      const from = 0, dur = 850, t0 = performance.now();
+      function step(now) {
+        const k = Math.min(1, (now - t0) / dur);
+        const eased = 1 - Math.pow(1 - k, 3);
+        el.textContent = Math.round(from + (target - from) * eased) + (suffix || '');
+        if (k < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // last computed verdict, for copy-to-ledger
+    let lastAudit = null;
+
     function audit() {
       const metric = els.metric.value.trim();
       const source = els.source.value.trim();
       const context = els.context.value.trim();
-      if (!metric) return;
+      if (!metric) {
+        // wry nudge without breaking flow
+        els.metric.focus();
+        els.metric.placeholder = 'name the thing first. the mountain audits nothing.';
+        return;
+      }
 
       const contextWords = (context.match(/\b(was|used to|now|different|changed|shift|no longer|instead|before|after)\b/gi) || []).length;
       const sourceWords = source ? 1 : 0;
@@ -121,46 +320,199 @@
       const fit = Math.max(0, 100 - shrineRisk + sourceWords * 5);
       let verdict = 'Compass';
       let verdictColor = 'text-emerald-400';
-      let summary = 'It still points somewhere useful.';
+      let summary = 'It still points somewhere useful. The bridge holds — for now. The mountain is watching.';
       let use = 'Keep';
 
       if (shrineRisk >= 70) {
         verdict = 'Shrine';
         verdictColor = 'text-rose-400';
-        summary = 'The context has moved. This number is now mainly preserving itself.';
+        summary = 'The ground moved and the number stayed. It now mostly guards itself. Let the fog take it — this candle warms no one.';
         use = 'Retire';
       } else if (shrineRisk >= 45) {
         verdict = 'Suspicious';
         verdictColor = 'text-amber-400';
-        summary = 'The metric still matters, but only if it still changes action.';
+        summary = 'Still warm, but cooling toward ceremony. It earns its keep only while it still changes what you do — not merely how you feel.';
         use = 'Reframe';
       }
 
+      const hex = VERDICT_COLORS[verdictColor];
       els.verdict.textContent = verdict;
-      els.verdict.className = `mt-2 text-2xl font-semibold ${verdictColor}`;
+      els.verdict.className = 'text-2xl font-semibold breathe stamp';
+      els.verdict.style.color = hex;
+      // re-trigger stamp animation on repeat audits
+      void els.verdict.offsetWidth;
+      els.verdict.classList.add('stamp');
+      document.documentElement.style.setProperty('--accent', hex);
+      document.documentElement.style.setProperty('--glow', `color-mix(in srgb, ${hex} 55%, transparent)`);
+
       els.summary.textContent = summary;
-      els.fit.textContent = `${fit}%`;
-      els.risk.textContent = `${shrineRisk}%`;
+      els.summary.style.color = 'var(--ink-dim)';
+
+      // animated numerics + swinging needle: the target, moving
+      countTo(els.fit, fit, '%');
+      countTo(els.risk, shrineRisk, '%');
+      countTo(els.gaugePct, shrineRisk, '');
       els.use.textContent = use;
+      setGauge(shrineRisk, hex);
+
+      // result panel breathes + reveals
+      const panel = document.getElementById('resultPanel');
+      panel.classList.add('result-live');
+      panel.classList.remove('reveal'); void panel.offsetWidth; panel.classList.add('reveal');
+
+      lastAudit = { metric, source, context, verdict, shrineRisk, fit, use, summary };
+      const copyBtn = document.getElementById('copyBtn');
+      copyBtn.classList.remove('hidden');
 
       const history = loadHistory();
       history.unshift({ metric, verdict, verdictColor, summary });
       saveHistory(history);
       renderHistory();
+
+      if (reduce()) return;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     document.getElementById('auditBtn').addEventListener('click', audit);
+
     document.getElementById('resetBtn').addEventListener('click', () => {
       els.metric.value = '';
       els.source.value = '';
       els.context.value = '';
+      els.metric.placeholder = 'weekly approval score, reply speed, battery';
       els.verdict.textContent = 'The mountain is waiting.';
-      els.verdict.className = 'mt-2 text-2xl font-semibold text-white';
-      els.summary.textContent = 'Enter a metric and the mountain will tell you whether it is a compass or a shrine.';
+      els.verdict.className = 'text-2xl font-semibold breathe';
+      els.verdict.style.color = '#fff';
+      els.summary.textContent = 'Name a metric and the mountain will tell you whether it is a compass or a shrine.';
+      els.summary.style.color = 'var(--ink-dim)';
       els.fit.textContent = '—';
       els.risk.textContent = '—';
       els.use.textContent = '—';
+      resetGauge();
+      document.documentElement.style.setProperty('--accent', '#a78bfa');
+      document.documentElement.style.setProperty('--glow', 'color-mix(in srgb, #a78bfa 55%, transparent)');
+      document.getElementById('resultPanel').classList.remove('result-live');
+      document.getElementById('copyBtn').classList.add('hidden');
+      lastAudit = null;
     });
+
+    // copy-to-ledger
+    document.getElementById('copyBtn').addEventListener('click', (e) => {
+      if (!lastAudit) return;
+      const a = lastAudit;
+      const text =
+`THE MOVING TARGET — audit
+metric:      ${a.metric}
+who carved:  ${a.source || 'unnamed'}
+verdict:     ${a.verdict}
+context fit: ${a.fit}%
+shrine risk: ${a.shrineRisk}%
+current use: ${a.use}
+ruling:      ${a.summary}
+— the watcher keeps a ledger`;
+      const btn = e.currentTarget;
+      const done = () => {
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.classList.add('copy-flash');
+        setTimeout(() => { btn.textContent = prev; btn.classList.remove('copy-flash'); }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => {
+          fallbackCopy(text); done();
+        });
+      } else { fallbackCopy(text); done(); }
+    });
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+    }
+
+    // ---- ambient embers (capped, reduced-motion-safe) ----
+    (function spawnEmbers(){
+      if (reduce()) return;
+      const field = document.getElementById('emberField');
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random() * 90) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 8) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg 1: type "prizrak" to wake the watcher ----
+    (function watcher(){
+      const seq = 'prizrak';
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        const k = (ev.key || '').toLowerCase();
+        if (k.length !== 1) return;
+        buf = (buf + k).slice(-seq.length);
+        if (buf === seq) {
+          const f = document.getElementById('footerWhisper');
+          f.textContent = 'you found the watcher. it was never not watching.';
+          f.style.color = 'var(--accent)';
+          f.style.textShadow = '0 0 12px var(--glow)';
+          setTimeout(() => {
+            f.textContent = "the watcher keeps a ledger of every shrine you wouldn't bury";
+            f.style.color = 'var(--ink-ghost)';
+            f.style.textShadow = 'none';
+          }, 4000);
+        }
+      });
+    })();
+
+    // ---- easter egg 2: triple-click the title → spawn one extra ember ----
+    document.getElementById('title').addEventListener('click', (ev) => {
+      if (ev.detail !== 3) return;
+      if (reduce()) return;
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (10 + Math.random() * 80) + '%';
+      e.style.animationDuration = (10 + Math.random() * 6) + 's';
+      document.getElementById('emberField').appendChild(e);
+      setTimeout(() => e.remove(), 18000);
+    });
+
+    // ---- easter egg 3: idle 60s → the watcher murmurs (non-blocking, never touches state) ----
+    (function idleWatch(){
+      let t;
+      const f = document.getElementById('footerWhisper');
+      const base = () => {
+        f.textContent = "the watcher keeps a ledger of every shrine you wouldn't bury";
+        f.style.color = 'var(--ink-ghost)';
+        f.style.textShadow = 'none';
+      };
+      const wake = () => {
+        if (reduce()) return;
+        f.textContent = 'still here. still watching. the needle keeps hunting.';
+        f.style.color = 'var(--ink-ghost)';
+        f.style.textShadow = 'none';
+        f.classList.add('flicker');
+        setTimeout(() => { f.classList.remove('flicker'); base(); }, 6000);
+      };
+      const arm = () => { clearTimeout(t); t = setTimeout(wake, 60000); };
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, arm, { passive: true }));
+      arm();
+    })();
+
+    // ---- nocturnal whisper: 00:00–03:00 local ----
+    (function nightfall(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const f = document.getElementById('footerWhisper');
+        f.textContent = 'the mountain does not sleep. neither does the watcher.';
+      }
+    })();
 
     renderHistory();
   </script>

@@ -6,122 +6,208 @@
     <title>The Compound Hours — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-        .bar { transition: width 1s ease-out; }
-        .number-pop { animation: pop 0.4s ease-out; }
-        @keyframes pop { 0%{transform:scale(0.8);opacity:0} 60%{transform:scale(1.05)} 100%{transform:scale(1);opacity:1} }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#d4a24a;            /* amber — this app's existing lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        /* --- structural layers --- */
+        .stage{ position:relative; z-index:2; }
+
+        /* --- atmosphere: drifting fog --- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        /* --- floating embers --- */
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+            animation:ember 14s linear infinite}
+
+        /* --- breathing glow for the verdict --- */
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        /* --- reveal --- */
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        /* --- flicker (sparingly, on ghost text) --- */
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        /* --- film grain --- */
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* --- legacy bars / pops --- */
+        .bar { transition: width 1.1s cubic-bezier(.16,1,.3,1); }
+        .number-pop { animation: pop 0.5s cubic-bezier(.16,1,.3,1); }
+        @keyframes pop { 0%{transform:scale(0.8);opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1);opacity:1} }
+
+        /* --- panel + input chrome --- */
+        .panel{ background:var(--bg-raised); border:1px solid var(--line); }
+        .panel-active{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+        .lift{ transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+        .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+        .well{ background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink); }
+        .well::placeholder{ color:var(--ink-ghost); }
+        .well:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+        .well:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        .btn-accent{ border:1px solid color-mix(in srgb, var(--accent) 60%, #000);
+            background:color-mix(in srgb, var(--accent) 12%, transparent);
+            color:var(--accent); transition:transform .12s ease, background .15s ease, box-shadow .15s ease; }
+        .btn-accent:hover{ background:color-mix(in srgb, var(--accent) 20%, transparent);
+            box-shadow:0 0 22px -6px var(--glow); }
+        .btn-accent:active{ transform:translateY(1px); }
+        .btn-accent:focus-visible{ outline:none; box-shadow:0 0 0 1px var(--glow); }
+
+        .accent-ink{ color:var(--accent); }
+        .label{ color:var(--ink-dim); text-transform:uppercase; letter-spacing:.18em; }
+        .ghost-line{ color:var(--ink-ghost); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.number-pop{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .bar{transition:none!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
-<div class="max-w-xl mx-auto">
+<body class="grain text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
+
+<!-- atmosphere -->
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
+<div class="stage max-w-xl mx-auto">
 
     <div class="text-center mb-8">
-        <div class="text-4xl mb-3">⏱️</div>
-        <h1 class="text-2xl font-bold text-white mb-2">The Compound Hours</h1>
-        <p class="text-sm text-zinc-500">What does your weekly commitment look like at scale?</p>
+        <div id="glyph" class="text-4xl mb-3 breathe select-none cursor-default" title="hold to wake the watcher">⏳</div>
+        <h1 id="title" class="text-2xl font-bold text-white mb-2 select-none">The Compound Hours</h1>
+        <p class="text-sm" style="color:var(--ink-dim)">the ledger of where the hours went. it does not flatter. it counts.</p>
     </div>
 
     <!-- Input -->
-    <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 mb-6">
+    <div class="panel lift rounded-lg p-5 mb-6">
         <div class="mb-4">
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">Activity</label>
+            <label class="text-xs label mb-2 block">Activity</label>
             <input id="activity" type="text" value="Pickleball" placeholder="Pickleball, reading, coding, running..."
-                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500">
+                class="well w-full rounded px-3 py-2 text-sm">
         </div>
         <div class="grid grid-cols-2 gap-4 mb-4">
             <div>
-                <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">Minutes per week</label>
+                <label class="text-xs label mb-2 block">Minutes per week</label>
                 <input id="minutes" type="number" value="783" min="1" max="10080" placeholder="783"
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500">
+                    class="well w-full rounded px-3 py-2 text-sm">
             </div>
             <div>
-                <label class="text-xs text-zinc-400 uppercase tracking-widest mb-2 block">Weeks per year active</label>
+                <label class="text-xs label mb-2 block">Weeks per year active</label>
                 <input id="weeks" type="number" value="48" min="1" max="52" placeholder="48"
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500">
+                    class="well w-full rounded px-3 py-2 text-sm">
             </div>
         </div>
-        <button id="calc-btn" class="w-full py-2.5 rounded border border-amber-800 bg-amber-950/20 hover:bg-amber-950/40 text-sm text-amber-400 font-bold transition-all">
-            Calculate →
+        <button id="calc-btn" class="btn-accent w-full py-2.5 rounded text-sm font-bold">
+            Tally the hours →
         </button>
     </div>
 
     <!-- Output -->
-    <div id="output" class="hidden fade-in space-y-4">
+    <div id="output" class="hidden reveal space-y-4">
 
         <!-- Summary bar -->
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-4">Annual commitment</p>
-            <div id="summary-grid" class="grid grid-cols-3 gap-3 mb-4 text-center">
+        <div class="panel panel-active rounded-lg p-5">
+            <div class="flex items-center justify-between mb-4">
+                <p class="text-xs label">Annual commitment</p>
+                <button id="copy-btn" class="text-[10px] label px-2 py-1 rounded border transition-colors"
+                    style="border-color:var(--line); color:var(--ink-dim)">copy to ledger</button>
+            </div>
+            <div id="summary-grid" class="grid grid-cols-3 gap-3 mb-2 text-center">
                 <div>
-                    <p class="text-2xl font-bold text-amber-400 number-pop" id="hrs-year">—</p>
-                    <p class="text-xs text-zinc-600 mt-1">hours / year</p>
+                    <p class="text-2xl font-bold accent-ink breathe number-pop" id="hrs-year">—</p>
+                    <p class="text-xs mt-1" style="color:var(--ink-dim)">hours / year</p>
                 </div>
                 <div>
                     <p class="text-2xl font-bold text-white number-pop" id="days-year">—</p>
-                    <p class="text-xs text-zinc-600 mt-1">full days</p>
+                    <p class="text-xs mt-1" style="color:var(--ink-dim)">full days, lost to it</p>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-zinc-400 number-pop" id="pct-year">—</p>
-                    <p class="text-xs text-zinc-600 mt-1">of waking life</p>
+                    <p class="text-2xl font-bold number-pop" id="pct-year" style="color:var(--ink-dim)">—</p>
+                    <p class="text-xs mt-1" style="color:var(--ink-dim)">of your waking life</p>
                 </div>
             </div>
         </div>
 
         <!-- Timeline -->
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-4">Cumulative hours over time</p>
+        <div class="panel rounded-lg p-5">
+            <p class="text-xs label mb-4">Cumulative hours, year over year</p>
             <div id="timeline" class="space-y-3"></div>
         </div>
 
         <!-- 10k comparison -->
-        <div id="ten-k-section" class="rounded-lg border border-zinc-700 bg-zinc-900/60 p-5">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-3">The 10,000-hour mark</p>
+        <div id="ten-k-section" class="panel rounded-lg p-5">
+            <p class="text-xs label mb-3">The 10,000-hour threshold</p>
             <div class="mb-3">
-                <div class="flex justify-between text-xs text-zinc-600 mb-1">
-                    <span>Progress to 10,000 hrs</span>
-                    <span id="ten-k-pct">—</span>
+                <div class="flex justify-between text-xs mb-1" style="color:var(--ink-dim)">
+                    <span>annual pace against the mark</span>
+                    <span id="ten-k-pct" class="accent-ink">—</span>
                 </div>
-                <div class="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                    <div id="ten-k-bar" class="h-full bg-amber-600 rounded-full bar" style="width:0%"></div>
+                <div class="h-2 rounded-full overflow-hidden" style="background:var(--bg-sunk)">
+                    <div id="ten-k-bar" class="h-full rounded-full bar" style="width:0%;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 40%,#000),var(--accent))"></div>
                 </div>
             </div>
-            <p id="ten-k-note" class="text-sm text-zinc-400 leading-relaxed"></p>
+            <p id="ten-k-note" class="text-sm leading-relaxed" style="color:var(--ink)"></p>
         </div>
 
         <!-- Prizrak note -->
-        <div class="rounded-lg border border-zinc-800 p-4">
-            <p id="prizrak-note" class="text-xs text-zinc-500 italic leading-relaxed"></p>
+        <div class="panel rounded-lg p-4">
+            <p id="prizrak-note" class="text-xs italic leading-relaxed" style="color:var(--ink-dim)"></p>
         </div>
 
-        <button id="reset-btn" class="w-full py-2 rounded border border-zinc-800 text-xs text-zinc-700 hover:text-zinc-500 hover:border-zinc-700 transition-all">
-            Calculate another
+        <button id="reset-btn" class="lift w-full py-2 rounded text-xs transition-all"
+            style="border:1px solid var(--line-soft); color:var(--ink-ghost)">
+            let the fog take it — count again
         </button>
     </div>
 
     <div class="mt-10 text-center">
-        <p class="text-xs text-zinc-800 italic">The hours are not the goal. The hours are the evidence.</p>
+        <p class="text-xs ghost-line italic flicker">the hours are not the goal. the hours are the evidence.</p>
+        <p id="night-whisper" class="text-xs ghost-line italic mt-2 hidden">the mountain does not sleep.</p>
+        <p id="watcher-line" class="text-xs ghost-line italic mt-2 opacity-0 transition-opacity duration-1000">you found the watcher.</p>
     </div>
 </div>
 
+<script src="/shared/star-widget.js"></script>
 <script>
 const NOTES = {
     low: [
-        "A small weekly investment. The compounding is slow but real. Ten years from now you will be better than you were, which is the only comparison that matters.",
-        "An hour a week is 52 hours a year. In 10 years: 520 hours. The mountain was not built in one session.",
+        "a small weekly stake. the compounding is slow but it is real. ten winters from now you will be deeper than you are — the only comparison the mountain respects.",
+        "an hour a week is fifty-two a year. in ten years, five hundred and twenty. the Tatras were not raised in a single session either.",
     ],
     medium: [
-        "This is a serious commitment without being consuming. The hours will add up to something real over 5–10 years — the kind of depth that shows in the work even when you stop counting.",
-        "Three to five hours a week sustained over years produces someone who genuinely knows something. The amateur becomes intermediate. The intermediate becomes someone worth consulting.",
+        "a serious commitment that does not yet consume you. over five or ten years these hours fossilize into something real — depth that shows in the work long after you stop counting.",
+        "three to five hours a week, held for years, makes someone who genuinely knows a thing. the amateur becomes the intermediate. the intermediate becomes the one others come to ask.",
     ],
     high: [
-        "You are building something. This level of commitment over years produces capability that is difficult to explain to people who have not seen the inside of it.",
-        "At this rate, the activity is not a hobby. It is a second practice. The question is whether the work you do in it is being tracked as carefully as the hours.",
+        "you are building something. this much, held over years, becomes a capability that cannot be explained to anyone who has not seen the inside of it.",
+        "at this rate it is no longer a hobby. it is a second practice. the only question the ghost asks: is the work inside the hours being tracked as carefully as the hours themselves.",
     ],
     extreme: [
-        "This is a professional-level commitment. The body and mind are being trained at a rate that most people never sustain. The compounding at this level is nonlinear — the hours at the end are worth more than the hours at the beginning.",
-        "The Slovak word for this kind of dedication is odhodlanosť — a resolved, unwavering commitment. The mountain recognizes it because the mountain is built the same way.",
+        "professional weight. body and mind trained at a pace most never sustain a single winter, let alone many. the compounding here is nonlinear — the last hours are worth more than the first.",
+        "the Slovak word is odhodlanosť — a resolved, unwavering refusal to stop. the mountain recognizes it, because the mountain is built the same way: one cold hour stacked on the last.",
     ]
 };
 
@@ -139,9 +225,13 @@ function fmt(n) {
     return n >= 1000 ? (n/1000).toFixed(1) + 'k' : Math.round(n).toLocaleString();
 }
 
+// last computed verdict, for copy-to-ledger
+let lastVerdict = null;
+
 document.getElementById('calc-btn').addEventListener('click', calculate);
 document.getElementById('reset-btn').addEventListener('click', () => {
     document.getElementById('output').classList.add('hidden');
+    document.querySelector('.panel.lift').scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 
 function calculate() {
@@ -157,30 +247,37 @@ function calculate() {
     const wakingHrsPerYear = 16 * 365;
     const pctWaking = (hrsPerYear / wakingHrsPerYear * 100);
 
-    document.getElementById('hrs-year').textContent = fmt(hrsPerYear);
-    document.getElementById('days-year').textContent = daysPerYear.toFixed(1);
-    document.getElementById('pct-year').textContent = pctWaking.toFixed(1) + '%';
+    const hrsStr = fmt(hrsPerYear);
+    const daysStr = daysPerYear.toFixed(1);
+    const pctStr = pctWaking.toFixed(1) + '%';
+
+    document.getElementById('hrs-year').textContent = hrsStr;
+    document.getElementById('days-year').textContent = daysStr;
+    document.getElementById('pct-year').textContent = pctStr;
 
     // Timeline bars
     const years = [1, 2, 5, 10, 20];
     const maxHrs = hrsPerYear * 20;
     const timeline = document.getElementById('timeline');
     timeline.innerHTML = '';
-    years.forEach(yr => {
+    years.forEach((yr, i) => {
         const total = hrsPerYear * yr;
         const pct = Math.min(100, (total / maxHrs) * 100);
         const div = document.createElement('div');
-        div.className = 'fade-in';
+        div.className = 'reveal';
+        div.style.animationDelay = (i * 0.06) + 's';
         div.innerHTML = `
             <div class="flex items-center gap-3">
-                <span class="text-xs text-zinc-600 w-12 shrink-0">${yr}y</span>
-                <div class="flex-1 h-5 bg-zinc-800 rounded overflow-hidden">
-                    <div class="h-full bg-gradient-to-r from-amber-900 to-amber-600 rounded bar" style="width:${pct}%"></div>
+                <span class="text-xs w-12 shrink-0" style="color:var(--ink-dim)">${yr}y</span>
+                <div class="flex-1 h-5 rounded overflow-hidden" style="background:var(--bg-sunk)">
+                    <div class="h-full rounded bar" style="width:0%;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 35%,#000),var(--accent))"></div>
                 </div>
-                <span class="text-xs text-zinc-300 w-20 text-right shrink-0">${fmt(total)} hrs</span>
+                <span class="text-xs w-20 text-right shrink-0" style="color:var(--ink)">${fmt(total)} hrs</span>
             </div>
         `;
         timeline.appendChild(div);
+        const fill = div.querySelector('.bar');
+        requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = pct + '%'; }));
     });
 
     // 10k section
@@ -189,19 +286,110 @@ function calculate() {
     document.getElementById('ten-k-pct').textContent = (hrsPerYear >= 10000 ? '100%' : (hrsPerYear / 10000 * 100).toFixed(1) + '% per year');
     setTimeout(() => {
         document.getElementById('ten-k-bar').style.width = Math.min(100, pct10k * 10) + '%';
-    }, 100);
+    }, 120);
 
     let tenKNote;
-    if (tenKYears <= 1) tenKNote = `At this rate, you hit 10,000 hours in under a year. That number is not a goal — it is a description of depth. You are past it, or approaching it fast.`;
-    else if (tenKYears <= 3) tenKNote = `At this rate: 10,000 hours in ${tenKYears.toFixed(1)} years. The threshold where ${activity} stops being something you do and becomes something you are.`;
-    else if (tenKYears <= 10) tenKNote = `10,000 hours in ${tenKYears.toFixed(1)} years at this pace. Most people never get there in anything. You are on a trajectory that most are not on.`;
-    else tenKNote = `At current pace, 10,000 hours would take ${tenKYears.toFixed(0)} years. The number is not the point — the consistency is. The hours are evidence of commitment that cannot be faked.`;
+    if (tenKYears <= 1) tenKNote = `at this rate you cross 10,000 hours inside a single year. the number was never a goal — it is a description of depth, and you are already standing inside it.`;
+    else if (tenKYears <= 3) tenKNote = `10,000 hours in ${tenKYears.toFixed(1)} years at this pace. the threshold where ${activity} stops being something you do and quietly becomes something you are.`;
+    else if (tenKYears <= 10) tenKNote = `10,000 hours in ${tenKYears.toFixed(1)} years at this pace. most never reach that depth in anything at all. you are on a trajectory the crowd is not on.`;
+    else tenKNote = `at this pace, 10,000 hours would take ${tenKYears.toFixed(0)} years. the number is not the point — the consistency is. these hours are evidence of a commitment that cannot be faked.`;
     document.getElementById('ten-k-note').textContent = tenKNote;
 
-    document.getElementById('prizrak-note').textContent = getNote(hrsPerYear);
+    const note = getNote(hrsPerYear);
+    document.getElementById('prizrak-note').textContent = note;
+
+    // assemble copyable ledger entry
+    lastVerdict =
+`THE COMPOUND HOURS — ${activity}
+${hrsStr} hours/year · ${daysStr} full days · ${pctStr} of waking life
+10,000-hour mark: ${tenKYears <= 1 ? 'within a year' : tenKYears.toFixed(1) + ' years at this pace'}
+— ${note}`;
+
     document.getElementById('output').classList.remove('hidden');
     document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// --- copy to the ledger ---
+const copyBtn = document.getElementById('copy-btn');
+copyBtn.addEventListener('click', async () => {
+    if (!lastVerdict) return;
+    try {
+        await navigator.clipboard.writeText(lastVerdict);
+        const prev = copyBtn.textContent;
+        copyBtn.textContent = 'copied to the ledger';
+        copyBtn.style.color = 'var(--accent)';
+        copyBtn.style.borderColor = 'var(--accent)';
+        setTimeout(() => {
+            copyBtn.textContent = prev;
+            copyBtn.style.color = 'var(--ink-dim)';
+            copyBtn.style.borderColor = 'var(--line)';
+        }, 1200);
+    } catch (e) { /* clipboard unavailable; stay silent */ }
+});
+
+// --- embers (capped at 8) ---
+(function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const field = document.getElementById('ember-field');
+    const COUNT = 8;
+    for (let i = 0; i < COUNT; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        field.appendChild(e);
+    }
+})();
+
+// --- easter egg 1: type "prizrak" to wake the watcher ---
+(function watcherEgg(){
+    const target = 'prizrak';
+    let buf = '';
+    addEventListener('keydown', (ev) => {
+        if (ev.key.length !== 1) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-target.length);
+        if (buf === target) {
+            const line = document.getElementById('watcher-line');
+            line.style.opacity = '1';
+            setTimeout(() => { line.style.opacity = '0'; }, 5000);
+        }
+    });
+})();
+
+// --- easter egg 2: triple-click the title spawns one extra ember ---
+document.getElementById('title').addEventListener('click', (ev) => {
+    if (ev.detail === 3) {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const field = document.getElementById('ember-field');
+        if (field.querySelectorAll('.ember').length >= 10) return; // hard cap 10
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (40 + Math.random() * 20) + '%';
+        e.style.animationDuration = '12s';
+        field.appendChild(e);
+        e.addEventListener('animationend', () => e.remove());
+    }
+});
+
+// --- easter egg 3: hold the glyph → it breathes faster for 3s ---
+(function holdGlyph(){
+    const g = document.getElementById('glyph');
+    let t;
+    const start = () => {
+        g.style.animationDuration = '1.1s';
+        clearTimeout(t);
+        t = setTimeout(() => { g.style.animationDuration = ''; }, 3000);
+    };
+    g.addEventListener('mousedown', start);
+    g.addEventListener('touchstart', start, { passive: true });
+})();
+
+// --- easter egg 4: 00:00–03:00 local → the mountain does not sleep ---
+(function nightWhisper(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) document.getElementById('night-whisper').classList.remove('hidden');
+})();
 
 // Auto-calculate on load with defaults
 calculate();

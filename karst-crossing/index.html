@@ -7,42 +7,120 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-  body { background: #0a0e14; font-family: 'Share Tech Mono', monospace; }
-  .river { animation: flow 8s linear infinite; }
+
+  :root{
+    --bg:#0a0a0a;
+    --bg-raised:#111113;
+    --bg-sunk:#0d0d0f;
+    --line:#26262b;
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#3a3530;
+    --accent:#5ea0e0;            /* the river — this app's lead blue */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  html,body{background:var(--bg);}
+  body{
+    font-family:'Share Tech Mono', monospace;
+    color:var(--ink);
+  }
+
+  /* ── atmosphere layers ──────────────────────────── */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  /* ── the underground river (kept, restyled) ─────── */
+  .river { animation: flow 11s linear infinite; }
   @keyframes flow { from { background-position: 0 0; } to { background-position: 0 200px; } }
-  .drip { animation: drip 3s ease-in infinite; }
-  @keyframes drip { 0%,80% { opacity: 0.15; } 90% { opacity: 0.6; } 100% { opacity: 0.15; } }
-  textarea:focus { outline: none; }
-  .fade-in { animation: fadeIn 0.6s ease-out; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-  .crossing-flash { animation: flash 1.2s ease-out forwards; }
-  @keyframes flash { 0% { background: #0a0e14; } 30% { background: #0d2433; } 100% { background: #0a0e14; } }
+
+  /* ── interactions ───────────────────────────────── */
+  .lift{transition:transform .15s, box-shadow .15s, border-color .15s}
+  .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .lift:active{transform:translateY(1px)}
+
+  textarea:focus, button:focus-visible, summary:focus-visible{
+    outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--glow);
+  }
+
+  .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow)}
+
+  /* limestone crossing wash */
+  .crossing-flash { animation: flash 1.4s ease-out forwards; }
+  @keyframes flash {
+    0% { background: var(--bg); }
+    25% { background:#0c1620; }
+    100% { background: var(--bg); }
+  }
+
+  /* the meniscus that ripples when you cross */
+  @keyframes ripple{from{transform:scale(.2);opacity:.55}to{transform:scale(2.6);opacity:0}}
+  .ripple{position:absolute;left:50%;top:18px;width:64px;height:64px;margin-left:-32px;
+    border:1px solid var(--accent);border-radius:50%;pointer-events:none;
+    animation:ripple 1.4s ease-out forwards}
+
+  ::selection{background:color-mix(in srgb,var(--accent) 30%, transparent);color:#fff}
+
+  details[open] summary .chev{transform:rotate(90deg)}
+  .chev{display:inline-block;transition:transform .2s}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker,.river,.crossing-flash,.ripple{animation:none!important}
+    .ember,.ripple{display:none}
+    .breathe,.flicker{opacity:1!important}
+  }
 </style>
 </head>
-<body class="text-slate-300 min-h-screen">
+<body class="grain text-slate-300 min-h-screen">
 
-<!-- ASCII river background (decorative) -->
-<div class="fixed inset-0 pointer-events-none overflow-hidden opacity-5 select-none">
-  <pre class="text-blue-400 text-xs leading-4 absolute top-0 left-0 w-full h-full overflow-hidden">
+<!-- atmosphere -->
+<div class="fog" aria-hidden="true"></div>
+
+<!-- ASCII river background (decorative, kept) -->
+<div class="fixed inset-0 pointer-events-none overflow-hidden opacity-[0.06] select-none" style="z-index:0" aria-hidden="true">
+  <pre class="river text-xs leading-4 absolute top-0 left-0 w-full h-full overflow-hidden" style="color:var(--accent);background:transparent">
 ~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~
   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~
 ~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~
   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~
 ~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~
   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~
-</pre>
+~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~
+  ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~  ~~~  ~~   ~
+  </pre>
 </div>
 
-<div class="max-w-xl mx-auto px-4 py-10 relative">
+<div class="max-w-xl mx-auto px-4 py-10 relative" style="z-index:2">
 
   <!-- Header -->
   <div class="mb-8">
     <div class="flex items-center justify-between mb-1">
-      <span class="text-blue-500 text-xs tracking-widest uppercase">KARST CROSSING PROTOCOL</span>
-      <span id="clock" class="text-slate-600 text-xs font-mono"></span>
+      <span id="title-tag" class="text-xs tracking-widest uppercase cursor-default select-none" style="color:var(--accent)">KARST CROSSING PROTOCOL</span>
+      <span id="clock" class="text-xs font-mono" style="color:var(--ink-dim)"></span>
     </div>
-    <h1 class="text-2xl font-bold text-white tracking-tight">The Karst Crossing</h1>
-    <p class="text-slate-600 text-xs mt-1 leading-relaxed">The river that crosses borders does not know it crosses borders.<br>Surface what moved underground today. Cross. Leave what belongs in the cave.</p>
+    <h1 id="title" class="text-2xl font-bold text-white tracking-tight cursor-default select-none breathe" style="display:inline-block">The Karst Crossing</h1>
+    <p class="text-xs mt-2 leading-relaxed" style="color:var(--ink-dim)">The river that crosses borders does not know it crosses borders.<br>Surface what moved underground today. Cross. Leave what belongs in the cave.</p>
   </div>
 
   <!-- App container -->
@@ -50,11 +128,19 @@
 
   <!-- Log -->
   <div id="log-section" class="mt-10 hidden">
-    <div class="border-t border-slate-800 pt-6">
-      <h2 class="text-xs text-slate-600 uppercase tracking-widest mb-3">Past Crossings</h2>
+    <div class="border-t pt-6" style="border-color:var(--line-soft)">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Past Crossings</h2>
+        <span id="log-count" class="text-xs" style="color:var(--ink-ghost)"></span>
+      </div>
       <div id="log-entries" class="space-y-3"></div>
     </div>
   </div>
+
+  <!-- Footer whisper -->
+  <footer class="mt-12 text-center">
+    <span id="whisper" class="text-xs flicker" style="color:var(--ink-ghost)">the limestone remembers every passage. so does the ghost.</span>
+  </footer>
 
 </div>
 
@@ -66,7 +152,7 @@ const PROMPTS = [
     label: "I. UNDERGROUND SIGNAL",
     question: "What moved through you today that the room never saw?",
     hint: "Real conviction. A doubt you didn't voice. A pattern you noticed but didn't name.",
-    color: "text-blue-400",
+    color: "#5ea0e0",
     border: "border-blue-900"
   },
   {
@@ -74,7 +160,7 @@ const PROMPTS = [
     label: "II. CROSSING CARGO",
     question: "What are you carrying across the border into tonight?",
     hint: "What follows you home from the VC machine. Name it or it travels unnamed.",
-    color: "text-amber-400",
+    color: "#d6a14a",
     border: "border-amber-900"
   },
   {
@@ -82,12 +168,16 @@ const PROMPTS = [
     label: "III. WHAT STAYS IN THE CAVE",
     question: "What do you leave in the dark?",
     hint: "The approval loop. The unfinished performance. The thing that was never yours.",
-    color: "text-slate-400",
+    color: "#9a948c",
     border: "border-slate-700"
   }
 ];
 
 let state = { step: 0, answers: {}, done: false };
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 function save(entry) {
   const log = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
@@ -123,23 +213,30 @@ function renderStep() {
   if (state.step < PROMPTS.length) {
     const p = PROMPTS[state.step];
     app.innerHTML = `
-    <div class="fade-in bg-slate-900 border ${p.border} border-l-4 rounded p-5">
-      <div class="${p.color} text-xs tracking-widest uppercase mb-3">${p.label}</div>
-      <div class="text-white text-base mb-1 leading-snug">${p.question}</div>
-      <div class="text-slate-600 text-xs mb-4">${p.hint}</div>
-      <textarea id="answer" rows="3" placeholder="..."
-        class="w-full bg-black border border-slate-700 focus:border-slate-500 rounded px-3 py-2 text-sm text-slate-200 placeholder-slate-700 resize-none transition-colors"></textarea>
+    <div class="reveal lift bg-[var(--bg-raised)] border ${p.border} border-l-4 rounded p-5" style="border-color:var(--line);border-left-color:${p.color}">
+      <div class="text-xs tracking-widest uppercase mb-3" style="color:${p.color}">${p.label}</div>
+      <div class="text-white text-base mb-1 leading-snug">${esc(p.question)}</div>
+      <div class="text-xs mb-4" style="color:var(--ink-dim)">${esc(p.hint)}</div>
+      <textarea id="answer" rows="3" placeholder="surface it…"
+        class="w-full bg-[var(--bg-sunk)] border rounded px-3 py-2 text-sm resize-none transition-colors"
+        style="border-color:var(--line);color:var(--ink)"></textarea>
       <div class="mt-3 flex justify-between items-center">
-        <span class="text-slate-700 text-xs">${state.step + 1} / ${PROMPTS.length}</span>
-        <button id="next-btn" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-slate-400 text-xs text-white rounded transition-colors">
+        <span class="text-xs" style="color:var(--ink-ghost)">${state.step + 1} / ${PROMPTS.length}</span>
+        <button id="next-btn" class="lift px-4 py-1.5 bg-[var(--bg-sunk)] border text-xs text-white rounded" style="border-color:var(--line)">
           ${state.step < PROMPTS.length - 1 ? 'CONTINUE →' : 'CROSS →'}
         </button>
       </div>
     </div>`;
     document.getElementById("answer").focus();
-    document.getElementById("next-btn").addEventListener("click", () => {
+
+    const advance = () => {
       const val = document.getElementById("answer").value.trim();
-      if (!val) return;
+      if (!val) {
+        const ta = document.getElementById("answer");
+        ta.placeholder = "the cave keeps the silence. say something.";
+        ta.style.borderColor = "var(--accent)";
+        return;
+      }
       state.answers[PROMPTS[state.step].id] = val;
       state.step++;
       if (state.step >= PROMPTS.length) {
@@ -147,6 +244,12 @@ function renderStep() {
       } else {
         renderStep();
       }
+    };
+
+    document.getElementById("next-btn").addEventListener("click", advance);
+    // Ctrl/Cmd+Enter to cross from the keyboard
+    document.getElementById("answer").addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); advance(); }
     });
   }
 }
@@ -160,56 +263,150 @@ function renderCrossing() {
     verdict: v
   };
   save(entry);
-  document.body.className += " crossing-flash";
+  document.body.className = document.body.className.replace(/\bcrossing-flash\b/g,"").trim() + " crossing-flash";
 
   app.innerHTML = `
-  <div class="fade-in text-center py-6">
-    <div class="text-blue-500 text-3xl mb-4">≋</div>
+  <div class="reveal text-center py-6 relative">
+    <div class="ripple" aria-hidden="true"></div>
+    <div class="text-4xl mb-4 breathe" style="color:var(--accent)">≋</div>
     <div class="text-white font-bold text-sm tracking-widest uppercase mb-1">CROSSING COMPLETE</div>
-    <div class="text-slate-500 text-xs mb-6">${new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit",hour12:false})} — ${new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</div>
-    <div class="bg-slate-900 border border-slate-700 rounded p-4 mb-6 text-left space-y-3">
+    <div class="text-xs mb-6" style="color:var(--ink-dim)">${new Date().toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit",hour12:false})} — ${new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</div>
+    <div class="bg-[var(--bg-raised)] border rounded p-4 mb-6 text-left space-y-3" style="border-color:var(--line)">
       ${PROMPTS.map(p => `
         <div>
-          <div class="${p.color} text-xs uppercase tracking-wider mb-0.5">${p.label}</div>
-          <div class="text-slate-300 text-sm">${state.answers[p.id]}</div>
-        </div>`).join('<div class="border-t border-slate-800 my-2"></div>')}
+          <div class="text-xs uppercase tracking-wider mb-0.5" style="color:${p.color}">${p.label}</div>
+          <div class="text-sm" style="color:var(--ink)">${esc(state.answers[p.id])}</div>
+        </div>`).join('<div class="border-t my-2" style="border-color:var(--line-soft)"></div>')}
     </div>
-    <div class="border border-slate-700 bg-black rounded px-4 py-3 mb-6">
-      <div class="text-slate-500 text-xs uppercase tracking-widest mb-1">Verdict</div>
-      <div class="text-white text-sm font-bold">${v}</div>
+    <div class="result-glow border bg-[var(--bg-sunk)] rounded px-4 py-3 mb-3" style="border-color:var(--line)">
+      <div class="text-xs uppercase tracking-widest mb-1" style="color:var(--ink-dim)">Verdict</div>
+      <div class="text-white text-sm font-bold breathe">${esc(v)}</div>
     </div>
-    <button id="new-btn" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 rounded transition-colors">NEW CROSSING</button>
+    <div class="flex items-center justify-center gap-3">
+      <button id="copy-btn" class="lift px-4 py-2 bg-[var(--bg-sunk)] border text-xs rounded" style="border-color:var(--line);color:var(--ink-dim)">COPY TO LEDGER</button>
+      <button id="new-btn" class="lift px-5 py-2 bg-[var(--bg-sunk)] border text-xs rounded" style="border-color:var(--line);color:var(--ink)">NEW CROSSING</button>
+    </div>
   </div>`;
 
   renderLogSection();
+
   document.getElementById("new-btn").addEventListener("click", () => {
     state = { step: 0, answers: {}, done: false };
     renderStep();
   });
+
+  document.getElementById("copy-btn").addEventListener("click", (e) => {
+    const btn = e.currentTarget;
+    const lines = PROMPTS.map(p => `${p.label}\n${state.answers[p.id]}`).join("\n\n");
+    const text = `THE KARST CROSSING — ${new Date().toLocaleString("en-US",{hour12:false})}\n\n${lines}\n\nVERDICT\n${v}`;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = "copied to the ledger";
+      btn.style.color = "var(--accent)";
+      btn.style.borderColor = "var(--accent)";
+      setTimeout(() => {
+        btn.textContent = "COPY TO LEDGER";
+        btn.style.color = "var(--ink-dim)";
+        btn.style.borderColor = "var(--line)";
+      }, 1200);
+    }).catch(() => {
+      btn.textContent = "the river refused it";
+      setTimeout(() => { btn.textContent = "COPY TO LEDGER"; }, 1200);
+    });
+  });
+
+  setTimeout(() => app.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
 }
 
 function renderLogSection() {
   const log = getLog();
-  if (log.length === 0) return;
-  document.getElementById("log-section").classList.remove("hidden");
+  const section = document.getElementById("log-section");
+  if (log.length === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+  section.classList.remove("hidden");
+  document.getElementById("log-count").textContent =
+    log.length === 1 ? "1 passage" : log.length + " passages";
+
   const container = document.getElementById("log-entries");
   container.innerHTML = log.map((e, i) => {
     const d = new Date(e.date);
     const label = d.toLocaleDateString("en-US", {month:"short",day:"numeric"}) + " " +
                   d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",hour12:false});
     return `
-    <details class="bg-slate-900/60 border border-slate-800 rounded ${i === 0 ? 'open' : ''}">
-      <summary class="px-3 py-2 text-xs text-slate-500 cursor-pointer hover:text-slate-300 flex justify-between">
-        <span>${label}</span>
-        <span class="text-slate-700">${e.verdict.slice(0, 28)}…</span>
+    <details class="lift bg-[var(--bg-raised)] border rounded ${i === 0 ? 'open' : ''}" style="border-color:var(--line-soft)">
+      <summary class="px-3 py-2 text-xs cursor-pointer flex justify-between items-center gap-3" style="color:var(--ink-dim)">
+        <span><span class="chev" style="color:var(--accent)">›</span> ${esc(label)}</span>
+        <span class="truncate" style="color:var(--ink-ghost)">${esc(e.verdict.slice(0, 28))}…</span>
       </summary>
       <div class="px-3 pb-3 pt-1 space-y-2 text-xs">
-        ${PROMPTS.map(p => `<div><span class="text-slate-600 uppercase">${p.id}: </span><span class="text-slate-400">${e.answers[p.id] || '—'}</span></div>`).join("")}
-        <div class="text-white border-t border-slate-800 pt-2 mt-2">${e.verdict}</div>
+        ${PROMPTS.map(p => `<div><span class="uppercase" style="color:${p.color}">${p.id}: </span><span style="color:var(--ink)">${esc(e.answers[p.id] || '—')}</span></div>`).join("")}
+        <div class="text-white border-t pt-2 mt-2" style="border-color:var(--line-soft)">${esc(e.verdict)}</div>
       </div>
     </details>`;
   }).join("");
 }
+
+/* ── easter eggs (non-blocking, never touch saved state) ── */
+
+// (a) type "prizrak" → the watcher answers
+(function(){
+  let buf = "";
+  window.addEventListener("keydown", (e) => {
+    if (e.key && e.key.length === 1) {
+      buf = (buf + e.key.toLowerCase()).slice(-7);
+      if (buf === "prizrak") {
+        const w = document.getElementById("whisper");
+        w.textContent = "you found the watcher. it was always at the far bank.";
+        w.style.color = "var(--accent)";
+        w.style.textShadow = "0 0 10px var(--glow)";
+      }
+    }
+  });
+})();
+
+// (b) triple-click the title → one extra ember drifts up
+function spawnEmber(){
+  const el = document.createElement("div");
+  el.className = "ember";
+  el.style.left = (Math.random()*100) + "vw";
+  el.style.animationDuration = (11 + Math.random()*6) + "s";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 18000);
+}
+(function(){
+  const title = document.getElementById("title");
+  let clicks = 0, timer = null;
+  title.addEventListener("click", () => {
+    clicks++;
+    clearTimeout(timer);
+    timer = setTimeout(() => { clicks = 0; }, 500);
+    if (clicks >= 3) { clicks = 0; spawnEmber(); }
+  });
+})();
+
+// (c) between 00:00–03:00 local, a deeper footer whisper surfaces
+(function(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    document.getElementById("whisper").textContent = "the mountain does not sleep. neither do you, it seems.";
+  }
+})();
+
+// ambient embers (capped, reduced-motion disables via CSS)
+(function(){
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (let i = 0; i < 7; i++) {
+    setTimeout(() => {
+      const el = document.createElement("div");
+      el.className = "ember";
+      el.style.left = (Math.random()*100) + "vw";
+      el.style.animationDelay = (Math.random()*14) + "s";
+      el.style.animationDuration = (12 + Math.random()*6) + "s";
+      document.body.appendChild(el);
+    }, i*400);
+  }
+})();
 
 // Init
 renderStep();

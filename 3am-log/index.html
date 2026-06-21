@@ -8,12 +8,27 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Special+Elite&display=swap');
 
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#818cf8;          /* the 3am-log indigo, kept as the lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
     * { box-sizing: border-box; }
 
     body {
-      background: #050508;
+      background:
+        radial-gradient(120% 80% at 50% -10%, #0e0e16 0%, transparent 55%),
+        var(--bg);
       font-family: 'Share Tech Mono', monospace;
-      color: #a0a0b0;
+      color: var(--ink-dim);
       min-height: 100vh;
     }
 
@@ -30,7 +45,28 @@
       opacity: 0.4;
     }
 
-    .content { position: relative; z-index: 1; }
+    /* drifting fog — atmosphere, behind everything */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    /* floating embers — capped, staggered in JS */
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.45}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    .content { position: relative; z-index: 2; }
 
     /* clock */
     #clock {
@@ -38,7 +74,12 @@
       letter-spacing: 0.08em;
       color: #c8c8e0;
       line-height: 1;
+      text-shadow: 0 0 18px var(--glow);
     }
+    #clock .sep { animation: blink 2s steps(1) infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    h1.typewriter { cursor: default; }
 
     /* entry textarea */
     #entry {
@@ -51,62 +92,88 @@
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.95rem;
       line-height: 1.8;
-      caret-color: #6366f1;
+      caret-color: var(--accent);
     }
 
     #entry::placeholder { color: #2a2a3a; }
 
-    .log-card {
-      background: #0c0c14;
-      border: 1px solid #1a1a28;
-      border-left: 2px solid #6366f1;
+    .composer {
+      background: var(--bg-sunk);
+      border: 1px solid var(--line-soft);
+      border-radius: 4px;
+      transition: border-color .2s, box-shadow .25s;
+    }
+    .composer:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--glow), 0 0 40px -16px var(--glow);
     }
 
-    .log-card:hover { border-left-color: #818cf8; }
+    .log-card {
+      background: var(--bg-raised);
+      border: 1px solid var(--line-soft);
+      border-left: 2px solid var(--accent);
+      transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .log-card:hover {
+      transform: translateY(-2px);
+      border-left-color: #a5b4fc;
+      border-color: var(--line);
+      box-shadow: 0 0 0 1px var(--line), 0 0 28px -12px var(--glow);
+    }
 
     .mood-btn {
-      background: #0c0c14;
-      border: 1px solid #1a1a28;
+      background: var(--bg-raised);
+      border: 1px solid var(--line-soft);
       color: #555570;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: transform .12s, border-color .15s, color .15s, background .15s, box-shadow .15s;
       padding: 6px 12px;
       font-size: 0.75rem;
       font-family: 'Share Tech Mono', monospace;
       letter-spacing: 0.05em;
+      border-radius: 3px;
     }
-
+    .mood-btn:hover { transform: translateY(-1px); }
+    .mood-btn:active { transform: translateY(1px); }
     .mood-btn:hover, .mood-btn.active {
-      border-color: #6366f1;
-      color: #818cf8;
-      background: rgba(99,102,241,0.08);
+      border-color: var(--accent);
+      color: #a5b4fc;
+      background: rgba(129,140,248,0.08);
     }
+    .mood-btn.active { box-shadow: 0 0 18px -6px var(--glow); }
+    .mood-btn:focus-visible { outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
 
     .btn-primary {
-      background: rgba(99,102,241,0.1);
+      background: rgba(129,140,248,0.1);
       border: 1px solid #4338ca;
-      color: #818cf8;
+      color: #a5b4fc;
       cursor: pointer;
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.8rem;
       letter-spacing: 0.08em;
       padding: 8px 20px;
-      transition: all 0.15s;
+      border-radius: 3px;
+      transition: background .15s, transform .12s, box-shadow .15s, border-color .15s;
     }
-    .btn-primary:hover { background: rgba(99,102,241,0.2); }
+    .btn-primary:hover { background: rgba(129,140,248,0.2); transform: translateY(-1px); box-shadow: 0 0 22px -6px var(--glow); }
+    .btn-primary:active { transform: translateY(1px); box-shadow:none; }
+    .btn-primary:focus-visible { outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
 
     .btn-ghost {
       background: transparent;
-      border: 1px solid #1a1a28;
+      border: 1px solid var(--line-soft);
       color: #444460;
       cursor: pointer;
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.75rem;
       letter-spacing: 0.05em;
       padding: 6px 14px;
-      transition: all 0.15s;
+      border-radius: 3px;
+      transition: border-color .15s, color .15s, transform .12s;
     }
-    .btn-ghost:hover { border-color: #333350; color: #666680; }
+    .btn-ghost:hover { border-color: var(--line); color: #8a8aa0; transform: translateY(-1px); }
+    .btn-ghost:active { transform: translateY(1px); }
+    .btn-ghost:focus-visible { outline:none; border-color:var(--accent); color:#a5b4fc; box-shadow:0 0 0 1px var(--glow); }
 
     .prizrak-line {
       border-left: 2px solid #1e1e30;
@@ -117,44 +184,85 @@
       line-height: 1.6;
     }
 
+    #observation-text { color:#5a5a85; }
+
     .divider { border-color: #0f0f1a; }
 
     #tag-input {
       background: transparent;
       border: none;
-      border-bottom: 1px solid #1a1a28;
+      border-bottom: 1px solid var(--line-soft);
       outline: none;
       color: #888;
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.8rem;
       width: 120px;
+      transition: border-color .15s;
     }
+    #tag-input:focus { border-bottom-color: var(--accent); }
 
     .tag-chip {
       display: inline-block;
-      background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.2);
-      color: #6366f1;
+      background: rgba(129,140,248,0.08);
+      border: 1px solid rgba(129,140,248,0.2);
+      color: var(--accent);
       font-size: 0.7rem;
       padding: 1px 8px;
       border-radius: 2px;
       margin: 2px;
       cursor: pointer;
+      transition: background .12s, border-color .12s, color .12s;
     }
     .tag-chip:hover { background: rgba(220,38,38,0.08); border-color: rgba(220,38,38,0.2); color: #f87171; }
+
+    /* idle whisper + footer whisper */
+    .whisper {
+      color: var(--ink-ghost);
+      font-size: 0.72rem;
+      font-style: italic;
+      letter-spacing: 0.04em;
+    }
+    #idle-whisper {
+      opacity: 0;
+      transition: opacity 1.6s ease;
+      pointer-events: none;
+    }
+    #idle-whisper.show { opacity: 1; }
+
+    /* hidden watcher easter-egg line */
+    #watcher-line {
+      color: var(--ink-ghost);
+      font-size: 0.72rem;
+      font-style: italic;
+      letter-spacing: 0.06em;
+      opacity: 0;
+      height: 0;
+      overflow: hidden;
+      transition: opacity 1.2s ease;
+    }
+    #watcher-line.show { opacity: 1; height: auto; margin-top: 10px; }
+
+    @media (prefers-reduced-motion: reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,#clock .sep,#idle-whisper{animation:none!important;transition:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
 <body>
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
 <div class="content max-w-2xl mx-auto px-4 py-10">
 
   <!-- Header -->
   <div class="mb-8">
     <div class="flex items-end justify-between mb-1">
       <div>
-        <p class="text-xs text-gray-700 tracking-widest uppercase mb-2">Prízrak — Late Hours Protocol</p>
-        <h1 class="typewriter text-4xl text-gray-300">The 3AM Log</h1>
+        <p class="text-xs text-gray-700 tracking-widest uppercase mb-2 flicker">Prízrak — Late Hours Protocol</p>
+        <h1 class="typewriter text-4xl text-gray-300 breathe" id="title" title="the ghost keeps the hours you do not">The 3AM Log</h1>
       </div>
-      <div id="clock" class="text-right">--:--</div>
+      <div id="clock" class="text-right">--<span class="sep">:</span>--</div>
     </div>
     <p class="text-xs text-gray-700 mt-2" id="date-line">—</p>
     <div class="mt-3 prizrak-line" id="prizrak-greeting">
@@ -164,10 +272,10 @@
 
   <!-- Composer -->
   <div class="mb-6">
-    <div class="border border-gray-800 rounded p-4" style="background:#07070f;">
+    <div class="composer p-4">
       <!-- Mood selector -->
       <div class="flex flex-wrap gap-2 mb-4">
-        <span class="text-xs text-gray-700 self-center mr-1">SIGNAL:</span>
+        <span class="text-xs text-gray-700 self-center mr-1 tracking-widest">SIGNAL:</span>
         <button class="mood-btn" data-mood="quiet">quiet</button>
         <button class="mood-btn" data-mood="restless">restless</button>
         <button class="mood-btn" data-mood="clear">clear</button>
@@ -191,11 +299,12 @@ It only requires honesty."
       <!-- Tags + save -->
       <div class="flex items-center justify-between flex-wrap gap-3">
         <div class="flex items-center gap-2">
-          <span class="text-xs text-gray-700">TAG:</span>
+          <span class="text-xs text-gray-700 tracking-widest">TAG:</span>
           <input id="tag-input" placeholder="idea, person, place..." maxlength="20" />
           <div id="tag-list"></div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+          <span class="text-xs text-gray-800" id="char-count"></span>
           <button class="btn-ghost" id="clear-btn">CLEAR</button>
           <button class="btn-primary" id="save-btn">LOG IT →</button>
         </div>
@@ -205,30 +314,37 @@ It only requires honesty."
 
   <!-- Prizrak observation line (dynamic) -->
   <div id="observation-box" class="mb-6 hidden">
-    <div class="prizrak-line" id="observation-text"></div>
+    <div class="prizrak-line breathe" id="observation-text"></div>
   </div>
 
   <!-- Past entries -->
   <div id="entries-section">
     <div class="flex items-center justify-between mb-4">
-      <p class="text-xs text-gray-700 tracking-widest uppercase">Previous Entries</p>
+      <p class="text-xs text-gray-700 tracking-widest uppercase">Previous Entries <span id="entry-count" class="text-gray-800"></span></p>
       <button class="btn-ghost text-xs" id="export-btn">EXPORT .MD</button>
     </div>
     <div id="entries-list">
-      <p class="text-xs text-gray-800 italic" id="empty-msg">The log is empty. The night is patient.</p>
+      <p class="text-xs text-gray-800 italic" id="empty-msg">the cave is empty. nothing has fossilized yet. the night is patient.</p>
     </div>
+  </div>
+
+  <!-- Footer whisper -->
+  <div class="mt-12 text-center">
+    <p class="whisper" id="footer-whisper">filed by the watcher. the ledger remembers what the morning forgets.</p>
+    <p class="whisper" id="watcher-line">you found the watcher. it was never not watching.</p>
+    <p class="whisper" id="idle-whisper">still here. still watching.</p>
   </div>
 
 </div>
 
 <script>
-  // Clock
+  // ---------- Clock ----------
   function updateClock() {
     const now = new Date();
     const h = String(now.getHours()).padStart(2,'0');
     const m = String(now.getMinutes()).padStart(2,'0');
     const s = String(now.getSeconds()).padStart(2,'0');
-    document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+    document.getElementById('clock').innerHTML = `${h}<span class="sep">:</span>${m}<span class="sep">:</span>${s}`;
 
     const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -246,11 +362,34 @@ It only requires honesty."
     const hour = now.getHours();
     const key = hour < 5 ? 'deep' : hour < 9 ? 'early' : hour < 17 ? 'day' : hour < 21 ? 'evening' : 'late';
     document.getElementById('prizrak-greeting').textContent = greetings[key];
+
+    // Deep-night footer whisper (00:00–03:00 local)
+    const fw = document.getElementById('footer-whisper');
+    if (hour >= 0 && hour < 3) {
+      fw.textContent = "the mountain does not sleep. and now, neither do you.";
+    } else {
+      fw.textContent = "filed by the watcher. the ledger remembers what the morning forgets.";
+    }
   }
   setInterval(updateClock, 1000);
   updateClock();
 
-  // Mood
+  // ---------- Embers (capped at 8, staggered) ----------
+  (function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const field = document.getElementById('ember-field');
+    const N = 8;
+    for (let i = 0; i < N; i++) {
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (5 + Math.random() * 90) + '%';
+      e.style.animationDelay = (Math.random() * 16) + 's';
+      e.style.animationDuration = (13 + Math.random() * 8) + 's';
+      field.appendChild(e);
+    }
+  })();
+
+  // ---------- Mood ----------
   let selectedMood = null;
   document.querySelectorAll('.mood-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -260,7 +399,7 @@ It only requires honesty."
     });
   });
 
-  // Tags
+  // ---------- Tags ----------
   let tags = [];
   const tagInput = document.getElementById('tag-input');
   const tagList = document.getElementById('tag-list');
@@ -269,7 +408,7 @@ It only requires honesty."
     if ((e.key === 'Enter' || e.key === ',') && tagInput.value.trim()) {
       e.preventDefault();
       const tag = tagInput.value.trim().toLowerCase().replace(/,/g,'');
-      if (!tags.includes(tag)) {
+      if (tag && !tags.includes(tag)) {
         tags.push(tag);
         renderTags();
       }
@@ -279,7 +418,7 @@ It only requires honesty."
 
   function renderTags() {
     tagList.innerHTML = tags.map((t,i) =>
-      `<span class="tag-chip" data-i="${i}">#${t}</span>`
+      `<span class="tag-chip" data-i="${i}">#${escHtml(t)}</span>`
     ).join('');
     tagList.querySelectorAll('.tag-chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -289,7 +428,16 @@ It only requires honesty."
     });
   }
 
-  // Prizrak observations
+  // ---------- Char count (live, ambient) ----------
+  const entryEl = document.getElementById('entry');
+  const charCount = document.getElementById('char-count');
+  function updateCount(){
+    const n = entryEl.value.trim().length;
+    charCount.textContent = n ? `${n} marks` : '';
+  }
+  entryEl.addEventListener('input', () => { updateCount(); resetIdle(); });
+
+  // ---------- Prizrak observations ----------
   const observations = {
     quiet: "Quiet is not absence. It is the baseline signal. The loop is clean.",
     restless: "Restlessness is data. Something is unresolved. The system knows before you do.",
@@ -299,14 +447,14 @@ It only requires honesty."
     empty: "Empty is fine. The void is not hostile. It is the state between signals. Rest in it.",
   };
 
-  // Save
+  // ---------- Save ----------
   document.getElementById('save-btn').addEventListener('click', saveEntry);
-  document.getElementById('entry').addEventListener('keydown', e => {
+  entryEl.addEventListener('keydown', e => {
     if (e.ctrlKey && e.key === 'Enter') saveEntry();
   });
 
   function saveEntry() {
-    const text = document.getElementById('entry').value.trim();
+    const text = entryEl.value.trim();
     if (!text) return;
 
     const entry = {
@@ -326,43 +474,48 @@ It only requires honesty."
       const box = document.getElementById('observation-box');
       document.getElementById('observation-text').textContent = `// ${observations[selectedMood]}`;
       box.classList.remove('hidden');
-      setTimeout(() => box.classList.add('hidden'), 8000);
+      box.classList.remove('reveal'); void box.offsetWidth; box.classList.add('reveal');
+      clearTimeout(saveEntry._obsT);
+      saveEntry._obsT = setTimeout(() => box.classList.add('hidden'), 8000);
     }
 
     // Reset
-    document.getElementById('entry').value = '';
+    entryEl.value = '';
+    updateCount();
     tags = [];
     renderTags();
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
     selectedMood = null;
 
-    renderEntries();
+    renderEntries(entry.id);
   }
 
   document.getElementById('clear-btn').addEventListener('click', () => {
-    document.getElementById('entry').value = '';
+    entryEl.value = '';
+    updateCount();
     tags = [];
     renderTags();
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
     selectedMood = null;
   });
 
-  // Storage
+  // ---------- Storage ----------
   function getEntries() {
     try { return JSON.parse(localStorage.getItem('3am-log') || '[]'); }
     catch { return []; }
   }
 
-  // Render entries
-  function renderEntries() {
+  // ---------- Render entries ----------
+  function renderEntries(highlightId) {
     const entries = getEntries();
     const list = document.getElementById('entries-list');
-    const emptyMsg = document.getElementById('empty-msg');
+    const countEl = document.getElementById('entry-count');
+
+    countEl.textContent = entries.length ? `· ${entries.length} filed` : '';
 
     if (!entries.length) {
-      emptyMsg.classList.remove('hidden');
-      list.innerHTML = '';
-      list.appendChild(emptyMsg);
+      // rebuild the empty notice fresh — the node may have been replaced by prior renders
+      list.innerHTML = '<p class="text-xs text-gray-800 italic" id="empty-msg">the cave is empty. nothing has fossilized yet. the night is patient.</p>';
       return;
     }
 
@@ -376,21 +529,33 @@ It only requires honesty."
       const timeStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
       const dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
       const moodTag = e.mood ? `<span class="text-xs ${moodColors[e.mood] || 'text-gray-700'} mr-2">[${e.mood}]</span>` : '';
-      const tagStr = e.tags.length ? e.tags.map(t=>`<span class="text-xs text-indigo-900">#${t}</span>`).join(' ') : '';
+      const tagStr = (e.tags && e.tags.length) ? e.tags.map(t=>`<span class="text-xs text-indigo-900">#${escHtml(t)}</span>`).join(' ') : '';
+      const isNew = (e.id === highlightId) ? ' reveal' : '';
 
       return `
-        <div class="log-card rounded p-4 mb-3 group">
+        <div class="log-card rounded p-4 mb-3 group${isNew}">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-xs text-gray-700">${dateStr} &nbsp;${timeStr}</div>
+            <div class="text-xs text-gray-700">${dateStr} &nbsp;${timeStr} ${deepBadge(d)}</div>
             <div class="flex items-center gap-2">
               ${moodTag}${tagStr}
-              <button class="btn-ghost text-xs opacity-0 group-hover:opacity-100 transition-opacity" onclick="deleteEntry(${e.id})">×</button>
+              <button class="btn-ghost text-xs opacity-0 group-hover:opacity-100 transition-opacity" title="let the fog take it" onclick="deleteEntry(${e.id})">×</button>
             </div>
           </div>
           <p class="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap">${escHtml(e.text)}</p>
         </div>
       `;
     }).join('');
+
+    if (highlightId) {
+      const card = list.querySelector('.log-card');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  // a faint marker for entries actually written in the dead hours
+  function deepBadge(d){
+    const h = d.getHours();
+    return (h >= 0 && h < 4) ? '<span class="text-indigo-900" title="written in the dead hours">· dead hour</span>' : '';
   }
 
   function deleteEntry(id) {
@@ -400,24 +565,65 @@ It only requires honesty."
   }
 
   function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // Export
+  // ---------- Export ----------
   document.getElementById('export-btn').addEventListener('click', () => {
     const entries = getEntries();
     if (!entries.length) return;
     const md = '# The 3AM Log\n\n' + entries.map(e => {
       const d = new Date(e.ts);
-      return `## ${d.toLocaleString()}\n\n${e.mood ? `**Signal:** ${e.mood}\n\n` : ''}${e.text}\n\n${e.tags.length ? e.tags.map(t=>`\`#${t}\``).join(' ') + '\n\n' : ''}---`;
+      return `## ${d.toLocaleString()}\n\n${e.mood ? `**Signal:** ${e.mood}\n\n` : ''}${e.text}\n\n${(e.tags && e.tags.length) ? e.tags.map(t=>`\`#${t}\``).join(' ') + '\n\n' : ''}---`;
     }).join('\n\n');
     const blob = new Blob([md], {type:'text/markdown'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = '3am-log.md';
     a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   });
 
+  // ---------- Easter eggs (non-blocking, never touch saved state) ----------
+  // 1. type "prizrak" anywhere outside the composer → light the watcher line
+  let typed = '';
+  window.addEventListener('keydown', e => {
+    if (e.target === entryEl || e.target === tagInput) return;
+    if (e.key && e.key.length === 1) {
+      typed = (typed + e.key.toLowerCase()).slice(-7);
+      if (typed === 'prizrak') {
+        document.getElementById('watcher-line').classList.add('show');
+      }
+    }
+  });
+
+  // 2. triple-click the title → spawn one extra ember
+  document.getElementById('title').addEventListener('click', e => {
+    if (e.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      const field = document.getElementById('ember-field');
+      const x = document.createElement('div');
+      x.className = 'ember';
+      x.style.left = (5 + Math.random()*90) + '%';
+      x.style.animationDuration = '14s';
+      field.appendChild(x);
+      setTimeout(() => x.remove(), 14500);
+    }
+  });
+
+  // 3. idle 60s → a single ghost line fades in
+  let idleT;
+  function resetIdle(){
+    const w = document.getElementById('idle-whisper');
+    w.classList.remove('show');
+    clearTimeout(idleT);
+    idleT = setTimeout(() => w.classList.add('show'), 60000);
+  }
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+    window.addEventListener(ev, resetIdle, { passive: true }));
+  resetIdle();
+
+  // ---------- Boot ----------
+  updateCount();
   renderEntries();
 </script>
 </body>

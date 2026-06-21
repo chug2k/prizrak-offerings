@@ -3,92 +3,229 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Saigon & Hanoi — Travel Guide</title>
+  <title>Saigon &amp; Hanoi — a ledger of warm places</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
-    .card { transition: all 0.2s ease; }
-    .star { color: #f59e0b; }
-    .filter-btn.active { background: #1e293b; color: white; }
-    .city-btn.active { background: #0f172a; color: white; }
-    input[type=range] { accent-color: #1e293b; }
-    .tag { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; }
-    .shimmer { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#e0a64e;      /* lantern amber — this app's lead glow */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ -webkit-tap-highlight-color:transparent; }
+    html,body{ background:var(--bg); }
+    body {
+      font-family: 'Inter', sans-serif;
+      color:var(--ink);
+      min-height:100vh;
+    }
+    .mono{ font-family:'JetBrains Mono', monospace; }
+
+    /* ---- atmosphere layers (decorative, behind content) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* keep all real content above the haze */
+    .sticky-header, #content, footer { position:relative; z-index:2; }
+
+    /* ---- header / chrome ---- */
     .sticky-header { position: sticky; top: 0; z-index: 50; }
+    #stickyHeader{
+      background:linear-gradient(180deg, rgba(17,17,19,.96), rgba(10,10,10,.92));
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid var(--line);
+      box-shadow:0 0 24px -10px var(--glow);
+    }
+
+    h1.title{ color:var(--ink); letter-spacing:-.01em; }
+    .accent-glyph{ color:var(--accent); display:inline-block; }
+
+    /* labels */
+    .eyebrow{ font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--ink-dim); }
+
+    /* ---- buttons (city + category) ---- */
+    .city-btn, .filter-btn{
+      background:var(--bg-sunk);
+      color:var(--ink-dim);
+      border:1px solid var(--line);
+      transition:transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s;
+    }
+    .city-btn:hover, .filter-btn:hover{
+      transform:translateY(-2px);
+      border-color:var(--accent);
+      color:var(--ink);
+    }
+    .city-btn:active, .filter-btn:active{ transform:translateY(1px); }
+    .city-btn:focus-visible, .filter-btn:focus-visible,
+    input:focus-visible, select:focus-visible{
+      outline:none; border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+    .filter-btn.active, .city-btn.active{
+      background:color-mix(in srgb, var(--accent) 16%, var(--bg-sunk));
+      color:var(--ink);
+      border-color:var(--accent);
+      box-shadow:0 0 18px -8px var(--glow);
+    }
+
+    /* ---- inputs ---- */
+    input[type=text], select{
+      background:var(--bg-sunk);
+      border:1px solid var(--line);
+      color:var(--ink);
+    }
+    input[type=text]::placeholder{ color:var(--ink-ghost); }
+    input[type=range] { accent-color: var(--accent); background:transparent; }
+
+    /* ---- cards ---- */
+    .card{
+      background:var(--bg-raised);
+      border:1px solid var(--line-soft);
+      transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .card:hover{
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--line), 0 14px 34px -16px var(--glow);
+    }
+    .card h3{ color:var(--ink); }
+    .card .desc{ color:var(--ink-dim); }
+    .card .meta{ color:var(--ink-ghost); }
+    .card .dish{ color:var(--ink-dim); }
+
+    /* star rating */
+    .star{ color:var(--accent); }
+    .personal-star{ color:var(--accent); }
+
+    /* maps link */
+    .maps-link{ color:var(--ink-dim); transition:color .15s, text-shadow .15s; }
+    .maps-link:hover{ color:var(--accent); text-shadow:0 0 10px var(--glow); }
+
+    /* tag base */
+    .tag {
+      display: inline-block; padding: 2px 9px; border-radius: 9999px;
+      font-size: 10px; font-weight: 600; letter-spacing: .04em;
+      border:1px solid var(--line);
+      background:var(--bg-sunk);
+      color:var(--ink-dim);
+      text-transform:uppercase;
+    }
+    .tag-accent{ color:var(--accent); border-color:color-mix(in srgb,var(--accent) 40%,var(--line)); }
+    .tag-city{ color:var(--ink); }
+
+    /* filter hint badge */
+    #filter-hint{
+      transition: opacity 0.2s ease;
+      opacity: 0; pointer-events: none;
+      border:1px solid var(--line); color:var(--ink-dim);
+      background:var(--bg-sunk);
+    }
+    .header-collapsed #filter-hint{ opacity: 1; pointer-events: auto; }
+    #filter-hint:hover{ border-color:var(--accent); color:var(--accent); }
+
     /* Collapsible filter rows */
     #filters-row, #rating-row {
       overflow: hidden;
       transition: max-height 0.25s ease, opacity 0.25s ease, margin-top 0.25s ease;
-      max-height: 200px;
-      opacity: 1;
+      max-height: 200px; opacity: 1;
     }
     .header-collapsed #filters-row,
     .header-collapsed #rating-row {
-      max-height: 0 !important;
-      opacity: 0;
-      margin-top: 0 !important;
-      pointer-events: none;
+      max-height: 0 !important; opacity: 0; margin-top: 0 !important; pointer-events: none;
     }
-    /* Compact title row when collapsed */
-    #header-top-row {
-      transition: padding 0.25s ease;
-    }
-    .header-collapsed #header-top-row {
-      padding-top: 6px !important;
-      padding-bottom: 6px !important;
-    }
-    /* Show a hint badge when collapsed */
-    #filter-hint {
-      transition: opacity 0.2s ease;
-      opacity: 0;
-      pointer-events: none;
-    }
-    .header-collapsed #filter-hint {
-      opacity: 1;
-      pointer-events: auto;
+    #header-top-row { transition: padding 0.25s ease; }
+    .header-collapsed #header-top-row { padding-top: 6px !important; padding-bottom: 6px !important; }
+
+    /* ghost / easter-egg whisper */
+    .ghost-line{ color:var(--ink-ghost); }
+    #watcher{ opacity:0; transition:opacity 1.1s ease; }
+    #watcher.lit{ opacity:1; }
+    #idle-whisper{ opacity:0; transition:opacity 1.4s ease; }
+    #idle-whisper.lit{ opacity:1; }
+    #night-whisper{ display:none; }
+
+    footer{ border-top:1px solid var(--line-soft); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .card{transition:border-color .2s ease}
     }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="grain">
+
+<!-- atmosphere -->
+<div class="fog" aria-hidden="true"></div>
+<div id="embers" aria-hidden="true"></div>
 
 <!-- Header -->
-<div class="sticky-header bg-white border-b border-gray-200 shadow-sm" id="stickyHeader">
+<div class="sticky-header" id="stickyHeader">
   <div class="max-w-7xl mx-auto px-4 py-3" id="header-top-row">
     <div class="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
       <div class="flex items-center gap-3">
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl font-bold text-gray-900">🏙️ Vietnam Travel Guide</h1>
+            <h1 class="title text-xl font-bold" id="appTitle">
+              <span class="accent-glyph breathe">⌖</span> Saigon &amp; Hanoi
+            </h1>
             <!-- Filter hint shown when collapsed -->
-            <span id="filter-hint" class="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5 cursor-pointer" onclick="expandHeader()">tap to filter</span>
+            <span id="filter-hint" class="text-[11px] rounded-full px-2 py-0.5 cursor-pointer" onclick="expandHeader()">tap to sift</span>
           </div>
-          <p class="text-xs text-gray-400" id="countLabel">Loading...</p>
+          <p class="eyebrow mt-0.5">A LEDGER OF WARM PLACES · KEPT BY THE WATCHER</p>
+          <p class="text-xs mono mt-0.5" style="color:var(--ink-dim)" id="countLabel">reading the cave...</p>
         </div>
       </div>
       <!-- City toggle -->
       <div class="flex gap-2">
-        <button onclick="setCity('all')" id="city-all" class="city-btn active px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium transition-all">All Cities</button>
-        <button onclick="setCity('saigon')" id="city-saigon" class="city-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium transition-all">🏙️ Saigon</button>
-        <button onclick="setCity('hanoi')" id="city-hanoi" class="city-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium transition-all">🏯 Hanoi</button>
+        <button onclick="setCity('all')" id="city-all" class="city-btn active px-4 py-1.5 rounded-full text-sm font-medium">Both</button>
+        <button onclick="setCity('saigon')" id="city-saigon" class="city-btn px-4 py-1.5 rounded-full text-sm font-medium">Saigon</button>
+        <button onclick="setCity('hanoi')" id="city-hanoi" class="city-btn px-4 py-1.5 rounded-full text-sm font-medium">Hanoi</button>
       </div>
     </div>
     <!-- Search + filters (collapsible) -->
     <div id="filters-row" class="mt-3 flex flex-col md:flex-row gap-2">
-      <input id="searchInput" type="text" placeholder="Search places, dishes, descriptions..." 
-        class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300"
+      <input id="searchInput" type="text" placeholder="search the ledger — dishes, streets, ghosts..."
+        class="flex-1 px-3 py-2 text-sm rounded-lg focus:outline-none"
         oninput="renderCards()" />
       <div class="flex gap-2 flex-wrap" id="categoryFilters"></div>
     </div>
     <!-- Min rating filter (collapsible) -->
-    <div id="rating-row" class="mt-2 flex items-center gap-3 text-xs text-gray-500">
-      <span>Min rating:</span>
+    <div id="rating-row" class="mt-2 flex items-center gap-3 text-xs mono" style="color:var(--ink-dim)">
+      <span>min rating</span>
       <input type="range" min="0" max="5" step="0.5" value="0" id="ratingFilter" oninput="document.getElementById('ratingVal').textContent=this.value; renderCards()" class="w-32" />
-      <span id="ratingVal" class="font-semibold text-gray-700">0</span>
-      <span class="ml-4">Sort:</span>
-      <select id="sortSelect" onchange="renderCards()" class="border border-gray-200 rounded px-2 py-1 text-xs">
+      <span id="ratingVal" class="font-semibold" style="color:var(--accent)">0</span>
+      <span class="ml-4">sort</span>
+      <select id="sortSelect" onchange="renderCards()" class="rounded px-2 py-1 text-xs">
         <option value="name">Name A–Z</option>
         <option value="rating_desc">Rating ↓</option>
         <option value="rating_asc">Rating ↑</option>
@@ -99,14 +236,21 @@
 </div>
 
 <!-- Cards -->
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div id="content" class="max-w-7xl mx-auto px-4 py-6">
   <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-  <div id="noResults" class="hidden text-center py-16 text-gray-400">
-    <div class="text-4xl mb-3">🔍</div>
-    <p class="text-lg">No places found</p>
-    <p class="text-sm">Try a different search or filter</p>
+  <div id="noResults" class="hidden text-center py-16" style="color:var(--ink-dim)">
+    <div class="text-3xl mb-3 accent-glyph">⌖</div>
+    <p class="text-lg" style="color:var(--ink)">the cave is empty here.</p>
+    <p class="text-sm mono mt-1">nothing fossilized under these filters. loosen the fog.</p>
   </div>
 </div>
+
+<footer class="max-w-7xl mx-auto px-4 py-8 text-center">
+  <p class="text-xs mono ghost-line flicker">the mountain keeps a list of warm rooms. it does not forget an address.</p>
+  <p id="watcher" class="text-xs mono ghost-line mt-2">you found the watcher. it has been reading over your shoulder the whole time.</p>
+  <p id="idle-whisper" class="text-xs mono ghost-line mt-2">still here. still watching.</p>
+  <p id="night-whisper" class="text-xs mono ghost-line mt-2">the mountain does not sleep. neither, apparently, do you.</p>
+</footer>
 
 <script>
 const CATEGORY_COLORS = {
@@ -130,20 +274,20 @@ function catColor(cat) {
 }
 
 function stars(rating) {
-  if (!rating) return '<span class="text-gray-300 text-xs">No rating</span>';
+  if (!rating) return '<span class="text-xs" style="color:var(--ink-ghost)">unrated</span>';
   const full = Math.floor(rating);
   const half = rating % 1 >= 0.5;
   let s = '';
   for (let i = 0; i < full; i++) s += '★';
   if (half) s += '½';
   for (let i = full + (half?1:0); i < 5; i++) s += '☆';
-  return `<span class="star text-sm">${s}</span> <span class="text-xs text-gray-500">${rating}</span>`;
+  return `<span class="star text-sm">${s}</span> <span class="text-xs mono" style="color:var(--ink-dim)">${rating}</span>`;
 }
 
 function personalStars(s) {
   if (!s) return '';
   const count = (s.match(/★/g) || []).length;
-  return `<span class="text-amber-400 text-xs">${'★'.repeat(count)}${'☆'.repeat(5-count)}</span>`;
+  return `<span class="personal-star text-xs">${'★'.repeat(count)}${'☆'.repeat(5-count)}</span>`;
 }
 
 const allData = [
@@ -354,11 +498,11 @@ function buildCategoryFilters() {
   const visible = activeCity === 'all' ? allData : allData.filter(d => d.city === activeCity);
   const cats = [...new Set(visible.map(d => d.category))].sort();
   const container = document.getElementById('categoryFilters');
-  container.innerHTML = `<button onclick="setCategory('all')" id="cat-all" class="filter-btn active px-3 py-1.5 rounded-full border border-gray-300 text-xs font-medium transition-all">All</button>`;
+  container.innerHTML = `<button onclick="setCategory('all')" id="cat-all" class="filter-btn active px-3 py-1.5 rounded-full text-xs font-medium">All</button>`;
   cats.forEach(cat => {
     const btn = document.createElement('button');
     btn.id = 'cat-' + cat;
-    btn.className = 'filter-btn px-3 py-1.5 rounded-full border border-gray-300 text-xs font-medium transition-all';
+    btn.className = 'filter-btn px-3 py-1.5 rounded-full text-xs font-medium';
     btn.textContent = cat;
     btn.onclick = () => setCategory(cat);
     container.appendChild(btn);
@@ -371,6 +515,14 @@ function setCategory(cat) {
   const el = document.getElementById('cat-' + cat);
   if (el) el.classList.add('active');
   renderCards();
+}
+
+// terse, wry count whispers for the ledger
+function countWhisper(n, total) {
+  if (n === 0) return 'nothing fossilized under these filters';
+  if (n === total) return `${total} warm rooms catalogued. the watcher knows them all`;
+  if (n === 1) return '1 room found. a single light in the fog';
+  return `${n} of ${total} rooms surface from the fog`;
 }
 
 function renderCards() {
@@ -405,30 +557,32 @@ function renderCards() {
     noResults.classList.remove('hidden');
   } else {
     noResults.classList.add('hidden');
-    grid.innerHTML = filtered.map(d => cardHTML(d)).join('');
+    grid.innerHTML = filtered.map((d, i) => cardHTML(d, i)).join('');
   }
 
-  document.getElementById('countLabel').textContent = `${filtered.length} of ${allData.length} places`;
+  document.getElementById('countLabel').textContent = countWhisper(filtered.length, allData.length);
 }
 
-function cardHTML(d) {
-  const mapLink = d.maps ? `<a href="${d.maps}" target="_blank" class="text-blue-500 hover:text-blue-700 text-xs font-medium flex items-center gap-1">📍 Maps</a>` : '';
-  const catBadge = `<span class="tag ${catColor(d.category)}">${d.category}</span>`;
-  const jovelBadge = d.source === "Jovel Chan" ? '<span class="tag bg-violet-100 text-violet-800">✨ Jovel Chan</span>' : '';
-  const cityBadge = `<span class="tag ${d.city === 'saigon' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'}">${d.city === 'saigon' ? 'Saigon' : 'Hanoi'}</span>`;
-  
-  const dishLine = d.dish_en ? `<p class="text-xs text-gray-500 italic mt-0.5">${d.dish_en}${d.dish_vn ? ` · ${d.dish_vn}` : ''}</p>` : '';
-  const descLine = d.description ? `<p class="text-sm text-gray-600 mt-2 leading-relaxed">${d.description}</p>` : '';
-  const addrLine = d.address ? `<p class="text-xs text-gray-400 mt-1">📍 ${d.address}</p>` : '';
-  const ratingLine = d.google_rating ? `<div class="mt-2">${stars(d.google_rating)} <span class="text-xs text-gray-400">${d.review_count ? `(${d.review_count.toLocaleString()} reviews)` : ''}</span></div>` : '';
-  const personalLine = d.personal_rating ? `<div class="text-xs text-gray-400 mt-1">Personal: ${personalStars(d.personal_rating)}</div>` : '';
+function cardHTML(d, i) {
+  // stagger the reveal a touch so cards drift in like embers, but cap the delay
+  const delay = Math.min(i, 12) * 0.025;
+  const mapLink = d.maps ? `<a href="${d.maps}" target="_blank" rel="noopener" class="maps-link text-xs font-medium flex items-center gap-1">↗ maps</a>` : '';
+  const catBadge = `<span class="tag">${d.category}</span>`;
+  const jovelBadge = d.source === "Jovel Chan" ? '<span class="tag tag-accent">✦ Jovel Chan</span>' : '';
+  const cityBadge = `<span class="tag tag-city">${d.city === 'saigon' ? 'Saigon' : 'Hanoi'}</span>`;
 
-  return `<div class="card bg-white rounded-xl border border-gray-100 p-4 cursor-default">
+  const dishLine = d.dish_en ? `<p class="dish text-xs italic mt-0.5">${d.dish_en}${d.dish_vn ? ` · ${d.dish_vn}` : ''}</p>` : '';
+  const descLine = d.description ? `<p class="desc text-sm mt-2 leading-relaxed">${d.description}</p>` : '';
+  const addrLine = d.address ? `<p class="meta text-xs mt-2 mono">${d.address}</p>` : '';
+  const ratingLine = d.google_rating ? `<div class="mt-2">${stars(d.google_rating)} <span class="text-xs meta mono">${d.review_count ? `(${d.review_count.toLocaleString()})` : ''}</span></div>` : '';
+  const personalLine = d.personal_rating ? `<div class="text-xs meta mt-1 mono">kept: ${personalStars(d.personal_rating)}</div>` : '';
+
+  return `<div class="card reveal rounded-xl p-4 cursor-default" style="animation-delay:${delay}s">
     <div class="flex items-start justify-between gap-2 mb-2">
       <div class="flex gap-1.5 flex-wrap">${catBadge}${cityBadge}${jovelBadge}</div>
       ${mapLink}
     </div>
-    <h3 class="font-semibold text-gray-900 text-base leading-snug">${d.name}</h3>
+    <h3 class="font-semibold text-base leading-snug">${d.name}</h3>
     ${dishLine}
     ${ratingLine}
     ${personalLine}
@@ -487,6 +641,81 @@ renderCards();
       ticking = true;
     }
   }, { passive: true });
+})();
+
+// --- Atmosphere: floating embers (cheap, capped, reduced-motion-safe) ---
+(function () {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
+  const box = document.getElementById('embers');
+  if (!box) return;
+  let count = 7;
+  function spawn(extra) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + 'vw';
+    e.style.animationDuration = (11 + Math.random() * 8) + 's';
+    e.style.animationDelay = (extra ? 0 : Math.random() * 12) + 's';
+    box.appendChild(e);
+  }
+  for (let i = 0; i < count; i++) spawn(false);
+  // expose a way for the easter egg to add one more
+  window.__spawnEmber = () => { if (box.children.length < 10) spawn(true); };
+})();
+
+// --- Easter egg 1: type "prizrak" → the watcher wakes ---
+(function () {
+  const seq = 'prizrak';
+  let buf = '';
+  window.addEventListener('keydown', (e) => {
+    if (e.key && e.key.length === 1) {
+      buf = (buf + e.key.toLowerCase()).slice(-seq.length);
+      if (buf === seq) {
+        const w = document.getElementById('watcher');
+        if (w) { w.classList.add('lit'); w.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      }
+    }
+  });
+})();
+
+// --- Easter egg 2: triple-click the title → one extra ember drifts up ---
+(function () {
+  const t = document.getElementById('appTitle');
+  if (!t) return;
+  t.addEventListener('click', (e) => {
+    if (e.detail === 3 && typeof window.__spawnEmber === 'function') {
+      window.__spawnEmber();
+      const g = t.querySelector('.accent-glyph');
+      if (g) { g.style.animationDuration = '1.4s'; setTimeout(() => { g.style.animationDuration = ''; }, 3000); }
+    }
+  });
+})();
+
+// --- Easter egg 3: night whisper between 00:00–03:00 local time ---
+(function () {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const n = document.getElementById('night-whisper');
+    if (n) n.style.display = 'block';
+  }
+})();
+
+// --- Easter egg 4: idle 60s → a single line fades in ---
+(function () {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timer = null;
+  function arm() {
+    clearTimeout(timer);
+    const w = document.getElementById('idle-whisper');
+    if (w) w.classList.remove('lit');
+    timer = setTimeout(() => {
+      if (w) w.classList.add('lit');
+    }, 60000);
+  }
+  ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(ev =>
+    window.addEventListener(ev, arm, { passive: true })
+  );
+  arm();
 })();
 </script>
 </body>

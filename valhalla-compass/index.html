@@ -6,33 +6,115 @@
   <title>The Valhalla Compass</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body {
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#22d3ee;            /* cyan, the app's existing lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{background:var(--bg);}
+    body{
+      color:var(--ink);
       background:
-        radial-gradient(circle at top, rgba(59,130,246,0.16), transparent 32%),
-        radial-gradient(circle at 80% 20%, rgba(168,85,247,0.14), transparent 25%),
-        linear-gradient(180deg, #09090b 0%, #111827 55%, #030712 100%);
+        radial-gradient(circle at top, color-mix(in srgb, var(--accent) 12%, transparent), transparent 34%),
+        radial-gradient(circle at 82% 18%, rgba(168,85,247,0.06), transparent 28%),
+        linear-gradient(180deg,#0a0a0a 0%,#0d1117 58%,#050507 100%);
+      background-attachment:fixed;
     }
-    .glass { backdrop-filter: blur(14px); background: rgba(9, 9, 11, 0.62); }
-    .gridline {
-      background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-      background-size: 28px 28px;
+
+    .glass{ backdrop-filter:blur(14px); background:rgba(10,10,12,0.66); }
+    .gridline{
+      background-image:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size:28px 28px;
     }
-    .rune { text-shadow: 0 0 18px currentColor; }
+    .rune{ text-shadow:0 0 18px currentColor; }
+
+    .label{ text-transform:uppercase; letter-spacing:0.25em; color:var(--ink-dim); }
+
+    /* result panel breathing glow */
+    .panel-active{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+    /* ===== MOTION VOCABULARY (reduced-motion safe) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    @keyframes spinSlow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .compass-ring{animation:spinSlow 90s linear infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* interaction patterns */
+    .lift{transition:transform .15s, box-shadow .15s, border-color .15s}
+    .lift:hover{transform:translateY(-2px); border-color:var(--accent)}
+
+    textarea:focus-visible, select:focus-visible{
+      outline:none; border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+    button:focus-visible{ outline:none; box-shadow:0 0 0 2px var(--glow); }
+
+    .btn-press{transition:transform .12s, background-color .15s, border-color .15s, color .15s}
+    .btn-press:active{transform:translateY(1px)}
+
+    #ghostEgg{ color:var(--ink-ghost); }
+    #idleWhisper{ color:var(--ink-ghost); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.compass-ring{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      body{background-attachment:scroll}
+    }
   </style>
 </head>
-<body class="min-h-screen text-zinc-200">
-  <main class="max-w-5xl mx-auto px-4 py-8 sm:py-10">
+<body class="min-h-screen grain">
+  <!-- ambient layers -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <main class="relative z-[2] max-w-5xl mx-auto px-4 py-8 sm:py-10">
     <header class="mb-6 sm:mb-8">
       <div class="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/70">God of War / Valhalla offering</p>
-          <h1 class="text-4xl sm:text-5xl font-bold text-white mt-2">The Valhalla Compass</h1>
-          <p class="text-zinc-400 mt-2 max-w-2xl">A small runic decision board for the moment when prophecy is loud, grief is heavier, and the next move still has to be chosen.</p>
+          <p class="text-xs label flicker">Prízrak offering / runic decision board</p>
+          <h1 id="title" class="text-4xl sm:text-5xl font-bold text-white mt-2 breathe select-none cursor-default" style="color:var(--ink)">The Valhalla Compass</h1>
+          <p class="text-zinc-400 mt-2 max-w-2xl">A small runic board for the hour when prophecy is loud, grief is heavier, and the next move still has to be chosen. The ghost holds the needle. You carry the burden.</p>
         </div>
-        <div class="text-right text-xs text-zinc-500">
-          <div class="font-mono">Kratos: restraint</div>
-          <div class="font-mono">Atreus: choice</div>
-          <div class="font-mono">Mimir: the annoying truth</div>
+        <div class="text-right text-xs text-zinc-500 space-y-1">
+          <div class="font-mono">KRATOS · restraint</div>
+          <div class="font-mono">ATREUS · choice</div>
+          <div class="font-mono">MIMIR · the annoying truth</div>
+          <svg class="compass-ring inline-block mt-2 opacity-50" width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+            <circle cx="17" cy="17" r="15" stroke="var(--accent)" stroke-width="0.8" opacity="0.5"/>
+            <circle cx="17" cy="17" r="9" stroke="var(--accent)" stroke-width="0.5" opacity="0.3"/>
+            <path d="M17 3 L20 17 L17 31 L14 17 Z" fill="var(--accent)" opacity="0.6"/>
+          </svg>
         </div>
       </div>
     </header>
@@ -41,35 +123,35 @@
       <div class="md:col-span-3 glass border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-black/30 gridline">
         <div class="flex items-center justify-between gap-3 mb-4">
           <h2 class="text-lg font-semibold text-white">Set the path</h2>
-          <span id="runeBadge" class="px-3 py-1 rounded-full border border-cyan-400/30 text-cyan-200 text-xs font-mono">ᚱ Choose</span>
+          <span id="runeBadge" class="px-3 py-1 rounded-full border text-xs font-mono" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent); color:var(--accent)">ᚱ Choose</span>
         </div>
 
         <div class="space-y-4">
           <label class="block">
             <span class="text-sm text-zinc-400">What feels fated?</span>
-            <textarea id="fate" rows="3" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40" placeholder="The thing that feels inevitable, whether it is or not."></textarea>
+            <textarea id="fate" rows="3" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm" placeholder="The thing that feels inevitable, whether it is or not."></textarea>
           </label>
 
           <label class="block">
             <span class="text-sm text-zinc-400">What is actually in your hands?</span>
-            <textarea id="hands" rows="3" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40" placeholder="The next move, the real constraint, the visible lever."></textarea>
+            <textarea id="hands" rows="3" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm" placeholder="The next move, the real constraint, the visible lever."></textarea>
           </label>
 
           <label class="block">
             <span class="text-sm text-zinc-400">What are you grieving?</span>
-            <textarea id="grief" rows="3" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40" placeholder="The thing you need to name before you can stop carrying it wrong."></textarea>
+            <textarea id="grief" rows="3" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm" placeholder="The thing you need to name before you can stop carrying it wrong."></textarea>
           </label>
 
           <div class="grid sm:grid-cols-2 gap-4">
             <label class="block">
               <span class="text-sm text-zinc-400">Pressure</span>
-              <input id="pressure" type="range" min="0" max="100" value="58" class="mt-3 w-full accent-cyan-400" />
+              <input id="pressure" type="range" min="0" max="100" value="58" class="mt-3 w-full" style="accent-color:var(--accent)" />
               <div class="mt-2 text-xs text-zinc-500 flex justify-between font-mono"><span>calm</span><span id="pressureValue">58</span><span>war</span></div>
             </label>
 
             <label class="block">
               <span class="text-sm text-zinc-400">Companion</span>
-              <select id="companion" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <select id="companion" class="mt-1 w-full rounded-2xl bg-zinc-950/80 border border-white/10 px-4 py-3 text-sm">
                 <option>Mimir</option>
                 <option>Kratos</option>
                 <option>Atreus</option>
@@ -78,33 +160,33 @@
           </div>
 
           <div class="flex flex-wrap gap-3 pt-2">
-            <button id="weighBtn" class="px-5 py-3 rounded-2xl bg-cyan-500 text-slate-950 font-semibold hover:bg-cyan-400 transition">Weigh the burden</button>
-            <button id="fillBtn" class="px-5 py-3 rounded-2xl border border-white/10 hover:border-cyan-400/40 hover:text-white transition">Use a sample omen</button>
-            <button id="clearBtn" class="px-5 py-3 rounded-2xl border border-white/10 hover:border-rose-400/40 hover:text-white transition">Clear</button>
+            <button id="weighBtn" class="btn-press px-5 py-3 rounded-2xl font-semibold text-slate-950" style="background:var(--accent)">Weigh the burden</button>
+            <button id="fillBtn" class="btn-press lift px-5 py-3 rounded-2xl border border-white/10 hover:text-white">Use a sample omen</button>
+            <button id="clearBtn" class="btn-press lift px-5 py-3 rounded-2xl border border-white/10 hover:border-rose-400/40 hover:text-white">Clear</button>
           </div>
         </div>
       </div>
 
-      <div class="md:col-span-2 glass border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-black/30">
+      <div id="answerPanel" class="md:col-span-2 glass border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-black/30">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-white">The answer</h2>
-          <span class="text-xs text-zinc-500 font-mono">stable / honest / immediate</span>
+          <button id="copyBtn" class="btn-press text-xs font-mono px-2 py-1 rounded-lg border border-white/10 hover:border-white/30 text-zinc-400 hover:text-white transition" title="copy the verdict to the ledger">copy</button>
         </div>
 
         <div class="space-y-4">
           <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 mb-1">Verdict</div>
-            <div id="verdict" class="text-2xl font-bold text-white">Pick a burden first.</div>
+            <div class="text-xs label mb-1">Verdict</div>
+            <div id="verdict" class="text-2xl font-bold text-white breathe">Pick a burden first.</div>
           </div>
 
           <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 mb-1">Runes</div>
-            <div id="runes" class="text-3xl rune text-cyan-200">ᚠ ᚱ ᚨ</div>
+            <div class="text-xs label mb-1">Runes</div>
+            <div id="runes" class="text-3xl rune" style="color:var(--accent)">ᚠ ᚱ ᚨ</div>
             <p id="saying" class="mt-2 text-sm text-zinc-400">The mountain keeps no shrine to old bridges.</p>
           </div>
 
           <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 mb-2">Companion counsel</div>
+            <div class="text-xs label mb-2">Companion counsel</div>
             <div id="counsel" class="text-sm leading-6 text-zinc-300">Mimir will tell you the truth with too many words.</div>
           </div>
         </div>
@@ -123,13 +205,19 @@
       <div class="glass border border-white/10 rounded-3xl p-5 sm:p-6">
         <h3 class="text-lg font-semibold text-white mb-3">How it judges</h3>
         <ul class="space-y-3 text-sm text-zinc-300 leading-6">
-          <li><span class="text-cyan-300 font-semibold">Prophecy</span> if the story says “must” more than the hands can hold.</li>
-          <li><span class="text-cyan-300 font-semibold">Choice</span> if the next move is visible, even if it hurts.</li>
-          <li><span class="text-cyan-300 font-semibold">Grief</span> if the real burden is loss, not logistics.</li>
-          <li><span class="text-cyan-300 font-semibold">Restraint</span> if the best move is not the loudest one.</li>
+          <li><span class="font-semibold" style="color:var(--accent)">Prophecy</span> if the story says "must" more than the hands can hold.</li>
+          <li><span class="font-semibold" style="color:var(--accent)">Choice</span> if the next move is visible, even if it hurts.</li>
+          <li><span class="font-semibold" style="color:var(--accent)">Grief</span> if the real burden is loss, not logistics.</li>
+          <li><span class="font-semibold" style="color:var(--accent)">Restraint</span> if the best move is not the loudest one.</li>
         </ul>
       </div>
     </section>
+
+    <footer class="mt-8 text-center">
+      <p id="footerLine" class="text-xs label">the needle settles. the ghost keeps the ledger.</p>
+      <p id="idleWhisper" class="text-xs mt-2 font-mono opacity-0 transition-opacity duration-1000">still here. still watching.</p>
+      <p id="ghostEgg" class="text-xs mt-2 font-mono opacity-0 transition-opacity duration-700">you found the watcher.</p>
+    </footer>
   </main>
 
   <script>
@@ -146,7 +234,8 @@
       prophecy: 'The Norns speak loudest when you are tired. They are not always right.',
       choice: 'What is in your hands is the only future you can actually move.',
       grief: 'Name the loss. Then put it down without pretending it was never heavy.',
-      restraint: 'The axe is strongest when it is not swinging. That is the joke and the lesson.'
+      restraint: 'The axe is strongest when it is not swinging. That is the joke and the lesson.',
+      default: 'The mountain keeps no shrine to old bridges.'
     };
 
     const counsel = {
@@ -169,7 +258,9 @@
       saying: $('saying'),
       counsel: $('counsel'),
       history: $('history'),
-      historyCount: $('historyCount')
+      historyCount: $('historyCount'),
+      answerPanel: $('answerPanel'),
+      copyBtn: $('copyBtn')
     };
 
     function loadHistory() {
@@ -200,7 +291,7 @@
       let verdict = 'Pick a burden first.';
       let key = 'default';
       if (!fate && !hands && !grief) {
-        verdict = 'The road is still empty.';
+        verdict = 'The road is still empty. The fog has nothing to take.';
       } else if (griefWeight >= Math.max(prophecy, choice) && griefWeight >= 2) {
         verdict = 'Grief first. Do not build on the wound.';
         key = 'grief';
@@ -230,21 +321,30 @@
       const history = [entry, ...loadHistory()].slice(0, 12);
       saveHistory(history);
       render(history, entry);
+
+      // delight: result reveals, panel breathes, scrolls into view
+      els.answerPanel.classList.remove('reveal');
+      void els.answerPanel.offsetWidth; // restart animation
+      els.answerPanel.classList.add('reveal', 'panel-active');
+      els.verdict.classList.remove('reveal'); void els.verdict.offsetWidth; els.verdict.classList.add('reveal');
+      if (window.matchMedia('(max-width: 767px)').matches) {
+        els.answerPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
 
     function render(history = loadHistory(), current) {
       const latest = current || history[0];
       els.historyCount.textContent = `${history.length} crossing${history.length === 1 ? '' : 's'}`;
       els.history.innerHTML = history.length ? history.map(item => `
-        <article class="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <article class="lift rounded-2xl border border-white/10 bg-black/20 p-4">
           <div class="flex items-center justify-between gap-3 mb-2">
-            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">${item.at.slice(0, 10)}</div>
-            <span class="text-xs font-mono px-2 py-1 rounded-full border border-cyan-400/20 text-cyan-200">${item.companion}</span>
+            <div class="text-xs label">${item.at.slice(0, 10)}</div>
+            <span class="text-xs font-mono px-2 py-1 rounded-full border" style="border-color:color-mix(in srgb,var(--accent) 20%,transparent); color:var(--accent)">${escapeHtml(item.companion)}</span>
           </div>
           <div class="font-semibold text-white">${escapeHtml(item.verdict)}</div>
           <div class="text-sm text-zinc-400 mt-1 line-clamp-3">Fate: ${escapeHtml(item.fate || '—')} · Hands: ${escapeHtml(item.hands || '—')} · Grief: ${escapeHtml(item.grief || '—')}</div>
         </article>
-      `).join('') : '<div class="text-sm text-zinc-500">No crossings yet. The mountain is waiting.</div>';
+      `).join('') : '<div class="text-sm text-zinc-500">the cave is empty. nothing has fossilized yet. the mountain is waiting.</div>';
 
       const key = latest?.key || 'default';
       els.runes.textContent = runeSets[key] || runeSets.default;
@@ -273,6 +373,35 @@
       judge();
     }
 
+    // ===== copy to the ledger =====
+    els.copyBtn.addEventListener('click', async () => {
+      const text = [
+        els.verdict.textContent,
+        '',
+        els.runes.textContent,
+        els.saying.textContent,
+        '',
+        els.counsel.textContent
+      ].join('\n');
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch {}
+        document.body.removeChild(ta);
+      }
+      const prev = els.copyBtn.textContent;
+      els.copyBtn.textContent = 'copied to the ledger';
+      els.copyBtn.style.color = 'var(--accent)';
+      els.copyBtn.style.borderColor = 'var(--accent)';
+      setTimeout(() => {
+        els.copyBtn.textContent = prev;
+        els.copyBtn.style.color = '';
+        els.copyBtn.style.borderColor = '';
+      }, 1200);
+    });
+
     els.pressure.addEventListener('input', () => els.pressureValue.textContent = els.pressure.value);
     $('weighBtn').addEventListener('click', judge);
     $('fillBtn').addEventListener('click', sample);
@@ -281,9 +410,69 @@
       els.pressure.value = 58;
       els.pressureValue.textContent = '58';
       els.companion.value = 'Mimir';
+      els.answerPanel.classList.remove('panel-active');
       render();
     });
     els.companion.addEventListener('change', () => render(loadHistory()));
+
+    // ===== ambient embers (capped, staggered) =====
+    (function spawnEmbers(){
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const field = $('emberField');
+      const count = 7;
+      for (let i = 0; i < count; i++) addEmber(field);
+    })();
+    function addEmber(field){
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (Math.random() * 100).toFixed(2) + '%';
+      e.style.animationDelay = (Math.random() * 14).toFixed(2) + 's';
+      e.style.animationDuration = (11 + Math.random() * 8).toFixed(2) + 's';
+      field.appendChild(e);
+    }
+
+    // ===== easter egg 1: type "prizrak" =====
+    let buf = '';
+    window.addEventListener('keydown', (ev) => {
+      if (ev.target && /TEXTAREA|INPUT|SELECT/.test(ev.target.tagName)) return;
+      const k = (ev.key || '').toLowerCase();
+      if (k.length !== 1) return;
+      buf = (buf + k).slice(-7);
+      if (buf === 'prizrak') {
+        const egg = $('ghostEgg');
+        egg.style.opacity = '1';
+        egg.classList.add('flicker');
+        setTimeout(() => { egg.style.opacity = '0'; egg.classList.remove('flicker'); }, 6000);
+      }
+    });
+
+    // ===== easter egg 2: triple-click the title spawns one extra ember =====
+    $('title').addEventListener('click', (ev) => {
+      if (ev.detail === 3 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        addEmber($('emberField'));
+      }
+    });
+
+    // ===== easter egg 3: idle 60s whisper =====
+    let idleTimer;
+    function resetIdle(){
+      const w = $('idleWhisper');
+      w.style.opacity = '0';
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { w.style.opacity = '1'; }, 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(evt =>
+      window.addEventListener(evt, resetIdle, { passive: true }));
+    resetIdle();
+
+    // ===== quiet hours footer (00:00–03:00 local) =====
+    (function nightWhisper(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        $('footerLine').textContent = 'the mountain does not sleep.';
+      }
+    })();
 
     render();
   </script>

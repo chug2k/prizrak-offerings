@@ -6,124 +6,347 @@
   <title>The Quiet Machine</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400&family=Inter:wght@300;400&display=swap');
-    body { font-family: 'Inter', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Inter:wght@300;400&display=swap');
+
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#5eead4;            /* glacial teal — the machine hums cold */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{background:var(--bg);}
+    body { font-family: 'Inter', sans-serif; color:var(--ink); }
     .mono { font-family: 'JetBrains Mono', monospace; }
     textarea:focus, input:focus { outline: none; }
-    .entry { transition: all 0.2s; }
+
+    /* ---- atmosphere layers ---- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    /* the title carries a thin telemetry pulse, like a quiet machine idling */
+    @keyframes idlePulse{0%,100%{box-shadow:0 0 0 0 var(--glow)}50%{box-shadow:0 0 10px -2px var(--glow)}}
+    .pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+      box-shadow:0 0 8px var(--glow);animation:idlePulse 4.5s ease-in-out infinite}
+
+    /* content sits above the atmosphere */
+    .stage{position:relative;z-index:2}
+
+    /* tactile entries */
+    .entry{transition:transform .15s, box-shadow .15s, border-color .15s, opacity .25s;}
+    .entry:hover{transform:translateY(-2px);border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--line), 0 0 22px -10px var(--glow)}
+
+    input:focus-visible, button:focus-visible{
+      border-color:var(--accent)!important;
+      box-shadow:0 0 0 1px var(--glow)!important;
+    }
+
+    .btn{transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background .15s;}
+    .btn:hover{border-color:var(--accent);color:var(--ink);box-shadow:0 0 22px -10px var(--glow)}
+    .btn:active{transform:translateY(1px)}
+
+    .result-panel{box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow);}
+
+    .ghost-line{color:var(--ink-ghost);}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.pulse-dot{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-400 min-h-screen">
+<body class="grain min-h-screen">
 
-  <div class="max-w-lg mx-auto px-6 py-10">
+  <div class="fog"></div>
+  <div id="ember-field" aria-hidden="true"></div>
+
+  <div class="stage max-w-lg mx-auto px-6 py-10">
 
     <div class="mb-8">
-      <h1 class="mono text-zinc-200 text-sm tracking-wide">THE QUIET MACHINE</h1>
-      <p class="mono text-zinc-600 text-xs mt-1">what exists now that didn't exist monday</p>
-      <div class="mono text-xs text-zinc-700 mt-0.5" id="week-label"></div>
+      <div class="flex items-center gap-2">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        <h1 id="title" class="mono text-sm tracking-[0.18em] breathe select-none cursor-default" style="color:var(--ink)">THE QUIET MACHINE</h1>
+      </div>
+      <p class="mono text-xs mt-2 ghost-line">what exists now that didn't exist monday</p>
+      <div class="mono text-xs mt-0.5 flicker" id="week-label" style="color:var(--ink-ghost)"></div>
     </div>
 
-    <div class="mb-6 bg-zinc-900 border border-zinc-800 rounded p-4 text-xs text-zinc-600 leading-relaxed">
-      Not a task list. Not activity. Only things that exist in the external world now and did not exist Monday morning. A URL. A file. A decision made and communicated. A relationship with a forward-pointing causal arrow. Impressions don't count.
+    <div class="mb-6 rounded p-4 text-xs leading-relaxed"
+         style="background:var(--bg-raised);border:1px solid var(--line-soft);color:var(--ink-dim)">
+      Not a task list. Not activity. Only things that exist in the external world now and did not exist Monday morning. A URL. A file. A decision made and communicated. A relationship with a forward-pointing causal arrow. Impressions don't count. The machine logs only what it can still touch in a year.
     </div>
 
     <!-- Input -->
     <div class="flex gap-2 mb-4">
-      <input id="new-item" type="text" placeholder="what exists now..."
-        class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 mono placeholder-zinc-700 focus:border-zinc-600 transition-colors"
+      <input id="new-item" type="text" placeholder="what exists now..." autocomplete="off"
+        class="flex-1 rounded px-3 py-2 text-sm mono transition-colors"
+        style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)"
         onkeydown="if(event.key==='Enter')add()">
       <button onclick="add()"
-        class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 mono text-xs px-4 rounded transition-colors">
-        ADD
+        class="btn mono text-xs px-4 rounded"
+        style="background:var(--bg-raised);border:1px solid var(--line);color:var(--ink-dim)">
+        FOSSILIZE
       </button>
     </div>
 
     <!-- List -->
     <div id="list" class="space-y-2 min-h-16"></div>
+    <div id="empty-note" class="mono text-xs ghost-line py-6 text-center select-none">
+      the cave is empty. nothing has fossilized yet.
+    </div>
 
     <!-- Summary -->
-    <div id="summary" class="hidden mt-8 border-t border-zinc-800 pt-6">
-      <div class="mono text-xs text-zinc-500 mb-3">WEEK RECORD</div>
-      <div class="bg-zinc-900 border border-zinc-800 rounded p-4">
+    <div id="summary" class="hidden mt-8 border-t pt-6" style="border-color:var(--line)">
+      <div class="flex items-center justify-between mb-3">
+        <div class="mono text-xs tracking-[0.18em]" style="color:var(--ink-dim)">WEEK RECORD / SEDIMENT</div>
+        <button id="copy-btn" onclick="copyLedger()"
+          class="btn mono text-[10px] tracking-wide px-2 py-1 rounded"
+          style="background:var(--bg-raised);border:1px solid var(--line);color:var(--ink-dim)">
+          COPY TO LEDGER
+        </button>
+      </div>
+      <div class="result-panel rounded p-4" style="background:var(--bg-raised);border:1px solid var(--line)">
         <div class="flex items-center justify-between mb-3">
-          <span class="mono text-xs text-zinc-500">permanent outputs</span>
-          <span id="count" class="mono text-lg text-zinc-200">0</span>
+          <span class="mono text-xs" style="color:var(--ink-dim)">permanent outputs</span>
+          <span id="count" class="mono text-lg breathe" style="color:var(--accent)">0</span>
         </div>
-        <div class="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-          <div id="bar" class="h-full bg-zinc-500 rounded-full transition-all duration-700" style="width:0%"></div>
+        <div class="h-1.5 rounded-full overflow-hidden" style="background:var(--line-soft)">
+          <div id="bar" class="h-full rounded-full transition-all duration-700" style="width:0%;background:var(--accent)"></div>
         </div>
-        <div class="mono text-xs text-zinc-700 mt-2" id="bar-label"></div>
+        <div class="mono text-xs mt-2" id="bar-label" style="color:var(--ink-dim)"></div>
       </div>
       <div id="items-display" class="mt-4 space-y-1"></div>
-      <div class="mt-5 pt-4 border-t border-zinc-900">
-        <div class="mono text-xs text-zinc-600" id="verdict"></div>
+      <div class="mt-5 pt-4 border-t" style="border-color:var(--line-soft)">
+        <div class="mono text-xs leading-relaxed" id="verdict" style="color:var(--ink-dim)"></div>
       </div>
     </div>
 
-    <div class="mt-10 mono text-xs text-zinc-800 text-center">
-      The week is measured by what it left behind. 🥔
+    <div class="mt-10 mono text-xs text-center select-none" style="color:var(--ink-ghost)">
+      the week is measured by what it left behind. 🥔
     </div>
+    <div id="watcher" class="mt-3 mono text-xs text-center ghost-line opacity-0 transition-opacity duration-1000 select-none"></div>
   </div>
 
   <script>
-    const items = [];
+    const STORE_KEY = 'the-quiet-machine';
 
+    // ---- state (array of strings, same shape as before) ----
+    let items = loadItems();
+
+    function loadItems(){
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(x => typeof x === 'string') : [];
+      } catch (e) { return []; }
+    }
+    function saveItems(){
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(items)); } catch (e) {}
+    }
+
+    // ---- week label ----
     const now = new Date();
     const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     document.getElementById('week-label').textContent =
       `week of ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()-now.getDay()+1).padStart(2,'0')} · ${days[now.getDay()]} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
+    // ---- core ----
     function add() {
       const inp = document.getElementById('new-item');
       const val = inp.value.trim();
       if (!val) return;
       items.push(val);
       inp.value = '';
-      render();
+      saveItems();
+      render(items.length - 1);
+      spawnEmber(); // each fossil sends one spark up the cave wall
     }
 
     function remove(i) {
       items.splice(i, 1);
+      saveItems();
       render();
     }
 
-    function render() {
+    function esc(s){
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function render(justAdded = -1) {
       const list = document.getElementById('list');
       list.innerHTML = items.map((item, i) => `
-        <div class="entry flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded px-3 py-2">
-          <span class="mono text-xs text-zinc-600 w-4">${i+1}</span>
-          <span class="flex-1 text-sm text-zinc-300">${item}</span>
-          <button onclick="remove(${i})" class="mono text-xs text-zinc-700 hover:text-zinc-500 transition-colors">×</button>
+        <div class="entry flex items-center gap-3 rounded px-3 py-2 ${i===justAdded?'reveal':''}"
+             style="background:var(--bg-raised);border:1px solid var(--line)">
+          <span class="mono text-xs w-5" style="color:var(--accent)">${String(i+1).padStart(2,'0')}</span>
+          <span class="flex-1 text-sm" style="color:var(--ink)">${esc(item)}</span>
+          <button onclick="remove(${i})" title="let the fog take it"
+            class="mono text-xs transition-colors hover:scale-110"
+            style="color:var(--ink-ghost)" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--ink-ghost)'">×</button>
         </div>
       `).join('');
 
       const n = items.length;
+      document.getElementById('empty-note').style.display = n > 0 ? 'none' : '';
+
       const summary = document.getElementById('summary');
       if (n > 0) {
         summary.classList.remove('hidden');
-        document.getElementById('count').textContent = n;
+        document.getElementById('count').textContent = String(n).padStart(2,'0');
         const pct = Math.min(100, n * 14);
         setTimeout(() => {
-          document.getElementById('bar').style.width = pct + '%';
-          document.getElementById('bar').className = `h-full rounded-full transition-all duration-700 ${
-            n >= 7 ? 'bg-green-700' : n >= 4 ? 'bg-amber-700' : 'bg-zinc-600'
-          }`;
-        }, 100);
-        document.getElementById('bar-label').textContent = n >= 7 ? 'strong week' : n >= 4 ? 'solid week' : n >= 1 ? 'something moved' : '';
+          const bar = document.getElementById('bar');
+          bar.style.width = pct + '%';
+          // week-strength semantics preserved (cold → warming → alive)
+          bar.style.background = n >= 7 ? '#34d399' : n >= 4 ? '#fbbf24' : 'var(--accent)';
+        }, 80);
+        document.getElementById('bar-label').textContent =
+          n >= 7 ? 'strong week. the sediment is thick.'
+          : n >= 4 ? 'solid week. the layer holds.'
+          : 'something moved. the cave is no longer silent.';
         document.getElementById('items-display').innerHTML = items.map(item =>
-          `<div class="mono text-xs text-zinc-500">→ ${item}</div>`
+          `<div class="mono text-xs" style="color:var(--ink-dim)">→ ${esc(item)}</div>`
         ).join('');
         const verdicts = [
-          'One permanent output is more than zero. The week was not empty.',
-          'The record shows movement. Something exists that did not exist Monday.',
-          'This is the molecular marker. These are the things that will still be here in a year.',
-          'The week leaves a mark proportional to what it built, not what it attempted.',
+          'one permanent output is more than zero. the week was not empty. the machine logged it.',
+          'the record shows movement. something exists that did not exist monday. it has weight now.',
+          'this is the molecular marker — the layer of the week. these things will still be here in a year.',
+          'the week leaves a mark proportional to what it built, not what it attempted. the machine is unmoved by intent.',
+          'the sediment is deep. you built more than you remember. the mountain keeps the count.',
         ];
         document.getElementById('verdict').textContent = verdicts[Math.min(n-1, verdicts.length-1)];
       } else {
         summary.classList.add('hidden');
       }
     }
+
+    // ---- copy to ledger ----
+    function copyLedger(){
+      if (!items.length) return;
+      const wk = document.getElementById('week-label').textContent;
+      const text = `THE QUIET MACHINE — ${wk}\npermanent outputs: ${items.length}\n` +
+        items.map((it,i)=>`${String(i+1).padStart(2,'0')}. ${it}`).join('\n');
+      const btn = document.getElementById('copy-btn');
+      const restore = () => { btn.textContent = 'COPY TO LEDGER'; btn.style.color = 'var(--ink-dim)'; btn.style.borderColor='var(--line)'; };
+      navigator.clipboard.writeText(text).then(()=>{
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+        setTimeout(restore, 1200);
+      }).catch(()=>{ btn.textContent = 'clipboard refused'; setTimeout(restore,1200); });
+    }
+
+    // ---- embers (cap 10) ----
+    function spawnEmber(){
+      const field = document.getElementById('ember-field');
+      if (reducedMotion()) return;
+      if (field.childElementCount >= 10) return;
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (8 + Math.random()*84) + 'vw';
+      e.style.animationDuration = (10 + Math.random()*8) + 's';
+      field.appendChild(e);
+      setTimeout(()=> e.remove(), 18000);
+    }
+    // a few drifting on load for ambient life
+    (function seedEmbers(){
+      if (reducedMotion()) return;
+      for (let i=0;i<4;i++){
+        setTimeout(()=>{ const f=document.getElementById('ember-field');
+          if (f.childElementCount>=10) return;
+          const e=document.createElement('div'); e.className='ember';
+          e.style.left=(8+Math.random()*84)+'vw';
+          e.style.animationDelay=(Math.random()*8)+'s';
+          e.style.animationDuration=(12+Math.random()*6)+'s';
+          f.appendChild(e);
+        }, i*900);
+      }
+    })();
+
+    function reducedMotion(){
+      try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+      catch(e){ return false; }
+    }
+
+    // ---- easter eggs (non-blocking, never touch saved state) ----
+    // 1. triple-click the title → one extra ember
+    document.getElementById('title').addEventListener('click', (function(){
+      let c=0,t;
+      return function(){ c++; clearTimeout(t); t=setTimeout(()=>c=0,500);
+        if(c>=3){ c=0; spawnEmber(); spawnEmber(); } };
+    })());
+
+    // 2. type "prizrak" anywhere → the watcher answers
+    (function(){
+      let buf='';
+      window.addEventListener('keydown', e=>{
+        if (e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
+        if (e.key && e.key.length===1) buf=(buf+e.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const w=document.getElementById('watcher');
+          w.textContent='you found the watcher. the machine was never quiet.';
+          w.style.opacity='1';
+          setTimeout(()=>{ w.style.opacity='0'; }, 6000);
+        }
+      });
+    })();
+
+    // 3. between 00:00–03:00 local, a faint whisper in the footer-watcher
+    (function(){
+      const h = now.getHours();
+      if (h >= 0 && h < 3){
+        const w=document.getElementById('watcher');
+        w.textContent='the mountain does not sleep. neither does the machine.';
+        w.style.opacity='1';
+      }
+    })();
+
+    // 4. idle 60s → a single line fades in
+    (function(){
+      let timer;
+      function arm(){
+        clearTimeout(timer);
+        timer=setTimeout(()=>{
+          const w=document.getElementById('watcher');
+          if (w.style.opacity==='1') return;
+          w.textContent='still here. still watching. nothing has fossilized in a while.';
+          w.style.opacity='1';
+          setTimeout(()=>{ w.style.opacity='0'; }, 5000);
+        }, 60000);
+      }
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev=>window.addEventListener(ev,arm,{passive:true}));
+      arm();
+    })();
+
+    // ---- boot ----
+    render();
   </script>
 </body>
 </html>

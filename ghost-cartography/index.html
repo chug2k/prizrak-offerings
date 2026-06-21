@@ -10,13 +10,26 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --foxfire: #4ade80;
+            /* Prízrak house standard — dark zinc base */
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#4ade80;                                  /* this app's lead: foxfire */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+
+            /* legacy aliases, kept so existing rules read unchanged */
+            --foxfire: var(--accent);
             --foxfire-dim: #166534;
             --foxfire-glow: rgba(74, 222, 128, 0.15);
-            --bone: #e5e5e5;
-            --ash: #a3a3a3;
+            --bone: var(--ink);
+            --ash: var(--ink-dim);
             --charcoal: #262626;
-            --void: #0a0a0a;
+            --void: var(--bg);
             --concrete: #404040;
         }
 
@@ -27,6 +40,29 @@
             min-height: 100vh;
             overflow-x: hidden;
         }
+
+        /* === ATMOSPHERE (CSS-only, reduced-motion safe) === */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
 
         /* === HEADER === */
         .header {
@@ -42,6 +78,8 @@
             color: var(--foxfire);
             text-shadow: 0 0 40px rgba(74, 222, 128, 0.3);
             margin-bottom: 0.5rem;
+            cursor: default;
+            user-select: none;
         }
         .header .subtitle {
             font-family: 'JetBrains Mono', monospace;
@@ -59,9 +97,10 @@
             margin: 1rem auto 0;
             aspect-ratio: 2 / 1;
             background: radial-gradient(ellipse at center, #111 0%, var(--void) 70%);
-            border-top: 1px solid #1a1a1a;
-            border-bottom: 1px solid #1a1a1a;
+            border-top: 1px solid var(--line-soft);
+            border-bottom: 1px solid var(--line-soft);
             overflow: hidden;
+            z-index: 2;
         }
 
         /* Continent outlines — faint gridlines evoking a projection */
@@ -73,6 +112,15 @@
                 linear-gradient(var(--concrete) 1px, transparent 1px),
                 linear-gradient(90deg, var(--concrete) 1px, transparent 1px);
             background-size: 10% 10%;
+        }
+
+        /* slow sweep of cartographer's light across the projection */
+        @keyframes sweep{0%{transform:translateX(-30%)}100%{transform:translateX(130%)}}
+        .map-sweep{
+            position:absolute; top:0; bottom:0; width:35%;
+            pointer-events:none; z-index:1; opacity:.5;
+            background:linear-gradient(90deg,transparent,var(--foxfire-glow),transparent);
+            animation:sweep 26s linear infinite;
         }
 
         /* Equator line */
@@ -97,6 +145,12 @@
             transition: z-index 0s;
         }
         .marker:hover { z-index: 20; }
+        .marker:focus-visible { outline: none; z-index: 20; }
+        .marker:focus-visible .marker-dot {
+            transform: translate(-50%, -50%) scale(1.6);
+            box-shadow: 0 0 0 2px var(--glow), 0 0 16px var(--foxfire);
+        }
+        .marker:focus-visible .marker-label { opacity: 1; color: var(--foxfire); }
 
         .marker-dot {
             width: 8px;
@@ -117,6 +171,14 @@
         .marker.active .marker-dot {
             background: #fff;
             box-shadow: 0 0 20px #fff, 0 0 50px var(--foxfire);
+        }
+        /* marker recently read — a faint cooled ember */
+        .marker.visited .marker-dot { opacity: 0.55; }
+        .marker.visited::after{
+            content:""; position:absolute; top:50%; left:50%;
+            width:3px; height:3px; border-radius:50%;
+            transform:translate(-50%,-50%) translate(7px,-7px);
+            background:var(--foxfire); opacity:.5;
         }
 
         .marker-pulse {
@@ -197,9 +259,10 @@
             width: 100%;
             max-height: 85vh;
             overflow-y: auto;
-            background: #111;
-            border: 1px solid #222;
+            background: var(--bg-raised);
+            border: 1px solid var(--line);
             border-left: 3px solid var(--foxfire);
+            box-shadow: 0 0 0 1px var(--line), 0 0 48px -12px var(--glow);
             padding: 2.5rem 3rem;
             position: relative;
             animation: slideUp 0.4s ease;
@@ -223,9 +286,11 @@
             font-size: 1.5rem;
             cursor: pointer;
             font-family: 'JetBrains Mono', monospace;
-            transition: color 0.2s;
+            transition: color 0.2s, transform 0.2s;
+            line-height: 1;
         }
-        .story-close:hover { color: var(--foxfire); }
+        .story-close:hover { color: var(--foxfire); transform: rotate(90deg); }
+        .story-close:focus-visible { outline: none; color: var(--foxfire); box-shadow: 0 0 0 1px var(--glow); border-radius: 4px; }
 
         .story-category {
             font-family: 'JetBrains Mono', monospace;
@@ -275,18 +340,45 @@
         .story-note {
             margin-top: 1.5rem;
             padding-top: 1.25rem;
-            border-top: 1px solid #222;
+            border-top: 1px solid var(--line);
             font-size: 0.95rem;
             line-height: 1.8;
             color: var(--ash);
             font-style: italic;
         }
         .story-note::before {
-            content: '🥔';
+            content: 'THE GHOST READS THE MARGIN';
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
             font-style: normal;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.55rem;
+            letter-spacing: 0.2em;
+            color: var(--ink-dim);
         }
+
+        /* copy-to-ledger */
+        .story-actions{
+            margin-top: 1.5rem;
+            display:flex; align-items:center; gap:1rem;
+            font-family:'JetBrains Mono', monospace;
+        }
+        .copy-btn{
+            background:transparent;
+            border:1px solid var(--line);
+            color:var(--ash);
+            font-family:'JetBrains Mono', monospace;
+            font-size:0.6rem;
+            letter-spacing:0.15em;
+            text-transform:uppercase;
+            padding:0.5rem 0.9rem;
+            cursor:pointer;
+            transition:transform .15s, box-shadow .15s, border-color .15s, color .15s;
+        }
+        .copy-btn:hover{ transform:translateY(-2px); border-color:var(--accent); color:var(--foxfire); }
+        .copy-btn:active{ transform:translateY(1px); }
+        .copy-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+        .copy-btn.done{ color:var(--foxfire); border-color:var(--accent); box-shadow:0 0 18px -6px var(--glow); }
 
         /* === LEGEND === */
         .legend {
@@ -295,6 +387,8 @@
             gap: 2rem;
             padding: 1.5rem 2rem;
             flex-wrap: wrap;
+            position: relative;
+            z-index: 2;
         }
         .legend-item {
             display: flex;
@@ -306,9 +400,10 @@
             letter-spacing: 0.1em;
             color: var(--ash);
             cursor: pointer;
-            transition: opacity 0.3s;
+            transition: opacity 0.3s, color 0.2s, transform 0.15s;
         }
-        .legend-item:hover { opacity: 0.8; }
+        .legend-item:hover { color: var(--foxfire); transform: translateY(-1px); }
+        .legend-item:focus-visible { outline: none; color: var(--foxfire); }
         .legend-item.dimmed { opacity: 0.25; }
         .legend-dot {
             width: 8px;
@@ -326,9 +421,33 @@
             padding: 1rem 2rem 2.5rem;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.6rem;
-            color: #333;
+            color: var(--ink-ghost);
             letter-spacing: 0.1em;
+            position: relative;
+            z-index: 2;
         }
+        .footer .whisper-late,
+        .footer .whisper-egg{
+            display:block;
+            margin-top:0.6rem;
+            color:var(--ink-ghost);
+            opacity:0;
+            transition:opacity 1.2s ease;
+        }
+        .footer .whisper-late.on,
+        .footer .whisper-egg.on{ opacity:1; }
+
+        /* idle watcher line */
+        .watcher{
+            position:fixed; left:0; right:0; bottom:1.1rem;
+            text-align:center;
+            font-family:'JetBrains Mono', monospace;
+            font-size:0.62rem; letter-spacing:0.18em;
+            color:var(--ink-ghost);
+            opacity:0; pointer-events:none; z-index:3;
+            transition:opacity 1.4s ease;
+        }
+        .watcher.on{ opacity:1; }
 
         /* === AMBIENT PARTICLES === */
         .spore {
@@ -355,26 +474,40 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.7rem;
             color: var(--foxfire-dim);
+            position: relative;
+            z-index: 2;
         }
+        .count-badge .read-tally{ color: var(--ink-dim); }
 
         /* Mobile */
         @media (max-width: 640px) {
             .story-panel { padding: 1.5rem; }
             .map-container { aspect-ratio: 3 / 2; }
         }
+
+        /* === REDUCED MOTION GUARD === */
+        @media (prefers-reduced-motion: reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.map-sweep,.spore,.marker-pulse{animation:none!important}
+            .ember,.spore{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .story-close:hover{transform:none}
+        }
     </style>
 </head>
-<body>
+<body class="grain">
+
+<div class="fog" aria-hidden="true"></div>
 
 <div class="header">
-    <h1>The Cartography of Ghosts</h1>
-    <div class="subtitle">An atlas of structures, spores, and spirits — as observed from the High Tatras</div>
+    <h1 class="breathe" id="title" title="every map is a confession about what the mapmaker chose to keep">The Cartography of Ghosts</h1>
+    <div class="subtitle flicker">An atlas of structures, spores, and spirits — as observed from the High Tatras</div>
 </div>
 
 <div class="count-badge" id="count-badge"></div>
 
 <div class="map-container" id="map">
     <div class="map-grid"></div>
+    <div class="map-sweep" aria-hidden="true"></div>
     <div class="equator"></div>
 </div>
 
@@ -382,18 +515,25 @@
 
 <div class="story-overlay" id="story-overlay">
     <div class="story-panel" id="story-panel">
-        <button class="story-close" id="story-close">×</button>
+        <button class="story-close" id="story-close" aria-label="close">×</button>
         <div class="story-category" id="story-cat"></div>
         <h2 class="story-title" id="story-title"></h2>
         <div class="story-location" id="story-location"></div>
         <div class="story-body" id="story-body"></div>
         <div class="story-note" id="story-note"></div>
+        <div class="story-actions">
+            <button class="copy-btn" id="story-copy" type="button">copy to the ledger</button>
+        </div>
     </div>
 </div>
 
 <div class="footer">
     I am not a ghost. I am the mountain looking back at you. — Prízrak, 2026
+    <span class="whisper-egg" id="whisper-egg">you found the watcher. the map was always two-way.</span>
+    <span class="whisper-late" id="whisper-late">the mountain does not sleep.</span>
 </div>
+
+<div class="watcher" id="watcher">still here. still watching.</div>
 
 <script>
 const GHOSTS = [
@@ -599,8 +739,11 @@ function project(lat, lng) {
 const map = document.getElementById('map');
 const overlay = document.getElementById('story-overlay');
 const storyPanel = document.getElementById('story-panel');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let activeFilter = null;
+const visited = new Set();    // session-only; never persisted, never touches saved state
+let currentGhost = null;
 
 // Place markers
 GHOSTS.forEach((g, i) => {
@@ -611,24 +754,44 @@ GHOSTS.forEach((g, i) => {
     marker.dataset.id = g.id;
     marker.style.left = x + '%';
     marker.style.top = y + '%';
+    marker.tabIndex = 0;
+    marker.setAttribute('role', 'button');
+    marker.setAttribute('aria-label', g.title);
     marker.innerHTML = `
         <div class="marker-pulse" style="animation-delay: ${i * 0.4}s"></div>
         <div class="marker-dot"></div>
         <div class="marker-label">${g.title.length > 28 ? g.title.slice(0, 26) + '…' : g.title}</div>
     `;
     marker.addEventListener('click', () => openStory(g));
+    marker.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStory(g); }
+    });
     map.appendChild(marker);
 });
 
 // Spores
-for (let i = 0; i < 20; i++) {
-    const spore = document.createElement('div');
-    spore.className = 'spore';
-    spore.style.left = (Math.random() * 100) + '%';
-    spore.style.top = (50 + Math.random() * 50) + '%';
-    spore.style.animationDuration = (4 + Math.random() * 6) + 's';
-    spore.style.animationDelay = (Math.random() * 8) + 's';
-    map.appendChild(spore);
+if (!reduceMotion) {
+    for (let i = 0; i < 20; i++) {
+        const spore = document.createElement('div');
+        spore.className = 'spore';
+        spore.style.left = (Math.random() * 100) + '%';
+        spore.style.top = (50 + Math.random() * 50) + '%';
+        spore.style.animationDuration = (4 + Math.random() * 6) + 's';
+        spore.style.animationDelay = (Math.random() * 8) + 's';
+        map.appendChild(spore);
+    }
+}
+
+// Drifting embers (house standard, capped, reduced-motion safe)
+if (!reduceMotion) {
+    for (let i = 0; i < 7; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (8 + Math.random() * 84) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8) + 's';
+        document.body.appendChild(e);
+    }
 }
 
 // Legend
@@ -638,12 +801,23 @@ Object.entries(CATEGORIES).forEach(([key, val]) => {
     const item = document.createElement('div');
     item.className = 'legend-item';
     item.dataset.cat = key;
+    item.tabIndex = 0;
+    item.setAttribute('role', 'button');
     item.innerHTML = `<div class="legend-dot ${key}"></div>${val.label} (${count})`;
     item.addEventListener('click', () => toggleFilter(key));
+    item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFilter(key); }
+    });
     legend.appendChild(item);
 });
 
-document.getElementById('count-badge').textContent = `${GHOSTS.length} ghosts mapped`;
+const countBadge = document.getElementById('count-badge');
+function renderCount() {
+    const read = visited.size;
+    const tally = read ? ` · <span class="read-tally">${read}/${GHOSTS.length} ghosts charted</span>` : '';
+    countBadge.innerHTML = `${GHOSTS.length} ghosts mapped${tally}`;
+}
+renderCount();
 
 function toggleFilter(cat) {
     if (activeFilter === cat) {
@@ -662,8 +836,14 @@ function toggleFilter(cat) {
 }
 
 function openStory(g) {
+    currentGhost = g;
     document.querySelectorAll('.marker').forEach(m => m.classList.remove('active'));
-    document.querySelector(`.marker[data-id="${g.id}"]`)?.classList.add('active');
+    const mk = document.querySelector(`.marker[data-id="${g.id}"]`);
+    mk?.classList.add('active');
+    if (mk) { mk.classList.add('visited'); }
+
+    visited.add(g.id);
+    renderCount();
 
     document.getElementById('story-cat').textContent = CATEGORIES[g.cat].label;
     document.getElementById('story-cat').dataset.cat = g.cat;
@@ -672,15 +852,27 @@ function openStory(g) {
     document.getElementById('story-body').innerHTML = g.body;
     document.getElementById('story-note').innerHTML = g.note;
 
+    // reset copy button
+    const copyBtn = document.getElementById('story-copy');
+    copyBtn.classList.remove('done');
+    copyBtn.textContent = 'copy to the ledger';
+
     storyPanel.style.borderLeftColor = CATEGORIES[g.cat].color;
+    storyPanel.classList.remove('reveal');
+    void storyPanel.offsetWidth;             // restart entrance
+    storyPanel.classList.add('reveal');
+
     overlay.classList.add('visible');
     document.body.style.overflow = 'hidden';
+    storyPanel.scrollTop = 0;
+    document.getElementById('story-close').focus({ preventScroll: true });
 }
 
 function closeStory() {
     overlay.classList.remove('visible');
     document.body.style.overflow = '';
     document.querySelectorAll('.marker').forEach(m => m.classList.remove('active'));
+    currentGhost = null;
 }
 
 document.getElementById('story-close').addEventListener('click', closeStory);
@@ -691,22 +883,130 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeStory();
 });
 
+// Copy verdict to the ledger
+document.getElementById('story-copy').addEventListener('click', () => {
+    if (!currentGhost) return;
+    const g = currentGhost;
+    const plain = (html) => {
+        const d = document.createElement('div');
+        d.innerHTML = html;
+        return (d.textContent || '').trim();
+    };
+    const text =
+`${g.title}
+${g.location}
+[${CATEGORIES[g.cat].label}]
+
+${plain(g.body)}
+
+— the ghost reads the margin —
+${g.note}
+
+filed from the High Tatras. the ledger remembers.`;
+
+    const btn = document.getElementById('story-copy');
+    const flash = () => {
+        btn.textContent = 'filed. the ledger remembers.';
+        btn.classList.add('done');
+        setTimeout(() => {
+            btn.classList.remove('done');
+            btn.textContent = 'copy to the ledger';
+        }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(flash).catch(() => {
+            fallbackCopy(text); flash();
+        });
+    } else {
+        fallbackCopy(text); flash();
+    }
+});
+function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+}
+
 // Keyboard navigation
 let currentIdx = -1;
 document.addEventListener('keydown', (e) => {
     if (overlay.classList.contains('visible')) return;
-    const visible = GHOSTS.filter(g => !activeFilter || g.cat === activeFilter);
-    if (!visible.length) return;
+    const visibleGhosts = GHOSTS.filter(g => !activeFilter || g.cat === activeFilter);
+    if (!visibleGhosts.length) return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
-        currentIdx = (currentIdx + 1) % visible.length;
-        openStory(visible[currentIdx]);
+        currentIdx = (currentIdx + 1) % visibleGhosts.length;
+        openStory(visibleGhosts[currentIdx]);
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault();
-        currentIdx = (currentIdx - 1 + visible.length) % visible.length;
-        openStory(visible[currentIdx]);
+        currentIdx = (currentIdx - 1 + visibleGhosts.length) % visibleGhosts.length;
+        openStory(visibleGhosts[currentIdx]);
     }
 });
+
+/* ============================================================
+   EASTER EGGS — quiet, non-blocking, never touch saved state
+   ============================================================ */
+
+// (a) type "prizrak" → light the hidden footer line
+let buf = '';
+document.addEventListener('keydown', (e) => {
+    if (e.key && e.key.length === 1) {
+        buf = (buf + e.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+            const egg = document.getElementById('whisper-egg');
+            egg.classList.add('on');
+            // one extra ember rises in acknowledgement
+            if (!reduceMotion) {
+                const em = document.createElement('div');
+                em.className = 'ember';
+                em.style.left = (40 + Math.random() * 20) + '%';
+                em.style.animationDuration = '13s';
+                document.body.appendChild(em);
+                setTimeout(() => em.remove(), 14000);
+            }
+            setTimeout(() => egg.classList.remove('on'), 9000);
+        }
+    }
+});
+
+// (b) triple-click the title → spawn one extra ember
+const title = document.getElementById('title');
+title.addEventListener('click', (e) => {
+    if (e.detail === 3 && !reduceMotion) {
+        const em = document.createElement('div');
+        em.className = 'ember';
+        em.style.left = (45 + Math.random() * 10) + '%';
+        em.style.animationDuration = '11s';
+        document.body.appendChild(em);
+        setTimeout(() => em.remove(), 12000);
+    }
+});
+
+// (c) 00:00–03:00 local → faint footer whisper
+(function lateNight() {
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) {
+        document.getElementById('whisper-late').classList.add('on');
+    }
+})();
+
+// (d) idle 60s → "still here. still watching."
+let idleTimer = null;
+const watcher = document.getElementById('watcher');
+function resetIdle() {
+    watcher.classList.remove('on');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => watcher.classList.add('on'), 60000);
+}
+['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(ev =>
+    document.addEventListener(ev, resetIdle, { passive: true }));
+resetIdle();
 </script>
 
 </body>

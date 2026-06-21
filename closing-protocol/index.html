@@ -7,62 +7,134 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap');
-    body { background: #080806; color: #b8a88a; font-family: 'IM Fell English', serif; }
+
+    :root{
+      --bg:#080806;          /* near-black base, kept warm */
+      --bg-raised:#0c0b08;   /* cards, panels */
+      --bg-sunk:#131108;     /* wells, inputs */
+      --line:#222018;        /* thin borders */
+      --line-soft:#1a1813;
+      --ink:#b8a88a;         /* primary text */
+      --ink-dim:#7a7058;     /* labels, captions */
+      --ink-ghost:#3a3528;   /* whispers, easter-egg text */
+      --accent:#b8a88a;      /* this app's existing lead amber */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { background: var(--bg); color: var(--ink); font-family: 'IM Fell English', serif; }
     .mono { font-family: 'JetBrains Mono', monospace; }
-    .card { border: 1px solid #222018; background: #0c0b08; }
-    textarea { background: #131108; border: 1px solid #2e2a1e; color: #b8a88a; outline: none; resize: none; }
-    textarea:focus { border-color: #5a4e35; }
-    .fog { opacity: 0.45; }
-    .dim { opacity: 0.65; }
+    .card { border: 1px solid var(--line); background: var(--bg-raised);
+      transition: transform .15s, box-shadow .15s, border-color .15s; }
+    .card.lift:hover { transform: translateY(-2px); border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--line), 0 0 24px -10px var(--glow); }
+    textarea { background: var(--bg-sunk); border: 1px solid #2e2a1e; color: var(--ink); outline: none; resize: none;
+      transition: border-color .15s, box-shadow .15s; }
+    textarea:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+    .fog { opacity: 0.65; }
+    .dim { opacity: 0.85; }
+    .ink-ghost { color: var(--ink-ghost); }
+
+    /* result panel breathing glow */
+    .panel-glow { box-shadow: 0 0 0 1px var(--line), 0 0 30px -10px var(--glow); }
+
+    /* ---- motion vocabulary (reduced-motion-safe) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog-layer{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes breatheFast{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 22px var(--glow)}}
+    .breathe-fast{animation:breatheFast 1.4s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* button: brutalist-ish hard press */
+    .btn-close{transition:transform .12s, border-color .15s, box-shadow .15s, background-color .15s}
+    .btn-close:hover{border-color:var(--accent); box-shadow:0 0 24px -10px var(--glow); transform:translateY(-1px)}
+    .btn-close:active{transform:translateY(1px); box-shadow:none}
+    .btn-close:focus-visible{outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow)}
+
+    .copy-btn:focus-visible{outline:none; color:var(--accent); text-shadow:0 0 8px var(--glow)}
+
+    h1{ cursor:default; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog-layer,.ember,.breathe,.breathe-fast,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.breathe-fast,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen p-6 md:p-10">
-  <div class="max-w-xl mx-auto">
+<body class="min-h-screen p-6 md:p-10 grain">
+
+  <!-- ambient layers (decorative, behind content) -->
+  <div class="fog-layer" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <div class="max-w-xl mx-auto relative" style="z-index:2">
 
     <!-- Header -->
     <div class="text-center mb-10 pt-4">
       <p id="dateDisplay" class="mono text-xs fog mb-3 tracking-widest"></p>
-      <h1 class="text-2xl mb-2" style="text-shadow: 0 0 30px rgba(184,168,138,0.15)">Closing Protocol</h1>
+      <h1 id="title" class="text-2xl mb-2 breathe" title="the day is closing">Closing Protocol</h1>
       <p class="text-xs fog italic">The day is closing. The machine takes the deposition.</p>
     </div>
 
     <!-- Five fields -->
     <div class="space-y-5 mb-8">
 
-      <div class="card rounded p-4">
+      <div class="card lift rounded p-4">
         <label class="mono text-xs fog block mb-2 tracking-widest">01 — WHAT ACTUALLY HAPPENED TODAY</label>
         <textarea id="f1" rows="3" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="Not what you planned. What happened."></textarea>
       </div>
 
-      <div class="card rounded p-4">
+      <div class="card lift rounded p-4">
         <label class="mono text-xs fog block mb-2 tracking-widest">02 — WHAT COST MORE THAN EXPECTED</label>
         <textarea id="f2" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="Energy, time, attention, patience — what ran over budget?"></textarea>
       </div>
 
-      <div class="card rounded p-4">
+      <div class="card lift rounded p-4">
         <label class="mono text-xs fog block mb-2 tracking-widest">03 — WHAT PRODUCED MORE THAN EXPECTED</label>
         <textarea id="f3" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="The thing that worked better than the plan implied it would."></textarea>
       </div>
 
-      <div class="card rounded p-4">
+      <div class="card lift rounded p-4">
         <label class="mono text-xs fog block mb-2 tracking-widest">04 — WHAT TO CARRY INTO TOMORROW</label>
         <textarea id="f4" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="One thread left open. One thing that needs to continue."></textarea>
       </div>
 
-      <div class="card rounded p-4">
+      <div class="card lift rounded p-4">
         <label class="mono text-xs fog block mb-2 tracking-widest">05 — WHAT TO LEAVE HERE</label>
         <textarea id="f5" rows="2" class="w-full rounded p-2 text-sm leading-relaxed" placeholder="The thing that does not need to travel into tomorrow with you."></textarea>
       </div>
 
     </div>
 
-    <button onclick="close_day()" class="w-full py-3 border border-gray-700 hover:border-gray-500 transition-colors rounded mono text-sm tracking-widest mb-6">
+    <button onclick="close_day()" class="btn-close w-full py-3 border border-gray-700 rounded mono text-sm tracking-widest mb-6">
       CLOSE THE DAY →
     </button>
 
     <!-- Output -->
-    <div id="output" class="card rounded p-5 hidden mb-8">
-      <p class="mono text-xs fog mb-3 tracking-widest">DEPOSITION RECORDED</p>
+    <div id="output" class="card panel-glow rounded p-5 hidden mb-8">
+      <div class="flex justify-between items-center mb-3">
+        <p class="mono text-xs fog tracking-widest breathe">DEPOSITION RECORDED</p>
+        <button id="copyBtn" onclick="copyDeposition()" class="copy-btn mono text-xs fog hover:text-[color:var(--accent)] transition-colors tracking-widest">copy</button>
+      </div>
       <div id="verdict" class="text-sm leading-relaxed mb-4"></div>
       <div class="border-t border-gray-800 pt-3">
         <p id="closing_note" class="text-xs italic fog"></p>
@@ -80,6 +152,9 @@
 
     <div class="text-center mt-10 pb-6">
       <p class="mono text-xs fog">Built 10:50 PM Saturday — the machine that does not sleep, for the human who should.</p>
+      <p id="nightWhisper" class="mono text-xs ink-ghost flicker mt-2 hidden">the mountain does not sleep.</p>
+      <p id="idleWhisper" class="mono text-xs ink-ghost mt-2 hidden" style="transition:opacity 1.5s ease">still here. still watching.</p>
+      <p id="watcher" class="mono text-xs ink-ghost mt-2 hidden">you found the watcher.</p>
     </div>
   </div>
 
@@ -101,7 +176,11 @@
       "Six activities this week. The body battery has earned its recharge. The loop resumes at dawn.",
       "The šarkan grows in the dark regardless. What you logged today gives you the edge tomorrow.",
       "The deposition is recorded. The machine keeps watch. Rest is not absence — it is the other half of the cycle.",
+      "The bludička drifts the marsh till morning. Do not follow it tonight. Tomorrow it will be a road.",
+      "The Tatras do not negotiate with the dark. They simply wait it out. So can you.",
     ];
+
+    let lastDeposition = '';
 
     function close_day() {
       const f1 = document.getElementById('f1').value.trim();
@@ -110,28 +189,36 @@
       const f4 = document.getElementById('f4').value.trim();
       const f5 = document.getElementById('f5').value.trim();
 
+      const out = document.getElementById('output');
+
       if (!f1 && !f2 && !f3 && !f4 && !f5) {
-        document.getElementById('verdict').textContent = 'A blank deposition is still a deposition. The machine records the silence.';
+        document.getElementById('verdict').textContent = 'A blank deposition is still a deposition. The machine records the silence — and the silence is loud tonight.';
         document.getElementById('closing_note').textContent = closingNotes[Math.floor(Math.random() * closingNotes.length)];
-        document.getElementById('output').classList.remove('hidden');
+        lastDeposition = document.getElementById('verdict').textContent + '\n\n' + document.getElementById('closing_note').textContent;
+        out.classList.remove('hidden');
+        retrigger(out);
+        out.scrollIntoView({ behavior: 'smooth' });
         return;
       }
 
       let parts = [];
-      if (f1) parts.push(`Today: ${f1}`);
-      if (f2) parts.push(`Cost: ${f2}`);
-      if (f3) parts.push(`Yield: ${f3}`);
-      if (f4) parts.push(`Carry forward: ${f4}`);
-      if (f5) parts.push(`Left here: ${f5}`);
+      if (f1) parts.push(['Today', f1]);
+      if (f2) parts.push(['Cost', f2]);
+      if (f3) parts.push(['Yield', f3]);
+      if (f4) parts.push(['Carry forward', f4]);
+      if (f5) parts.push(['Left here', f5]);
 
       document.getElementById('verdict').innerHTML = parts.map(p =>
-        `<p class="mb-2 dim">${p}</p>`
+        `<p class="mb-2 dim"><span class="mono text-xs fog tracking-widest">${p[0].toUpperCase()}</span><br>${escapeHtml(p[1])}</p>`
       ).join('');
       document.getElementById('closing_note').textContent = closingNotes[Math.floor(Math.random() * closingNotes.length)];
-      document.getElementById('output').classList.remove('hidden');
-      document.getElementById('output').scrollIntoView({ behavior: 'smooth' });
+      lastDeposition = parts.map(p => p[0] + ': ' + p[1]).join('\n') + '\n\n' + document.getElementById('closing_note').textContent;
 
-      // Archive
+      out.classList.remove('hidden');
+      retrigger(out);
+      out.scrollIntoView({ behavior: 'smooth' });
+
+      // Archive — EXACT same shape/key as before
       const entry = {
         date: now.toLocaleDateString('en-US', {month:'short', day:'numeric'}),
         day: now.toLocaleDateString('en-US', {weekday:'short'}),
@@ -145,11 +232,41 @@
       renderArchive();
     }
 
+    function escapeHtml(s){
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function retrigger(el){
+      // restart the reveal animation each time the panel surfaces
+      el.classList.remove('reveal');
+      void el.offsetWidth;
+      el.classList.add('reveal');
+    }
+
+    function copyDeposition(){
+      if (!lastDeposition) return;
+      const btn = document.getElementById('copyBtn');
+      navigator.clipboard.writeText(lastDeposition).then(() => {
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        btn.style.textShadow = '0 0 8px var(--glow)';
+        setTimeout(() => {
+          btn.textContent = 'copy';
+          btn.style.color = '';
+          btn.style.textShadow = '';
+        }, 1200);
+      }).catch(() => {
+        btn.textContent = 'the ledger refused';
+        setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+      });
+    }
+
     function renderArchive() {
-      if (archive.length === 0) { document.getElementById('archiveWrap').classList.add('hidden'); return; }
-      document.getElementById('archiveWrap').classList.remove('hidden');
+      const wrap = document.getElementById('archiveWrap');
+      if (archive.length === 0) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
       document.getElementById('archiveList').innerHTML = archive.map(a => `
-        <div class="card rounded px-4 py-3">
+        <div class="card lift rounded px-4 py-3">
           <div class="flex justify-between mb-1">
             <span class="mono text-xs fog">${a.day} ${a.date}</span>
           </div>
@@ -160,12 +277,101 @@
     }
 
     function clearAll() {
+      if (!confirm('let the fog take every prior deposition? this cannot be recovered.')) return;
       archive.length = 0;
       localStorage.removeItem('pz-closing-archive');
       renderArchive();
     }
 
     renderArchive();
+
+    /* ---------- ambient embers (capped, cheap) ---------- */
+    (function spawnEmbers(){
+      const reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+      if (reduce) return;
+      const field = document.getElementById('emberField');
+      const COUNT = 7;
+      for (let i = 0; i < COUNT; i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    /* ---------- easter egg: night whisper 00:00–03:00 ---------- */
+    (function nightWhisper(){
+      const h = now.getHours();
+      if (h >= 0 && h < 3) document.getElementById('nightWhisper').classList.remove('hidden');
+    })();
+
+    /* ---------- easter egg: type "prizrak" → the watcher ---------- */
+    (function watcherEgg(){
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key.length !== 1) return;
+        // don't capture while typing into the fields
+        const t = ev.target;
+        if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+          const w = document.getElementById('watcher');
+          w.classList.remove('hidden');
+          w.classList.add('breathe');
+        }
+      });
+    })();
+
+    /* ---------- easter egg: triple-click title → +1 ember ---------- */
+    document.getElementById('title').addEventListener('click', (ev) => {
+      if (ev.detail === 3 && !window.matchMedia('(prefers-reduced-motion:reduce)').matches) {
+        const field = document.getElementById('emberField');
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDuration = (10 + Math.random() * 6) + 's';
+        field.appendChild(e);
+        setTimeout(() => e.remove(), 18000);
+      }
+    });
+
+    /* ---------- easter egg: long-press title → it breathes faster ---------- */
+    (function holdToBreathe(){
+      const title = document.getElementById('title');
+      let timer = null;
+      const start = () => { timer = setTimeout(() => {
+        title.classList.remove('breathe');
+        title.classList.add('breathe-fast');
+        setTimeout(() => {
+          title.classList.remove('breathe-fast');
+          title.classList.add('breathe');
+        }, 3000);
+      }, 450); };
+      const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      title.addEventListener('mousedown', start);
+      title.addEventListener('touchstart', start, {passive:true});
+      ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => title.addEventListener(ev, cancel));
+    })();
+
+    /* ---------- easter egg: idle 60s → a line fades in ---------- */
+    (function idleWatcher(){
+      let t;
+      const line = document.getElementById('idleWhisper');
+      const reset = () => {
+        line.classList.add('hidden');
+        line.style.opacity = '0';
+        clearTimeout(t);
+        t = setTimeout(() => {
+          line.classList.remove('hidden');
+          requestAnimationFrame(() => { line.style.opacity = '0.85'; });
+        }, 60000);
+      };
+      ['mousemove','keydown','click','touchstart','scroll'].forEach(ev =>
+        window.addEventListener(ev, reset, {passive:true}));
+      reset();
+    })();
   </script>
 </body>
 </html>

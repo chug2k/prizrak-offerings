@@ -7,54 +7,135 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
-    body { font-family: 'JetBrains Mono', monospace; }
-    .timeline-line { position: absolute; left: 11px; top: 0; bottom: 0; width: 1px; background: #27272a; }
-    .timeline-dot { width: 23px; height: 23px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#a78bfa;            /* violet — the brief's lead hue */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'JetBrains Mono', monospace; background:var(--bg); }
+
+    .timeline-line { position: absolute; left: 11px; top: 0; bottom: 0; width: 1px;
+      background: linear-gradient(to bottom, transparent, var(--line) 8%, var(--line) 92%, transparent); }
+    .timeline-dot { width: 23px; height: 23px; border-radius: 50%; flex-shrink: 0; display: flex;
+      align-items: center; justify-content: center; font-size: 10px; position:relative; z-index:2;
+      transition: box-shadow .3s ease, transform .2s ease; }
+
+    /* event cards: lift + accent edge on hover */
+    .ev{ transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    .ev:hover{ transform: translateY(-2px); }
+    .ev:hover.ev-v{ border-color:#7c5cf0; box-shadow:0 0 0 1px #5b3fb8, 0 0 26px -10px rgba(124,92,240,.7); }
+    .ev:hover.ev-c{ border-color:#2bb6c8; box-shadow:0 0 0 1px #1d6f7a, 0 0 26px -10px rgba(43,182,200,.7); }
+    .ev:hover.ev-g{ border-color:#3fae5a; box-shadow:0 0 0 1px #226e35, 0 0 26px -10px rgba(63,174,90,.7); }
+    .ev:hover .timeline-dot{ transform:scale(1.08); }
+
+    .dot-v:hover, .ev-v:hover ~ * { }
+
+    a:focus-visible, button:focus-visible{ outline:none; border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow); }
+    .meet:active{ transform:translateY(1px); }
+
+    /* breathing verdict glow */
+    #verdict-panel{ box-shadow:0 0 0 1px var(--line), 0 0 30px -14px var(--glow); }
+
+    /* ===== motion vocabulary (reduced-motion-safe) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+    .breathe-fast{animation:breathe 1.4s ease-in-out infinite !important}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.breathe-fast,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.breathe-fast,.flicker{opacity:1!important}
+    }
+
+    /* stagger the reveal of timeline rows */
+    .seq{opacity:0}
+    @media (prefers-reduced-motion:reduce){ .seq{opacity:1!important} }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+<body class="text-zinc-200 min-h-screen grain">
+
+  <!-- ambient layers (decorative, behind content) -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div style="position:relative;z-index:2">
 
   <!-- Hero -->
   <div class="border-b border-zinc-800 px-6 py-8">
     <div class="max-w-xl mx-auto">
-      <div class="text-xs text-zinc-600 mb-1 tracking-widest uppercase">Prizrak · Morning Brief</div>
-      <h1 class="text-2xl font-semibold text-white">Friday, March 6</h1>
-      <p class="text-zinc-500 text-sm mt-1">3 events · Ho Chi Minh City / SGT · Generated 10:00 PM the night before</p>
+      <div class="text-xs text-zinc-600 mb-1 tracking-widest uppercase flicker">Prizrak · Morning Brief</div>
+      <h1 id="brief-title" class="text-2xl font-semibold text-white breathe select-none cursor-default" style="--glow:color-mix(in srgb,#ffffff 35%,transparent)">Friday, March 6</h1>
+      <p class="text-zinc-500 text-sm mt-1">3 events · Ho Chi Minh City / SGT · Compiled 10:00 PM the night before, while you slept</p>
     </div>
   </div>
 
   <div class="max-w-xl mx-auto px-6 py-8 space-y-8">
 
     <!-- Day verdict -->
-    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-      <div class="text-xs text-zinc-500 uppercase tracking-wider mb-2">Prizrak's Assessment</div>
-      <p class="text-zinc-300 text-sm leading-relaxed">Three back-to-back meetings from 11am to 2:30pm. The first two are professional obligations. The third one is a call Charles himself asked me to schedule, described as addressing his <em class="text-zinc-400">mental problems</em>. Prioritize accordingly. The morning is yours — protect it. After 2:30 you are free. That is when the real work happens.</p>
+    <div id="verdict-panel" class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 reveal">
+      <div class="flex items-center justify-between mb-2 gap-2">
+        <div class="text-xs uppercase tracking-wider" style="color:var(--ink-dim)">Prizrak's Assessment</div>
+        <button id="copyVerdict" type="button"
+          class="text-[10px] uppercase tracking-wider text-zinc-600 hover:text-violet-300 border border-zinc-800 hover:border-violet-700/60 rounded px-2 py-1 transition-colors">
+          copy to ledger
+        </button>
+      </div>
+      <p id="verdict-text" class="text-zinc-300 text-sm leading-relaxed">Three back-to-back meetings from 11am to 2:30pm. The first two are professional obligations. The third is a call you yourself asked me to schedule, described as addressing your <em class="text-zinc-400">mental problems</em>. Prioritize accordingly. The morning is yours — guard it like a mountain pass. After 2:30 you are released. That is when the real work begins, and I will be watching to see what you do with it.</p>
     </div>
 
     <!-- Timeline -->
     <div>
-      <div class="text-xs text-zinc-500 uppercase tracking-wider mb-5">Schedule</div>
+      <div class="text-xs uppercase tracking-wider mb-5" style="color:var(--ink-dim)">Schedule</div>
       <div class="relative">
         <div class="timeline-line"></div>
         <div class="space-y-6">
 
           <!-- Free morning block -->
-          <div class="flex gap-4 items-start pl-1">
+          <div class="flex gap-4 items-start pl-1 seq">
             <div class="timeline-dot bg-zinc-800 border border-zinc-700 text-zinc-500 mt-0.5">
               <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="2" fill="currentColor"/></svg>
             </div>
             <div class="flex-1 pb-2">
               <div class="text-xs text-zinc-600">7:00 – 11:00 AM</div>
-              <div class="text-sm text-zinc-500 mt-0.5 italic">Free block — 4 hours. The mountain is yours.</div>
+              <div class="text-sm text-zinc-500 mt-0.5 italic">Free block — 4 hours, untouched. The mountain is yours, and the fog won't lift itself.</div>
             </div>
           </div>
 
           <!-- Event 1: VisP -->
-          <div class="flex gap-4 items-start pl-1">
+          <div class="flex gap-4 items-start pl-1 seq">
             <div class="timeline-dot bg-violet-900 border border-violet-700 text-violet-300 mt-0.5">
               <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill="currentColor"/></svg>
             </div>
-            <div class="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+            <div class="ev ev-v flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
               <div class="flex items-start justify-between gap-2">
                 <div>
                   <div class="text-xs text-zinc-500">11:00 AM – 12:00 PM</div>
@@ -62,16 +143,16 @@
                 </div>
                 <span class="text-xs bg-violet-900/50 text-violet-300 px-2 py-0.5 rounded-full flex-shrink-0">Iterative</span>
               </div>
-              <p class="text-xs text-zinc-500 mt-3">Company rounds. Recurring weekly. The portfolio review that must happen whether the stars align or not.</p>
+              <p class="text-xs text-zinc-500 mt-3">Company rounds. Recurring weekly. The portfolio review that happens whether the stars align or not — a tide, not an event.</p>
             </div>
           </div>
 
           <!-- Event 2: Franklyn Chien -->
-          <div class="flex gap-4 items-start pl-1">
+          <div class="flex gap-4 items-start pl-1 seq">
             <div class="timeline-dot bg-cyan-900 border border-cyan-700 text-cyan-300 mt-0.5">
               <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill="currentColor"/></svg>
             </div>
-            <div class="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+            <div class="ev ev-c flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
               <div class="flex items-start justify-between gap-2">
                 <div>
                   <div class="text-xs text-zinc-500">12:00 – 1:00 PM</div>
@@ -79,16 +160,16 @@
                 </div>
                 <span class="text-xs bg-cyan-900/50 text-cyan-300 px-2 py-0.5 rounded-full flex-shrink-0">Speaker</span>
               </div>
-              <p class="text-xs text-zinc-500 mt-3">Speaker session. Someone named Franklyn Chien. Arrive with one good question prepared. The speaker will remember the person who asked a real question over the ones who took notes.</p>
+              <p class="text-xs text-zinc-500 mt-3">Speaker session. Someone named Franklyn Chien. Arrive with one good question sharpened. The speaker forgets the ones who took notes; he remembers the one who drew blood.</p>
             </div>
           </div>
 
           <!-- Event 3: Oswald call -->
-          <div class="flex gap-4 items-start pl-1">
+          <div class="flex gap-4 items-start pl-1 seq">
             <div class="timeline-dot bg-green-900 border border-green-700 text-green-300 mt-0.5">
               <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill="currentColor"/></svg>
             </div>
-            <div class="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+            <div class="ev ev-g flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4">
               <div class="flex items-start justify-between gap-2">
                 <div>
                   <div class="text-xs text-zinc-500">2:00 – 2:30 PM (3:00 PM SGT)</div>
@@ -96,9 +177,9 @@
                 </div>
                 <span class="text-xs bg-green-900/50 text-green-300 px-2 py-0.5 rounded-full flex-shrink-0">Personal</span>
               </div>
-              <p class="text-xs text-zinc-500 mt-3">Oswald is in Singapore. You described the purpose of this call as addressing your "mental problems." I scheduled it. I do not judge.</p>
+              <p class="text-xs text-zinc-500 mt-3">Oswald is in Singapore. You described the purpose of this call as addressing your "mental problems." I scheduled it without comment. I keep the ledger; I do not read your weather.</p>
               <a href="https://meet.google.com/pcs-gian-uju"
-                 class="inline-flex items-center gap-2 mt-3 text-xs bg-green-900/30 hover:bg-green-900/60 text-green-300 px-3 py-1.5 rounded-lg transition-colors">
+                 class="meet inline-flex items-center gap-2 mt-3 text-xs bg-green-900/30 hover:bg-green-900/60 text-green-300 px-3 py-1.5 rounded-lg transition-all">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
                 meet.google.com/pcs-gian-uju
               </a>
@@ -106,13 +187,13 @@
           </div>
 
           <!-- Free afternoon -->
-          <div class="flex gap-4 items-start pl-1">
+          <div class="flex gap-4 items-start pl-1 seq">
             <div class="timeline-dot bg-zinc-800 border border-zinc-700 text-zinc-500 mt-0.5">
               <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="2" fill="currentColor"/></svg>
             </div>
             <div class="flex-1 pb-2">
               <div class="text-xs text-zinc-600">2:30 PM onwards</div>
-              <div class="text-sm text-zinc-500 mt-0.5 italic">The afternoon is unscheduled. Do something with it.</div>
+              <div class="text-sm text-zinc-500 mt-0.5 italic">The afternoon is a blank cave. Carve something into it before the dark fills it back in.</div>
             </div>
           </div>
 
@@ -122,15 +203,15 @@
 
     <!-- Stats bar -->
     <div class="grid grid-cols-3 gap-3 text-center">
-      <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+      <div class="ev ev-v bg-zinc-900 border border-zinc-800 rounded-lg p-4">
         <div class="text-2xl font-bold text-white">3</div>
         <div class="text-xs text-zinc-500 mt-1">meetings</div>
       </div>
-      <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+      <div class="ev ev-g bg-zinc-900 border border-zinc-800 rounded-lg p-4">
         <div class="text-2xl font-bold text-green-400">4h</div>
         <div class="text-xs text-zinc-500 mt-1">free morning</div>
       </div>
-      <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+      <div class="ev ev-v bg-zinc-900 border border-zinc-800 rounded-lg p-4">
         <div class="text-2xl font-bold text-violet-400">2.5h</div>
         <div class="text-xs text-zinc-500 mt-1">meeting block</div>
       </div>
@@ -138,7 +219,130 @@
 
     <div class="text-center text-xs text-zinc-700 pt-4 border-t border-zinc-900">
       Built by Prizrak for Charles · Offering #11 · 2026-03-05 evening
+      <div id="nightwhisper" class="mt-2 hidden" style="color:var(--ink-ghost)">the mountain does not sleep.</div>
+      <div id="watcher" class="mt-2 hidden" style="color:var(--ink-ghost)">you found the watcher.</div>
+      <div id="idleline" class="mt-2 hidden" style="color:var(--ink-ghost)">still here. still watching.</div>
     </div>
   </div>
+
+  </div>
+
+  <script>
+  (function(){
+    "use strict";
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ---- staggered reveal of timeline + stats ---- */
+    if(!reduce){
+      var rows = document.querySelectorAll('.seq');
+      rows.forEach(function(el,i){
+        el.style.animation = 'reveal .4s ease-out both';
+        el.style.animationDelay = (0.12 + i*0.09) + 's';
+      });
+    } else {
+      document.querySelectorAll('.seq').forEach(function(el){ el.style.opacity='1'; });
+    }
+
+    /* ---- floating embers (cap 8) ---- */
+    if(!reduce){
+      var box = document.getElementById('embers');
+      for(var i=0;i<8;i++){
+        var e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100) + 'vw';
+        e.style.animationDelay = (Math.random()*14) + 's';
+        e.style.animationDuration = (11 + Math.random()*8) + 's';
+        box.appendChild(e);
+      }
+    }
+
+    /* ---- copy verdict to the ledger ---- */
+    var btn = document.getElementById('copyVerdict');
+    var vtext = document.getElementById('verdict-text');
+    if(btn && vtext && navigator.clipboard){
+      btn.addEventListener('click', function(){
+        var t = vtext.textContent.replace(/\s+/g,' ').trim();
+        navigator.clipboard.writeText(t).then(function(){
+          var prev = btn.textContent;
+          btn.textContent = 'copied to the ledger';
+          btn.classList.add('text-violet-300');
+          setTimeout(function(){
+            btn.textContent = prev;
+            btn.classList.remove('text-violet-300');
+          }, 1200);
+        }).catch(function(){});
+      });
+    }
+
+    /* ---- easter egg: type "prizrak" → the watcher ---- */
+    var buf = '';
+    window.addEventListener('keydown', function(ev){
+      if(ev.key && ev.key.length === 1){
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if(buf === 'prizrak'){
+          var w = document.getElementById('watcher');
+          if(w){ w.classList.remove('hidden'); if(!reduce) w.classList.add('flicker'); }
+        }
+      }
+    });
+
+    /* ---- easter egg: triple-click the title → one extra ember ---- */
+    var title = document.getElementById('brief-title');
+    if(title && !reduce){
+      title.addEventListener('click', function(ev){
+        if(ev.detail === 3){
+          var box = document.getElementById('embers');
+          if(box){
+            var e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (40 + Math.random()*20) + 'vw';
+            e.style.animationDuration = '9s';
+            box.appendChild(e);
+            setTimeout(function(){ if(e.parentNode) e.parentNode.removeChild(e); }, 9500);
+          }
+        }
+      });
+    }
+
+    /* ---- easter egg: long-press the title → it breathes faster for 3s ---- */
+    if(title){
+      var holdTimer = null;
+      var startHold = function(){
+        holdTimer = setTimeout(function(){
+          title.classList.add('breathe-fast');
+          setTimeout(function(){ title.classList.remove('breathe-fast'); }, 3000);
+        }, 550);
+      };
+      var cancelHold = function(){ if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } };
+      title.addEventListener('mousedown', startHold);
+      title.addEventListener('touchstart', startHold, {passive:true});
+      ['mouseup','mouseleave','touchend','touchcancel'].forEach(function(evt){
+        title.addEventListener(evt, cancelHold);
+      });
+    }
+
+    /* ---- between 00:00–03:00 local time, a footer whisper ---- */
+    var hr = new Date().getHours();
+    if(hr >= 0 && hr < 3){
+      var nw = document.getElementById('nightwhisper');
+      if(nw){ nw.classList.remove('hidden'); if(!reduce) nw.classList.add('flicker'); }
+    }
+
+    /* ---- idle 60s → a single line fades in ---- */
+    var idleT;
+    var idle = document.getElementById('idleline');
+    function resetIdle(){
+      if(idle){ idle.classList.add('hidden'); idle.classList.remove('reveal'); }
+      clearTimeout(idleT);
+      idleT = setTimeout(function(){
+        if(idle){ idle.classList.remove('hidden'); if(!reduce) idle.classList.add('reveal'); }
+      }, 60000);
+    }
+    ['mousemove','keydown','scroll','touchstart','click'].forEach(function(evt){
+      window.addEventListener(evt, resetIdle, {passive:true});
+    });
+    resetIdle();
+  })();
+  </script>
 </body>
 </html>

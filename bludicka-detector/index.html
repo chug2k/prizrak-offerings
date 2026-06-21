@@ -6,72 +6,142 @@
   <title>The Bludička Detector</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0c0c0f; }
-    @keyframes flicker {
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#818cf8;          /* indigo lead, kept from original */
+      --accent-deep:#6366f1;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body { background: var(--bg); }
+    body { color: var(--ink); }
+
+    /* ---- house motion vocabulary (reduced-motion-safe) ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* original drifting will-o'-the-wisp lights, kept but quieter */
+    @keyframes wispFlicker {
       0%,100%{opacity:1;filter:blur(0px)}
-      25%{opacity:0.85;filter:blur(0.5px)}
-      50%{opacity:0.95;filter:blur(0px)}
-      75%{opacity:0.8;filter:blur(1px)}
+      25%{opacity:0.55;filter:blur(0.5px)}
+      50%{opacity:0.85;filter:blur(0px)}
+      75%{opacity:0.5;filter:blur(1px)}
     }
     @keyframes drift {
       0%,100%{transform:translateY(0px) translateX(0px)}
-      33%{transform:translateY(-4px) translateX(2px)}
-      66%{transform:translateY(2px) translateX(-3px)}
+      33%{transform:translateY(-6px) translateX(3px)}
+      66%{transform:translateY(3px) translateX(-4px)}
     }
-    .flame { animation: flicker 3s ease-in-out infinite, drift 7s ease-in-out infinite; }
-    .flame2 { animation: flicker 4s ease-in-out infinite 0.8s, drift 9s ease-in-out infinite 1s; }
-    .flame3 { animation: flicker 2.5s ease-in-out infinite 0.3s, drift 6s ease-in-out infinite 2s; }
+    .flame { animation: wispFlicker 3s ease-in-out infinite, drift 7s ease-in-out infinite; }
+    .flame2 { animation: wispFlicker 4s ease-in-out infinite 0.8s, drift 9s ease-in-out infinite 1s; }
+    .flame3 { animation: wispFlicker 2.5s ease-in-out infinite 0.3s, drift 6s ease-in-out infinite 2s; }
+
     @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
     .fade-up { animation: fadeUp 0.5s ease; }
-    .verdict-box { border-left: 3px solid #6366f1; background: rgba(99,102,241,0.06); }
-    textarea, input { caret-color: #818cf8; }
+
+    .verdict-box { border-left: 3px solid var(--accent-deep); background: color-mix(in srgb, var(--accent) 7%, transparent);
+      box-shadow:0 0 0 1px var(--line-soft), 0 0 28px -8px var(--glow); }
+    textarea, input { caret-color: var(--accent); }
     .step { display: none; }
     .step.active { display: block; }
-    .option-btn { transition: all 0.15s; }
-    .option-btn:hover { background: rgba(99,102,241,0.15); border-color: #6366f1; }
-    .option-btn.selected { background: rgba(99,102,241,0.2); border-color: #818cf8; color: #c7d2fe; }
-    .history-row { border-left: 2px solid #1e1e2e; }
+
+    .option-btn { transition: transform .15s, background .15s, border-color .15s, color .15s, box-shadow .15s; }
+    .option-btn:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: var(--accent-deep); transform: translateY(-2px); }
+    .option-btn:active { transform: translateY(1px); }
+    .option-btn.selected { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: #c7d2fe; box-shadow:0 0 0 1px var(--glow); }
+    .option-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .act-btn{ transition: transform .15s, background .15s, color .15s, box-shadow .15s, border-color .15s; }
+    .act-btn:hover{ transform: translateY(-2px); }
+    .act-btn:active{ transform: translateY(1px); }
+    .act-btn:focus-visible{ outline:none; box-shadow:0 0 0 1px var(--glow); }
+
+    textarea:focus-visible, input:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .history-row { border-left: 2px solid var(--line); transition: border-color .15s, background .15s; }
+    .history-row:hover { border-left-color: var(--accent-deep); }
+
+    .candle { display:inline-block; }
+    .candle.lit { cursor: pointer; }
+
+    #ghost-egg{ color:var(--ink-ghost); }
+    #idle-whisper{ color:var(--ink-ghost); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.flame,.flame2,.flame3,.fade-up,.candle{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="text-zinc-300 min-h-screen font-sans antialiased">
+<body class="grain text-zinc-300 min-h-screen font-sans antialiased">
 
-  <!-- Ghost lights -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden">
+  <!-- atmosphere layers -->
+  <div class="fog"></div>
+  <div id="ember-field"></div>
+
+  <!-- Ghost lights (the bludičky themselves) -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden" style="z-index:0">
     <div class="flame absolute top-1/3 left-1/4 w-3 h-3 rounded-full bg-indigo-400/20 blur-sm"></div>
     <div class="flame2 absolute top-2/3 right-1/3 w-2 h-2 rounded-full bg-blue-300/15 blur-sm"></div>
     <div class="flame3 absolute top-1/2 right-1/4 w-2 h-2 rounded-full bg-indigo-300/10 blur-md"></div>
   </div>
 
-  <div class="relative max-w-xl mx-auto px-4 py-10">
+  <div class="relative max-w-xl mx-auto px-4 py-10" style="z-index:2">
 
     <!-- Header -->
     <div class="mb-10 text-center">
-      <div class="text-4xl mb-3">🕯️</div>
-      <h1 class="text-2xl font-bold text-white mb-2">The Bludička Detector</h1>
-      <p class="text-zinc-500 text-sm leading-relaxed">You have been walking for hours. You feel forward motion.<br>You keep passing the same tree.<br>Somewhere in your inference chain, one assumption is broken. Find it.</p>
-      <p class="text-[11px] text-zinc-700 mt-3 italic">Named for the Carpathian ghost lights that lead travelers to swamps.<br>The light is real. The problem is the inference.</p>
+      <div id="candle" class="candle lit text-4xl mb-3 breathe" title="the watcher is patient" role="img" aria-label="candle">🕯️</div>
+      <h1 id="title" class="text-2xl font-bold text-white mb-2 select-none" style="text-shadow:0 0 12px var(--glow)">The Bludička Detector</h1>
+      <p class="text-zinc-500 text-sm leading-relaxed">You have walked for hours. You feel forward motion.<br>You keep passing the same tree.<br>Somewhere in your inference chain, one assumption is rotten. Find it.</p>
+      <p class="text-[11px] text-zinc-700 mt-3 italic">Named for the Carpathian ghost-lights that lead travelers into the swamp.<br>The light is real. The problem is the inference.</p>
     </div>
 
     <!-- Step 0: Problem -->
     <div id="step-0" class="step active fade-up">
-      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">The Loop</div>
-      <p class="text-sm text-zinc-400 mb-4">Name the problem you have been circling. Not the symptom — the underlying thing you keep returning to without resolution.</p>
-      <textarea id="problem" rows="3" placeholder="I keep coming back to… / I can't seem to resolve… / Every time I try to move on this, I end up…"
-        class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-indigo-600 placeholder-zinc-700 resize-none mb-4"></textarea>
-      <div class="text-xs font-mono text-zinc-600 mb-2">How long has this been unresolved?</div>
+      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">DOMAIN 00 / THE LOOP</div>
+      <p class="text-sm text-zinc-400 mb-4">Name the problem you keep circling. Not the symptom — the thing you keep returning to without ever crossing the threshold.</p>
+      <textarea id="problem" rows="3" placeholder="I keep coming back to… / I can't seem to resolve… / Every time I move on this, I end up…"
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 resize-none mb-4"></textarea>
+      <div class="text-xs font-mono text-zinc-600 mb-2">HOW LONG HAS THE FOG HELD?</div>
       <div class="flex gap-2 flex-wrap mb-6">
         <button class="option-btn border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-400 font-mono" data-q="duration" data-v="days" onclick="selectOption(this)">A few days</button>
         <button class="option-btn border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-400 font-mono" data-q="duration" data-v="weeks" onclick="selectOption(this)">A few weeks</button>
         <button class="option-btn border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-400 font-mono" data-q="duration" data-v="months" onclick="selectOption(this)">Months</button>
         <button class="option-btn border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-400 font-mono" data-q="duration" data-v="years" onclick="selectOption(this)">Over a year</button>
       </div>
-      <button onclick="nextStep(1)" class="w-full py-3 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono transition-colors">Continue →</button>
+      <button onclick="nextStep(1)" class="act-btn w-full py-3 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono">Step into the dark →</button>
     </div>
 
     <!-- Step 1: The signal -->
     <div id="step-1" class="step">
-      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">The Light You Are Following</div>
-      <p class="text-sm text-zinc-400 mb-4">The Bludička works because the light is real. What is the genuine signal that keeps drawing you back to this problem?</p>
+      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">DOMAIN 01 / THE LIGHT YOU FOLLOW</div>
+      <p class="text-sm text-zinc-400 mb-4">The Bludička works because the light is real. What is the genuine signal that keeps drawing you back toward this water?</p>
       <div class="flex flex-col gap-2 mb-6">
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="signal" data-v="evidence" onclick="selectOption(this)">Real evidence that the path exists (data, examples, precedent)</button>
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="signal" data-v="desire" onclick="selectOption(this)">Strong desire — I want this outcome more than others</button>
@@ -80,15 +150,15 @@
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="signal" data-v="obligation" onclick="selectOption(this)">External obligation — someone or something expects resolution</button>
       </div>
       <div class="flex gap-3">
-        <button onclick="nextStep(0)" class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 rounded-xl text-sm font-mono">← Back</button>
-        <button onclick="nextStep(2)" class="flex-1 py-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono">Continue →</button>
+        <button onclick="nextStep(0)" class="act-btn px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 rounded-xl text-sm font-mono">← Back</button>
+        <button onclick="nextStep(2)" class="act-btn flex-1 py-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono">Continue →</button>
       </div>
     </div>
 
     <!-- Step 2: What you've tried -->
     <div id="step-2" class="step">
-      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">The Movement</div>
-      <p class="text-sm text-zinc-400 mb-4">What have you actually done to try to resolve this? Pick the most accurate description of your pattern.</p>
+      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">DOMAIN 02 / THE MOVEMENT</div>
+      <p class="text-sm text-zinc-400 mb-4">What have you actually done to escape? Pick the truest description of your pattern — the one the ghost would recognize.</p>
       <div class="flex flex-col gap-2 mb-6">
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="pattern" data-v="gather" onclick="selectOption(this)">Gathered more information — researched, read, asked around</button>
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="pattern" data-v="decide" onclick="selectOption(this)">Made decisions and then reversed them</button>
@@ -97,15 +167,15 @@
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="pattern" data-v="avoid" onclick="selectOption(this)">Avoided it directly, addressed adjacent things instead</button>
       </div>
       <div class="flex gap-3">
-        <button onclick="nextStep(1)" class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 rounded-xl text-sm font-mono">← Back</button>
-        <button onclick="nextStep(3)" class="flex-1 py-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono">Continue →</button>
+        <button onclick="nextStep(1)" class="act-btn px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 rounded-xl text-sm font-mono">← Back</button>
+        <button onclick="nextStep(3)" class="act-btn flex-1 py-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono">Continue →</button>
       </div>
     </div>
 
     <!-- Step 3: The assumption -->
     <div id="step-3" class="step">
-      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">The Unexamined Coat</div>
-      <p class="text-sm text-zinc-400 mb-4">There is one assumption underneath this loop that you treat as load-bearing — so foundational you rarely question it. Which sounds closest?</p>
+      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">DOMAIN 03 / THE UNEXAMINED COAT</div>
+      <p class="text-sm text-zinc-400 mb-4">Underneath the loop sits one assumption you treat as load-bearing — so foundational you almost never turn it over. Which sounds closest?</p>
       <div class="flex flex-col gap-2 mb-4">
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="assumption" data-v="possible" onclick="selectOption(this)">That this outcome is actually achievable in my current situation</button>
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="assumption" data-v="right_path" onclick="selectOption(this)">That I am pursuing the right path and just need to do it better</button>
@@ -113,11 +183,11 @@
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="assumption" data-v="want" onclick="selectOption(this)">That I actually want what I think I want</button>
         <button class="option-btn border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-400 text-left" data-q="assumption" data-v="cost" onclick="selectOption(this)">That the cost of not resolving this is high enough to justify the effort</button>
       </div>
-      <textarea id="assumption-note" rows="2" placeholder="Optional: what specifically is the assumption? (write it out)"
-        class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-indigo-600 placeholder-zinc-700 resize-none mb-4"></textarea>
+      <textarea id="assumption-note" rows="2" placeholder="Optional: turn the coat inside out — write the assumption in your own words."
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-700 resize-none mb-4"></textarea>
       <div class="flex gap-3">
-        <button onclick="nextStep(2)" class="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 rounded-xl text-sm font-mono">← Back</button>
-        <button onclick="nextStep(4)" class="flex-1 py-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono">Continue →</button>
+        <button onclick="nextStep(2)" class="act-btn px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 rounded-xl text-sm font-mono">← Back</button>
+        <button onclick="nextStep(4)" class="act-btn flex-1 py-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 rounded-xl text-sm font-mono">Read the swamp →</button>
       </div>
     </div>
 
@@ -128,14 +198,17 @@
 
     <!-- History -->
     <div id="history-section" class="hidden mt-10">
-      <div class="text-xs font-mono text-zinc-700 uppercase tracking-wider mb-3">Previous Detections</div>
+      <div class="text-xs font-mono text-zinc-700 uppercase tracking-wider mb-3">PREVIOUS DETECTIONS / THE LEDGER</div>
       <div id="history-list" class="space-y-3"></div>
     </div>
 
     <!-- Footer -->
     <div class="mt-12 pt-6 border-t border-zinc-900 text-center">
-      <p class="text-xs text-zinc-700">The Bludička leads to water. The coat turn breaks the loop. The path is still yours to find.</p>
+      <p class="text-xs text-zinc-700">The Bludička leads to water. The coat turned inside-out breaks its hold. The path is still yours to find.</p>
       <p class="text-[10px] text-zinc-800 mt-1">From Carpathian Rusyn demonology · Bereznykŷ, Upper Boržava Valley</p>
+      <p id="night-whisper" class="text-[10px] mt-2 hidden flicker" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+      <p id="idle-whisper" class="text-[10px] mt-2 opacity-0 transition-opacity duration-1000">still here. still watching.</p>
+      <p id="ghost-egg" class="text-[10px] mt-2 hidden">you found the watcher.</p>
     </div>
   </div>
 
@@ -149,32 +222,32 @@ const DIAGNOSES = {
   broken_inference: {
     label: "Broken inference",
     coat: "The assumption that this path leads where you think it does",
-    desc: "You are following a real signal to a wrong destination. The light exists. The swamp exists. The inference between them is the problem — not your effort, not your desire. What if the outcome you are pursuing is not actually at the end of this particular path?",
-    action: "Map the path explicitly: signal → steps → assumed destination. Find the step where you inserted 'and therefore.'"
+    desc: "You are following a real signal to a wrong destination. The light exists. The swamp exists. The inference between them is the broken thing — not your effort, not your desire. What if the outcome you are chasing is simply not at the end of this particular path?",
+    action: "Map the path out loud: signal → steps → assumed destination. Find the step where you quietly inserted 'and therefore.'"
   },
   wrong_want: {
     label: "Misidentified want",
     coat: "The assumption that you want what you think you want",
-    desc: "The desire feels real, but the object of the desire may be a proxy for something else. You are following the light, but the light represents something adjacent to what would actually satisfy you. The Bludička often uses your own desires as bait.",
-    action: "Ask: if you got exactly what you think you want, what would you do next? The answer reveals whether the want is terminal or instrumental."
+    desc: "The desire feels real, but its object may be a proxy for something else. You are following the light, yet the light only stands in for what would actually satisfy you. The Bludička prefers bait you bring yourself.",
+    action: "Ask: if you got exactly what you think you want, what would you do the next morning? The answer tells you whether the want is the destination or only a road sign."
   },
   waiting_loop: {
     label: "Infinite wait",
     coat: "The assumption that the right conditions will arrive",
-    desc: "The loop is a holding pattern. You have decided, implicitly, that now is not the time — and the 'right time' is defined in a way that does not arrive. This is the most comfortable loop. The coat does not feel inside-out because nothing is visibly wrong.",
-    action: "Name the specific condition you are waiting for. Ask: what probability do you assign to it occurring in the next 90 days? If below 30%, the wait is not a strategy."
+    desc: "The loop is a holding pattern. You decided, without quite admitting it, that now is not the time — and 'the right time' is defined so it never comes. This is the warmest loop. The coat never feels inside-out because nothing visibly burns.",
+    action: "Name the exact condition you are waiting for. What probability do you give it inside the next 90 days? Below 30% and the wait is not a strategy — it is the swamp."
   },
   execution_trap: {
     label: "Execution trap",
     coat: "The assumption that you are on the right path and just need to do it better",
-    desc: "You have been here before. Same path, different attempt. The Blud works through repetition — each new effort feels like it might be the one that breaks through. The coat has not been turned because each restart feels like a genuine new attempt.",
-    action: "What would have to be true for this path to be genuinely different this time? If the answer requires a change in you rather than a change in the approach, note the difference."
+    desc: "You have stood here before. Same path, fresh attempt. The Blud works through repetition — every new run feels like the one that finally breaks through. The coat stays unturned because each restart wears the costume of a genuine new beginning.",
+    action: "What would have to be true for this path to be genuinely different this time? If the answer needs a change in you rather than the approach, mark that difference. It is the whole game."
   },
   cost_question: {
     label: "Sunk cost spiral",
     coat: "The assumption that the cost of not resolving this is high",
-    desc: "The loop persists because letting go feels like loss. The Bludička in this form leads you toward a path you have already invested in. The light is the investment itself. What if the actual cost of continuing to circle is higher than the cost of the unresolved question?",
-    action: "Calculate the cost of the loop itself: how much time per week, how much attention, how much energy that could go elsewhere? Compare to the stated cost of non-resolution."
+    desc: "The loop holds because letting go feels like loss. In this form the Bludička leads you back toward what you already buried treasure in. The light is the investment itself. What if circling costs more than the unanswered question ever would?",
+    action: "Tally the loop directly: hours per week, attention, the energy bleeding elsewhere. Set it against the stated cost of leaving it unresolved. One of those numbers is lying to you."
   }
 };
 
@@ -197,9 +270,20 @@ function nextStep(n) {
   if (n === 4) {
     buildResult();
   }
-  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active','fade-up'));
   const next = document.getElementById(`step-${n}`);
-  if (next) { next.classList.add('active'); next.classList.add('fade-up'); }
+  if (next) {
+    next.classList.add('active');
+    // re-trigger reveal animation
+    next.classList.remove('fade-up');
+    void next.offsetWidth;
+    next.classList.add('fade-up');
+    if (n === 4) { try { next.scrollIntoView({behavior:'smooth', block:'start'}); } catch(e){} }
+  }
+}
+
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function buildResult() {
@@ -216,38 +300,59 @@ function buildResult() {
 
   const d = DIAGNOSES[diagKey];
 
-  const durationText = { days:'a few days', weeks:'a few weeks', months:'months', years:'over a year' }[answers.duration] || '';
-  const signalText = { evidence:'real evidence', desire:'strong desire', fear:'fear of cost', identity:'identity stakes', obligation:'external obligation' }[answers.signal] || '';
+  const durationText = { days:'a few days', weeks:'a few weeks', months:'months', years:'over a year' }[answers.duration] || 'an unmarked stretch';
+  const signalText = { evidence:'real evidence', desire:'strong desire', fear:'fear of cost', identity:'identity stakes', obligation:'external obligation' }[answers.signal] || 'an unnamed pull';
+
+  const problemSafe = escapeHTML(problem.slice(0,80));
+  const noteSafe = assumptionNote ? escapeHTML(assumptionNote) : '';
+
+  // plain-text version of the verdict, for the ledger / clipboard
+  const copyText =
+`THE BLUDIČKA DETECTOR — ${d.label}
+loop: "${problem.slice(0,120)}"
+held for ${durationText} · signal: ${signalText}
+
+the coat to turn:
+${d.coat}
+
+reading:
+${d.desc}
+
+the coat to turn (action):
+${d.action}${assumptionNote ? `\n\nyour words: "${assumptionNote}"` : ''}`;
+
+  window._lastCopyText = copyText;
 
   const html = `
-    <div class="mb-6">
+    <div class="mb-6 reveal">
       <div class="flex items-center gap-3 mb-2">
-        <div class="w-2 h-2 rounded-full bg-indigo-400 shrink-0"></div>
-        <span class="text-xs font-mono text-zinc-600 uppercase tracking-wider">Detection Complete</span>
+        <div class="w-2 h-2 rounded-full bg-indigo-400 shrink-0 breathe"></div>
+        <span class="text-xs font-mono text-zinc-600 uppercase tracking-wider">DETECTION COMPLETE</span>
       </div>
-      <div class="text-xs text-zinc-700 font-mono mb-4">"${problem.slice(0,80)}${problem.length>80?'…':''}" · looping for ${durationText} · signal: ${signalText}</div>
+      <div class="text-xs text-zinc-700 font-mono mb-4">"${problemSafe}${problem.length>80?'…':''}" · held for ${durationText} · signal: ${signalText}</div>
     </div>
 
-    <div class="verdict-box rounded-xl p-5 mb-5">
-      <div class="text-xs font-mono text-indigo-400 mb-1 uppercase tracking-wider">${d.label}</div>
+    <div class="verdict-box rounded-xl p-5 mb-5 reveal">
+      <div class="text-xs font-mono text-indigo-400 mb-1 uppercase tracking-wider breathe">${d.label}</div>
       <div class="text-base font-semibold text-white mb-3">${d.coat}</div>
       <div class="text-sm text-zinc-300 leading-relaxed">${d.desc}</div>
-      ${assumptionNote ? `<div class="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-500 italic">"${assumptionNote}"</div>` : ''}
+      ${noteSafe ? `<div class="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-500 italic">"${noteSafe}"</div>` : ''}
     </div>
 
-    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6">
-      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">The Coat to Turn</div>
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6 reveal">
+      <div class="text-xs font-mono text-zinc-600 mb-2 uppercase tracking-wider">THE COAT TO TURN</div>
       <div class="text-sm text-zinc-300 leading-relaxed">${d.action}</div>
     </div>
 
     <div class="bg-zinc-900/50 border border-zinc-900 rounded-xl p-4 mb-6">
-      <div class="text-xs font-mono text-zinc-700 mb-2">What the Blud taught us</div>
-      <div class="text-xs text-zinc-600 leading-relaxed">The Bludička's light is real. It is the inference that is broken — not your effort, not your desire. The inside-out coat does not destroy the spirit. It breaks its navigational hold. You still have to find the path. But you stop looping first.</div>
+      <div class="text-xs font-mono text-zinc-700 mb-2">WHAT THE BLUD TAUGHT US</div>
+      <div class="text-xs text-zinc-600 leading-relaxed">The Bludička's light is real. It is the inference that is broken — not your effort, not your desire. Turning the coat inside-out does not kill the spirit. It severs its navigational hold. You still have to find the path. You just stop looping first.</div>
     </div>
 
-    <div class="flex gap-3">
-      <button onclick="saveEntry('${diagKey}')" class="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono transition-colors">Save to Log</button>
-      <button onclick="resetDetector()" class="flex-1 py-2.5 bg-indigo-900/50 hover:bg-indigo-900 text-indigo-300 rounded-xl text-sm font-mono transition-colors">New Detection</button>
+    <div class="flex gap-2 flex-wrap">
+      <button onclick="copyVerdict(this)" class="act-btn flex-1 min-w-[7rem] py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono">Copy</button>
+      <button onclick="saveEntry('${diagKey}')" class="act-btn flex-1 min-w-[7rem] py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl text-sm font-mono">File to the ledger</button>
+      <button onclick="resetDetector()" class="act-btn flex-1 min-w-[7rem] py-2.5 bg-indigo-900/50 hover:bg-indigo-900 text-indigo-300 rounded-xl text-sm font-mono">New detection</button>
     </div>
   `;
 
@@ -255,15 +360,44 @@ function buildResult() {
   window._lastEntry = { date: new Date().toISOString().split('T')[0], problem: problem.slice(0,80), diagKey, label: d.label, coat: d.coat, answers: {...answers} };
 }
 
+function copyVerdict(btn) {
+  const text = window._lastCopyText || '';
+  const done = () => {
+    const original = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.style.color = 'var(--accent)';
+    setTimeout(() => { btn.textContent = original; btn.style.color = ''; }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e) {}
+}
+
 function saveEntry(diagKey) {
   if (!window._lastEntry) return;
+  const btn = (typeof event !== 'undefined' && event && event.target) ? event.target : null;
   history.unshift(window._lastEntry);
   if (history.length > 15) history = history.slice(0,15);
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ history }));
   renderHistory();
-  const btn = event.target;
-  btn.textContent = 'Saved ✓';
-  setTimeout(() => btn.textContent = 'Save to Log', 1500);
+  if (btn) {
+    btn.textContent = 'filed. the ledger remembers';
+    btn.style.color = 'var(--accent)';
+    setTimeout(() => { btn.textContent = 'File to the ledger'; btn.style.color = ''; }, 1500);
+  }
 }
 
 function resetDetector() {
@@ -280,14 +414,14 @@ function renderHistory() {
   if (!history || history.length === 0) { section.classList.add('hidden'); return; }
   section.classList.remove('hidden');
   list.innerHTML = history.map((e,i) => `
-    <div class="history-row pl-4 py-3 bg-zinc-900/30 rounded-r-lg">
+    <div class="history-row pl-4 py-3 bg-zinc-900/30 rounded-r-lg reveal">
       <div class="flex items-center gap-3 mb-1">
-        <span class="text-xs font-mono text-zinc-700">${e.date}</span>
-        <span class="text-xs text-indigo-400 font-mono">${e.label}</span>
+        <span class="text-xs font-mono text-zinc-700">${escapeHTML(e.date||'')}</span>
+        <span class="text-xs text-indigo-400 font-mono">${escapeHTML(e.label||'')}</span>
       </div>
-      <div class="text-sm text-zinc-400 mb-1">${e.problem}</div>
-      <div class="text-xs text-zinc-600">${e.coat}</div>
-      <button onclick="removeHistory(${i})" class="text-[10px] text-zinc-800 hover:text-zinc-600 font-mono mt-1">delete</button>
+      <div class="text-sm text-zinc-400 mb-1">${escapeHTML(e.problem||'')}</div>
+      <div class="text-xs text-zinc-600">${escapeHTML(e.coat||'')}</div>
+      <button onclick="removeHistory(${i})" class="text-[10px] text-zinc-800 hover:text-zinc-600 font-mono mt-1">let the fog take it</button>
     </div>`).join('');
 }
 
@@ -297,10 +431,75 @@ function removeHistory(i) {
   renderHistory();
 }
 
+/* ---- atmosphere: drifting embers ---- */
+function spawnEmbers(count){
+  const field = document.getElementById('ember-field');
+  if (!field) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
+  const n = Math.min(count, 10 - field.childElementCount);
+  for (let k=0; k<n; k++){
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random()*100) + 'vw';
+    e.style.animationDelay = (Math.random()*14) + 's';
+    e.style.animationDuration = (11 + Math.random()*7) + 's';
+    field.appendChild(e);
+  }
+}
+
+/* ---- easter eggs (quiet, non-blocking, never touch saved state) ---- */
+function initEggs(){
+  // type "prizrak" -> light the watcher line
+  let buf = '';
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-7);
+      if (buf === 'prizrak') {
+        const g = document.getElementById('ghost-egg');
+        if (g) { g.classList.remove('hidden'); g.classList.add('flicker'); }
+      }
+    }
+  });
+
+  // triple-click the title -> spawn one extra ember
+  const title = document.getElementById('title');
+  if (title) title.addEventListener('click', (ev) => { if (ev.detail === 3) spawnEmbers(1); });
+
+  // hold the candle -> it breathes faster for 3s
+  const candle = document.getElementById('candle');
+  if (candle) {
+    let t = null;
+    const hold = () => { candle.style.animationDuration = '1.4s'; clearTimeout(t); t = setTimeout(() => candle.style.animationDuration = '', 3000); };
+    candle.addEventListener('mousedown', hold);
+    candle.addEventListener('touchstart', (e) => { e.preventDefault(); hold(); }, {passive:false});
+  }
+
+  // 00:00–03:00 local -> faint footer whisper
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const nw = document.getElementById('night-whisper');
+    if (nw) nw.classList.remove('hidden');
+  }
+
+  // idle 60s -> a single line fades in
+  const idle = document.getElementById('idle-whisper');
+  let idleTimer = null;
+  const resetIdle = () => {
+    if (idle) idle.style.opacity = '0';
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (idle) idle.style.opacity = '0.9'; }, 60000);
+  };
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, resetIdle, {passive:true}));
+  resetIdle();
+}
+
 window.addEventListener('load', () => {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) { try { const d = JSON.parse(saved); history = d.history || []; } catch(e) {} }
   renderHistory();
+  spawnEmbers(7);
+  initEggs();
 });
 </script>
 </body>

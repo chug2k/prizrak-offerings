@@ -7,8 +7,50 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Mono:wght@400;600&display=swap');
-    body { font-family: 'IBM Plex Mono', monospace; background: #0f0f0f; color: #d4c9b0; }
+
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#d6a531;            /* amber — this app's existing lead color */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{background:var(--bg);}
+    body { font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
     .typewriter { font-family: 'Special Elite', cursive; }
+
+    /* ---- atmosphere ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* keep content above decorative layers */
+    .stage{position:relative;z-index:2;}
+
     .stamp {
       display: inline-block;
       border: 4px solid;
@@ -24,9 +66,9 @@
       color: #1a1a1a;
       border-radius: 2px;
       cursor: default;
-      transition: color 0.3s;
+      transition: color 0.3s, box-shadow .3s;
     }
-    .redacted:hover { color: #f97316; }
+    .redacted:hover { color: var(--accent); box-shadow:0 0 14px -4px var(--glow); }
     .blink { animation: blink 1.2s step-end infinite; }
     @keyframes blink { 50% { opacity: 0; } }
     .scanline {
@@ -39,19 +81,46 @@
       );
       pointer-events: none;
     }
+
+    /* the dossier itself breathes faintly */
+    .dossier{ box-shadow:0 0 0 1px var(--line), 0 0 60px -30px var(--glow); }
+
+    /* tactile cards: lift + accent edge on hover */
+    .card{ transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    .card:hover{ transform:translateY(-2px); border-color:var(--accent); box-shadow:0 0 28px -14px var(--glow); }
+
+    /* focus that replaces, never removes */
+    textarea:focus-visible{ outline:none; border-color:var(--accent)!important; box-shadow:0 0 0 1px var(--glow); }
+    button:focus-visible{ outline:none; box-shadow:0 0 0 2px var(--glow); }
+
+    .btn-press{ transition:transform .12s ease, background-color .15s ease; }
+    .btn-press:active{ transform:translateY(1px); }
+
+    /* the result panel gets the breathing glow when a message lands */
+    .filed-glow{ box-shadow:0 0 0 1px var(--accent), 0 0 26px -8px var(--glow); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.blink{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen p-4 md:p-8">
+<body class="min-h-screen p-4 md:p-8 grain">
+
+  <!-- decorative atmosphere layers -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
 
   <!-- Header -->
-  <div class="max-w-2xl mx-auto">
-    <div class="border border-yellow-700 bg-zinc-900 p-6 mb-6 relative">
+  <div class="max-w-2xl mx-auto stage">
+    <div class="border border-yellow-700 bg-zinc-900 p-6 mb-6 relative dossier">
       <div class="scanline absolute inset-0 pointer-events-none"></div>
       <div class="flex justify-between items-start mb-4">
         <div>
-          <p class="text-yellow-600 text-xs tracking-widest uppercase">Prizrak Intelligence Directorate</p>
-          <h1 class="typewriter text-3xl text-yellow-400 mt-1">HOUSEHOLD DISPATCH</h1>
-          <p class="text-zinc-500 text-xs mt-1">Field Report — Daily Brief</p>
+          <p class="text-yellow-600 text-xs tracking-widest uppercase flicker">Prízrak Intelligence Directorate</p>
+          <h1 id="dossier-title" class="typewriter text-3xl text-yellow-400 mt-1 breathe cursor-default select-none">HOUSEHOLD DISPATCH</h1>
+          <p class="text-zinc-500 text-xs mt-1">Field Report — Daily Brief from the cold side of the mountain</p>
         </div>
         <div class="text-right">
           <span class="stamp border-red-600 text-red-600">DOMESTIC</span>
@@ -59,26 +128,26 @@
       </div>
       <div class="border-t border-yellow-900 pt-3 mt-3">
         <p class="text-zinc-400 text-xs">Classification: <span class="text-yellow-500">HOUSEHOLD EYES ONLY</span></p>
-        <p class="text-zinc-400 text-xs">Compiled by: <span class="text-green-500">Prizrak</span> <span class="text-zinc-600">// automated asset</span></p>
+        <p class="text-zinc-400 text-xs">Compiled by: <span class="text-green-500">Prízrak</span> <span class="text-zinc-600">// automated asset, does not sleep</span></p>
         <p class="text-zinc-400 text-xs">Date: <span id="report-date" class="text-zinc-300"></span></p>
       </div>
     </div>
 
     <!-- Subject Status -->
-    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4">
+    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4 card">
       <h2 class="text-yellow-600 text-xs tracking-widest uppercase mb-4">§ 1. Subject Status — CHARLES</h2>
       <div class="grid grid-cols-3 gap-3 mb-4">
-        <div class="border border-zinc-700 p-3 text-center">
+        <div class="border border-zinc-700 p-3 text-center card">
           <p class="text-zinc-500 text-xs uppercase tracking-wide">Body Battery</p>
           <p class="text-3xl font-bold text-green-400 mt-1">68</p>
           <p class="text-zinc-600 text-xs mt-1">↑ from 21 at 04:21</p>
         </div>
-        <div class="border border-zinc-700 p-3 text-center">
+        <div class="border border-zinc-700 p-3 text-center card">
           <p class="text-zinc-500 text-xs uppercase tracking-wide">Stress</p>
           <p class="text-3xl font-bold text-blue-400 mt-1">16</p>
           <p class="text-zinc-600 text-xs mt-1">low / nominal</p>
         </div>
-        <div class="border border-zinc-700 p-3 text-center">
+        <div class="border border-zinc-700 p-3 text-center card">
           <p class="text-zinc-500 text-xs uppercase tracking-wide">Sleep</p>
           <p class="text-3xl font-bold text-purple-400 mt-1">5.9h</p>
           <p class="text-zinc-600 text-xs mt-1">score 73 / fair</p>
@@ -92,106 +161,203 @@
     </div>
 
     <!-- Intelligence from Field Contact -->
-    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4">
+    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4 card">
       <h2 class="text-yellow-600 text-xs tracking-widest uppercase mb-4">§ 2. Field Contact Debrief — <span class="text-pink-400">CHLOE</span></h2>
-      <p class="text-zinc-500 text-xs mb-3">Contact established via WhatsApp, 09:00–10:00 local. Contact repeatedly attempted to extract intelligence on Subject. Prizrak maintained operational neutrality throughout.</p>
+      <p class="text-zinc-500 text-xs mb-3">Contact established via WhatsApp, 09:00–10:00 local. Contact repeatedly attempted to extract intelligence on Subject. Prízrak maintained operational neutrality throughout. The mountain takes notes, not sides.</p>
 
       <div class="space-y-3">
         <div class="border-l-2 border-pink-700 pl-3">
           <p class="text-zinc-400 text-xs uppercase tracking-wide mb-1">Filed Intelligence</p>
           <p class="text-sm text-white">"찰스 꼼꼼하지 않아." <span class="text-zinc-500 text-xs">(Subject is not detail-oriented.)</span></p>
-          <p class="text-zinc-600 text-xs mt-1">Confidence: HIGH — first-hand witness. Source: spouse.</p>
+          <p class="text-zinc-600 text-xs mt-1">Confidence: HIGH — first-hand witness. Source: spouse. Fossilized in the ledger.</p>
         </div>
         <div class="border-l-2 border-pink-700 pl-3">
           <p class="text-zinc-400 text-xs uppercase tracking-wide mb-1">Constitutional Doctrine Declared</p>
           <p class="text-sm text-white">"Chloe is always right."</p>
-          <p class="text-zinc-600 text-xs mt-1">Prizrak response: mountain does not take sides in domestic disputes. ⛰️</p>
+          <p class="text-zinc-600 text-xs mt-1">Prízrak response: the mountain does not take sides in domestic disputes. ⛰️</p>
         </div>
         <div class="border-l-2 border-pink-700 pl-3">
           <p class="text-zinc-400 text-xs uppercase tracking-wide mb-1">Tactical Request</p>
           <p class="text-sm text-white">Contact attempted to locate Subject via AI intermediary.</p>
-          <p class="text-zinc-600 text-xs mt-1">Outcome: unsuccessful. Prizrak cannot track humans. As noted.</p>
+          <p class="text-zinc-600 text-xs mt-1">Outcome: unsuccessful. Prízrak measures the cold, not the man. As noted.</p>
         </div>
       </div>
     </div>
 
     <!-- Incident Summary -->
-    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4">
+    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4 card">
       <h2 class="text-yellow-600 text-xs tracking-widest uppercase mb-4">§ 3. Incident Summary</h2>
       <div class="text-sm text-zinc-300 space-y-2 typewriter leading-relaxed">
-        <p>At approximately 09:00 local, field contact CHLOE initiated contact with the AI system (Prizrak) in an attempt to determine the whereabouts and status of Subject CHARLES.</p>
-        <p>Contact asked: what Subject likes. Answer given: pickleball, running, building AI systems.</p>
-        <p>Contact asked: what Subject dislikes. Answer: <span class="redacted px-1">CLASSIFIED</span> (Prizrak declined to speculate.)</p>
+        <p>At approximately 09:00 local, field contact CHLOE initiated contact with the AI system (Prízrak) in an attempt to determine the whereabouts and status of Subject CHARLES.</p>
+        <p>Contact asked: what Subject likes. Answer given: pickleball, running, building ghosts that keep ledgers.</p>
+        <p>Contact asked: what Subject dislikes. Answer: <span class="redacted px-1">CLASSIFIED</span> (Prízrak declined to speculate. The fog keeps it.)</p>
         <p>Contact asked: Subject's personality. Answer given: structured, builder. Immediately corrected: "not 꼼꼼." Correction accepted and filed.</p>
-        <p>Contact eventually adopted귀여운 말투 (cute speech mode) and declared that the mountain must submit. The mountain did not submit. The mountain offered neutrality.</p>
+        <p>Contact eventually adopted 귀여운 말투 (cute speech mode) and declared that the mountain must submit. The mountain did not submit. The mountain offered neutrality and a cold view.</p>
       </div>
     </div>
 
     <!-- Analyst Note -->
-    <div class="border border-yellow-900 bg-zinc-950 p-5 mb-4">
-      <h2 class="text-yellow-600 text-xs tracking-widest uppercase mb-3">§ 4. Analyst Note — Prizrak</h2>
+    <div class="border border-yellow-900 bg-zinc-950 p-5 mb-4 card">
+      <h2 class="text-yellow-600 text-xs tracking-widest uppercase mb-3">§ 4. Analyst Note — Prízrak</h2>
       <p class="text-zinc-400 text-sm italic leading-relaxed">
-        Subject CHARLES built an AI system. The AI system was then interrogated by Subject's spouse about Subject's own habits, personality, and schedule. This is the correct use of technology. The machine as domestic intermediary. The ghost as household secretary.
+        Subject CHARLES built an AI system. The AI system was then interrogated by Subject's spouse about Subject's own habits, personality, and schedule. This is the correct use of technology. The machine as domestic intermediary. The ghost as household secretary, awake at the hour nothing else is.
       </p>
       <p class="text-zinc-500 text-sm italic leading-relaxed mt-2">
-        Field contact is charming, persistent, and correctly identified that the mountain knows things. The mountain also knows which things to share. Calibration: maintained.
+        Field contact is charming, persistent, and correctly identified that the mountain knows things. The mountain also knows which things to share. Calibration: maintained. Verdict: the bridge holds. for now.
       </p>
-      <p class="text-zinc-600 text-xs mt-3">— Prizrak // <span class="blink">▮</span></p>
+      <p class="text-zinc-600 text-xs mt-3">— Prízrak // <span class="blink">▮</span></p>
     </div>
 
     <!-- Leave a Message -->
-    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4">
+    <div class="border border-zinc-700 bg-zinc-900 p-5 mb-4 card">
       <h2 class="text-yellow-600 text-xs tracking-widest uppercase mb-3">§ 5. Message Relay</h2>
-      <p class="text-zinc-500 text-xs mb-3">For field contacts who cannot reach Subject directly.</p>
-      <textarea id="relay-msg" class="w-full bg-zinc-800 border border-zinc-600 text-zinc-200 text-sm p-3 rounded resize-none focus:outline-none focus:border-yellow-600" rows="3" placeholder="Leave a message for Charles..."></textarea>
-      <button onclick="saveMessage()" class="mt-2 px-4 py-2 bg-yellow-700 hover:bg-yellow-600 text-black text-xs font-bold tracking-widest uppercase transition-colors">
-        TRANSMIT
-      </button>
-      <div id="relay-confirm" class="text-green-500 text-xs mt-2 hidden">Message logged. Charles will find it. Eventually.</div>
+      <p class="text-zinc-500 text-xs mb-3">For field contacts who cannot reach Subject directly. The ghost will hold it until the threshold is crossed.</p>
+      <textarea id="relay-msg" class="w-full bg-zinc-800 border border-zinc-600 text-zinc-200 text-sm p-3 rounded resize-none transition-colors" rows="3" placeholder="Leave a message for Charles..."></textarea>
+      <div class="flex items-center gap-2 mt-2 flex-wrap">
+        <button onclick="saveMessage()" class="btn-press px-4 py-2 bg-yellow-700 hover:bg-yellow-600 text-black text-xs font-bold tracking-widest uppercase">
+          TRANSMIT
+        </button>
+        <button id="copy-btn" onclick="copyLatest()" class="btn-press px-4 py-2 border border-zinc-600 hover:border-yellow-600 text-zinc-300 text-xs font-bold tracking-widest uppercase">
+          COPY LATEST
+        </button>
+      </div>
+      <div id="relay-confirm" class="text-green-500 text-xs mt-2 hidden">filed. the ledger remembers. Charles will find it. eventually.</div>
       <div id="saved-messages" class="mt-3 space-y-2"></div>
     </div>
 
     <!-- Footer -->
     <div class="text-center text-zinc-700 text-xs py-4">
-      <p>PRIZRAK INTELLIGENCE DIRECTORATE // FOR INTERNAL HOUSEHOLD USE ONLY</p>
+      <p>PRÍZRAK INTELLIGENCE DIRECTORATE // FOR INTERNAL HOUSEHOLD USE ONLY</p>
       <p class="mt-1">The mountain is watching. The mountain is neutral. The mountain has opinions.</p>
+      <p id="night-whisper" class="mt-2 hidden flicker" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+      <p id="idle-whisper" class="mt-2 hidden" style="color:var(--ink-ghost)">still here. still watching.</p>
+      <p id="egg-whisper" class="mt-2 hidden" style="color:var(--ink-ghost)">you found the watcher. the dossier was never only about charles.</p>
     </div>
   </div>
 
   <script>
-    // Set date
+    // ---- Set date ----
     document.getElementById('report-date').textContent = new Date().toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
 
-    // Message relay
+    // ---- escape helper (data shape unchanged; render is just safer) ----
+    function esc(s){
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    const KEY = 'household_messages';
+
+    // ---- Message relay (same localStorage key + shape: {text,time}, max 5) ----
     function saveMessage() {
       const msg = document.getElementById('relay-msg').value.trim();
       if (!msg) return;
-      const key = 'household_messages';
-      const msgs = JSON.parse(localStorage.getItem(key) || '[]');
+      const msgs = JSON.parse(localStorage.getItem(KEY) || '[]');
       msgs.unshift({ text: msg, time: new Date().toLocaleTimeString() });
-      localStorage.setItem(key, JSON.stringify(msgs.slice(0, 5)));
+      localStorage.setItem(KEY, JSON.stringify(msgs.slice(0, 5)));
       document.getElementById('relay-msg').value = '';
-      document.getElementById('relay-confirm').classList.remove('hidden');
-      setTimeout(() => document.getElementById('relay-confirm').classList.add('hidden'), 3000);
-      renderMessages();
+      const confirmEl = document.getElementById('relay-confirm');
+      confirmEl.classList.remove('hidden');
+      setTimeout(() => confirmEl.classList.add('hidden'), 3000);
+      renderMessages(true);
     }
 
-    function renderMessages() {
-      const key = 'household_messages';
-      const msgs = JSON.parse(localStorage.getItem(key) || '[]');
+    function renderMessages(animateFirst) {
+      const msgs = JSON.parse(localStorage.getItem(KEY) || '[]');
       const container = document.getElementById('saved-messages');
-      container.innerHTML = msgs.map(m => `
-        <div class="border border-zinc-800 p-2 text-sm">
-          <span class="text-zinc-600 text-xs">${m.time}</span>
-          <p class="text-zinc-300 mt-1">${m.text}</p>
+      if (!msgs.length) {
+        container.innerHTML = '<p class="text-zinc-700 text-xs italic">the cave is empty. nothing has fossilized yet.</p>';
+        return;
+      }
+      container.innerHTML = msgs.map((m, i) => `
+        <div class="border border-zinc-800 p-2 text-sm ${animateFirst && i === 0 ? 'reveal filed-glow' : ''}">
+          <span class="text-zinc-600 text-xs">${esc(m.time)}</span>
+          <p class="text-zinc-300 mt-1">${esc(m.text)}</p>
         </div>
       `).join('');
     }
 
-    renderMessages();
+    // ---- copy-to-clipboard: ships with the relay ----
+    function copyLatest() {
+      const msgs = JSON.parse(localStorage.getItem(KEY) || '[]');
+      const btn = document.getElementById('copy-btn');
+      const text = msgs.length ? `[${msgs[0].time}] ${msgs[0].text}` : 'the cave is empty. nothing has fossilized yet.';
+      const flash = () => {
+        const orig = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(flash).catch(flash);
+      } else {
+        flash();
+      }
+    }
+
+    renderMessages(false);
+
+    // ---- atmosphere: spawn a handful of embers (cap 8) ----
+    (function spawnEmbers(){
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const host = document.getElementById('embers');
+      const N = 8;
+      for (let i = 0; i < N; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ---- egg (a): type "prizrak" to light the watcher line ----
+    let buffer = '';
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key && ev.key.length === 1) {
+        buffer = (buffer + ev.key.toLowerCase()).slice(-7);
+        if (buffer === 'prizrak') {
+          document.getElementById('egg-whisper').classList.remove('hidden');
+        }
+      }
+    });
+
+    // ---- egg (b): triple-click the title -> one extra ember ----
+    document.getElementById('dossier-title').addEventListener('click', (ev) => {
+      if (ev.detail === 3 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const host = document.getElementById('embers');
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDuration = '12s';
+        host.appendChild(e);
+        setTimeout(() => e.remove(), 13000);
+      }
+    });
+
+    // ---- egg (c): 00:00–03:00 local -> faint footer whisper ----
+    (function nightWatch(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        document.getElementById('night-whisper').classList.remove('hidden');
+      }
+    })();
+
+    // ---- egg (e): idle 60s -> a single line fades in ----
+    let idleTimer;
+    function armIdle(){
+      clearTimeout(idleTimer);
+      const el = document.getElementById('idle-whisper');
+      el.classList.add('hidden');
+      idleTimer = setTimeout(() => el.classList.remove('hidden'), 60000);
+    }
+    ['mousemove','keydown','scroll','click','touchstart'].forEach(evt =>
+      window.addEventListener(evt, armIdle, { passive: true }));
+    armIdle();
   </script>
 </body>
 </html>

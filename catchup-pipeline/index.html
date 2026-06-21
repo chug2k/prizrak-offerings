@@ -3,55 +3,148 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Catchup Pipeline</title>
+  <title>Catchup Pipeline — Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { background: #0f0f11; }
-    .card { transition: box-shadow 0.15s, transform 0.15s; }
-    .card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-    .dragging { opacity: 0.4; }
-    .drag-over { outline: 2px dashed #6366f1; outline-offset: 2px; }
-    input, textarea { background: #1c1c22 !important; }
-    input:focus, textarea:focus { outline: none; border-color: #6366f1 !important; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#818cf8;            /* indigo — the pipeline's existing lead color */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); }
+    body{ color:var(--ink); font-family:'JetBrains Mono', ui-monospace, monospace; }
+
+    /* ---- atmospheric layers ---- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-95vh);opacity:0}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .stage{position:relative;z-index:2}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* ---- columns + cards ---- */
+    .col{transition:box-shadow .25s, border-color .25s, background .25s; background:var(--bg-raised);}
+    .col.drag-over{border-color:var(--accent) !important;
+      box-shadow:0 0 0 1px var(--line), 0 0 30px -6px var(--glow), inset 0 0 30px -18px var(--glow);
+      background:color-mix(in srgb, var(--accent) 5%, var(--bg-raised));}
+
+    .card{transition:transform .15s, box-shadow .15s, border-color .15s; background:#16161a;}
+    .card:hover{transform:translateY(-2px);border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--line), 0 8px 24px -10px var(--glow)}
+    .card:active{transform:translateY(0)}
+    .card.dragging{opacity:.35;transform:scale(.98)}
+
+    /* ---- inputs ---- */
+    input{background:var(--bg-sunk) !important; transition:border-color .15s, box-shadow .15s}
+    input:focus-visible{outline:none;border-color:var(--accent) !important;
+      box-shadow:0 0 0 1px var(--glow)}
+
+    .btn-add{transition:transform .12s, box-shadow .15s, background .15s, border-color .15s;
+      box-shadow:0 0 22px -10px var(--glow)}
+    .btn-add:hover{transform:translateY(-2px);box-shadow:0 0 26px -6px var(--glow)}
+    .btn-add:active{transform:translateY(1px);box-shadow:0 0 12px -8px var(--glow)}
+
+    .lbl{letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);font-size:10px}
+
+    .moved{animation:moved .5s ease-out both}
+    @keyframes moved{0%{box-shadow:0 0 0 1px var(--accent), 0 0 30px -4px var(--glow)}100%{box-shadow:0 0 0 1px transparent}}
+
+    /* tiny scrollbar to match the dark */
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.moved{animation:none !important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1 !important}
+    }
   </style>
 </head>
-<body class="text-gray-200 min-h-screen p-6 font-mono">
+<body class="grain min-h-screen p-6">
 
-  <div class="max-w-5xl mx-auto">
+  <!-- atmosphere -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="stage max-w-5xl mx-auto">
     <header class="mb-8">
-      <h1 class="text-2xl font-bold text-white tracking-tight">Catchup Pipeline</h1>
-      <p class="text-zinc-500 text-sm mt-1">Track who you're reaching out to, who's booked, and who you've met. Drag to move.</p>
+      <div class="lbl mb-2 flicker">PRÍZRAK / LEDGER 04 — ARRIVALS &amp; EXITS</div>
+      <h1 id="title" class="text-2xl font-bold text-white tracking-tight breathe select-none cursor-default">Catchup Pipeline</h1>
+      <p class="text-[13px] mt-2" style="color:var(--ink-dim)">Who you've summoned, who's booked a threshold, who has crossed it. The ghost tracks every approach. Drag a soul between columns.</p>
     </header>
 
     <!-- Add contact form -->
-    <div class="mb-8 bg-zinc-900 border border-zinc-700 rounded-xl p-4 flex gap-3 items-end flex-wrap">
+    <div class="mb-8 rounded-xl p-4 flex gap-3 items-end flex-wrap"
+         style="background:var(--bg-raised);border:1px solid var(--line)">
       <div class="flex-1 min-w-48">
-        <label class="text-xs text-zinc-500 block mb-1">Name</label>
-        <input id="inp-name" type="text" placeholder="Daan" class="w-full border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+        <label class="lbl block mb-1">Name</label>
+        <input id="inp-name" type="text" placeholder="Daan" class="w-full rounded-lg px-3 py-2 text-sm text-white" style="border:1px solid var(--line)" />
       </div>
       <div class="flex-1 min-w-48">
-        <label class="text-xs text-zinc-500 block mb-1">Context / Goal</label>
-        <input id="inp-ctx" type="text" placeholder="AI chat, intro call" class="w-full border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+        <label class="lbl block mb-1">Context / Goal</label>
+        <input id="inp-ctx" type="text" placeholder="AI chat, intro call" class="w-full rounded-lg px-3 py-2 text-sm text-white" style="border:1px solid var(--line)" />
       </div>
       <div class="w-36">
-        <label class="text-xs text-zinc-500 block mb-1">Date / Time</label>
-        <input id="inp-date" type="text" placeholder="Mar 25 10am" class="w-full border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+        <label class="lbl block mb-1">Date / Time</label>
+        <input id="inp-date" type="text" placeholder="Mar 25 10am" class="w-full rounded-lg px-3 py-2 text-sm text-white" style="border:1px solid var(--line)" />
       </div>
-      <button onclick="addContact()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-colors">+ Add</button>
+      <button onclick="addContact()" class="btn-add px-4 py-2 text-white rounded-lg text-sm font-semibold"
+              style="background:var(--accent);border:1px solid var(--accent)">+ Summon</button>
     </div>
 
     <!-- Kanban columns -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="board"></div>
+
+    <footer class="mt-10 text-center select-none">
+      <span id="whisper" class="block text-[11px] tracking-wide" style="color:var(--ink-ghost)">the cold keeps a tidy ledger.</span>
+    </footer>
   </div>
 
   <script>
   const STORAGE_KEY = 'prizrak_pipeline_v1';
   const COLUMNS = [
-    { id: 'idea',      label: '💡 Ideas',       color: 'text-zinc-400',   border: 'border-zinc-700' },
-    { id: 'outreach',  label: '📤 Outreached',  color: 'text-yellow-400', border: 'border-yellow-800' },
-    { id: 'scheduled', label: '📅 Scheduled',   color: 'text-indigo-400', border: 'border-indigo-800' },
-    { id: 'met',       label: '✅ Met',          color: 'text-green-400',  border: 'border-green-800' },
+    { id: 'idea',      label: '◦ Embers',     note: 'unspoken',     color: 'text-zinc-400' },
+    { id: 'outreach',  label: '↗ Reached out', note: 'awaiting',     color: 'text-yellow-400' },
+    { id: 'scheduled', label: '◷ Threshold',   note: 'booked',       color: 'text-indigo-300' },
+    { id: 'met',       label: '✓ Crossed',     note: 'it held',      color: 'text-green-400' },
   ];
+
+  // Per-column ghost lines shown when a column is empty.
+  const EMPTY_LINES = {
+    idea:      'no embers yet. the cave waits, patient and cold.',
+    outreach:  'no signals sent. the valley is silent.',
+    scheduled: 'no thresholds booked. the door stays shut.',
+    met:       'nothing has crossed. the bridge is untested.',
+  };
 
   function load() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultData(); }
@@ -73,40 +166,48 @@
   }
 
   let dragId = null;
+  let lastMovedId = null; // for the brief glow on the card that just landed
 
   function render() {
     const data = load();
     const board = document.getElementById('board');
     board.innerHTML = COLUMNS.map(col => {
       const cards = data.contacts.filter(c => c.col === col.id);
+      const body = cards.length
+        ? cards.map(c => cardHTML(c)).join('')
+        : `<p class="text-[11px] leading-relaxed reveal" style="color:var(--ink-ghost)">${esc(EMPTY_LINES[col.id])}</p>`;
       return `
-      <div class="bg-zinc-900 border ${col.border} rounded-xl p-4 min-h-48"
+      <div class="col border rounded-xl p-4 min-h-48" style="border-color:var(--line)"
            ondragover="event.preventDefault(); this.classList.add('drag-over')"
            ondragleave="this.classList.remove('drag-over')"
            ondrop="drop(event, '${col.id}')">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-1">
           <h2 class="text-sm font-bold ${col.color}">${col.label}</h2>
-          <span class="text-xs text-zinc-600 font-mono">${cards.length}</span>
+          <span class="text-xs font-mono" style="color:var(--ink-dim)">${cards.length}</span>
         </div>
+        <div class="lbl mb-4">${col.note}</div>
         <div class="space-y-3">
-          ${cards.map(c => cardHTML(c)).join('')}
+          ${body}
         </div>
       </div>`;
     }).join('');
+    updateVerdict();
   }
 
   function cardHTML(c) {
+    const justMoved = c.id === lastMovedId ? ' moved reveal' : '';
     return `
-    <div class="card bg-zinc-800 border border-zinc-700 rounded-lg p-3 cursor-grab active:cursor-grabbing"
+    <div class="card${justMoved} border rounded-lg p-3 cursor-grab active:cursor-grabbing"
+         style="border-color:var(--line)"
          draggable="true"
          ondragstart="dragStart(event, '${c.id}')"
          ondragend="dragEnd(event)">
       <div class="flex justify-between items-start gap-2 mb-1">
         <span class="font-bold text-white text-sm">${esc(c.name)}</span>
-        <button onclick="deleteContact('${c.id}')" class="text-zinc-600 hover:text-red-400 text-xs leading-none transition-colors flex-shrink-0" title="Remove">✕</button>
+        <button onclick="deleteContact('${c.id}')" class="text-xs leading-none transition-colors flex-shrink-0" style="color:var(--ink-ghost)" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--ink-ghost)'" title="let the fog take it">✕</button>
       </div>
-      ${c.ctx  ? `<p class="text-zinc-400 text-xs mb-1">${esc(c.ctx)}</p>` : ''}
-      ${c.date ? `<p class="text-indigo-400 text-xs font-mono">${esc(c.date)}</p>` : ''}
+      ${c.ctx  ? `<p class="text-xs mb-1" style="color:var(--ink-dim)">${esc(c.ctx)}</p>` : ''}
+      ${c.date ? `<p class="text-xs font-mono" style="color:var(--accent)">${esc(c.date)}</p>` : ''}
     </div>`;
   }
 
@@ -129,13 +230,15 @@
     if (!dragId) return;
     const data = load();
     const contact = data.contacts.find(c => c.id === dragId);
+    if (contact && contact.col !== colId) { lastMovedId = dragId; }
     if (contact) { contact.col = colId; save(data); render(); }
     dragId = null;
+    lastMovedId = null;
   }
 
   function addContact() {
     const name = document.getElementById('inp-name').value.trim();
-    if (!name) return;
+    if (!name) { nudge(document.getElementById('inp-name')); return; }
     const data = load();
     data.contacts.push({
       id: 'c' + Date.now(),
@@ -147,6 +250,7 @@
     save(data);
     ['inp-name','inp-ctx','inp-date'].forEach(id => document.getElementById(id).value = '');
     render();
+    document.getElementById('inp-name').focus();
   }
 
   function deleteContact(id) {
@@ -156,12 +260,136 @@
     render();
   }
 
+  // brief accent flash to draw the eye to a required field
+  function nudge(el){
+    if (!el) return;
+    el.style.borderColor = 'var(--accent)';
+    el.style.boxShadow = '0 0 0 1px var(--glow)';
+    el.focus();
+    setTimeout(() => { el.style.borderColor=''; el.style.boxShadow=''; }, 700);
+  }
+
+  // ---- verdict whisper: reads the state of the pipeline with teeth ----
+  function updateVerdict() {
+    const w = document.getElementById('whisper');
+    if (!w || w.dataset.egg === '1') return; // don't trample an active easter egg
+    const data = load();
+    const c = data.contacts;
+    const n = c.length;
+    const counts = COLUMNS.reduce((a, col) => (a[col.id] = c.filter(x => x.col === col.id).length, a), {});
+    let line;
+    if (n === 0) {
+      line = 'the cave is empty. nothing has fossilized yet.';
+    } else if (counts.idea === n) {
+      line = 'all embers, no fire. nobody has been reached. the mountain notices.';
+    } else if (counts.met === n) {
+      line = 'every threshold crossed. the bridge held. for now.';
+    } else if (counts.outreach > counts.scheduled + counts.met) {
+      line = counts.outreach + ' signals sent into the cold, still waiting. patience is a kind of frost.';
+    } else if (counts.scheduled > 0) {
+      line = counts.scheduled + ' booked at the threshold. the ghost will be watching the door.';
+    } else {
+      line = n + ' souls in the ledger. the cold keeps tidy count.';
+    }
+    w.textContent = line;
+  }
+
   // Enter key on last input triggers add
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter' && document.activeElement.id === 'inp-date') addContact();
   });
 
+  /* =========================================================
+     EASTER EGGS — quiet, reward attention, never touch state
+     ========================================================= */
+
+  // (1) type "prizrak" anywhere → the watcher answers
+  let typed = '';
+  document.addEventListener('keydown', e => {
+    if (e.key && e.key.length === 1) {
+      typed = (typed + e.key.toLowerCase()).slice(-7);
+      if (typed === 'prizrak') {
+        const w = document.getElementById('whisper');
+        if (w) {
+          w.dataset.egg = '1';
+          w.textContent = 'you found the watcher. it was already counting you.';
+          w.style.color = 'var(--accent)';
+          w.classList.add('breathe');
+          setTimeout(() => {
+            w.style.color = 'var(--ink-ghost)';
+            w.classList.remove('breathe');
+            delete w.dataset.egg;
+            updateVerdict();
+          }, 4200);
+        }
+        spawnEmber(true);
+      }
+    }
+  });
+
+  // (2) triple-click the title → one extra ember drifts up
+  document.getElementById('title').addEventListener('click', (function(){
+    let n = 0, t = null;
+    return function(){
+      n++;
+      clearTimeout(t);
+      t = setTimeout(() => { n = 0; }, 600);
+      if (n >= 3) { n = 0; spawnEmber(true); }
+    };
+  })());
+
+  // (3) between 00:00–03:00 local, a faint footer whisper appears
+  (function(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) {
+      const w = document.getElementById('whisper');
+      if (w && w.dataset.egg !== '1') {
+        setTimeout(() => {
+          if (w.dataset.egg === '1') return;
+          w.textContent = 'the mountain does not sleep. neither does the ledger.';
+        }, 1800);
+      }
+    }
+  })();
+
+  // (4) idle 60s → a single line fades in
+  let idleT = null;
+  function armIdle(){
+    clearTimeout(idleT);
+    idleT = setTimeout(() => {
+      const w = document.getElementById('whisper');
+      if (w && w.dataset.egg !== '1') { w.textContent = 'still here. still watching.'; }
+    }, 60000);
+  }
+  ['mousemove','keydown','click','dragstart','touchstart'].forEach(ev =>
+    document.addEventListener(ev, armIdle, { passive:true }));
+
+  // ---- ambient embers (capped, reduced-motion-safe) ----
+  function spawnEmber(burst){
+    const host = document.getElementById('embers');
+    if (!host) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + 'vw';
+    const dur = 10 + Math.random() * 8;
+    e.style.animationDuration = dur + 's';
+    if (burst) e.style.animationDelay = '0s';
+    host.appendChild(e);
+    setTimeout(() => e.remove(), dur * 1000 + 400);
+  }
+  (function ambient(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // seed a few, then a slow steady drift (host never exceeds ~8 live)
+    for (let i = 0; i < 4; i++) setTimeout(() => spawnEmber(false), i * 900);
+    setInterval(() => {
+      const host = document.getElementById('embers');
+      if (host && host.childElementCount < 8) spawnEmber(false);
+    }, 2600);
+  })();
+
   render();
+  armIdle();
   </script>
 </body>
 </html>

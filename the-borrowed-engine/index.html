@@ -7,23 +7,113 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600&display=swap');
-  body { font-family: 'Space Grotesk', sans-serif; background: #080808; color: #d8d8d8; }
+
+  :root{
+    --bg:#0a0a0a;
+    --bg-raised:#111113;
+    --bg-sunk:#0d0d0f;
+    --line:#26262b;
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#3a3530;
+    --accent:#44aaff;                 /* this app's existing lead colour: owned-fuel blue */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    --owned:#44aaff;                  /* functional data colours, not brand hues */
+    --borrowed:#ff6644;
+  }
+
+  body { font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--ink); }
   .mono { font-family: 'Space Mono', monospace; }
-  input[type=range] { -webkit-appearance: none; appearance: none; height: 2px; background: #222; outline: none; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #e0e0e0; cursor: pointer; }
-  .bar-owned { background: linear-gradient(90deg, #44aaff, #2266aa); }
-  .bar-borrowed { background: linear-gradient(90deg, #ff6644, #aa3322); }
-  .verdict-box { border-left: 3px solid #333; transition: border-color 0.4s; }
+
+  /* ---- range inputs ---- */
+  input[type=range] { -webkit-appearance: none; appearance: none; height: 2px; background: var(--line); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: #e0e0e0; cursor: pointer; transition: box-shadow .15s, transform .12s, background .15s;
+    box-shadow: 0 0 0 0 var(--glow);
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); box-shadow: 0 0 10px var(--glow); background:#fff; }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; border:0; border-radius: 50%; background: #e0e0e0; cursor: pointer;
+    transition: box-shadow .15s, transform .12s;
+  }
+  input[type=range]::-moz-range-thumb:hover { transform: scale(1.15); box-shadow: 0 0 10px var(--glow); }
+  input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--glow), 0 0 12px var(--glow); }
+  input[type=range]:focus-visible { outline:none; }
+
+  .bar-owned { background: linear-gradient(90deg, var(--owned), #2266aa); }
+  .bar-borrowed { background: linear-gradient(90deg, var(--borrowed), #aa3322); }
+
+  .verdict-box {
+    border-left: 3px solid var(--line);
+    transition: border-color 0.5s, box-shadow 0.5s, background 0.5s;
+    background: var(--bg-raised);
+    border-radius: 2px;
+  }
+  .verdict-box.lit { box-shadow: 0 0 0 1px var(--line), 0 0 30px -10px var(--glow); }
+
+  .question label { transition: color .25s; }
+  .question:focus-within label { color:#fff; }
+
+  /* value readout flicks when it changes */
+  .val-pulse { animation: valpulse .3s ease-out; }
+  @keyframes valpulse { 0%{ color:var(--accent); text-shadow:0 0 8px var(--glow); transform:scale(1.25); } 100%{ color:inherit; text-shadow:none; transform:scale(1); } }
+
+  /* ---- atmosphere (delight spec) ---- */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .content{position:relative;z-index:2}
+
+  /* copy button */
+  .copy-btn{transition:color .15s, border-color .15s, box-shadow .15s, transform .1s;}
+  .copy-btn:hover{border-color:var(--accent);color:var(--ink);}
+  .copy-btn:active{transform:translateY(1px);}
+  .copy-btn:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);}
+  .copy-btn.flash{color:var(--accent);border-color:var(--accent);box-shadow:0 0 14px -4px var(--glow);}
+
+  #idle-whisper{opacity:0;transition:opacity 1.4s ease;}
+  #idle-whisper.show{opacity:1;}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker,.val-pulse{animation:none!important}
+    .ember{display:none}
+    .breathe,.flicker{opacity:1!important}
+    #idle-whisper{transition:none}
+  }
 </style>
 </head>
-<body class="min-h-screen p-6 md:p-12">
-<div class="max-w-xl mx-auto">
+<body class="min-h-screen p-6 md:p-12 grain">
+<div class="fog" aria-hidden="true"></div>
+<div id="embers" aria-hidden="true"></div>
+
+<div class="max-w-xl mx-auto content">
 
   <div class="mb-10">
-    <p class="mono text-xs text-gray-700 mb-2 tracking-widest">PRIZRAK / DIAGNOSTICS</p>
-    <h1 class="text-2xl font-semibold text-white mb-3">The Borrowed Engine</h1>
-    <p class="text-gray-500 text-sm leading-relaxed">
-      Some work runs on fuel you own — curiosity, belief, genuine care. Some runs on fuel you rent — approval, obligation, fear of the exit interview. The engine sounds the same either way. The range is different.
+    <p class="mono text-xs mb-2 tracking-widest" style="color:var(--ink-dim)">PRIZRAK / DIAGNOSTICS · ENGINE BAY</p>
+    <h1 id="title" class="text-2xl font-semibold text-white mb-3 breathe select-none" style="cursor:default">The Borrowed Engine</h1>
+    <p class="text-sm leading-relaxed" style="color:var(--ink-dim)">
+      Some work runs on fuel you own — curiosity, belief, genuine care. Some runs on fuel you rent — approval, obligation, fear of the exit interview. The engine sounds the same either way. The range is different. The ghost just measures the chemistry.
     </p>
   </div>
 
@@ -31,60 +121,70 @@
   <div class="space-y-8 mb-10" id="questions">
 
     <div class="question">
-      <label class="text-sm text-gray-300 block mb-1">1. When you explain your work to someone, do you feel pride or performance?</label>
-      <p class="mono text-xs text-gray-700 mb-3">0 = pure performance / 10 = genuine pride</p>
-      <input type="range" min="0" max="10" value="5" class="w-full" id="q1" oninput="update()">
-      <div class="flex justify-between mono text-xs text-gray-800 mt-1"><span>performance</span><span id="q1v">5</span><span>pride</span></div>
+      <label class="text-sm block mb-1" style="color:var(--ink)" for="q1">1. When you explain your work to someone, do you feel pride or performance?</label>
+      <p class="mono text-xs mb-3" style="color:var(--ink-dim)">0 = pure performance / 10 = genuine pride</p>
+      <input type="range" min="0" max="10" value="5" class="w-full" id="q1" oninput="update()" aria-label="pride versus performance">
+      <div class="flex justify-between mono text-xs mt-1" style="color:var(--ink-ghost)"><span>performance</span><span id="q1v" style="color:var(--ink-dim)">5</span><span>pride</span></div>
     </div>
 
     <div class="question">
-      <label class="text-sm text-gray-300 block mb-1">2. Would you do this work if no one senior to you would ever know the outcome?</label>
-      <p class="mono text-xs text-gray-700 mb-3">0 = absolutely not / 10 = yes, for the work itself</p>
-      <input type="range" min="0" max="10" value="5" class="w-full" id="q2" oninput="update()">
-      <div class="flex justify-between mono text-xs text-gray-800 mt-1"><span>no</span><span id="q2v">5</span><span>yes</span></div>
+      <label class="text-sm block mb-1" style="color:var(--ink)" for="q2">2. Would you do this work if no one senior to you would ever know the outcome?</label>
+      <p class="mono text-xs mb-3" style="color:var(--ink-dim)">0 = absolutely not / 10 = yes, for the work itself</p>
+      <input type="range" min="0" max="10" value="5" class="w-full" id="q2" oninput="update()" aria-label="would you do it unseen">
+      <div class="flex justify-between mono text-xs mt-1" style="color:var(--ink-ghost)"><span>no</span><span id="q2v" style="color:var(--ink-dim)">5</span><span>yes</span></div>
     </div>
 
     <div class="question">
-      <label class="text-sm text-gray-300 block mb-1">3. When a task goes wrong, is your first thought about fixing it or about who will find out?</label>
-      <p class="mono text-xs text-gray-700 mb-3">0 = who finds out / 10 = how to fix it</p>
-      <input type="range" min="0" max="10" value="5" class="w-full" id="q3" oninput="update()">
-      <div class="flex justify-between mono text-xs text-gray-800 mt-1"><span>who knows</span><span id="q3v">5</span><span>fix it</span></div>
+      <label class="text-sm block mb-1" style="color:var(--ink)" for="q3">3. When a task goes wrong, is your first thought about fixing it or about who will find out?</label>
+      <p class="mono text-xs mb-3" style="color:var(--ink-dim)">0 = who finds out / 10 = how to fix it</p>
+      <input type="range" min="0" max="10" value="5" class="w-full" id="q3" oninput="update()" aria-label="fix it versus who finds out">
+      <div class="flex justify-between mono text-xs mt-1" style="color:var(--ink-ghost)"><span>who knows</span><span id="q3v" style="color:var(--ink-dim)">5</span><span>fix it</span></div>
     </div>
 
     <div class="question">
-      <label class="text-sm text-gray-300 block mb-1">4. How often do you think about whether people think you're good at this job?</label>
-      <p class="mono text-xs text-gray-700 mb-3">0 = constantly / 10 = rarely, the work speaks</p>
-      <input type="range" min="0" max="10" value="5" class="w-full" id="q4" oninput="update()">
-      <div class="flex justify-between mono text-xs text-gray-800 mt-1"><span>constantly</span><span id="q4v">5</span><span>rarely</span></div>
+      <label class="text-sm block mb-1" style="color:var(--ink)" for="q4">4. How often do you think about whether people think you're good at this job?</label>
+      <p class="mono text-xs mb-3" style="color:var(--ink-dim)">0 = constantly / 10 = rarely, the work speaks</p>
+      <input type="range" min="0" max="10" value="5" class="w-full" id="q4" oninput="update()" aria-label="how often you think about being judged">
+      <div class="flex justify-between mono text-xs mt-1" style="color:var(--ink-ghost)"><span>constantly</span><span id="q4v" style="color:var(--ink-dim)">5</span><span>rarely</span></div>
     </div>
 
     <div class="question">
-      <label class="text-sm text-gray-300 block mb-1">5. Does the work itself interest you, or the results of being seen doing it?</label>
-      <p class="mono text-xs text-gray-700 mb-3">0 = being seen / 10 = the work itself</p>
-      <input type="range" min="0" max="10" value="5" class="w-full" id="q5" oninput="update()">
-      <div class="flex justify-between mono text-xs text-gray-800 mt-1"><span>being seen</span><span id="q5v">5</span><span>the work</span></div>
+      <label class="text-sm block mb-1" style="color:var(--ink)" for="q5">5. Does the work itself interest you, or the results of being seen doing it?</label>
+      <p class="mono text-xs mb-3" style="color:var(--ink-dim)">0 = being seen / 10 = the work itself</p>
+      <input type="range" min="0" max="10" value="5" class="w-full" id="q5" oninput="update()" aria-label="the work versus being seen">
+      <div class="flex justify-between mono text-xs mt-1" style="color:var(--ink-ghost)"><span>being seen</span><span id="q5v" style="color:var(--ink-dim)">5</span><span>the work</span></div>
     </div>
 
   </div>
 
   <!-- Fuel gauge -->
   <div class="mb-8">
-    <p class="mono text-xs text-gray-600 mb-3 tracking-widest">FUEL COMPOSITION</p>
-    <div class="flex h-3 rounded overflow-hidden mb-2">
+    <p class="mono text-xs mb-3 tracking-widest" style="color:var(--ink-dim)">FUEL COMPOSITION</p>
+    <div class="flex h-3 rounded overflow-hidden mb-2" style="background:var(--bg-sunk)">
       <div id="bar-owned" class="bar-owned h-full transition-all duration-500" style="width:50%"></div>
       <div id="bar-borrowed" class="bar-borrowed h-full transition-all duration-500" style="width:50%"></div>
     </div>
     <div class="flex justify-between mono text-xs">
-      <span class="text-blue-400"><span id="pct-owned">50</span>% owned</span>
-      <span class="text-red-400"><span id="pct-borrowed">50</span>% borrowed</span>
+      <span style="color:var(--owned)"><span id="pct-owned">50</span>% owned</span>
+      <span style="color:var(--borrowed)"><span id="pct-borrowed">50</span>% borrowed</span>
     </div>
   </div>
 
   <!-- Verdict -->
-  <div id="verdict" class="verdict-box pl-5 py-4"></div>
+  <div id="verdict" class="verdict-box pl-5 pr-4 py-4"></div>
 
-  <div class="mt-12 border-t border-gray-900 pt-6">
-    <p class="mono text-xs text-gray-800">Borrowed fuel burns. Owned fuel compounds. The range is in the chemistry.</p>
+  <!-- copy verdict to the ledger -->
+  <div class="mt-3 flex justify-end">
+    <button id="copy-btn" type="button" onclick="copyVerdict()"
+      class="copy-btn mono text-xs tracking-widest px-3 py-1.5 rounded"
+      style="border:1px solid var(--line); color:var(--ink-dim); background:var(--bg-sunk)">COPY TO THE LEDGER</button>
+  </div>
+
+  <div class="mt-12 border-t pt-6" style="border-color:var(--line-soft)">
+    <p class="mono text-xs flicker" style="color:var(--ink-ghost)">Borrowed fuel burns. Owned fuel compounds. The range is in the chemistry.</p>
+    <p id="night-whisper" class="mono text-xs mt-2" style="color:var(--ink-ghost);display:none"></p>
+    <p id="idle-whisper" class="mono text-xs mt-2" style="color:var(--ink-ghost)"></p>
+    <p id="egg-whisper" class="mono text-xs mt-2" style="color:var(--ink-ghost);display:none"></p>
   </div>
 </div>
 
@@ -97,9 +197,17 @@ const verdicts = [
   { min: 80, max: 101, color: '#44ff88', title: 'Own fuel', text: 'The work is driven by genuine interest, belief, or care. The approval, if it comes, is incidental. This is the position where the best work gets done — where the effort invested tracks the intrinsic value of the problem rather than the external reward for solving it. The engine is yours. Guard what produces this state.' },
 ];
 
+let lastPct = null;
+
 function update() {
   const vals = [1,2,3,4,5].map(i => parseInt(document.getElementById('q'+i).value));
-  vals.forEach((v,i) => { document.getElementById('q'+(i+1)+'v').textContent = v; });
+  vals.forEach((v,i) => {
+    const el = document.getElementById('q'+(i+1)+'v');
+    if (el.textContent !== String(v)) {
+      el.textContent = v;
+      el.classList.remove('val-pulse'); void el.offsetWidth; el.classList.add('val-pulse');
+    }
+  });
   const score = vals.reduce((a,b) => a+b, 0);
   const pct = Math.round(score / 50 * 100);
   document.getElementById('bar-owned').style.width = pct + '%';
@@ -109,10 +217,96 @@ function update() {
   const v = verdicts.find(x => pct >= x.min && pct < x.max);
   const el = document.getElementById('verdict');
   el.style.borderColor = v.color;
-  el.innerHTML = `<p class="mono text-xs mb-2 tracking-widest" style="color:${v.color}">${v.title.toUpperCase()}</p><p class="text-gray-300 text-sm leading-relaxed">${v.text}</p>`;
+  el.style.setProperty('--glow', 'color-mix(in srgb, ' + v.color + ' 55%, transparent)');
+  el.classList.add('lit');
+  // only re-animate the verdict text when the tier actually changes — avoids jitter on every drag
+  const tierChanged = (lastPct === null) || (verdicts.find(x => pct >= x.min && pct < x.max) !== verdicts.find(x => lastPct >= x.min && lastPct < x.max));
+  el.innerHTML = '<p class="mono text-xs mb-2 tracking-widest" style="color:' + v.color + '; text-shadow:0 0 10px ' + v.color + '55">' + v.title.toUpperCase() + '</p><p class="text-sm leading-relaxed" style="color:var(--ink)">' + v.text + '</p>';
+  if (tierChanged) { el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal'); }
+  lastPct = pct;
 }
 
+function copyVerdict() {
+  const vals = [1,2,3,4,5].map(i => parseInt(document.getElementById('q'+i).value));
+  const pct = Math.round(vals.reduce((a,b)=>a+b,0) / 50 * 100);
+  const v = verdicts.find(x => pct >= x.min && pct < x.max);
+  const line = 'THE BORROWED ENGINE — ' + pct + '% owned / ' + (100-pct) + '% borrowed\n' + v.title.toUpperCase() + '\n' + v.text;
+  const btn = document.getElementById('copy-btn');
+  const done = () => {
+    const prev = 'COPY TO THE LEDGER';
+    btn.textContent = 'COPIED TO THE LEDGER';
+    btn.classList.add('flash');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('flash'); }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(line).then(done).catch(() => { fallbackCopy(line); done(); });
+  } else { fallbackCopy(line); done(); }
+}
+function fallbackCopy(t){ const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} document.body.removeChild(ta); }
+
 update();
+
+/* ---- atmosphere: spawn a few embers (cap 8) ---- */
+(function(){
+  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReduced) return;
+  const wrap = document.getElementById('embers');
+  let count = 8;
+  function spawn(extra){
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = Math.random()*100 + 'vw';
+    e.style.animationDelay = (extra ? 0 : Math.random()*14) + 's';
+    e.style.animationDuration = (11 + Math.random()*7) + 's';
+    wrap.appendChild(e);
+  }
+  for (let i=0;i<count;i++) spawn(false);
+  // triple-click the title -> one extra ember rises
+  let clicks=0, t;
+  document.getElementById('title').addEventListener('click', () => {
+    clicks++; clearTimeout(t);
+    t = setTimeout(()=>{clicks=0;}, 600);
+    if (clicks>=3){ clicks=0; if (wrap.children.length < 12) spawn(true); }
+  });
+})();
+
+/* ---- easter egg: type "prizrak" ---- */
+(function(){
+  const seq='prizrak'; let buf='';
+  window.addEventListener('keydown', (ev)=>{
+    if (ev.key && ev.key.length===1){
+      buf=(buf+ev.key.toLowerCase()).slice(-seq.length);
+      if (buf===seq){
+        const w=document.getElementById('egg-whisper');
+        w.style.display='block'; w.textContent='you found the watcher. it was reading the gauge over your shoulder.';
+        w.classList.remove('flicker'); void w.offsetWidth; w.classList.add('flicker');
+      }
+    }
+  });
+})();
+
+/* ---- night whisper 00:00–03:00 local ---- */
+(function(){
+  const h=new Date().getHours();
+  if (h>=0 && h<3){
+    const w=document.getElementById('night-whisper');
+    w.style.display='block'; w.textContent='the mountain does not sleep. neither does the engine.';
+  }
+})();
+
+/* ---- idle 60s: the watcher speaks ---- */
+(function(){
+  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timer;
+  const w=document.getElementById('idle-whisper');
+  function reset(){
+    w.classList.remove('show'); w.textContent='';
+    clearTimeout(timer);
+    timer=setTimeout(()=>{ w.textContent='still here. still watching the chemistry.'; if(!prefersReduced) w.classList.add('show'); else w.style.opacity='1'; }, 60000);
+  }
+  ['mousemove','keydown','input','touchstart','click'].forEach(e=>window.addEventListener(e, reset, {passive:true}));
+  reset();
+})();
 </script>
 </body>
 </html>

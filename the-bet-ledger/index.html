@@ -6,45 +6,108 @@
     <title>The Bet Ledger — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.35s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#6db3f2;            /* cold glacial blue — the app's existing lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        /* ---- motion vocabulary (reduced-motion-safe) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
         .calibration-bar { transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+
+        /* ---- interaction patterns ---- */
+        .lift{transition:transform .15s, box-shadow .15s, border-color .15s}
+        .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+        .lift:active{transform:translateY(1px)}
+
+        input:focus-visible, select:focus-visible, button:focus-visible{
+            outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+        .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow)}
+
+        select option{ background:#111113; color:var(--ink); }
+
+        /* idle whisper */
+        #idle-whisper{opacity:0;transition:opacity 1.2s ease}
+        #idle-whisper.show{opacity:1}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .lift{transition:none}
+            .calibration-bar{transition:none}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen">
-    <div class="max-w-2xl mx-auto px-4 py-10">
+<body class="font-mono antialiased min-h-screen grain">
+    <div class="fog"></div>
+    <div id="ember-field" aria-hidden="true"></div>
+
+    <div class="max-w-2xl mx-auto px-4 py-10 relative" style="z-index:2">
 
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-white mb-1">The Bet Ledger</h1>
-            <p class="text-sm text-zinc-500 leading-relaxed">Every decision is a prediction. Track them. The pattern of what you got right — and wrong — reveals your actual model of the world.</p>
+            <p class="text-[10px] uppercase tracking-[0.35em] mb-2" style="color:var(--ink-dim)">PRÍZRAK / LEDGER 07</p>
+            <h1 id="title" class="text-3xl font-bold text-white mb-1 breathe select-none cursor-default" title="every prediction is a small bet against the fog">The Bet Ledger</h1>
+            <p class="text-sm leading-relaxed" style="color:var(--ink-dim)">Every decision is a prediction laid against the dark. The ghost keeps the count. What you got right — and what you got wrong — is the only honest map of how you think.</p>
         </div>
 
         <!-- Add Bet -->
-        <div id="add-section" class="mb-8 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-4">New Prediction</p>
+        <div id="add-section" class="mb-8 rounded-lg border p-5 lift" style="border-color:var(--line);background:var(--bg-raised)">
+            <p class="text-xs uppercase tracking-widest mb-4" style="color:var(--ink-dim)">NEW PREDICTION</p>
             <div class="space-y-3">
-                <input id="bet-text" type="text" placeholder="What do you predict will happen?" class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 placeholder-zinc-600">
+                <input id="bet-text" type="text" placeholder="what do you predict will happen?" class="w-full rounded px-3 py-2 text-sm transition-colors" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)">
                 <div class="flex gap-3 flex-wrap">
                     <div class="flex-1 min-w-[140px]">
-                        <label class="text-xs text-zinc-600 block mb-1">By when?</label>
-                        <input id="bet-date" type="date" class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500">
+                        <label class="text-[10px] uppercase tracking-widest block mb-1" style="color:var(--ink-dim)">BY WHEN</label>
+                        <input id="bet-date" type="date" class="w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)">
                     </div>
                     <div class="flex-1 min-w-[140px]">
-                        <label class="text-xs text-zinc-600 block mb-1">Confidence</label>
-                        <select id="bet-confidence" class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500">
-                            <option value="50">50% — coin flip</option>
+                        <label class="text-[10px] uppercase tracking-widest block mb-1" style="color:var(--ink-dim)">CONFIDENCE</label>
+                        <select id="bet-confidence" class="w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)">
+                            <option value="50">50% — coin in the dark</option>
                             <option value="60">60% — lean yes</option>
                             <option value="70" selected>70% — fairly sure</option>
                             <option value="80">80% — confident</option>
                             <option value="90">90% — nearly certain</option>
-                            <option value="95">95% — almost certain</option>
+                            <option value="95">95% — bones don't lie</option>
                         </select>
                     </div>
                     <div class="flex-1 min-w-[140px]">
-                        <label class="text-xs text-zinc-600 block mb-1">Domain</label>
-                        <select id="bet-domain" class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500">
+                        <label class="text-[10px] uppercase tracking-widest block mb-1" style="color:var(--ink-dim)">DOMAIN</label>
+                        <select id="bet-domain" class="w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)">
                             <option value="work">Work</option>
                             <option value="people">People</option>
                             <option value="market">Market</option>
@@ -53,7 +116,7 @@
                         </select>
                     </div>
                 </div>
-                <button id="add-btn" class="w-full py-2 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-500 text-sm text-zinc-300 transition-all">Place bet</button>
+                <button id="add-btn" class="w-full py-2 rounded text-sm lift" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)">Place the bet</button>
             </div>
         </div>
 
@@ -62,33 +125,37 @@
 
         <!-- Tabs -->
         <div class="flex gap-1 mb-4" id="tabs">
-            <button data-tab="open" class="tab-btn px-3 py-1.5 rounded text-xs border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition-all">Open</button>
-            <button data-tab="resolved" class="tab-btn px-3 py-1.5 rounded text-xs border border-zinc-800 text-zinc-600 hover:text-zinc-400 transition-all">Resolved</button>
+            <button data-tab="open" class="tab-btn px-3 py-1.5 rounded text-xs border transition-all">Open</button>
+            <button data-tab="resolved" class="tab-btn px-3 py-1.5 rounded text-xs border transition-all">Resolved</button>
         </div>
 
         <!-- List -->
         <div id="bet-list" class="space-y-3"></div>
 
         <!-- Footer -->
-        <div class="mt-12 pt-6 border-t border-zinc-800">
-            <p class="text-xs text-zinc-700 italic">The win tells you what worked once. The loss log tells you what your model is actually made of.</p>
+        <div class="mt-12 pt-6 border-t" style="border-color:var(--line)">
+            <p class="text-xs italic" style="color:var(--ink-ghost)">The win tells you what worked once. The loss log tells you what your model is actually made of.</p>
+            <p id="footer-whisper" class="text-xs italic mt-2 flicker hidden" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+            <p id="idle-whisper" class="text-xs italic mt-2" style="color:var(--ink-ghost)">still here. still watching.</p>
+            <p id="egg-line" class="text-xs italic mt-2 hidden" style="color:var(--ink-ghost)">you found the watcher.</p>
         </div>
     </div>
 
     <!-- Resolve Modal -->
-    <div id="modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
-        <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-6 w-full max-w-sm">
-            <p class="text-sm text-zinc-300 mb-4" id="modal-text"></p>
+    <div id="modal" class="hidden fixed inset-0 flex items-center justify-center z-50 px-4" style="background:rgba(0,0,0,.74)">
+        <div class="rounded-lg p-6 w-full max-w-sm reveal result-glow" style="background:var(--bg-raised);border:1px solid var(--line)">
+            <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-dim)">RENDER JUDGMENT</p>
+            <p class="text-sm mb-4" id="modal-text" style="color:var(--ink)"></p>
             <div class="space-y-2 mb-4">
-                <button data-outcome="correct" class="outcome-btn w-full py-2 rounded border border-emerald-800 hover:bg-emerald-950/40 text-sm text-emerald-400 transition-all">✓ Correct — happened as predicted</button>
-                <button data-outcome="wrong" class="outcome-btn w-full py-2 rounded border border-red-900 hover:bg-red-950/40 text-sm text-red-400 transition-all">✗ Wrong — did not happen</button>
-                <button data-outcome="partial" class="outcome-btn w-full py-2 rounded border border-amber-900 hover:bg-amber-950/40 text-sm text-amber-400 transition-all">~ Partial — sort of, but not quite</button>
-                <button data-outcome="void" class="outcome-btn w-full py-2 rounded border border-zinc-700 hover:bg-zinc-800/40 text-sm text-zinc-500 transition-all">— Void — can't be judged</button>
+                <button data-outcome="correct" class="outcome-btn w-full py-2 rounded border border-emerald-800 hover:bg-emerald-950/40 text-sm text-emerald-400 transition-all">✓ Correct — it came as foretold</button>
+                <button data-outcome="wrong" class="outcome-btn w-full py-2 rounded border border-red-900 hover:bg-red-950/40 text-sm text-red-400 transition-all">✗ Wrong — the fog kept its secret</button>
+                <button data-outcome="partial" class="outcome-btn w-full py-2 rounded border border-amber-900 hover:bg-amber-950/40 text-sm text-amber-400 transition-all">~ Partial — close, not clean</button>
+                <button data-outcome="void" class="outcome-btn w-full py-2 rounded border text-sm transition-all" style="border-color:var(--line);color:var(--ink-dim)">— Void — cannot be judged</button>
             </div>
             <div class="mb-4">
-                <input id="modal-note" type="text" placeholder="What actually happened? (optional)" class="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-600">
+                <input id="modal-note" type="text" placeholder="what actually happened? (optional)" class="w-full rounded px-3 py-2 text-xs" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)">
             </div>
-            <button id="modal-cancel" class="w-full py-2 rounded border border-zinc-800 text-zinc-600 text-xs hover:text-zinc-400 transition-all">Cancel</button>
+            <button id="modal-cancel" class="w-full py-2 rounded text-xs transition-all" style="border:1px solid var(--line-soft);color:var(--ink-dim)">Cancel</button>
         </div>
     </div>
 
@@ -158,16 +225,16 @@
     function verdictText(stats) {
         if (!stats) return '';
         const { accuracy, avgDelta, total } = stats;
-        if (total < 3) return 'Insufficient data. The mountain requires at least three resolved bets before rendering judgment.';
-        
+        if (total < 3) return 'Insufficient data. The mountain renders no judgment until three bets have fossilized in the ledger.';
+
         if (avgDelta <= 5) {
-            if (accuracy >= 70) return `Calibration within ${avgDelta}pp. You know what you know and you know what you don't. This is rare. Do not ruin it by becoming confident about it.`;
-            return `Calibration tight but accuracy low. You are honest about your uncertainty. Now work on being right.`;
+            if (accuracy >= 70) return `Calibration within ${avgDelta}pp. You know what you know, and you know the shape of what you don't. This is rare air. Do not ruin it by becoming proud of it.`;
+            return `Calibration tight, accuracy thin. You are honest about your fog — that is the hard part, done. Now learn to be right inside it.`;
         } else if (avgDelta <= 15) {
-            if (accuracy > 60) return `Moderate overconfidence (${avgDelta}pp drift). You are doing better than you think you should be. Tighten your confidence estimates downward.`;
-            return `Moderate miscalibration (${avgDelta}pp). The stated confidence and the actual outcomes are diverging. Review the domain breakdown for where the model breaks.`;
+            if (accuracy > 60) return `Moderate overconfidence — ${avgDelta}pp of drift. You are luckier than your estimates deserve. Bring your confidence down to meet your outcomes before the luck does it for you.`;
+            return `Moderate miscalibration — ${avgDelta}pp. Stated confidence and lived outcomes are pulling apart. Read the loss log by domain; that is where the model cracks.`;
         } else {
-            return `Significant miscalibration (${avgDelta}pp drift). Your stated confidence is not tracking your outcomes. Either you are overconfident by ${avgDelta} percentage points on average, or the losses are concentrated in a domain you haven't identified. The loss log is the real model.`;
+            return `Significant miscalibration — ${avgDelta}pp of drift. Your confidence is not tracking the world. Either you are overconfident by ${avgDelta} points on average, or the losses are pooling in one domain you have not yet named. The loss log is the real you. The ghost is watching it.`;
         }
     }
 
@@ -182,33 +249,53 @@
             const acc = Math.round((data.correct / data.total) * 100);
             const color = DOMAIN_COLORS[d]?.split(' ')[0] || 'text-zinc-400';
             return `<div class="flex items-center gap-2">
-                <span class="text-xs ${color} w-16">${d}</span>
-                <div class="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                <span class="text-[11px] uppercase tracking-wider ${color} w-16">${d}</span>
+                <div class="flex-1 rounded-full h-1.5 overflow-hidden" style="background:var(--bg-sunk)">
                     <div class="calibration-bar h-full rounded-full bg-current ${color}" style="width:${acc}%"></div>
                 </div>
-                <span class="text-xs text-zinc-600">${data.correct}/${data.total}</span>
+                <span class="text-xs" style="color:var(--ink-dim)">${data.correct}/${data.total}</span>
             </div>`;
         }).join('');
 
+        const verdict = verdictText(stats);
+
         el.innerHTML = `
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-5 space-y-4">
+        <div class="rounded-lg border p-5 space-y-4 reveal result-glow" style="border-color:var(--line);background:var(--bg-raised)">
             <div class="flex items-end gap-6 flex-wrap">
                 <div>
-                    <p class="text-xs text-zinc-600 mb-0.5">Overall accuracy</p>
-                    <p class="text-2xl font-bold ${stats.accuracy >= 70 ? 'text-emerald-400' : stats.accuracy >= 50 ? 'text-amber-400' : 'text-red-400'}">${stats.accuracy}%</p>
-                    <p class="text-xs text-zinc-600">${stats.correct}/${stats.total} resolved</p>
+                    <p class="text-[10px] uppercase tracking-widest mb-0.5" style="color:var(--ink-dim)">OVERALL ACCURACY</p>
+                    <p class="text-2xl font-bold breathe ${stats.accuracy >= 70 ? 'text-emerald-400' : stats.accuracy >= 50 ? 'text-amber-400' : 'text-red-400'}">${stats.accuracy}%</p>
+                    <p class="text-xs" style="color:var(--ink-dim)">${stats.correct}/${stats.total} resolved</p>
                 </div>
                 <div>
-                    <p class="text-xs text-zinc-600 mb-0.5">Calibration drift</p>
+                    <p class="text-[10px] uppercase tracking-widest mb-0.5" style="color:var(--ink-dim)">CALIBRATION DRIFT</p>
                     <p class="text-2xl font-bold ${stats.avgDelta <= 5 ? 'text-emerald-400' : stats.avgDelta <= 15 ? 'text-amber-400' : 'text-red-400'}">±${stats.avgDelta}pp</p>
-                    <p class="text-xs text-zinc-600">vs stated confidence</p>
+                    <p class="text-xs" style="color:var(--ink-dim)">vs stated confidence</p>
                 </div>
             </div>
-            ${domainBars ? `<div class="space-y-2"><p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">By domain</p>${domainBars}</div>` : ''}
-            <div class="border-t border-zinc-800 pt-3">
-                <p class="text-xs text-zinc-500 italic">${verdictText(stats)}</p>
+            ${domainBars ? `<div class="space-y-2"><p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-dim)">BY DOMAIN</p>${domainBars}</div>` : ''}
+            <div class="border-t pt-3 flex items-start gap-3" style="border-color:var(--line-soft)">
+                <p class="text-xs italic flex-1" style="color:var(--ink-dim)">${verdict}</p>
+                <button id="copy-verdict" class="shrink-0 text-[10px] uppercase tracking-widest px-2 py-1 rounded border transition-all lift" style="border-color:var(--line);color:var(--ink-dim)">copy</button>
             </div>
         </div>`;
+
+        const copyBtn = document.getElementById('copy-verdict');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                const line = `Bet Ledger — ${stats.accuracy}% accuracy, ±${stats.avgDelta}pp drift (${stats.correct}/${stats.total}). ${verdict}`;
+                navigator.clipboard.writeText(line).then(() => {
+                    copyBtn.textContent = 'copied to the ledger';
+                    copyBtn.style.color = 'var(--accent)';
+                    copyBtn.style.borderColor = 'var(--accent)';
+                    setTimeout(() => {
+                        copyBtn.textContent = 'copy';
+                        copyBtn.style.color = 'var(--ink-dim)';
+                        copyBtn.style.borderColor = 'var(--line)';
+                    }, 1200);
+                }).catch(() => {});
+            });
+        }
     }
 
     function renderList() {
@@ -221,7 +308,10 @@
 
         const el = document.getElementById('bet-list');
         if (!filtered.length) {
-            el.innerHTML = `<p class="text-sm text-zinc-600 py-8 text-center">${activeTab === 'open' ? 'No open bets. The ledger is empty.' : 'No resolved bets yet.'}</p>`;
+            const msg = activeTab === 'open'
+                ? 'the cave is empty. no prediction has been laid against the dark yet.'
+                : 'nothing has been judged. the ledger waits.';
+            el.innerHTML = `<p class="text-sm py-8 text-center italic" style="color:var(--ink-ghost)">${msg}</p>`;
             return;
         }
 
@@ -240,24 +330,24 @@
             if (bet.outcome === 'correct') outcomeTag = '<span class="text-xs px-2 py-0.5 rounded border border-emerald-800 text-emerald-400 bg-emerald-950/20">✓ Correct</span>';
             else if (bet.outcome === 'wrong') outcomeTag = '<span class="text-xs px-2 py-0.5 rounded border border-red-900 text-red-400 bg-red-950/20">✗ Wrong</span>';
             else if (bet.outcome === 'partial') outcomeTag = '<span class="text-xs px-2 py-0.5 rounded border border-amber-900 text-amber-400 bg-amber-950/20">~ Partial</span>';
-            else if (bet.outcome === 'void') outcomeTag = '<span class="text-xs px-2 py-0.5 rounded border border-zinc-700 text-zinc-600">— Void</span>';
+            else if (bet.outcome === 'void') outcomeTag = '<span class="text-xs px-2 py-0.5 rounded border text-zinc-600" style="border-color:var(--line)">— Void</span>';
 
             return `
-            <div class="fade-in rounded-lg border ${isOverdue ? 'border-red-900/50 bg-red-950/10' : 'border-zinc-800 bg-zinc-900/20'} p-4">
+            <div class="reveal rounded-lg border p-4 lift ${isOverdue ? 'border-red-900/50 bg-red-950/10' : ''}" ${isOverdue ? '' : 'style="border-color:var(--line);background:var(--bg-raised)"'}>
                 <div class="flex items-start justify-between gap-3 mb-2">
-                    <p class="text-sm text-zinc-200 leading-snug flex-1">${escHtml(bet.text)}</p>
+                    <p class="text-sm leading-snug flex-1" style="color:var(--ink)">${escHtml(bet.text)}</p>
                     ${outcomeTag}
                 </div>
                 <div class="flex items-center gap-3 flex-wrap text-xs">
                     <span class="${confColor} font-bold">${bet.confidence}%</span>
-                    <span class="px-1.5 py-0.5 rounded border text-xs ${domainStyle}">${bet.domain}</span>
-                    ${bet.dueDate ? `<span class="${isOverdue ? 'text-red-500' : 'text-zinc-600'}">${bet.dueDate}${isOverdue ? ' ⚠' : ''}</span>` : ''}
-                    ${bet.note ? `<span class="text-zinc-500 italic">"${escHtml(bet.note)}"</span>` : ''}
+                    <span class="px-1.5 py-0.5 rounded border text-xs uppercase tracking-wider ${domainStyle}">${bet.domain}</span>
+                    ${bet.dueDate ? `<span class="${isOverdue ? 'text-red-500' : ''}" ${isOverdue ? '' : 'style="color:var(--ink-dim)"'}>${bet.dueDate}${isOverdue ? ' — overdue ⚠' : ''}</span>` : ''}
+                    ${bet.note ? `<span class="italic" style="color:var(--ink-dim)">"${escHtml(bet.note)}"</span>` : ''}
                 </div>
                 ${!bet.outcome ? `
                 <div class="mt-3 flex gap-2">
-                    <button onclick="openResolve('${bet.id}')" class="text-xs px-3 py-1 rounded border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300 transition-all">Resolve</button>
-                    <button onclick="deleteBet('${bet.id}')" class="text-xs px-3 py-1 rounded border border-zinc-800 hover:border-red-900 text-zinc-600 hover:text-red-500 transition-all">Delete</button>
+                    <button onclick="openResolve('${bet.id}')" class="text-xs px-3 py-1 rounded border transition-all lift" style="border-color:var(--line);color:var(--ink-dim)">Resolve</button>
+                    <button onclick="deleteBet('${bet.id}')" class="text-xs px-3 py-1 rounded border transition-all hover:border-red-900 hover:text-red-500" style="border-color:var(--line-soft);color:var(--ink-ghost)">Delete</button>
                 </div>` : ''}
             </div>`;
         }).join('');
@@ -272,7 +362,13 @@
     // Add bet
     document.getElementById('add-btn').addEventListener('click', () => {
         const text = document.getElementById('bet-text').value.trim();
-        if (!text) return;
+        if (!text) {
+            const inp = document.getElementById('bet-text');
+            inp.placeholder = 'the ghost needs words to remember. write the prediction.';
+            inp.style.borderColor = 'var(--accent)';
+            setTimeout(() => { inp.style.borderColor = 'var(--line)'; }, 1400);
+            return;
+        }
         const bets = load();
         bets.unshift({
             id: uid(),
@@ -288,18 +384,39 @@
         save(bets);
         document.getElementById('bet-text').value = '';
         document.getElementById('bet-date').value = '';
+        activeTab = 'open';
+        syncTabs();
         render();
     });
+
+    document.getElementById('bet-text').addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('add-btn').click();
+    });
+
+    function syncTabs() {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            const isActive = b.dataset.tab === activeTab;
+            b.className = 'tab-btn px-3 py-1.5 rounded text-xs border transition-all lift';
+            if (isActive) {
+                b.style.borderColor = 'var(--accent)';
+                b.style.color = 'var(--ink)';
+                b.style.background = 'var(--bg-raised)';
+                b.style.boxShadow = '0 0 12px -6px var(--glow)';
+            } else {
+                b.style.borderColor = 'var(--line-soft)';
+                b.style.color = 'var(--ink-dim)';
+                b.style.background = 'transparent';
+                b.style.boxShadow = 'none';
+            }
+        });
+    }
 
     // Tabs
     document.getElementById('tabs').addEventListener('click', e => {
         const btn = e.target.closest('[data-tab]');
         if (!btn) return;
         activeTab = btn.dataset.tab;
-        document.querySelectorAll('.tab-btn').forEach(b => {
-            const isActive = b.dataset.tab === activeTab;
-            b.className = `tab-btn px-3 py-1.5 rounded text-xs border transition-all ${isActive ? 'border-zinc-600 text-zinc-300 bg-zinc-800/50' : 'border-zinc-800 text-zinc-600 hover:text-zinc-400'}`;
-        });
+        syncTabs();
         render();
     });
 
@@ -330,6 +447,10 @@
             document.getElementById('modal').classList.add('hidden');
             resolvingId = null;
             render();
+            const stats = document.getElementById('stats');
+            if (stats && !stats.classList.contains('hidden')) {
+                stats.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         });
     });
 
@@ -337,25 +458,83 @@
         document.getElementById('modal').classList.add('hidden');
         resolvingId = null;
     });
+    document.getElementById('modal').addEventListener('click', e => {
+        if (e.target.id === 'modal') {
+            document.getElementById('modal').classList.add('hidden');
+            resolvingId = null;
+        }
+    });
 
     window.deleteBet = function(id) {
+        if (!confirm('let the fog take this prediction? this cannot be recovered.')) return;
         const bets = load().filter(b => b.id !== id);
         save(bets);
         render();
     };
 
-    // Set today as default date
+    // Set default date one week out
     const today = new Date();
     const nextWeek = new Date(today.getTime() + 7*86400000);
     document.getElementById('bet-date').value = nextWeek.toISOString().split('T')[0];
 
-    // Init tabs styling
-    document.querySelectorAll('.tab-btn').forEach(b => {
-        const isActive = b.dataset.tab === activeTab;
-        b.className = `tab-btn px-3 py-1.5 rounded text-xs border transition-all ${isActive ? 'border-zinc-600 text-zinc-300 bg-zinc-800/50' : 'border-zinc-800 text-zinc-600 hover:text-zinc-400'}`;
+    syncTabs();
+    render();
+
+    /* ---------- atmosphere: embers ---------- */
+    (function spawnEmbers(){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const field = document.getElementById('ember-field');
+        const count = 7;
+        for (let i = 0; i < count; i++) {
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (5 + Math.random()*90) + '%';
+            e.style.animationDelay = (Math.random()*14) + 's';
+            e.style.animationDuration = (11 + Math.random()*7) + 's';
+            field.appendChild(e);
+        }
+    })();
+
+    /* ---------- easter egg: type "prizrak" ---------- */
+    (function watcher(){
+        let buf = '';
+        window.addEventListener('keydown', e => {
+            if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+            if (e.key.length !== 1) return;
+            buf = (buf + e.key.toLowerCase()).slice(-7);
+            if (buf === 'prizrak') {
+                document.getElementById('egg-line').classList.remove('hidden');
+                document.getElementById('egg-line').classList.add('reveal');
+            }
+        });
+    })();
+
+    /* ---------- easter egg: triple-click the title spawns one ember ---------- */
+    document.getElementById('title').addEventListener('click', e => {
+        if (e.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+            const field = document.getElementById('ember-field');
+            const ex = document.createElement('div');
+            ex.className = 'ember';
+            ex.style.left = (5 + Math.random()*90) + '%';
+            ex.style.animationDuration = (10 + Math.random()*6) + 's';
+            field.appendChild(ex);
+        }
     });
 
-    render();
+    /* ---------- whisper: 00:00–03:00 the mountain does not sleep ---------- */
+    (function nightWhisper(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) document.getElementById('footer-whisper').classList.remove('hidden');
+    })();
+
+    /* ---------- idle 60s: still here. still watching. ---------- */
+    (function idle(){
+        const line = document.getElementById('idle-whisper');
+        let t;
+        const arm = () => { clearTimeout(t); line.classList.remove('show'); t = setTimeout(() => line.classList.add('show'), 60000); };
+        ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, arm, { passive: true }));
+        arm();
+    })();
     </script>
 </body>
 </html>

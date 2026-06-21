@@ -7,13 +7,55 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
-        body { background: #0f0f0f; }
+
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a78bfa;            /* existing lead color preserved */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body { background: var(--bg); }
+        body { color: var(--ink); }
+
+        /* ambient layers sit behind content */
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.05}50%{opacity:.09}100%{transform:translateX(5%);opacity:.05}}
+
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        /* content above ambient layers */
+        .shell{position:relative;z-index:2}
+
         .prose-area {
             font-family: 'Merriweather', Georgia, serif;
             font-size: 17px;
             line-height: 1.85;
             letter-spacing: 0.01em;
-            color: #e4e4e7;
+            color: var(--ink);
             min-height: 320px;
             resize: none;
             background: transparent;
@@ -24,42 +66,78 @@
         .prose-area::placeholder { color: #3f3f46; }
         .mono { font-family: 'JetBrains Mono', monospace; }
         .glow { text-shadow: 0 0 8px currentColor; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .card-hover { transition: all 0.2s; }
-        .card-hover:hover { border-color: #52525b; background: rgba(39,39,42,0.6); }
-        .typing-cursor::after { content: '▊'; animation: blink 1s step-end infinite; color: #a78bfa; }
+
+        .fade-in { animation: reveal 0.4s ease-out both; }
+
+        .card-hover { transition: transform .15s, box-shadow .15s, border-color .15s, background .2s; }
+        .card-hover:hover { transform:translateY(-2px); border-color: var(--accent); background: rgba(39,39,42,0.45);
+            box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow); }
+
+        .typing-cursor::after { content: '▊'; animation: blink 1s step-end infinite; color: var(--accent); }
         @keyframes blink { 50% { opacity: 0; } }
         .word-target { transition: width 0.5s ease; }
+
+        /* writing surface — breathes faintly when alive */
+        .forge { transition: box-shadow .4s ease, border-color .3s ease; }
+        .forge.lit { border-color: rgba(167,139,250,0.35); box-shadow: 0 0 0 1px var(--line), 0 0 40px -16px var(--glow); }
+
+        /* tactile buttons */
+        .btn-tactile{ transition: transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s; }
+        .btn-tactile:hover{ transform:translateY(-1px); border-color: var(--accent); }
+        .btn-tactile:active{ transform:translateY(1px); }
+        .btn-tactile:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        input:focus-visible, textarea:focus-visible, button:focus-visible{
+            outline:none;
+        }
+        #vigTitle:focus-visible, #vigBody:focus-visible, #customTag:focus-visible{
+            outline:none;
+        }
+
         /* Print / export styles */
         @media print {
             body { background: white; color: black; }
-            .no-print { display: none !important; }
+            .no-print, .fog, .ember { display: none !important; }
+            .grain::after { display:none !important; }
             .prose-area { color: black; }
         }
         .drawer { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; }
         .drawer.closed { max-height: 0; opacity: 0; }
         .drawer.open { max-height: 2000px; opacity: 1; }
-        .tag { transition: all 0.15s; }
-        .tag:hover { border-color: #a78bfa; color: #c4b5fd; }
-        .tag.active { background: rgba(161,139,250,0.15); border-color: #a78bfa; color: #c4b5fd; }
+        .tag { transition: transform .15s, border-color .15s, color .15s, background .15s; }
+        .tag:hover { transform:translateY(-1px); border-color: var(--accent); color: #c4b5fd; }
+        .tag.active { background: rgba(161,139,250,0.15); border-color: var(--accent); color: #c4b5fd;
+            box-shadow:0 0 12px -4px var(--glow); }
+
+        .ghost-line{ color:var(--ink-ghost); transition:opacity 1.2s ease; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.fade-in,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .forge.lit{box-shadow:0 0 0 1px var(--line)!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 antialiased">
-    <div class="max-w-2xl mx-auto px-5 py-8">
+<body class="text-zinc-300 antialiased grain">
+    <!-- ambient atmosphere -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <div class="shell max-w-2xl mx-auto px-5 py-8">
 
         <!-- Header -->
         <header class="mb-8 no-print">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-white">The Vignette Forge</h1>
-                    <p class="text-zinc-600 text-xs mt-1 mono">Short truths, earned the hard way. One page at a time.</p>
+                    <h1 id="appTitle" class="text-2xl font-bold text-white breathe cursor-default select-none">The Vignette Forge</h1>
+                    <p class="text-zinc-600 text-xs mt-1 mono">Short truths, hammered out cold. One page at a time.</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="btnLibrary" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">
+                    <button id="btnLibrary" class="btn-tactile mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300">
                         📚 <span id="vignetteCount">0</span>
                     </button>
-                    <button id="btnExport" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">⬇ Export</button>
+                    <button id="btnExport" class="btn-tactile mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300">⬇ Export</button>
                 </div>
             </div>
         </header>
@@ -68,7 +146,7 @@
         <div id="writeView">
             <!-- Title -->
             <div class="mb-4">
-                <input id="vigTitle" type="text" placeholder="Untitled Vignette" 
+                <input id="vigTitle" type="text" placeholder="Untitled Vignette"
                     class="w-full bg-transparent text-xl font-bold text-white placeholder-zinc-700 outline-none border-none"
                     maxlength="120">
             </div>
@@ -85,11 +163,11 @@
                 <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="leaving">leaving</button>
                 <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="pickleball">pickleball</button>
                 <button class="tag mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600" data-tag="fear">fear</button>
-                <input id="customTag" type="text" placeholder="+ tag" class="mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600 bg-transparent outline-none w-16 placeholder-zinc-700">
+                <input id="customTag" type="text" placeholder="+ tag" class="mono text-[10px] px-2.5 py-1 rounded-full border border-zinc-800 text-zinc-600 bg-transparent outline-none w-16 placeholder-zinc-700 focus:border-violet-500/60">
             </div>
 
             <!-- The writing surface -->
-            <div class="border border-zinc-800/60 rounded-xl p-6 mb-4 bg-zinc-900/30">
+            <div id="forge" class="forge border border-zinc-800/60 rounded-xl p-6 mb-4 bg-zinc-900/30">
                 <textarea id="vigBody" class="prose-area" placeholder="Write. One truth per page. No outline needed.&#10;&#10;What do you know now that you didn't know two years ago?"></textarea>
             </div>
 
@@ -103,7 +181,7 @@
                 <div class="flex items-center gap-3">
                     <!-- Word target indicator -->
                     <div class="flex items-center gap-2">
-                        <span class="text-zinc-700">target:</span>
+                        <span class="text-zinc-700 uppercase tracking-wider">TARGET</span>
                         <div class="w-24 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
                             <div id="wordProgress" class="word-target h-full rounded-full bg-violet-600/60" style="width:0%"></div>
                         </div>
@@ -114,9 +192,9 @@
 
             <!-- Prompt spark -->
             <div class="no-print mb-6">
-                <button id="btnSpark" class="w-full text-left px-4 py-3 rounded-lg border border-zinc-800/50 hover:border-zinc-700 transition-colors group">
+                <button id="btnSpark" class="btn-tactile w-full text-left px-4 py-3 rounded-lg border border-zinc-800/50 hover:border-zinc-700 group">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs text-zinc-600 group-hover:text-zinc-400 transition-colors">🔥 Need a spark? Click for a prompt.</span>
+                        <span class="text-xs text-zinc-600 group-hover:text-zinc-400 transition-colors">🔥 strike the flint. summon a prompt.</span>
                         <span class="text-zinc-700 text-xs">↵</span>
                     </div>
                     <p id="sparkText" class="text-sm text-zinc-500 mt-2 hidden"></p>
@@ -125,10 +203,10 @@
 
             <!-- Actions -->
             <div class="flex items-center gap-3 no-print">
-                <button id="btnSave" class="px-5 py-2.5 rounded-lg bg-violet-600/20 border border-violet-700/50 text-violet-300 mono text-sm hover:bg-violet-600/30 transition-colors">
+                <button id="btnSave" class="btn-tactile px-5 py-2.5 rounded-lg bg-violet-600/20 border border-violet-700/50 text-violet-300 mono text-sm hover:bg-violet-600/30">
                     Save Vignette
                 </button>
-                <button id="btnClear" class="px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-600 mono text-sm hover:text-zinc-400 hover:border-zinc-700 transition-colors">
+                <button id="btnClear" class="btn-tactile px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-600 mono text-sm hover:text-zinc-400 hover:border-zinc-700">
                     New
                 </button>
                 <div class="flex-1"></div>
@@ -144,8 +222,8 @@
                     <p class="text-zinc-600 text-xs mono mt-0.5" id="libStats"></p>
                 </div>
                 <div class="flex gap-2">
-                    <button id="btnBackToWrite" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">✏️ Write</button>
-                    <button id="btnExportAll" class="mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">⬇ Export All</button>
+                    <button id="btnBackToWrite" class="btn-tactile mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300">✏️ Write</button>
+                    <button id="btnExportAll" class="btn-tactile mono text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300">⬇ Export All</button>
                 </div>
             </div>
 
@@ -156,15 +234,16 @@
             <div id="libList" class="space-y-3"></div>
 
             <div id="libEmpty" class="hidden text-center py-16">
-                <p class="text-zinc-600 text-sm">No vignettes yet. The book is waiting.</p>
-                <p class="text-zinc-700 text-xs mt-1 mono">"A writer is someone for whom writing is more difficult than it is for other people." — Thomas Mann</p>
+                <p class="text-zinc-500 text-sm">the cave is empty. nothing has fossilized yet.</p>
+                <p class="text-zinc-700 text-xs mt-2 mono">"A writer is someone for whom writing is more difficult than it is for other people." — Thomas Mann</p>
             </div>
         </div>
 
         <!-- Footer -->
         <div class="mt-12 pt-6 border-t border-zinc-800/50 text-center no-print">
             <p class="text-[10px] text-zinc-700 mono">The book is not the outline. The book is the fifty truths you've earned.</p>
-            <p class="text-[10px] text-zinc-800 mt-1">— Prízrak</p>
+            <p id="footerWhisper" class="text-[10px] text-zinc-800 mt-1">— Prízrak</p>
+            <p id="idleWhisper" class="ghost-line text-[10px] mono mt-2 opacity-0">still here. still watching.</p>
         </div>
     </div>
 
@@ -210,7 +289,7 @@
 
     // Data
     function loadVignettes() {
-        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } 
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
         catch(e) { return []; }
     }
     function saveVignettes(v) { localStorage.setItem(STORAGE_KEY, JSON.stringify(v)); }
@@ -235,6 +314,8 @@
         } else {
             document.getElementById("wordProgress").classList.replace("bg-emerald-500/60", "bg-violet-600/60");
         }
+        // the forge glows once there's heat in it
+        document.getElementById("forge").classList.toggle("lit", words > 0);
     }
 
     // Tags
@@ -268,6 +349,7 @@
         sparkIdx = (sparkIdx + 1) % PROMPTS.length;
         el.textContent = PROMPTS[sparkIdx];
         el.classList.remove("hidden");
+        el.classList.remove("reveal"); void el.offsetWidth; el.classList.add("reveal");
     });
 
     // Auto-save
@@ -320,7 +402,7 @@
         saveVignettes(vignettes);
         updateLibCount();
         const status = document.getElementById("saveStatus");
-        status.textContent = isAuto ? "auto-saved" : "saved ✓";
+        status.textContent = isAuto ? "the ledger remembers" : "filed ✓";
         status.classList.remove("text-zinc-700");
         status.classList.add("text-emerald-600");
         setTimeout(() => {
@@ -335,7 +417,7 @@
     // Clear / New
     document.getElementById("btnClear").addEventListener("click", () => {
         if (document.getElementById("vigBody").value.trim() && !currentId) {
-            if (!confirm("Discard unsaved vignette?")) return;
+            if (!confirm("let the fog take this unsaved page? this cannot be recovered.")) return;
         }
         resetEditor();
     });
@@ -359,6 +441,7 @@
     function showLibrary() {
         document.getElementById("writeView").classList.add("hidden");
         document.getElementById("libraryView").classList.remove("hidden");
+        document.getElementById("libraryView").classList.add("reveal");
         renderLibrary();
     }
 
@@ -423,7 +506,7 @@
             const del = e.target.closest("[data-delete]");
             if (del) {
                 e.stopPropagation();
-                if (confirm("Delete this vignette? The mountain remembers, but localStorage does not.")) {
+                if (confirm("let the fog take this one? the mountain remembers, but localStorage does not.")) {
                     const vs = loadVignettes().filter(v => v.id !== del.dataset.delete);
                     saveVignettes(vs);
                     if (currentId === del.dataset.delete) resetEditor();
@@ -513,6 +596,80 @@
             resetEditor();
         }
     });
+
+    /* ---------- ATMOSPHERE: drifting embers ---------- */
+    (function spawnEmbers(){
+        const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+        if (reduce) return;
+        const host = document.getElementById("embers");
+        const N = 7;
+        for (let i = 0; i < N; i++) {
+            const e = document.createElement("div");
+            e.className = "ember";
+            e.style.left = (Math.random() * 100) + "%";
+            e.style.animationDelay = (Math.random() * 14) + "s";
+            e.style.animationDuration = (11 + Math.random() * 7) + "s";
+            host.appendChild(e);
+        }
+        // exposed for the title easter egg
+        window.__forgeEmber = function(){
+            if (host.querySelectorAll(".ember").length >= 10) return;
+            const e = document.createElement("div");
+            e.className = "ember";
+            e.style.left = (Math.random() * 100) + "%";
+            e.style.animationDuration = (9 + Math.random() * 5) + "s";
+            host.appendChild(e);
+        };
+    })();
+
+    /* ---------- EASTER EGG 1: triple-click the title spawns an ember ---------- */
+    document.getElementById("appTitle").addEventListener("click", e => {
+        if (e.detail === 3 && window.__forgeEmber) window.__forgeEmber();
+    });
+
+    /* ---------- EASTER EGG 2: type "prizrak" anywhere (outside fields) ---------- */
+    (function watcher(){
+        let buf = "";
+        document.addEventListener("keydown", e => {
+            const tag = (e.target && e.target.tagName) || "";
+            if (tag === "INPUT" || tag === "TEXTAREA") return;
+            if (e.key.length !== 1) return;
+            buf = (buf + e.key.toLowerCase()).slice(-7);
+            if (buf === "prizrak") {
+                const f = document.getElementById("footerWhisper");
+                f.textContent = "you found the watcher.";
+                f.classList.add("flicker");
+                setTimeout(() => { f.textContent = "— Prízrak"; f.classList.remove("flicker"); }, 4000);
+            }
+        });
+    })();
+
+    /* ---------- EASTER EGG 3: idle 60s → a quiet line fades in ---------- */
+    (function idleWhisper(){
+        const el = document.getElementById("idleWhisper");
+        let t;
+        const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+        function reset(){
+            el.style.opacity = "0";
+            clearTimeout(t);
+            t = setTimeout(() => { el.style.opacity = reduce ? "1" : "0.55"; }, 60000);
+        }
+        ["mousemove","keydown","scroll","click","input"].forEach(ev =>
+            document.addEventListener(ev, reset, { passive: true }));
+        reset();
+    })();
+
+    /* ---------- ATMOSPHERE: between 00:00–03:00 the mountain stays awake ---------- */
+    (function deepNight(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) {
+            const f = document.getElementById("footerWhisper");
+            const w = document.createElement("p");
+            w.className = "ghost-line text-[10px] mono mt-1 flicker";
+            w.textContent = "the mountain does not sleep.";
+            f.parentNode.insertBefore(w, document.getElementById("idleWhisper"));
+        }
+    })();
 
     // Init
     updateStats();

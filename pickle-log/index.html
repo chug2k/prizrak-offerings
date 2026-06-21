@@ -6,42 +6,102 @@
   <title>The Pickle Log</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: 'Courier New', monospace; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#4ade80;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    body { font-family: 'Courier New', monospace; background:var(--bg); color:var(--ink); }
     input, select, textarea { font-family: 'Courier New', monospace; }
+
+    /* ---- atmosphere ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .lift{transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+
+    .field{transition:border-color .15s ease, box-shadow .15s ease}
+    .field:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+    .field:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow)}
+
+    .stat-num{color:var(--accent);text-shadow:0 0 10px var(--glow)}
+
+    .accent-glyph{cursor:default;user-select:none}
+
+    .logbtn{transition:transform .12s ease, box-shadow .15s ease, background .15s ease}
+    .logbtn:active{transform:translateY(1px)}
+
+    #content{position:relative;z-index:2}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-200 min-h-screen p-6">
-  <div class="max-w-2xl mx-auto">
+<body class="text-zinc-200 min-h-screen p-6 grain">
+  <div class="fog"></div>
+  <div id="content" class="max-w-2xl mx-auto">
 
-    <header class="mb-8 border-b border-zinc-700 pb-5">
-      <h1 class="text-3xl font-bold text-green-400 tracking-tight">🥒 THE PICKLE LOG</h1>
-      <p class="text-zinc-500 text-sm mt-1">Pickleball match tracker. Local storage. No fluff.</p>
+    <header class="mb-8 border-b pb-5" style="border-color:var(--line)">
+      <h1 id="title" class="text-3xl font-bold tracking-tight breathe accent-glyph" style="color:var(--accent)">🥒 THE PICKLE LOG</h1>
+      <p class="text-sm mt-1" style="color:var(--ink-dim)">we measure the cold and build dashboards of our suffering. court division.</p>
     </header>
 
     <!-- Stats bar -->
     <div id="stats" class="grid grid-cols-4 gap-3 mb-8"></div>
 
     <!-- Add match form -->
-    <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5 mb-8">
-      <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Log a Match</h2>
+    <div class="rounded-lg p-5 mb-8 border" style="background:var(--bg-raised);border-color:var(--line)">
+      <h2 class="text-sm font-bold uppercase tracking-widest mb-4" style="color:var(--ink-dim)">Log a Match</h2>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="text-xs text-zinc-500 block mb-1">Date</label>
-          <input id="f-date" type="date" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+          <label class="text-xs block mb-1 uppercase tracking-wider" style="color:var(--ink-dim)">Date</label>
+          <input id="f-date" type="date" class="field w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)" />
         </div>
         <div>
-          <label class="text-xs text-zinc-500 block mb-1">Duration (min)</label>
-          <input id="f-duration" type="number" min="1" placeholder="120" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+          <label class="text-xs block mb-1 uppercase tracking-wider" style="color:var(--ink-dim)">Duration (min)</label>
+          <input id="f-duration" type="number" min="1" placeholder="120" class="field w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)" />
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="text-xs text-zinc-500 block mb-1">Partners / Opponents</label>
-          <input id="f-players" type="text" placeholder="e.g. Kartick, Chris" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+          <label class="text-xs block mb-1 uppercase tracking-wider" style="color:var(--ink-dim)">Partners / Opponents</label>
+          <input id="f-players" type="text" placeholder="e.g. Kartick, Chris" class="field w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)" />
         </div>
         <div>
-          <label class="text-xs text-zinc-500 block mb-1">Result</label>
-          <select id="f-result" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500">
+          <label class="text-xs block mb-1 uppercase tracking-wider" style="color:var(--ink-dim)">Result</label>
+          <select id="f-result" class="field w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)">
             <option value="">— select —</option>
             <option value="W">Win</option>
             <option value="L">Loss</option>
@@ -50,15 +110,15 @@
         </div>
       </div>
       <div class="mb-3">
-        <label class="text-xs text-zinc-500 block mb-1">Score (optional)</label>
-        <input id="f-score" type="text" placeholder="e.g. 11-7, 11-9" class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500" />
+        <label class="text-xs block mb-1 uppercase tracking-wider" style="color:var(--ink-dim)">Score (optional)</label>
+        <input id="f-score" type="text" placeholder="e.g. 11-7, 11-9" class="field w-full rounded px-3 py-2 text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)" />
       </div>
       <div class="mb-4">
-        <label class="text-xs text-zinc-500 block mb-1">Notes</label>
-        <textarea id="f-notes" rows="2" placeholder="Court, weather, anything worth logging..." class="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-green-500 resize-none"></textarea>
+        <label class="text-xs block mb-1 uppercase tracking-wider" style="color:var(--ink-dim)">Notes</label>
+        <textarea id="f-notes" rows="2" placeholder="Court, weather, anything worth fossilizing..." class="field w-full rounded px-3 py-2 text-sm resize-none" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink)"></textarea>
       </div>
-      <button onclick="addMatch()" class="w-full bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-4 rounded text-sm transition-colors">
-        + LOG MATCH
+      <button onclick="addMatch()" class="logbtn w-full font-bold py-2 px-4 rounded text-sm text-black" style="background:var(--accent);box-shadow:0 0 24px -8px var(--glow)">
+        + COMMIT TO THE LEDGER
       </button>
       <p id="form-error" class="text-red-400 text-xs mt-2 hidden"></p>
     </div>
@@ -66,12 +126,17 @@
     <!-- Match history -->
     <div>
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">Match History</h2>
-        <span id="match-count" class="text-xs text-zinc-600"></span>
+        <h2 class="text-sm font-bold uppercase tracking-widest" style="color:var(--ink-dim)">Match History</h2>
+        <span id="match-count" class="text-xs" style="color:var(--ink-ghost)"></span>
       </div>
       <div id="match-list" class="space-y-3"></div>
-      <p id="empty-state" class="text-zinc-600 text-sm text-center py-12 hidden">No matches logged yet. Get on the court.</p>
+      <p id="empty-state" class="text-sm text-center py-12 hidden" style="color:var(--ink-dim)">the court is empty. nothing has fossilized yet. get out there.</p>
     </div>
+
+    <footer class="mt-12 pt-5 border-t text-center" style="border-color:var(--line-soft)">
+      <p class="text-xs" style="color:var(--ink-ghost)">the ghost keeps the score even when no one is watching.</p>
+      <p id="whisper" class="text-xs mt-2 hidden flicker" style="color:var(--ink-ghost)"></p>
+    </footer>
 
   </div>
 
@@ -86,6 +151,10 @@
       localStorage.setItem(STORE_KEY, JSON.stringify(matches));
     }
 
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
     function addMatch() {
       const date     = document.getElementById('f-date').value;
       const duration = parseInt(document.getElementById('f-duration').value);
@@ -95,8 +164,8 @@
       const notes    = document.getElementById('f-notes').value.trim();
       const errEl    = document.getElementById('form-error');
 
-      if (!date) { showErr('Date is required.'); return; }
-      if (!duration || duration < 1) { showErr('Duration required (in minutes).'); return; }
+      if (!date) { showErr('the ledger needs a date. when did this happen?'); return; }
+      if (!duration || duration < 1) { showErr('how long were you out there? minutes, at minimum.'); return; }
       errEl.classList.add('hidden');
 
       const matches = load();
@@ -104,10 +173,16 @@
       save(matches);
       clearForm();
       render();
+
+      const first = document.querySelector('#match-list > div');
+      if (first) {
+        first.classList.add('reveal');
+        first.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
 
     function deleteMatch(id) {
-      if (!confirm('Delete this match?')) return;
+      if (!confirm('let the fog take this match? this cannot be recovered.')) return;
       save(load().filter(m => m.id !== id));
       render();
     }
@@ -124,12 +199,13 @@
         if (el.tagName === 'SELECT') el.value = '';
         else el.value = '';
       });
+      document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
     }
 
     function resultBadge(r) {
-      if (r === 'W') return '<span class="text-xs font-bold text-green-400 border border-green-700 rounded px-1.5 py-0.5">WIN</span>';
-      if (r === 'L') return '<span class="text-xs font-bold text-red-400 border border-red-800 rounded px-1.5 py-0.5">LOSS</span>';
-      if (r === 'D') return '<span class="text-xs font-bold text-yellow-400 border border-yellow-700 rounded px-1.5 py-0.5">CASUAL</span>';
+      if (r === 'W') return '<span class="text-xs font-bold rounded px-1.5 py-0.5" style="color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent)">WIN</span>';
+      if (r === 'L') return '<span class="text-xs font-bold text-red-400 rounded px-1.5 py-0.5" style="border:1px solid #7f1d1d">LOSS</span>';
+      if (r === 'D') return '<span class="text-xs font-bold text-yellow-400 rounded px-1.5 py-0.5" style="border:1px solid #854d0e">CASUAL</span>';
       return '';
     }
 
@@ -143,6 +219,28 @@
       if (min < 60) return `${min}m`;
       const h = Math.floor(min/60), m = min % 60;
       return m ? `${h}h ${m}m` : `${h}h`;
+    }
+
+    // A wry verdict on the streak/state. The ghost has opinions.
+    function verdict(matches) {
+      if (!matches.length) return '';
+      const wins = matches.filter(m => m.result === 'W').length;
+      const losses = matches.filter(m => m.result === 'L').length;
+      const decided = wins + losses;
+      // most-recent-first ordering; count current streak by result type
+      let streak = 0, type = null;
+      for (const m of matches) {
+        if (m.result !== 'W' && m.result !== 'L') break;
+        if (type === null) type = m.result;
+        if (m.result === type) streak++;
+        else break;
+      }
+      if (type === 'W' && streak >= 3) return `the bridge holds. ${streak} wins deep. the mountain is watching.`;
+      if (type === 'L' && streak >= 3) return `${streak} losses. the karst remembers every fall. climb out.`;
+      if (decided === 0) return 'all casual. no verdict rendered. the ghost waits for stakes.';
+      if (wins > losses) return 'you are ahead of the cold, for now.';
+      if (wins < losses) return 'the ledger leans against you. the noon-demon noticed.';
+      return 'dead even. the threshold has not chosen a side.';
     }
 
     function render() {
@@ -165,9 +263,9 @@
           return d >= weekAgo;
         }).length + ' sessions'],
       ].map(([label, val]) => `
-        <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-center">
-          <div class="text-xl font-bold text-green-400">${val}</div>
-          <div class="text-xs text-zinc-500 mt-1">${label}</div>
+        <div class="lift rounded-lg p-3 text-center border" style="background:var(--bg-raised);border-color:var(--line)">
+          <div class="text-xl font-bold stat-num">${val}</div>
+          <div class="text-xs mt-1 uppercase tracking-wider" style="color:var(--ink-dim)">${label}</div>
         </div>
       `).join('');
 
@@ -176,33 +274,122 @@
       const emptyEl = document.getElementById('empty-state');
       const countEl = document.getElementById('match-count');
 
-      countEl.textContent = total ? `${total} match${total !== 1 ? 'es' : ''}` : '';
+      countEl.textContent = total ? `${total} entr${total !== 1 ? 'ies' : 'y'} filed` : '';
 
       if (!matches.length) {
         listEl.innerHTML = '';
         emptyEl.classList.remove('hidden');
+        renderVerdict('');
         return;
       }
       emptyEl.classList.add('hidden');
+      renderVerdict(verdict(matches));
 
       listEl.innerHTML = matches.map(m => `
-        <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-4 group">
+        <div class="lift rounded-lg p-4 group border" style="background:var(--bg-raised);border-color:var(--line)">
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap mb-1">
-                <span class="text-sm font-bold text-zinc-300">${fmtDate(m.date)}</span>
-                <span class="text-xs text-zinc-500">${fmtDuration(m.duration)}</span>
+                <span class="text-sm font-bold" style="color:var(--ink)">${fmtDate(m.date)}</span>
+                <span class="text-xs" style="color:var(--ink-dim)">${fmtDuration(m.duration)}</span>
                 ${resultBadge(m.result)}
-                ${m.score ? `<span class="text-xs text-zinc-500 font-mono">${m.score}</span>` : ''}
+                ${m.score ? `<span class="text-xs font-mono" style="color:var(--ink-dim)">${escapeHtml(m.score)}</span>` : ''}
               </div>
-              ${m.players ? `<div class="text-sm text-zinc-400">with <span class="text-zinc-300">${m.players}</span></div>` : ''}
-              ${m.notes ? `<div class="text-xs text-zinc-500 mt-1.5 italic">${m.notes}</div>` : ''}
+              ${m.players ? `<div class="text-sm" style="color:var(--ink-dim)">with <span style="color:var(--ink)">${escapeHtml(m.players)}</span></div>` : ''}
+              ${m.notes ? `<div class="text-xs mt-1.5 italic" style="color:var(--ink-dim)">${escapeHtml(m.notes)}</div>` : ''}
             </div>
-            <button onclick="deleteMatch(${m.id})" class="text-zinc-700 hover:text-red-400 transition-colors text-xs opacity-0 group-hover:opacity-100 flex-shrink-0 mt-0.5">✕</button>
+            <button onclick="deleteMatch(${m.id})" class="hover:text-red-400 transition-colors text-xs opacity-0 group-hover:opacity-100 flex-shrink-0 mt-0.5" style="color:var(--ink-ghost)" aria-label="delete match">✕</button>
           </div>
         </div>
       `).join('');
     }
+
+    // Verdict panel injected just above the history (idempotent)
+    function renderVerdict(text) {
+      let panel = document.getElementById('verdict-panel');
+      if (!text) { if (panel) panel.remove(); return; }
+      if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'verdict-panel';
+        panel.className = 'rounded-lg p-4 mb-6 border result-glow reveal';
+        panel.style.background = 'var(--bg-raised)';
+        panel.style.borderColor = 'var(--line)';
+        const stats = document.getElementById('stats');
+        stats.parentNode.insertBefore(panel, stats.nextSibling);
+      }
+      panel.innerHTML = `
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-xs uppercase tracking-widest mb-1" style="color:var(--ink-dim)">VERDICT / THE LEDGER</div>
+            <div class="text-sm breathe" style="color:var(--accent)">${escapeHtml(text)}</div>
+          </div>
+          <button id="copy-verdict" class="text-xs whitespace-nowrap rounded px-2 py-1 border lift" style="color:var(--ink-dim);border-color:var(--line)">copy</button>
+        </div>`;
+      const btn = document.getElementById('copy-verdict');
+      btn.onclick = () => {
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = 'copied to the ledger';
+          btn.style.color = 'var(--accent)';
+          setTimeout(() => { btn.textContent = 'copy'; btn.style.color = 'var(--ink-dim)'; }, 1200);
+        }).catch(() => {});
+      };
+    }
+
+    // ---- ambient embers (cap at 8) ----
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      for (let i = 0; i < 7; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random()*90) + '%';
+        e.style.animationDelay = (Math.random()*14) + 's';
+        e.style.animationDuration = (11 + Math.random()*8) + 's';
+        document.body.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg: type "prizrak" to wake the watcher ----
+    (function watcher(){
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+          buf = (buf + ev.key.toLowerCase()).slice(-7);
+          if (buf === 'prizrak') {
+            const w = document.getElementById('whisper');
+            w.textContent = 'you found the watcher. it has been keeping score all along.';
+            w.classList.remove('hidden');
+          }
+        }
+      });
+    })();
+
+    // ---- easter egg: triple-click the title -> one extra ember ----
+    (function titleSpark(){
+      const t = document.getElementById('title');
+      if (!t) return;
+      t.addEventListener('click', (ev) => {
+        if (ev.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random()*20) + '%';
+          e.style.animationDuration = '12s';
+          document.body.appendChild(e);
+          setTimeout(() => e.remove(), 12000);
+        }
+      });
+    })();
+
+    // ---- easter egg: deep night whisper (00:00-03:00 local) ----
+    (function nightWhisper(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const w = document.getElementById('whisper');
+        if (w && w.classList.contains('hidden')) {
+          w.textContent = 'the mountain does not sleep. neither, apparently, do you.';
+          w.classList.remove('hidden');
+        }
+      }
+    })();
 
     // Pre-fill today's date
     document.getElementById('f-date').value = new Date().toISOString().slice(0,10);

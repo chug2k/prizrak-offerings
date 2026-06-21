@@ -7,92 +7,206 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
-    body { font-family: 'JetBrains Mono', monospace; }
 
-    .clock-face {
-      position: relative;
-      width: 80px;
-      height: 80px;
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#a78bfa;      /* violet — this app's lead color (evening) */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
     }
-    .clock-ring {
-      fill: none;
-      stroke-width: 3;
-      stroke-linecap: round;
+
+    *{ box-sizing:border-box; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background:var(--bg);
+      color:var(--ink);
     }
-    .clock-bg { stroke: #27272a; }
+
+    /* ---- atmosphere layers ---- */
+    .fog{
+      position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate;
+    }
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{
+      position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite;
+    }
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    .grain::after{
+      content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* slow rotation of the second-hand tick for awake clocks */
+    @keyframes tickPulse{0%,100%{opacity:.55}50%{opacity:1}}
+    .tick-pulse{animation:tickPulse 3s ease-in-out infinite}
+
+    .wrap{ position:relative; z-index:2; }
+
+    /* ---- cards ---- */
+    .card {
+      background: var(--bg-raised);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, opacity .3s ease;
+    }
+    .card:hover {
+      transform:translateY(-2px);
+      border-color: var(--accent);
+      box-shadow:0 0 0 1px var(--line), 0 0 26px -10px var(--glow);
+    }
+
+    .label{ text-transform:uppercase; letter-spacing:.18em; color:var(--ink-dim); }
 
     .status-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       display: inline-block;
-      margin-right: 6px;
       flex-shrink: 0;
-      margin-top: 2px;
     }
-
-    .card {
-      background: #18181b;
-      border: 1px solid #27272a;
-      border-radius: 12px;
-      padding: 20px;
-      transition: border-color 0.2s;
-    }
-    .card:hover { border-color: #52525b; }
+    .status-dot.live{ box-shadow:0 0 8px currentColor; }
+    @keyframes dotPulse{0%,100%{box-shadow:0 0 4px currentColor}50%{box-shadow:0 0 10px currentColor}}
 
     .hero-svg {
       width: 100%;
-      height: 120px;
+      height: 130px;
       display: block;
-      margin-bottom: 32px;
-      border-radius: 8px;
+      margin-bottom: 28px;
+      border-radius: 10px;
       overflow: hidden;
+      border:1px solid var(--line-soft);
+    }
+    .hero-title{ cursor:default; }
+
+    /* copy button */
+    .ghost-btn{
+      border:1px solid var(--line);
+      background:var(--bg-sunk);
+      color:var(--ink-dim);
+      border-radius:8px;
+      padding:6px 12px;
+      font-size:11px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      transition:transform .12s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+      cursor:pointer;
+    }
+    .ghost-btn:hover{ border-color:var(--accent); color:var(--ink); transform:translateY(-1px); }
+    .ghost-btn:active{ transform:translateY(1px); }
+    .ghost-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    .ghost-btn.flash{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .reachable-pill{ transition:border-color .15s ease, color .15s ease; }
+
+    /* the watcher line (idle egg) */
+    #watcher{
+      transition:opacity 1.2s ease;
+      opacity:0;
+      color:var(--ink-ghost);
+    }
+    #watcher.show{ opacity:1; }
+
+    #egg-line{ color:var(--ink-ghost); opacity:0; transition:opacity .8s ease; }
+    #egg-line.show{ opacity:1; }
+
+    #night-whisper{ color:var(--ink-ghost); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.tick-pulse,.card{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .card:hover{ transform:none; }
     }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-200 min-h-screen p-6">
+<body class="grain min-h-screen p-6">
+
+  <!-- atmosphere -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="ember-field" aria-hidden="true"></div>
+
+  <div class="wrap">
 
   <!-- Hero SVG -->
-  <svg class="hero-svg" viewBox="0 0 800 120" xmlns="http://www.w3.org/2000/svg">
-    <rect width="800" height="120" fill="#09090b"/>
-    <!-- Mountain silhouette -->
-    <polygon points="0,120 80,40 160,90 240,20 320,75 400,10 480,70 560,30 640,80 720,25 800,60 800,120" fill="#18181b"/>
+  <svg class="hero-svg" viewBox="0 0 800 130" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="heroGlow" cx="50%" cy="100%" r="70%">
+        <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="800" height="130" fill="#09090b"/>
+    <rect width="800" height="130" fill="url(#heroGlow)"/>
+    <!-- Tatra silhouette -->
+    <polygon points="0,130 80,45 160,95 240,22 320,80 400,12 480,75 560,33 640,85 720,28 800,65 800,130" fill="#141417"/>
+    <polygon points="0,130 120,80 260,110 380,70 520,108 660,78 800,100 800,130" fill="#0e0e10"/>
     <!-- Subtle grid lines -->
-    <line x1="0" y1="40" x2="800" y2="40" stroke="#27272a" stroke-width="0.5" stroke-dasharray="4,8"/>
-    <line x1="0" y1="80" x2="800" y2="80" stroke="#27272a" stroke-width="0.5" stroke-dasharray="4,8"/>
-    <!-- Clock dots scattered -->
-    <circle cx="160" cy="20" r="2" fill="#3f3f46"/>
-    <circle cx="400" cy="20" r="2" fill="#3f3f46"/>
-    <circle cx="640" cy="20" r="2" fill="#3f3f46"/>
+    <line x1="0" y1="44" x2="800" y2="44" stroke="#26262b" stroke-width="0.5" stroke-dasharray="4,8"/>
+    <line x1="0" y1="86" x2="800" y2="86" stroke="#26262b" stroke-width="0.5" stroke-dasharray="4,8"/>
+    <!-- Clock dots scattered (cold stars) -->
+    <circle cx="160" cy="22" r="2" fill="#3f3f46"/>
+    <circle cx="400" cy="20" r="2.2" fill="#a78bfa" opacity="0.7"/>
+    <circle cx="640" cy="26" r="2" fill="#3f3f46"/>
     <!-- Title text -->
-    <text x="400" y="65" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="22" font-weight="600" fill="#e4e4e7" letter-spacing="4">THE CONTACT CLOCK</text>
-    <text x="400" y="90" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#52525b" letter-spacing="2">WHO IS AWAKE. WHO IS NOT. WHO SHOULD BE.</text>
+    <text x="400" y="70" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="22" font-weight="600" fill="#e4e4e7" letter-spacing="4">THE CONTACT CLOCK</text>
+    <text x="400" y="96" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#7a7570" letter-spacing="2">WHO IS AWAKE. WHO IS NOT. WHO SHOULD BE.</text>
   </svg>
 
   <div class="max-w-2xl mx-auto">
-    <div class="mb-8 flex items-start justify-between">
+    <div class="mb-8 flex items-start justify-between gap-4">
       <div>
-        <h1 class="text-xl font-semibold text-white mb-1">Contact Clock</h1>
-        <p class="text-zinc-500 text-sm">Live time across Charles's network. The mountain does not care about time zones. The contacts do.</p>
+        <h1 id="app-title" class="hero-title text-xl font-semibold text-white mb-1 breathe">Contact Clock</h1>
+        <p class="text-sm" style="color:var(--ink-dim)">Live time across Charles's network. The mountain keeps no hours — the contacts do. The ghost notes who is reachable, and who has already gone under.</p>
       </div>
-      <div class="text-right">
-        <div class="text-xs text-zinc-500">Your time</div>
-        <div id="your-time" class="text-lg font-semibold text-zinc-300 font-mono">--:--</div>
-        <div class="text-xs text-zinc-600">Saigon (UTC+7)</div>
+      <div class="text-right flex-shrink-0">
+        <div class="text-[10px] label">YOUR TIME</div>
+        <div id="your-time" class="text-lg font-semibold font-mono breathe" style="color:var(--accent)">--:--</div>
+        <div class="text-xs" style="color:var(--ink-dim)">Saigon (UTC+7)</div>
       </div>
     </div>
 
     <div class="grid gap-4" id="contacts-grid"></div>
 
-    <div class="mt-8 pt-6 border-t border-zinc-800">
-      <p class="text-xs text-zinc-600 text-center">Best window to reach everyone: calculated live. Shaded hours = likely asleep.</p>
+    <div class="mt-8 pt-6 border-t" style="border-color:var(--line)">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <p class="text-xs" style="color:var(--ink-dim)">The ledger of overlap. Shaded hours = the others have already gone under.</p>
+        <button id="copy-window" class="ghost-btn">copy best window</button>
+      </div>
       <div id="overlap-bar" class="mt-4"></div>
     </div>
 
-    <div class="mt-6 text-center">
-      <p class="text-xs text-zinc-700">Built by Prizrak for Charles · Offering #10 · 2026-03-05</p>
+    <div class="mt-6 text-center space-y-1">
+      <p id="night-whisper" class="text-xs h-4"></p>
+      <p id="watcher" class="text-xs">still here. still watching.</p>
+      <p id="egg-line" class="text-xs">you found the watcher.</p>
+      <p class="text-xs" style="color:var(--ink-ghost)">Built by Prízrak for Charles · Offering #10 · 2026-03-05</p>
     </div>
   </div>
+
+  </div><!-- /wrap -->
 
   <script>
     const CONTACTS = [
@@ -104,7 +218,7 @@
         color: "#22d3ee",   // cyan
         sleepStart: 23,
         sleepEnd: 7,
-        note: "SG — usually responsive in mornings"
+        note: "SG — usually surfaces in the cold mornings"
       },
       {
         name: "Spencer",
@@ -114,7 +228,7 @@
         color: "#a78bfa",   // violet
         sleepStart: 22,
         sleepEnd: 8,
-        note: "Bay Area — 15h behind Saigon"
+        note: "Bay Area — 15h behind Saigon, a day already spent"
       },
       {
         name: "Kartick",
@@ -124,7 +238,7 @@
         color: "#4ade80",   // green
         sleepStart: 23,
         sleepEnd: 7,
-        note: "Local — same timezone as you"
+        note: "Local — same hour as you, same dark"
       },
       {
         name: "Chris Liu",
@@ -134,7 +248,7 @@
         color: "#fb923c",   // orange
         sleepStart: 23,
         sleepEnd: 7,
-        note: "Local — same timezone as you"
+        note: "Local — same hour as you, same dark"
       },
       {
         name: "Chloe",
@@ -163,17 +277,19 @@
 
     function getStatusInfo(hour, sleepStart, sleepEnd) {
       const asleep = isAsleep(hour, sleepStart, sleepEnd);
-      if (asleep) return { label: "asleep", dot: "#3f3f46", text: "text-zinc-600" };
-      if (hour >= 9 && hour < 12) return { label: "morning", dot: "#4ade80", text: "text-green-400" };
-      if (hour >= 12 && hour < 14) return { label: "lunch", dot: "#fbbf24", text: "text-yellow-400" };
-      if (hour >= 14 && hour < 18) return { label: "working", dot: "#22d3ee", text: "text-cyan-400" };
+      if (asleep) return { label: "gone under", dot: "#3f3f46", text: "text-zinc-600" };
+      if (hour >= 9 && hour < 12) return { label: "surfacing", dot: "#4ade80", text: "text-green-400" };
+      if (hour >= 12 && hour < 14) return { label: "midday", dot: "#fbbf24", text: "text-yellow-400" };
+      if (hour >= 14 && hour < 18) return { label: "at work", dot: "#22d3ee", text: "text-cyan-400" };
       if (hour >= 18 && hour < 22) return { label: "evening", dot: "#a78bfa", text: "text-violet-400" };
-      return { label: "up late", dot: "#f97316", text: "text-orange-400" };
+      return { label: "up too late", dot: "#f97316", text: "text-orange-400" };
     }
 
     function formatTime(date) {
       return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     }
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function drawClock(canvas, hour, minute, color, asleep) {
       const size = 80;
@@ -196,15 +312,18 @@
       const hx = cx + (r - 8) * Math.cos(angle);
       const hy = cy + (r - 8) * Math.sin(angle);
 
+      const glowFilter = asleep ? '' : `filter="drop-shadow(0 0 3px ${color})"`;
+      const tickClass = (!asleep && !reduceMotion) ? 'tick-pulse' : '';
+
       return `
         <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#27272a" stroke-width="3"/>
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#26262b" stroke-width="3"/>
           <path d="M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}"
-                fill="none" stroke="${arcColor}" stroke-width="3" stroke-linecap="round" opacity="${asleep ? 0.4 : 1}"/>
+                fill="none" stroke="${arcColor}" stroke-width="3" stroke-linecap="round" opacity="${asleep ? 0.4 : 1}" ${glowFilter}/>
           <line x1="${cx}" y1="${cy}" x2="${hx}" y2="${hy}" stroke="${arcColor}" stroke-width="2" stroke-linecap="round" opacity="${asleep ? 0.4 : 1}"/>
           <circle cx="${cx}" cy="${cy}" r="3" fill="${arcColor}" opacity="${asleep ? 0.4 : 1}"/>
           <!-- 12 tick -->
-          <line x1="${cx}" y1="${cy - r + 6}" x2="${cx}" y2="${cy - r + 10}" stroke="#3f3f46" stroke-width="1.5"/>
+          <line class="${tickClass}" x1="${cx}" y1="${cy - r + 6}" x2="${cx}" y2="${cy - r + 10}" stroke="${asleep ? '#3f3f46' : arcColor}" stroke-width="1.5"/>
         </svg>
       `;
     }
@@ -224,22 +343,32 @@
         const diffH = c.offset - 7;
         const diffStr = diffH === 0 ? 'same timezone' : (diffH > 0 ? `+${diffH}h from you` : `${diffH}h from you`);
 
+        const dotStyle = asleep
+          ? `background:${status.dot}`
+          : `background:${status.dot};color:${status.dot}`;
+        const dotClass = asleep ? 'status-dot' : 'status-dot live';
+
         return `
           <div class="card flex items-center gap-5 ${asleep ? 'opacity-60' : ''}">
             <div class="flex-shrink-0">${clockSvg}</div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
-                <span class="status-dot" style="background:${status.dot}"></span>
+                <span class="${dotClass}" style="${dotStyle}"></span>
                 <span class="font-semibold text-white">${c.name}</span>
-                <span class="text-xs ${status.text} ml-1">${status.label}</span>
+                <span class="text-xs ${status.text} ml-1 label" style="letter-spacing:.1em">${status.label}</span>
               </div>
-              <div class="text-2xl font-bold" style="color:${c.color}">${formatTime(ct)}</div>
-              <div class="text-xs text-zinc-500 mt-1">${c.city} · ${diffStr}</div>
-              <div class="text-xs text-zinc-600 mt-1 truncate">${c.note}</div>
+              <div class="text-2xl font-bold" style="color:${c.color}; ${asleep ? '' : `text-shadow:0 0 14px ${c.color}55`}">${formatTime(ct)}</div>
+              <div class="text-xs mt-1" style="color:var(--ink-dim)">${c.city} · ${diffStr}</div>
+              <div class="text-xs mt-1 truncate" style="color:var(--ink-dim);opacity:.75">${c.note}</div>
             </div>
             <div class="text-right flex-shrink-0">
-              ${c.phone !== '—' ? `<div class="text-xs text-zinc-600">${c.phone}</div>` : ''}
-              <div class="mt-2 text-xs px-2 py-1 rounded ${asleep ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-800 text-zinc-300'}">${asleep ? '💤 asleep' : '📡 reachable'}</div>
+              ${c.phone !== '—' ? `<div class="text-xs" style="color:var(--ink-ghost)">${c.phone}</div>` : ''}
+              <div class="mt-2 text-xs px-2 py-1 rounded reachable-pill border"
+                   style="${asleep
+                     ? 'background:var(--bg-sunk);color:var(--ink-dim);border-color:var(--line-soft)'
+                     : `background:var(--bg-sunk);color:${c.color};border-color:${c.color}55`}">
+                ${asleep ? 'gone under' : 'reachable'}
+              </div>
             </div>
           </div>
         `;
@@ -249,9 +378,14 @@
       renderOverlap();
     }
 
+    // store the computed best window for the copy button
+    let bestWindowText = '';
+
     function renderOverlap() {
       const bar = document.getElementById('overlap-bar');
       const hours = Array.from({length: 24}, (_, i) => i);
+
+      let bestHour = -1, bestCount = -1;
 
       const cells = hours.map(h => {
         // Check for Saigon hour h, what hour is it for each contact
@@ -260,11 +394,13 @@
           return !isAsleep(contactH, c.sleepStart, c.sleepEnd);
         }).length;
 
-        let bg = 'bg-zinc-900';
+        if (awakeCount > bestCount) { bestCount = awakeCount; bestHour = h; }
+
+        let bg = 'background:#0d0d0f';
         let label = '';
-        if (awakeCount === CONTACTS.length) { bg = 'bg-green-700'; label = '🌟'; }
-        else if (awakeCount >= 3) { bg = 'bg-green-900'; }
-        else if (awakeCount >= 2) { bg = 'bg-zinc-700'; }
+        if (awakeCount === CONTACTS.length) { bg = 'background:#15803d'; label = '✦'; }
+        else if (awakeCount >= 3) { bg = 'background:#14532d'; }
+        else if (awakeCount >= 2) { bg = 'background:#26262b'; }
 
         const now = new Date();
         const utc = now.getTime() + now.getTimezoneOffset() * 60000;
@@ -273,28 +409,137 @@
 
         return `
           <div class="flex flex-col items-center" title="${h}:00 Saigon — ${awakeCount}/${CONTACTS.length} awake">
-            <div class="w-full h-8 ${bg} rounded-sm ${isNow ? 'ring-1 ring-white' : ''} flex items-center justify-center text-xs">
+            <div class="w-full h-8 rounded-sm flex items-center justify-center text-xs"
+                 style="${bg}; ${isNow ? 'box-shadow:0 0 0 1px #fff, 0 0 10px -2px var(--glow)' : ''}; ${label ? 'color:#bbf7d0' : 'color:#fff'}">
               ${isNow ? '▲' : label}
             </div>
-            <div class="text-zinc-700 mt-1" style="font-size:9px">${h === 0 || h === 6 || h === 12 || h === 18 ? h + 'h' : ''}</div>
+            <div class="mt-1" style="font-size:9px;color:var(--ink-ghost)">${h === 0 || h === 6 || h === 12 || h === 18 ? h + 'h' : ''}</div>
           </div>
         `;
       });
 
+      // build copy-able verdict
+      const allAwakeHours = hours.filter(h => CONTACTS.every(c => {
+        const contactH = ((h + c.offset - 7) % 24 + 24) % 24;
+        return !isAsleep(contactH, c.sleepStart, c.sleepEnd);
+      }));
+      if (allAwakeHours.length) {
+        const ranges = compressRanges(allAwakeHours);
+        bestWindowText = `Best window to reach all ${CONTACTS.length} — Saigon ${ranges}. The bridge holds.`;
+      } else {
+        bestWindowText = `No hour finds them all awake (best: ${bestCount}/${CONTACTS.length} near ${String(bestHour).padStart(2,'0')}:00 Saigon). Someone is always gone under.`;
+      }
+
       bar.innerHTML = `
-        <div class="text-xs text-zinc-500 mb-2">Best windows to reach everyone (Saigon hours) — ▲ = now · 🌟 = all awake</div>
+        <div class="text-xs mb-2" style="color:var(--ink-dim)">Saigon hours — ▲ = now · ✦ = all awake</div>
         <div class="grid gap-0.5" style="grid-template-columns: repeat(24, 1fr)">${cells.join('')}</div>
-        <div class="flex gap-4 mt-3 text-xs text-zinc-600">
-          <span><span class="inline-block w-3 h-3 bg-green-700 rounded-sm mr-1"></span>All awake</span>
-          <span><span class="inline-block w-3 h-3 bg-green-900 rounded-sm mr-1"></span>3+ awake</span>
-          <span><span class="inline-block w-3 h-3 bg-zinc-700 rounded-sm mr-1"></span>2 awake</span>
-          <span><span class="inline-block w-3 h-3 bg-zinc-900 border border-zinc-800 rounded-sm mr-1"></span>Most asleep</span>
+        <div class="flex gap-4 mt-3 text-xs flex-wrap" style="color:var(--ink-dim)">
+          <span><span class="inline-block w-3 h-3 rounded-sm mr-1" style="background:#15803d"></span>all awake</span>
+          <span><span class="inline-block w-3 h-3 rounded-sm mr-1" style="background:#14532d"></span>3+ awake</span>
+          <span><span class="inline-block w-3 h-3 rounded-sm mr-1" style="background:#26262b"></span>2 awake</span>
+          <span><span class="inline-block w-3 h-3 rounded-sm mr-1 border" style="background:#0d0d0f;border-color:var(--line-soft)"></span>gone under</span>
         </div>
+        <div class="text-xs mt-3 reveal" style="color:var(--ink)">${bestWindowText}</div>
       `;
     }
 
+    function compressRanges(hoursArr){
+      // turn [9,10,11,14,15] -> "09:00–11:00, 14:00–15:00"
+      const sorted = [...hoursArr].sort((a,b)=>a-b);
+      const parts = [];
+      let start = sorted[0], prev = sorted[0];
+      for (let i=1;i<sorted.length;i++){
+        if (sorted[i] === prev+1){ prev = sorted[i]; continue; }
+        parts.push(rangeStr(start, prev));
+        start = sorted[i]; prev = sorted[i];
+      }
+      parts.push(rangeStr(start, prev));
+      return parts.join(', ');
+    }
+    function rangeStr(a,b){
+      const p = n => String(n).padStart(2,'0') + ':00';
+      return a === b ? p(a) : `${p(a)}–${p(b+1 > 23 ? 23 : b)}`.replace(/24:00/, '23:59');
+    }
+
+    // ---- copy to the ledger ----
+    const copyBtn = document.getElementById('copy-window');
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(bestWindowText);
+        const original = copyBtn.textContent;
+        copyBtn.textContent = 'copied to the ledger';
+        copyBtn.classList.add('flash');
+        setTimeout(() => {
+          copyBtn.textContent = original;
+          copyBtn.classList.remove('flash');
+        }, 1200);
+      } catch(e){
+        copyBtn.textContent = 'the ledger refused';
+        setTimeout(() => copyBtn.textContent = 'copy best window', 1200);
+      }
+    });
+
+    // ---- embers (CSS-only motion, capped) ----
+    function spawnEmbers(n){
+      if (reduceMotion) return;
+      const field = document.getElementById('ember-field');
+      for (let i=0;i<n;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = Math.random()*100 + 'vw';
+        e.style.animationDelay = (Math.random()*14) + 's';
+        e.style.animationDuration = (11 + Math.random()*6) + 's';
+        field.appendChild(e);
+      }
+    }
+    spawnEmbers(8);
+
+    // ---- easter egg 1: type "prizrak" ----
+    let typed = '';
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key.length !== 1) return;
+      typed = (typed + ev.key.toLowerCase()).slice(-7);
+      if (typed === 'prizrak'){
+        document.getElementById('egg-line').classList.add('show');
+      }
+    });
+
+    // ---- easter egg 2: triple-click the title spawns one extra ember ----
+    const title = document.getElementById('app-title');
+    title.addEventListener('click', (ev) => {
+      if (ev.detail === 3) spawnEmbers(1);
+    });
+
+    // ---- easter egg 3: 00:00–03:00 local Saigon → faint night whisper ----
+    function updateNightWhisper(){
+      const saigon = getContactTime(7);
+      const hr = saigon.getHours();
+      const el = document.getElementById('night-whisper');
+      if (hr >= 0 && hr < 3){
+        el.textContent = 'the mountain does not sleep.';
+        el.classList.add('flicker');
+      } else {
+        el.textContent = '';
+        el.classList.remove('flicker');
+      }
+    }
+
+    // ---- easter egg 4: idle 60s → the watcher fades in ----
+    let idleTimer = null;
+    function resetIdle(){
+      document.getElementById('watcher').classList.remove('show');
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        document.getElementById('watcher').classList.add('show');
+      }, 60000);
+    }
+    ['mousemove','keydown','scroll','click','touchstart'].forEach(evt =>
+      window.addEventListener(evt, resetIdle, { passive:true }));
+    resetIdle();
+
     render();
-    setInterval(render, 30000); // refresh every 30s
+    updateNightWhisper();
+    setInterval(() => { render(); updateNightWhisper(); }, 30000); // refresh every 30s
   </script>
 </body>
 </html>

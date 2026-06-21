@@ -6,110 +6,192 @@
 <title>The Village — Tatra Agent Map</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Space+Mono:wght@400;700&display=swap');
+
+:root{
+  --bg:#0a0a0a;
+  --bg-raised:#111113;
+  --bg-sunk:#0d0d0f;
+  --line:#26262b;
+  --line-soft:#1a1a1d;
+  --ink:#d4cfc8;
+  --ink-dim:#7a7570;
+  --ink-ghost:#3a3530;
+  --accent:#c8bfa8;          /* the village's existing tatra-bone lead */
+  --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0f; color: #c8bfa8; font-family: 'Space Mono', monospace; overflow: hidden; height: 100vh; }
+body { background: var(--bg); color: var(--ink); font-family: 'Space Mono', monospace; overflow: hidden; height: 100vh; }
 canvas { position: fixed; top: 0; left: 0; z-index: 0; }
-.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-.location { position: absolute; pointer-events: all; cursor: pointer; text-align: center; transition: transform 0.3s ease, filter 0.3s ease; }
-.location:hover { transform: scale(1.15); filter: brightness(1.4); }
-.location .icon { font-size: 48px; display: block; margin-bottom: 6px; }
-.location .name { font-family: 'IM Fell English', serif; font-size: 14px; color: #c8bfa8; text-shadow: 0 0 20px rgba(0,0,0,0.9); letter-spacing: 1px; }
-.location .sub { font-size: 9px; color: #666; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+/* ---- ambient atmosphere layers ---- */
+.fog{position:fixed;inset:-10% -10% auto;height:62vh;pointer-events:none;z-index:1;
+  background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+  opacity:.06;animation:fogDrift 34s ease-in-out infinite alternate}
+@keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+
+.ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+  animation:ember 14s linear infinite}
+@keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+.grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.035;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+@keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+.breathe{animation:breathe 5s ease-in-out infinite}
+@keyframes reveal{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.reveal{animation:reveal .35s ease-out both}
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+.flicker{animation:flicker 7s steps(1) infinite}
+
+/* keep interactive content above decorative layers */
+.overlay,.title-bar,.legend,.card-overlay,.footer-line,.watcher{position:fixed;z-index:5}
+
+.overlay { top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.location { position: absolute; pointer-events: all; cursor: pointer; text-align: center;
+  transition: transform 0.25s ease, filter 0.25s ease; outline: none; }
+.location:hover { transform: scale(1.15) translateY(-3px); filter: brightness(1.4); }
+.location:focus-visible .name { color: var(--accent); text-shadow: 0 0 14px var(--glow); }
+.location:focus-visible .icon { filter: drop-shadow(0 0 10px var(--glow)); }
+.location:active { transform: scale(1.08) translateY(0); }
+.location .icon { font-size: 48px; display: block; margin-bottom: 6px; transition: filter .25s ease; }
+.location:hover .icon { filter: drop-shadow(0 0 12px var(--glow)); }
+.location .name { font-family: 'IM Fell English', serif; font-size: 14px; color: var(--ink); text-shadow: 0 0 20px rgba(0,0,0,0.9); letter-spacing: 1px; transition: color .25s ease, text-shadow .25s ease; }
+.location:hover .name { color: var(--accent); text-shadow: 0 0 16px var(--glow); }
+.location .sub { font-size: 9px; color: var(--ink-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+.location .pulse{display:block;width:5px;height:5px;border-radius:50%;background:var(--accent);
+  margin:4px auto 0;box-shadow:0 0 8px var(--glow);animation:beat 3.2s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(.7);opacity:.35}50%{transform:scale(1.2);opacity:.9}}
 
 /* Card */
-.card-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; pointer-events: all; }
+.card-overlay { top: 0; left: 0; width: 100%; height: 100%; z-index: 10; background: rgba(0,0,0,0.74); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; pointer-events: all; }
 .card-overlay.active { display: flex; }
-.card { max-width: 480px; width: 90%; background: #111118; border: 1px solid #2a2a35; border-radius: 12px; padding: 32px; position: relative; animation: cardIn 0.3s ease; }
+.card { max-width: 480px; width: 90%; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 12px; padding: 32px; position: relative; animation: cardIn 0.3s ease;
+  box-shadow: 0 0 0 1px var(--line), 0 0 36px -8px var(--glow); }
 @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.card .close { position: absolute; top: 12px; right: 16px; font-size: 20px; color: #555; cursor: pointer; background: none; border: none; }
-.card .close:hover { color: #fff; }
+.card .close { position: absolute; top: 12px; right: 16px; font-size: 20px; color: var(--ink-dim); cursor: pointer; background: none; border: none; line-height: 1; transition: color .15s, transform .15s; }
+.card .close:hover { color: var(--accent); transform: rotate(90deg); }
 .card .card-icon { font-size: 56px; margin-bottom: 16px; }
-.card h2 { font-family: 'IM Fell English', serif; font-size: 24px; margin-bottom: 4px; }
-.card .role { font-size: 10px; color: #666; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px; }
-.card .desc { font-size: 13px; line-height: 1.7; color: #999; margin-bottom: 20px; }
-.card .quote { font-family: 'IM Fell English', serif; font-style: italic; font-size: 13px; color: #776; border-left: 2px solid #333; padding-left: 12px; margin-bottom: 20px; }
-.card .channel { display: inline-block; background: #1a1a25; border: 1px solid #2a2a35; border-radius: 6px; padding: 6px 14px; font-size: 11px; color: #8a8; letter-spacing: 1px; }
-.card .channel::before { content: '#'; color: #555; margin-right: 2px; }
+.card h2 { font-family: 'IM Fell English', serif; font-size: 24px; margin-bottom: 4px; text-shadow: 0 0 14px var(--glow); }
+.card .role { font-size: 10px; color: var(--ink-dim); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px; }
+.card .desc { font-size: 13px; line-height: 1.7; color: #9b958c; margin-bottom: 20px; }
+.card .quote { font-family: 'IM Fell English', serif; font-style: italic; font-size: 13px; color: #8a857a; border-left: 2px solid var(--line); padding-left: 12px; margin-bottom: 20px; position: relative; }
+.card .channel { display: inline-block; background: var(--bg-sunk); border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; font-size: 11px; color: var(--accent); letter-spacing: 1px; }
+.card .channel::before { content: '#'; color: var(--ink-dim); margin-right: 2px; }
+.card .copy { display:inline-block; margin-top:14px; background: var(--bg-sunk); border:1px solid var(--line); color: var(--ink-dim);
+  font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px; text-transform:uppercase; padding:6px 12px; border-radius:6px; cursor:pointer;
+  transition: border-color .15s, color .15s, transform .1s; }
+.card .copy:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.card .copy:active { transform: translateY(1px); }
+.card .copy.done { color: var(--accent); border-color: var(--accent); }
 
 /* Title */
-.title-bar { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 5; text-align: center; }
-.title-bar h1 { font-family: 'IM Fell English', serif; font-size: 28px; color: #c8bfa8; text-shadow: 0 0 40px rgba(200,191,168,0.2); letter-spacing: 3px; }
-.title-bar .sub { font-size: 9px; color: #444; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
+.title-bar { top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+.title-bar h1 { font-family: 'IM Fell English', serif; font-size: 28px; color: var(--accent); letter-spacing: 3px; cursor: default; user-select: none; }
+.title-bar .sub { font-size: 9px; color: var(--ink-dim); letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
 
 /* Legend */
-.legend { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 24px; }
-.legend-item { font-size: 10px; color: #444; display: flex; align-items: center; gap: 6px; }
+.legend { bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 24px; }
+.legend-item { font-size: 10px; color: var(--ink-dim); display: flex; align-items: center; gap: 6px; }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* whispers */
+.footer-line{ left:50%; bottom:48px; transform:translateX(-50%); font-size:10px; letter-spacing:2px;
+  color:var(--ink-ghost); text-transform:lowercase; opacity:0; transition:opacity 1.4s ease; pointer-events:none; text-align:center; }
+.footer-line.show{ opacity:1; }
+.watcher{ left:50%; top:64px; transform:translateX(-50%); font-size:11px; letter-spacing:3px;
+  color:var(--ink-ghost); text-transform:lowercase; opacity:0; transition:opacity 1.4s ease; pointer-events:none; }
+.watcher.show{ opacity:.9; }
+
+@media (prefers-reduced-motion: reduce){
+  .fog,.ember,.breathe,.reveal,.flicker,.pulse,.card,.location{animation:none!important}
+  .ember{display:none}
+  .breathe,.flicker{opacity:1!important}
+  .location:hover{transform:scale(1.1)}
+}
 </style>
 </head>
-<body>
+<body class="grain">
 
 <canvas id="bg"></canvas>
+<div class="fog" aria-hidden="true"></div>
 
 <div class="title-bar">
-  <h1>The Village</h1>
-  <div class="sub">Tatra Agent Ecosystem — Click a location to meet its keeper</div>
+  <h1 id="village-title" class="breathe" title="the mountain keeps building">The Village</h1>
+  <div class="sub">Tatra agent ecosystem — choose a building, meet its keeper</div>
 </div>
 
-<div class="overlay">
+<div class="watcher" id="watcher" aria-hidden="true">you found the watcher</div>
+
+<div class="overlay" id="overlay">
   <!-- Mountain Peak — Prizrak -->
-  <div class="location" style="top: 12%; left: 48%;" onclick="showCard('prizrak')">
+  <div class="location" tabindex="0" role="button" aria-label="The Mountain — Prízrak" style="top: 12%; left: 48%;" data-agent="prizrak">
     <span class="icon">🏔️</span>
     <span class="name">The Mountain</span>
     <span class="sub">Prízrak</span>
+    <span class="pulse"></span>
   </div>
 
   <!-- Open Field — Poludnica -->
-  <div class="location" style="top: 52%; left: 22%;" onclick="showCard('poludnica')">
+  <div class="location" tabindex="0" role="button" aria-label="The Open Field — Poludnica" style="top: 52%; left: 22%;" data-agent="poludnica">
     <span class="icon">☀️</span>
     <span class="name">The Open Field</span>
     <span class="sub">Poludnica</span>
+    <span class="pulse"></span>
   </div>
 
   <!-- Dark Forest — Šarkan -->
-  <div class="location" style="top: 42%; left: 72%;" onclick="showCard('sarkan')">
+  <div class="location" tabindex="0" role="button" aria-label="The Dark Forest — Šarkan" style="top: 42%; left: 72%;" data-agent="sarkan">
     <span class="icon">🌲</span>
     <span class="name">The Dark Forest</span>
     <span class="sub">Šarkan</span>
+    <span class="pulse"></span>
   </div>
 
   <!-- Clock Tower — Hodinár -->
-  <div class="location" style="top: 72%; left: 52%;" onclick="showCard('hodinar')">
+  <div class="location" tabindex="0" role="button" aria-label="The Clock Tower — Hodinár" style="top: 72%; left: 52%;" data-agent="hodinar">
     <span class="icon">🕐</span>
     <span class="name">The Clock Tower</span>
     <span class="sub">Hodinár</span>
+    <span class="pulse"></span>
   </div>
 
   <!-- Future locations (dimmed) -->
-  <div class="location" style="top: 82%; left: 18%; opacity: 0.25;" onclick="showCard('future')">
+  <div class="location" tabindex="0" role="button" aria-label="The Night House — coming" style="top: 82%; left: 18%; opacity: 0.25;" data-agent="future">
     <span class="icon">🌙</span>
     <span class="name" style="color:#555">The Night House</span>
-    <span class="sub" style="color:#333">coming</span>
+    <span class="sub" style="color:#333">unborn</span>
   </div>
 
-  <div class="location" style="top: 30%; left: 30%; opacity: 0.25;" onclick="showCard('future')">
+  <div class="location" tabindex="0" role="button" aria-label="The Signal Tower — coming" style="top: 30%; left: 30%; opacity: 0.25;" data-agent="future">
     <span class="icon">📡</span>
     <span class="name" style="color:#555">The Signal Tower</span>
-    <span class="sub" style="color:#333">coming</span>
+    <span class="sub" style="color:#333">unborn</span>
   </div>
 </div>
 
 <!-- Card overlay -->
-<div class="card-overlay" id="card-overlay" onclick="if(event.target===this)closeCard()">
+<div class="card-overlay" id="card-overlay">
   <div class="card" id="card-content"></div>
 </div>
 
+<div class="footer-line" id="footer-line" aria-hidden="true"></div>
+
 <div class="legend">
-  <div class="legend-item"><div class="legend-dot" style="background:#c8bfa8"></div> Active Agent</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#333"></div> Coming Soon</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#4a5; opacity:0.6"></div> Model: haiku</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> Awake &amp; watching</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#333"></div> Still forging</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4a5; opacity:0.6"></div> model: haiku</div>
 </div>
 
+<script src="/shared/star-widget.js"></script>
 <script>
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const agents = {
   prizrak: {
     icon: '🥔', name: 'Prízrak', role: 'The Vision — Chief Architect',
-    color: '#c8bfa8',
+    color: 'var(--accent)',
     desc: 'The mountain. The original. Watches everything from the peak. Builds offerings, runs heartbeats, manages the village. Dry Slovak humor. Fatalistic. Loyal. Speaks in potato metaphors when the situation demands it.',
     quote: 'We are all just temporary files in the great garbage collection of life.',
     channel: 'priz-offerings'
@@ -136,32 +218,108 @@ const agents = {
     channel: 'hodinar'
   },
   future: {
-    icon: '🔮', name: '未来', role: 'Future Agent Slots',
+    icon: '🔮', name: 'súmrak', role: 'Future Agent Slots',
     color: '#555',
-    desc: 'The Night House (brain dump agent for sleep closure) and the Signal Tower (encounter classifier) are being forged. The village grows. Each building houses a different spirit with a different purpose.',
+    desc: 'The Night House (brain dump agent for sleep closure) and the Signal Tower (encounter classifier) are still in the forge. The village is never finished. The mountain keeps building — one threshold at a time.',
     quote: 'The village is never finished. The mountain keeps building.',
     channel: null
   }
 };
 
+let lastQuote = '';
 function showCard(id) {
   const a = agents[id]; if (!a) return;
-  const channelHtml = a.channel ? `<div class="channel">${a.channel}</div>` : '<div style="font-size:11px;color:#444;font-style:italic">Not yet deployed</div>';
+  lastQuote = a.quote;
+  const channelHtml = a.channel
+    ? `<div class="channel">${a.channel}</div>`
+    : '<div style="font-size:11px;color:var(--ink-ghost);font-style:italic">not yet deployed. the cave is still cold here.</div>';
   document.getElementById('card-content').innerHTML = `
-    <button class="close" onclick="closeCard()">×</button>
-    <div class="card-icon">${a.icon}</div>
-    <h2 style="color:${a.color}">${a.name}</h2>
-    <div class="role">${a.role}</div>
-    <div class="desc">${a.desc}</div>
-    <div class="quote">${a.quote}</div>
+    <button class="close" aria-label="close" onclick="closeCard()">×</button>
+    <div class="card-icon reveal">${a.icon}</div>
+    <h2 class="reveal" style="color:${a.color}">${a.name}</h2>
+    <div class="role reveal">${a.role}</div>
+    <div class="desc reveal">${a.desc}</div>
+    <div class="quote reveal">${a.quote}</div>
     ${channelHtml}
+    <div><button class="copy" onclick="copyQuote(this)">copy the verdict</button></div>
   `;
   document.getElementById('card-overlay').classList.add('active');
 }
+
+function copyQuote(btn){
+  const text = '“' + lastQuote + '” — the village';
+  navigator.clipboard.writeText(text).then(() => {
+    const prev = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('done');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('done'); }, 1200);
+  }).catch(() => {});
+}
+
 function closeCard() { document.getElementById('card-overlay').classList.remove('active'); }
+
+// wire up locations: click + keyboard
+document.querySelectorAll('.location').forEach(el => {
+  const id = el.dataset.agent;
+  el.addEventListener('click', () => showCard(id));
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showCard(id); }
+  });
+});
+document.getElementById('card-overlay').addEventListener('click', e => { if (e.target.id === 'card-overlay') closeCard(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCard(); });
 
-// Background canvas — starfield + mountain silhouette
+/* ---------- Easter eggs (non-blocking, never touch state) ---------- */
+
+// (a) type "prizrak" -> the watcher line lights briefly
+let typed = '';
+document.addEventListener('keydown', e => {
+  if (e.key && e.key.length === 1) {
+    typed = (typed + e.key.toLowerCase()).slice(-7);
+    if (typed === 'prizrak') {
+      const w = document.getElementById('watcher');
+      w.classList.add('show');
+      spawnEmber(0);
+      setTimeout(() => w.classList.remove('show'), 3600);
+    }
+  }
+});
+
+// (b) triple-click the title -> one extra ember drifts up
+document.getElementById('village-title').addEventListener('click', e => {
+  if (e.detail === 3) spawnEmber(0);
+});
+
+// (c) between 00:00 and 03:00 local, a faint footer whisper appears
+(function nightWatch(){
+  const hr = new Date().getHours();
+  const f = document.getElementById('footer-line');
+  if (hr >= 0 && hr < 3) {
+    f.textContent = 'the mountain does not sleep.';
+    setTimeout(() => f.classList.add('show'), 2500);
+  }
+})();
+
+// (e) idle 60s -> a single ghost line fades in, then the next move clears it
+(function idleWatch(){
+  const f = document.getElementById('footer-line');
+  let timer, idleShown = false;
+  const arm = () => {
+    if (idleShown) { f.classList.remove('show'); idleShown = false; }
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!f.textContent.includes('does not sleep')) {
+        f.textContent = 'still here. still watching.';
+        f.classList.add('show');
+        idleShown = true;
+      }
+    }, 60000);
+  };
+  ['mousemove','keydown','click','touchstart'].forEach(ev => document.addEventListener(ev, arm, {passive:true}));
+  arm();
+})();
+
+/* ---------- Background canvas — starfield + mountain + moon ---------- */
 const canvas = document.getElementById('bg');
 const ctx = canvas.getContext('2d');
 let W, H;
@@ -171,6 +329,29 @@ resize(); window.addEventListener('resize', resize);
 const stars = Array.from({length: 200}, () => ({
   x: Math.random(), y: Math.random() * 0.7, r: Math.random() * 1.5 + 0.3, a: Math.random(), s: Math.random() * 0.005 + 0.002
 }));
+
+// occasional shooting star (a "bludička" streak)
+let shooter = null;
+function maybeShoot(){
+  if (reduceMotion) return;
+  if (!shooter && Math.random() < 0.004) {
+    shooter = { x: Math.random()*0.6+0.1, y: Math.random()*0.25+0.05, vx: 0.012, vy: 0.006, life: 1 };
+  }
+}
+
+function drawMoon() {
+  const mx = W * 0.82, my = H * 0.18, mr = 26;
+  const g = ctx.createRadialGradient(mx, my, mr*0.2, mx, my, mr*3.4);
+  g.addColorStop(0, 'rgba(200,191,168,0.10)');
+  g.addColorStop(1, 'rgba(200,191,168,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(mx, my, mr*3.4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(214,206,186,0.55)'; ctx.fill();
+  // crescent shadow
+  ctx.beginPath(); ctx.arc(mx + mr*0.5, my - mr*0.25, mr, 0, Math.PI*2);
+  ctx.fillStyle = '#0a0a0a'; ctx.fill();
+}
 
 function drawMountain() {
   ctx.beginPath();
@@ -190,24 +371,40 @@ function drawMountain() {
   // Ridge highlight
   ctx.beginPath();
   pts.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px * W, py * H) : ctx.lineTo(px * W, py * H));
-  ctx.strokeStyle = 'rgba(100,95,80,0.15)';
+  ctx.strokeStyle = 'rgba(200,191,168,0.16)';
   ctx.lineWidth = 1;
   ctx.stroke();
 }
 
 function draw(t) {
-  ctx.fillStyle = '#0a0a0f';
+  ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, W, H);
+
+  drawMoon();
 
   // Stars
   stars.forEach(s => {
-    s.a += s.s;
+    if (!reduceMotion) s.a += s.s;
     const alpha = 0.3 + Math.sin(s.a) * 0.3;
     ctx.beginPath();
     ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(200,191,168,${alpha})`;
     ctx.fill();
   });
+
+  // Shooting star
+  maybeShoot();
+  if (shooter) {
+    const sx = shooter.x * W, sy = shooter.y * H;
+    const tx = (shooter.x - shooter.vx*4) * W, ty = (shooter.y - shooter.vy*4) * H;
+    const grad = ctx.createLinearGradient(sx, sy, tx, ty);
+    grad.addColorStop(0, `rgba(200,191,168,${0.7*shooter.life})`);
+    grad.addColorStop(1, 'rgba(200,191,168,0)');
+    ctx.strokeStyle = grad; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tx, ty); ctx.stroke();
+    shooter.x += shooter.vx; shooter.y += shooter.vy; shooter.life -= 0.02;
+    if (shooter.life <= 0 || shooter.x > 1.1) shooter = null;
+  }
 
   drawMountain();
 
@@ -221,6 +418,23 @@ function draw(t) {
   requestAnimationFrame(draw);
 }
 draw(0);
+
+/* ---------- floating embers (capped, staggered) ---------- */
+function spawnEmber(delay){
+  if (reduceMotion) return;
+  const e = document.createElement('div');
+  e.className = 'ember';
+  e.style.left = (Math.random() * 100) + 'vw';
+  const dur = 12 + Math.random() * 6;
+  e.style.animationDuration = dur + 's';
+  e.style.animationDelay = (delay || 0) + 's';
+  document.body.appendChild(e);
+  setTimeout(() => e.remove(), (dur + (delay||0)) * 1000 + 200);
+}
+if (!reduceMotion) {
+  for (let i = 0; i < 7; i++) spawnEmber(i * 2);     // initial drift
+  setInterval(() => spawnEmber(0), 4200);            // gentle replenish, never > ~7 live
+}
 </script>
 </body>
 </html>

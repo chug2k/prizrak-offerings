@@ -7,26 +7,97 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
-  body { font-family: 'IBM Plex Sans', sans-serif; background: #0f0f0f; color: #e0e0e0; }
+
+  :root{
+    --bg:#0a0a0a;
+    --bg-raised:#111113;
+    --bg-sunk:#0d0d0f;
+    --line:#26262b;
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#3a3530;
+    --accent:#d97706;            /* the app's existing lead: amber, the approval flame */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--ink); }
   .mono { font-family: 'IBM Plex Mono', monospace; }
-  .clock-ring { transition: stroke-dashoffset 0.8s ease; }
-  .zone-item { transition: all 0.3s ease; }
+
+  /* layering: decorative behind, content above */
+  .fog, .ember, .grain::after { pointer-events:none; }
+
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;z-index:0;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .content { position:relative; z-index:2; }
+
+  .clock-ring { transition: stroke-dashoffset 0.8s cubic-bezier(.2,.8,.2,1); }
+  .zone-item { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
   .zone-item:hover { transform: translateX(4px); }
-  input[type="text"] { background: #1a1a1a; border: 1px solid #333; color: #e0e0e0; }
-  input[type="text"]:focus { outline: none; border-color: #666; }
-  select { background: #1a1a1a; border: 1px solid #333; color: #e0e0e0; }
-  select:focus { outline: none; border-color: #666; }
-  .verdict-glow { box-shadow: 0 0 30px rgba(255,140,0,0.15); }
+
+  input[type="text"], input[type="number"], select {
+    background: var(--bg-sunk); border: 1px solid var(--line); color: var(--ink);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input:focus-visible, select:focus-visible {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--glow);
+  }
+  /* fallback for browsers without :focus-visible support */
+  input:focus, select:focus { outline:none; border-color: var(--accent); }
+
+  .verdict-glow { box-shadow: 0 0 0 1px var(--line), 0 0 24px -8px var(--glow); }
+
+  button { transition: transform .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+  button:active { transform: translateY(1px); }
+
+  .addblock:hover { color: var(--ink-dim); border-color: var(--accent); }
+
+  .copybtn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .ghost-line { color: var(--ink-ghost); }
+
+  /* title is allowed to glow softly */
+  h1.title { text-shadow: 0 0 10px var(--glow); }
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker,.clock-ring{animation:none!important; transition:none!important}
+    .ember{display:none}
+    .breathe,.flicker{opacity:1!important}
+  }
 </style>
 </head>
-<body class="min-h-screen p-4 md:p-8">
+<body class="min-h-screen p-4 md:p-8 grain">
 
-<div class="max-w-2xl mx-auto">
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
+<div class="max-w-2xl mx-auto content">
   <!-- Header -->
   <div class="mb-8">
-    <div class="mono text-xs text-gray-600 mb-1">PRIZRAK / CHARLES / 2026</div>
-    <h1 class="text-2xl font-semibold text-white">The Conviction Clock</h1>
-    <p class="text-gray-500 text-sm mt-1">How much of your week runs on conviction vs. approval?</p>
+    <div class="mono text-xs tracking-wider mb-1" style="color:var(--ink-dim)">PRÍZRAK / CHARLES / 2026</div>
+    <h1 id="app-title" class="title text-2xl font-semibold text-white select-none cursor-default">The Conviction Clock</h1>
+    <p class="text-sm mt-1" style="color:var(--ink-dim)">How much of your week runs on conviction vs. approval? The ghost keeps the ledger.</p>
   </div>
 
   <!-- Clock visualization -->
@@ -34,60 +105,64 @@
     <div class="relative">
       <svg width="200" height="200" class="transform -rotate-90">
         <!-- Background ring -->
-        <circle cx="100" cy="100" r="80" fill="none" stroke="#222" stroke-width="16"/>
-        <!-- Approval ring (orange) -->
-        <circle id="approval-ring" cx="100" cy="100" r="80" fill="none" stroke="#d97706" stroke-width="16"
-          stroke-dasharray="502.65" stroke-dashoffset="502.65" class="clock-ring"/>
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#1c1c1f" stroke-width="16"/>
+        <!-- Approval ring (amber) -->
+        <circle id="approval-ring" cx="100" cy="100" r="80" fill="none" stroke="var(--accent)" stroke-width="16"
+          stroke-dasharray="502.65" stroke-dashoffset="502.65" class="clock-ring"
+          style="filter:drop-shadow(0 0 4px var(--glow))"/>
         <!-- Conviction ring (white) -->
         <circle id="conviction-ring" cx="100" cy="100" r="80" fill="none" stroke="#f5f5f5" stroke-width="16"
           stroke-dasharray="502.65" stroke-dashoffset="502.65" class="clock-ring opacity-90"/>
       </svg>
       <div class="absolute inset-0 flex flex-col items-center justify-center">
-        <div id="pct-display" class="text-3xl font-semibold text-white mono">—%</div>
-        <div class="text-xs text-gray-500 mt-1">conviction</div>
+        <div id="pct-display" class="text-3xl font-semibold text-white mono breathe">—%</div>
+        <div class="text-xs mt-1" style="color:var(--ink-dim)">conviction</div>
       </div>
     </div>
   </div>
 
   <!-- Input section -->
   <div class="space-y-3 mb-8">
-    <div class="mono text-xs text-gray-600 uppercase tracking-wider mb-3">Log this week's work blocks</div>
-    
+    <div class="mono text-xs uppercase tracking-wider mb-3" style="color:var(--ink-dim)">Log this week's work blocks</div>
+
     <div id="entries-container" class="space-y-2">
       <!-- entries rendered here -->
     </div>
 
-    <button onclick="addEntry()" class="w-full border border-dashed border-gray-700 text-gray-600 hover:text-gray-400 hover:border-gray-500 py-3 text-sm transition-colors mono">
+    <button onclick="addEntry()" class="addblock w-full border border-dashed py-3 text-sm mono" style="border-color:var(--line); color:var(--ink-ghost)">
       + add block
     </button>
   </div>
 
   <!-- Diagnostic questions -->
-  <div id="diagnostic" class="hidden mb-8 p-4 border border-gray-800 bg-gray-950">
-    <div class="mono text-xs text-gray-600 uppercase tracking-wider mb-4">Conviction Test — for uncertain entries</div>
+  <div id="diagnostic" class="hidden mb-8 p-4 border" style="border-color:var(--line); background:var(--bg-sunk)">
+    <div class="mono text-xs uppercase tracking-wider mb-4" style="color:var(--ink-dim)">Conviction Test — for uncertain entries</div>
     <div class="space-y-3">
-      <div class="text-sm text-gray-400">
+      <div class="text-sm" style="color:var(--ink-dim)">
         <span class="text-white">Q1.</span> Would you do this if the outcome was invisible — no one saw the result?
       </div>
-      <div class="text-sm text-gray-400">
+      <div class="text-sm" style="color:var(--ink-dim)">
         <span class="text-white">Q2.</span> If it failed, would you feel relieved that you tried, or relieved that you can stop?
       </div>
-      <div class="text-sm text-gray-400">
+      <div class="text-sm" style="color:var(--ink-dim)">
         <span class="text-white">Q3.</span> Who are you doing this for? Name them. Is that person external validation or genuine care?
       </div>
-      <div class="text-xs text-gray-600 mt-3 mono">If Q1=no, Q2=relieved-to-stop, or Q3=external-validation: mark it orange.</div>
+      <div class="text-xs mt-3 mono" style="color:var(--ink-ghost)">If Q1=no, Q2=relieved-to-stop, or Q3=external-validation: mark it amber.</div>
     </div>
   </div>
 
   <!-- Verdict -->
-  <div id="verdict" class="hidden p-5 border border-gray-800 verdict-glow mb-6">
-    <div class="mono text-xs text-gray-600 uppercase tracking-wider mb-3">Verdict</div>
-    <div id="verdict-text" class="text-sm text-gray-300 leading-relaxed"></div>
-    <div id="verdict-prescription" class="text-xs text-gray-600 mt-3 mono border-t border-gray-800 pt-3"></div>
+  <div id="verdict" class="hidden p-5 border verdict-glow mb-6" style="border-color:var(--line)">
+    <div class="flex items-center justify-between mb-3">
+      <div class="mono text-xs uppercase tracking-wider" style="color:var(--ink-dim)">Verdict</div>
+      <button id="copy-verdict" onclick="copyVerdict()" class="copybtn mono text-xs border px-2 py-1" style="border-color:var(--line); color:var(--ink-dim)">copy to ledger</button>
+    </div>
+    <div id="verdict-text" class="text-sm leading-relaxed" style="color:var(--ink)"></div>
+    <div id="verdict-prescription" class="text-xs mt-3 mono border-t pt-3" style="color:var(--ink-dim); border-color:var(--line)"></div>
   </div>
 
   <!-- Toggle diagnostic -->
-  <button onclick="toggleDiagnostic()" class="text-xs text-gray-700 hover:text-gray-500 mono underline transition-colors">
+  <button onclick="toggleDiagnostic()" class="text-xs mono underline" style="color:var(--ink-ghost)">
     show conviction test questions
   </button>
 </div>
@@ -97,6 +172,32 @@ let entries = [];
 let idCounter = 0;
 
 const CIRCUMFERENCE = 502.65;
+const STORE_KEY = 'conviction-clock-entries';
+
+/* ---------- persistence (additive; never required for core math) ---------- */
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(
+      entries.map(e => ({ label: e.label, hours: e.hours, type: e.type }))
+    ));
+  } catch (_) { /* the ledger is full; the work still counts */ }
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return false;
+    entries = parsed.map(e => ({
+      id: idCounter++,
+      label: typeof e.label === 'string' ? e.label : '',
+      hours: Math.max(0.5, parseFloat(e.hours) || 0.5),
+      type: ['conviction','approval','neutral'].includes(e.type) ? e.type : 'neutral'
+    }));
+    return true;
+  } catch (_) { return false; }
+}
 
 function addEntry() {
   const id = idCounter++;
@@ -118,24 +219,28 @@ function updateEntry(id, field, value) {
   }
 }
 
+function escapeAttr(s){
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function renderEntries() {
   const container = document.getElementById('entries-container');
   container.innerHTML = entries.map(e => `
     <div class="zone-item flex gap-2 items-center group">
-      <input type="text" placeholder="what were you doing?" value="${e.label}"
+      <input type="text" placeholder="what were you doing?" value="${escapeAttr(e.label)}"
         oninput="updateEntry(${e.id}, 'label', this.value)"
         class="flex-1 px-3 py-2 text-sm mono rounded-none">
       <input type="number" value="${e.hours}" min="0.5" max="100" step="0.5"
         onchange="updateEntry(${e.id}, 'hours', this.value)"
         class="w-16 px-2 py-2 text-sm mono text-center rounded-none">
-      <span class="text-xs text-gray-600">hr</span>
+      <span class="text-xs" style="color:var(--ink-dim)">hr</span>
       <select onchange="updateEntry(${e.id}, 'type', this.value)"
         class="px-2 py-2 text-sm mono rounded-none">
         <option value="conviction" ${e.type === 'conviction' ? 'selected' : ''}>✦ conviction</option>
         <option value="approval" ${e.type === 'approval' ? 'selected' : ''}>◎ approval</option>
         <option value="neutral" ${e.type === 'neutral' ? 'selected' : ''}>· neutral</option>
       </select>
-      <button onclick="removeEntry(${e.id})" class="text-gray-700 hover:text-red-700 mono text-sm transition-colors opacity-0 group-hover:opacity-100">×</button>
+      <button onclick="removeEntry(${e.id})" class="mono text-sm opacity-0 group-hover:opacity-100" style="color:var(--ink-ghost)" onmouseover="this.style.color='#b91c1c'" onmouseout="this.style.color='var(--ink-ghost)'">×</button>
     </div>
   `).join('');
   update();
@@ -145,6 +250,8 @@ function update() {
   const total = entries.reduce((s, e) => s + e.hours, 0);
   const convictionHours = entries.filter(e => e.type === 'conviction').reduce((s, e) => s + e.hours, 0);
   const approvalHours = entries.filter(e => e.type === 'approval').reduce((s, e) => s + e.hours, 0);
+
+  save();
 
   if (total === 0) {
     document.getElementById('pct-display').textContent = '—%';
@@ -171,30 +278,35 @@ function update() {
   const pctEl = document.getElementById('pct-display');
   if (convPct >= 70) pctEl.style.color = '#f5f5f5';
   else if (convPct >= 50) pctEl.style.color = '#d4d4aa';
-  else if (convPct >= 30) pctEl.style.color = '#d97706';
+  else if (convPct >= 30) pctEl.style.color = 'var(--accent)';
   else pctEl.style.color = '#ef4444';
 
   renderVerdict(convPct, appPct, convictionHours, approvalHours, total);
-  document.getElementById('verdict').classList.remove('hidden');
+  const v = document.getElementById('verdict');
+  const wasHidden = v.classList.contains('hidden');
+  v.classList.remove('hidden');
+  if (wasHidden) {
+    v.classList.remove('reveal'); void v.offsetWidth; v.classList.add('reveal');
+  }
 }
 
 function renderVerdict(convPct, appPct, convH, appH, total) {
   let text, prescription;
 
   if (convPct >= 80) {
-    text = `${convPct}% conviction. The mountain is solid. You are doing what you would do if no one was watching, because the work is worth doing. This is the rare state. Do not optimize it away.`;
+    text = `${convPct}% conviction. The mountain is solid. You are doing what you would do if no one was watching, because the work is worth doing. This is the rare state — thin air, clear ridge. Do not optimize it away.`;
     prescription = `prescription: protect the blocks that got you here. Notice what they have in common.`;
   } else if (convPct >= 60) {
-    text = `${convPct}% conviction. A workable ratio — but the ${appH.toFixed(1)} approval hours are real. Something is pulling you toward the external scoreboard. Name it. Not to eliminate it, but to know it.`;
+    text = `${convPct}% conviction. A workable ratio — but the ${appH.toFixed(1)} approval hours are real, and they are heavy. Something is pulling you toward the external scoreboard. Name it. Not to eliminate it, but to know its face.`;
     prescription = `prescription: identify the single largest approval block. Ask: what would you do with that time if the result was invisible?`;
   } else if (convPct >= 40) {
-    text = `${convPct}% conviction. The approval-seeking has the majority on some days. You are spending ${appH.toFixed(1)} hours this week trying to win a game defined by someone else. The work may still be good. But you know the difference between building and performing.`;
+    text = `${convPct}% conviction. The approval-seeking has the majority on some days. You spent ${appH.toFixed(1)} hours this week trying to win a game defined by someone else. The work may still be good. But you know the difference between building and performing. The ghost knows it too.`;
     prescription = `prescription: one conviction block next week that produces nothing external-facing. Just the work.`;
   } else if (convPct > 0) {
-    text = `${convPct}% conviction. This is the approval-seeking week you described — doing shitty work because the motivation is wrong. The ${convH.toFixed(1)} conviction hours are the signal worth following. The rest is noise dressed as productivity.`;
-    prescription = `prescription: the ${convH.toFixed(1)} hours — what were they? That is the direction.`;
+    text = `${convPct}% conviction. This is the approval-seeking week you feared — shitty work done because the motivation is borrowed. The ${convH.toFixed(1)} conviction hours are the one signal worth following. The rest is noise dressed as productivity, fog wearing the shape of progress.`;
+    prescription = `prescription: the ${convH.toFixed(1)} hours — what were they? That is the direction. Walk toward it.`;
   } else {
-    text = `No conviction blocks logged. Either this was a maintenance week, or you have not yet found the work that would survive the question: "would you do this if no one saw the result?"`;
+    text = `No conviction blocks logged. Either this was a maintenance week — hibernation, snow on the pass — or you have not yet found the work that would survive the question: "would you do this if no one saw the result?"`;
     prescription = `prescription: the question is not rhetorical. Answer it.`;
   }
 
@@ -202,11 +314,30 @@ function renderVerdict(convPct, appPct, convH, appH, total) {
   document.getElementById('verdict-prescription').textContent = prescription;
 }
 
+function copyVerdict() {
+  const t = document.getElementById('verdict-text').textContent;
+  const p = document.getElementById('verdict-prescription').textContent;
+  const btn = document.getElementById('copy-verdict');
+  const payload = `${t}\n\n${p}`;
+  navigator.clipboard.writeText(payload).then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.style.color = 'var(--accent)';
+    btn.style.borderColor = 'var(--accent)';
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.color = 'var(--ink-dim)';
+      btn.style.borderColor = 'var(--line)';
+    }, 1200);
+  }).catch(() => {});
+}
+
 function toggleDiagnostic() {
   const d = document.getElementById('diagnostic');
   const btn = event.target;
   if (d.classList.contains('hidden')) {
     d.classList.remove('hidden');
+    d.classList.remove('reveal'); void d.offsetWidth; d.classList.add('reveal');
     btn.textContent = 'hide conviction test questions';
   } else {
     d.classList.add('hidden');
@@ -214,28 +345,80 @@ function toggleDiagnostic() {
   }
 }
 
-// Start with 3 example entries
-addEntry();
-entries[0].label = 'investor portfolio reviews';
-entries[0].hours = 12;
-entries[0].type = 'approval';
+/* ---------- ambient embers ---------- */
+function spawnEmbers(n) {
+  const field = document.getElementById('ember-field');
+  for (let i = 0; i < n; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + '%';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (12 + Math.random() * 8) + 's';
+    field.appendChild(e);
+  }
+}
 
-addEntry();
-entries[1].label = 'founder calls — real listening';
-entries[1].hours = 6;
-entries[1].type = 'conviction';
+/* ---------- easter eggs (non-blocking, never touch saved state) ---------- */
+// (a) type "prizrak" -> light a hidden watcher line
+let typed = '';
+window.addEventListener('keydown', (ev) => {
+  if (ev.key.length !== 1) return;
+  typed = (typed + ev.key.toLowerCase()).slice(-7);
+  if (typed === 'prizrak') {
+    const w = document.getElementById('watcher');
+    if (w) { w.textContent = 'you found the watcher. it was always counting.'; w.classList.add('flicker'); }
+  }
+});
 
-addEntry();
-entries[2].label = '';
-entries[2].hours = 8;
-entries[2].type = 'neutral';
+// (b) triple-click the title -> one extra ember
+document.getElementById('app-title').addEventListener('click', (ev) => {
+  if (ev.detail === 3) spawnEmbers(1);
+});
 
+// (c) 00:00–03:00 local -> faint footer whisper
+function nocturnalWhisper() {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const n = document.getElementById('nightline');
+    if (n) n.textContent = 'the mountain does not sleep.';
+  }
+}
+
+// (e) idle 60s -> a single line fades in
+let idleTimer;
+function resetIdle() {
+  clearTimeout(idleTimer);
+  const idle = document.getElementById('idleline');
+  if (idle) idle.textContent = '';
+  idleTimer = setTimeout(() => {
+    if (idle) { idle.textContent = 'still here. still watching.'; idle.classList.add('reveal'); }
+  }, 60000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+  window.addEventListener(ev, resetIdle, { passive: true }));
+
+/* ---------- boot ---------- */
+spawnEmbers(8);
+nocturnalWhisper();
+resetIdle();
+
+const restored = load();
+if (!restored) {
+  // First visit: seed the example week.
+  entries.push({ id: idCounter++, label: 'investor portfolio reviews', hours: 12, type: 'approval' });
+  entries.push({ id: idCounter++, label: 'founder calls — real listening', hours: 6, type: 'conviction' });
+  entries.push({ id: idCounter++, label: '', hours: 8, type: 'neutral' });
+}
 renderEntries();
 </script>
 
-<div class="max-w-2xl mx-auto mt-8 pb-8">
-  <div class="mono text-xs text-gray-800">
-    built by prizrak @ 04:22 saigon · for charles · conviction/approval split tracker
+<div class="max-w-2xl mx-auto mt-8 pb-8 content">
+  <div class="mono text-xs space-y-1" style="color:var(--ink-ghost)">
+    <div>built by prízrak @ 04:22 saigon · for charles · conviction/approval split tracker</div>
+    <div id="watcher" class="ghost-line"></div>
+    <div id="idleline" class="ghost-line"></div>
+    <div id="nightline" class="ghost-line"></div>
+    <div class="ghost-line">we measure the cold and build dashboards of our suffering.</div>
   </div>
 </div>
 

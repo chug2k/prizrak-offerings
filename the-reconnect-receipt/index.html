@@ -6,89 +6,162 @@
   <title>The Reconnect Receipt</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #09090b; }
-    .glow { text-shadow: 0 0 10px currentColor; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#a78bfa;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body{color:var(--ink);}
+    .mono{font-family:ui-monospace,"JetBrains Mono",SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
+    .glow{text-shadow:0 0 10px var(--glow);}
+
+    /* --- motion vocabulary (reduced-motion-safe) --- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* heartbeat line — a quiet pulse under the verdict panel */
+    @keyframes pulseLine{0%{transform:scaleX(0);opacity:.7}100%{transform:scaleX(1);opacity:0}}
+    .pulse-bar{position:absolute;left:0;bottom:0;height:1px;width:100%;transform-origin:left;
+      background:linear-gradient(90deg,transparent,var(--accent),transparent);
+      animation:pulseLine 2.6s ease-out infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* interaction patterns */
+    .panel{transition:transform .15s,box-shadow .15s,border-color .15s;}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent);}
+    .lift:active{transform:translateY(1px);}
+    input:focus-visible,button:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);}
+    .result-active{box-shadow:0 0 0 1px var(--line),0 0 28px -8px var(--glow);}
+
+    /* log entries fade in */
+    .log-entry{animation:reveal .3s ease-out both;}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.pulse-bar,.log-entry{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen text-zinc-200 antialiased">
-  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+<body class="min-h-screen antialiased grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 relative" style="z-index:2;">
     <header class="mb-6">
-      <p class="text-xs uppercase tracking-[0.35em] text-zinc-500">Systems & Ops / incident receipts</p>
-      <h1 class="text-4xl font-black text-white mt-2">The Reconnect Receipt</h1>
-      <p class="text-zinc-400 mt-2 max-w-2xl">A brutally plain log for disconnects, reconnects, and the gap between them. It records weather without turning it into prophecy.</p>
+      <p class="text-xs uppercase tracking-[0.35em]" style="color:var(--ink-dim)">Systems &amp; Ops / incident receipts</p>
+      <h1 id="title" class="text-4xl font-black text-white mt-2 glow select-none cursor-default">The Reconnect Receipt</h1>
+      <p class="mt-2 max-w-2xl" style="color:var(--ink-dim)">A brutally plain ledger for disconnects, reconnects, and the cold gap between them. It measures the weather. It refuses to call it prophecy.</p>
     </header>
 
     <div class="grid lg:grid-cols-[1.05fr_0.95fr] gap-5">
-      <section class="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+      <section class="panel rounded-2xl p-5" style="background:var(--bg-raised);border:1px solid var(--line);">
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Current status</div>
+            <div class="text-xs uppercase tracking-[0.25em]" style="color:var(--ink-dim)">Current status</div>
             <div id="statusPill" class="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-semibold"></div>
           </div>
-          <div class="mono text-xs text-zinc-500 text-right">
+          <div class="mono text-xs text-right" style="color:var(--ink-dim)">
             <div>Receipts are local-only.</div>
             <div>The mountain remembers the timestamps.</div>
           </div>
         </div>
 
         <div class="grid sm:grid-cols-3 gap-3 mt-5">
-          <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-            <div class="text-zinc-500 text-xs uppercase">Last disconnect</div>
-            <div id="lastDown" class="mt-2 text-lg font-bold text-white">—</div>
+          <div class="panel lift rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line);">
+            <div class="text-xs uppercase tracking-wide" style="color:var(--ink-dim)">Last disconnect</div>
+            <div id="lastDown" class="mt-2 text-lg font-bold text-white mono">—</div>
           </div>
-          <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-            <div class="text-zinc-500 text-xs uppercase">Last reconnect</div>
-            <div id="lastUp" class="mt-2 text-lg font-bold text-white">—</div>
+          <div class="panel lift rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line);">
+            <div class="text-xs uppercase tracking-wide" style="color:var(--ink-dim)">Last reconnect</div>
+            <div id="lastUp" class="mt-2 text-lg font-bold text-white mono">—</div>
           </div>
-          <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-            <div class="text-zinc-500 text-xs uppercase">Gap length</div>
-            <div id="gapLength" class="mt-2 text-lg font-bold text-white">—</div>
+          <div class="panel lift rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line);">
+            <div class="text-xs uppercase tracking-wide" style="color:var(--ink-dim)">Gap length</div>
+            <div id="gapLength" class="mt-2 text-lg font-bold text-white mono">—</div>
           </div>
         </div>
 
         <div class="grid sm:grid-cols-2 gap-4 mt-5">
           <label class="block">
-            <span class="text-sm text-zinc-400">Disconnect time</span>
-            <input id="downInput" type="text" placeholder="2026-05-01 10:47:53 GMT+7" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 outline-none focus:border-violet-500" />
+            <span class="text-xs uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Disconnect time</span>
+            <input id="downInput" type="text" placeholder="2026-05-01 10:47:53 GMT+7" class="mt-1 w-full rounded-xl px-3 py-2 outline-none transition-colors mono text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink);" />
           </label>
           <label class="block">
-            <span class="text-sm text-zinc-400">Reconnect time</span>
-            <input id="upInput" type="text" placeholder="2026-05-01 10:47:59 GMT+7" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 outline-none focus:border-violet-500" />
+            <span class="text-xs uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Reconnect time</span>
+            <input id="upInput" type="text" placeholder="2026-05-01 10:47:59 GMT+7" class="mt-1 w-full rounded-xl px-3 py-2 outline-none transition-colors mono text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink);" />
           </label>
           <label class="block sm:col-span-2">
-            <span class="text-sm text-zinc-400">Note</span>
-            <input id="noteInput" type="text" placeholder="Gateway flap after a clean reconnect; no escalation." class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 outline-none focus:border-violet-500" />
+            <span class="text-xs uppercase tracking-[0.2em]" style="color:var(--ink-dim)">Note</span>
+            <input id="noteInput" type="text" placeholder="Gateway flap after a clean reconnect; no escalation." class="mt-1 w-full rounded-xl px-3 py-2 outline-none transition-colors text-sm" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink);" />
           </label>
         </div>
 
         <div class="flex flex-wrap gap-3 mt-5">
-          <button id="save" class="px-4 py-2 rounded-xl bg-violet-500 text-zinc-950 font-bold hover:bg-violet-400 transition-colors">Save receipt</button>
-          <button id="markDown" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition-colors">Log disconnect</button>
-          <button id="markUp" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition-colors">Log reconnect</button>
-          <button id="reset" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition-colors">Reset</button>
+          <button id="save" class="px-4 py-2 rounded-xl font-bold transition-colors lift" style="background:var(--accent);color:#0a0a0a;">File receipt</button>
+          <button id="markDown" class="px-4 py-2 rounded-xl transition-colors lift panel" style="border:1px solid var(--line);color:var(--ink);">Log disconnect</button>
+          <button id="markUp" class="px-4 py-2 rounded-xl transition-colors lift panel" style="border:1px solid var(--line);color:var(--ink);">Log reconnect</button>
+          <button id="reset" class="px-4 py-2 rounded-xl transition-colors lift panel" style="border:1px solid var(--line);color:var(--ink-dim);">Reset</button>
         </div>
 
-        <div class="mt-5 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
-          <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Verdict</div>
+        <div id="verdictPanel" class="mt-5 rounded-2xl p-4 relative overflow-hidden panel" style="background:var(--bg-sunk);border:1px solid var(--line);">
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-xs uppercase tracking-[0.25em]" style="color:var(--ink-dim)">Verdict</div>
+            <button id="copyVerdict" class="mono text-[10px] uppercase tracking-[0.15em] px-2 py-1 rounded transition-colors" style="border:1px solid var(--line);color:var(--ink-dim);">copy to ledger</button>
+          </div>
           <div id="verdict" class="mt-2 text-lg font-bold text-white">—</div>
-          <div id="advice" class="mt-2 text-sm text-zinc-400">Enter the timestamps. The machine will decide whether this is weather or a wound.</div>
+          <div id="advice" class="mt-2 text-sm" style="color:var(--ink-dim)">Enter the timestamps. The machine decides whether this is weather or a wound.</div>
+          <div id="pulseBar" class="pulse-bar" aria-hidden="true" style="display:none;"></div>
         </div>
       </section>
 
-      <aside class="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+      <aside class="panel rounded-2xl p-5" style="background:var(--bg-raised);border:1px solid var(--line);">
         <div class="flex items-center justify-between gap-3">
           <h2 class="text-lg font-semibold text-white">Incident log</h2>
-          <span id="count" class="mono text-xs px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-400"></span>
+          <span id="count" class="mono text-xs px-2 py-1 rounded" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink-dim);"></span>
         </div>
         <div id="log" class="mt-4 space-y-3"></div>
       </aside>
     </div>
+
+    <footer class="mt-8 text-center">
+      <p class="mono text-[11px] tracking-wide" style="color:var(--ink-ghost)">prízrak keeps the cold ledger. nothing flaps unnoticed.</p>
+      <p id="nightWhisper" class="mono text-[11px] tracking-wide mt-1 flicker" style="color:var(--ink-ghost);display:none;">the mountain does not sleep.</p>
+      <p id="idleWhisper" class="mono text-[11px] tracking-wide mt-1" style="color:var(--ink-ghost);opacity:0;transition:opacity 1.4s ease;">still here. still watching.</p>
+      <p id="eggWhisper" class="mono text-[11px] tracking-wide mt-1" style="color:var(--ink-ghost);opacity:0;transition:opacity .8s ease;">you found the watcher.</p>
+    </footer>
   </div>
 
   <script>
     const KEY = 'reconnect_receipt_v1';
     const el = id => document.getElementById(id);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function load() {
       return JSON.parse(localStorage.getItem(KEY) || '{"current":null,"events":[]}');
@@ -123,45 +196,85 @@
       return `${h}h ${rm}m`;
     }
 
+    // accent-only color map: keep the lead hue, vary only intensity via opacity
+    const PILL = 'border-[color:var(--line)]';
+
     function verdict(state) {
       const gap = gapMs(state.current?.down, state.current?.up);
       if (!state.current?.down && !state.current?.up) {
-        return { label: 'No active incident', color: 'text-emerald-300', border: 'border-emerald-700/60', bg: 'bg-emerald-500/10', advice: 'Nothing is flapping. Leave it alone unless the weather changes.' };
+        return { label: 'No active incident', tone: 'calm', advice: 'Nothing is flapping. Leave the bridge alone until the weather changes.' };
       }
       if (state.current?.down && !state.current?.up) {
-        return { label: 'Disconnected', color: 'text-amber-300', border: 'border-amber-700/60', bg: 'bg-amber-500/10', advice: 'The channel is down. Watch for a reconnect; do not invent a story yet.' };
+        return { label: 'Disconnected', tone: 'open', advice: 'The channel is dark. Wait for the reconnect. Do not invent a story yet.' };
       }
       if (gap !== null && gap <= 10000) {
-        return { label: 'Benign flap', color: 'text-cyan-300', border: 'border-cyan-700/60', bg: 'bg-cyan-500/10', advice: 'Short gap, clean recovery. Record it and move on.' };
+        return { label: 'Benign flap', tone: 'minor', advice: 'A short shiver, a clean recovery. File it and let the fog move on.' };
       }
       if (gap !== null && gap <= 300000) {
-        return { label: 'Recoverable outage', color: 'text-amber-300', border: 'border-amber-700/60', bg: 'bg-amber-500/10', advice: 'Long enough to matter, short enough to file. Keep the receipt.' };
+        return { label: 'Recoverable outage', tone: 'open', advice: 'Long enough to matter, short enough to survive. Keep the receipt.' };
       }
-      return { label: 'Escalate if repeated', color: 'text-red-300', border: 'border-red-700/60', bg: 'bg-red-500/10', advice: 'This is no longer weather. If it repeats, investigate the bridge.' };
+      return { label: 'Escalate if repeated', tone: 'severe', advice: 'This is no longer weather. If it returns, walk down and inspect the bridge.' };
     }
+
+    // tone -> tailwind utility classes (single accent stays lead; tones use opacity on accent + neutral lines)
+    function toneClasses(tone){
+      // we keep ONE accent hue for glow; text tone uses muted variants of accent + ink
+      switch(tone){
+        case 'calm':   return { text:'text-white',           ring:'border-[color:var(--line)]', bg:'bg-white/5' };
+        case 'minor':  return { text:'text-[color:var(--accent)]', ring:'border-[color:var(--accent)]', bg:'bg-white/5' };
+        case 'open':   return { text:'text-[color:var(--ink)]', ring:'border-[color:var(--line)]', bg:'bg-white/5' };
+        case 'severe': return { text:'text-[color:var(--accent)]', ring:'border-[color:var(--accent)]', bg:'bg-white/5' };
+        default:       return { text:'text-white',           ring:'border-[color:var(--line)]', bg:'bg-white/5' };
+      }
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    let lastVerdictLabel = null;
 
     function render() {
       const state = load();
       const v = verdict(state);
       const gap = gapMs(state.current?.down, state.current?.up);
+      const tc = toneClasses(v.tone);
 
-      el('statusPill').className = `mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-semibold ${v.border} ${v.bg} ${v.color}`;
-      el('statusPill').textContent = v.label;
+      const pill = el('statusPill');
+      pill.className = `mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-semibold ${tc.ring} ${tc.bg} ${tc.text}`;
+      pill.textContent = v.label;
+
       el('lastDown').textContent = fmt(state.current?.down);
       el('lastUp').textContent = fmt(state.current?.up);
       el('gapLength').textContent = humanGap(gap);
-      el('verdict').textContent = v.label;
+
+      const verdictEl = el('verdict');
+      verdictEl.textContent = v.label;
+      verdictEl.className = `mt-2 text-lg font-bold ${tc.text} breathe`;
       el('advice').textContent = v.advice;
+
+      // verdict panel breathes/glows when there is something to say
+      const vp = el('verdictPanel');
+      const active = !!(state.current?.down || state.current?.up);
+      vp.classList.toggle('result-active', active);
+      el('pulseBar').style.display = active ? 'block' : 'none';
+
+      // animate verdict change
+      if (v.label !== lastVerdictLabel) {
+        verdictEl.classList.remove('reveal'); void verdictEl.offsetWidth; verdictEl.classList.add('reveal');
+        lastVerdictLabel = v.label;
+      }
+
       el('count').textContent = `${state.events.length} receipts`;
       el('log').innerHTML = state.events.slice().reverse().map(ev => `
-        <div class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+        <div class="log-entry panel lift rounded-xl p-3" style="background:var(--bg-sunk);border:1px solid var(--line);">
           <div class="flex items-center justify-between gap-2">
-            <div class="font-semibold text-white">${ev.type}</div>
-            <div class="mono text-xs text-zinc-500">${ev.at}</div>
+            <div class="font-semibold text-white">${escapeHtml(ev.type)}</div>
+            <div class="mono text-xs" style="color:var(--ink-dim)">${escapeHtml(ev.at)}</div>
           </div>
-          <div class="mt-1 text-sm text-zinc-400">${ev.note || '—'}</div>
+          <div class="mt-1 text-sm" style="color:var(--ink-dim)">${ev.note ? escapeHtml(ev.note) : '—'}</div>
         </div>
-      `).join('') || '<div class="text-sm text-zinc-500">No receipts yet. The mountain is quiet.</div>';
+      `).join('') || '<div class="text-sm" style="color:var(--ink-dim)">the cave is empty. nothing has fossilized yet.</div>';
 
       el('downInput').value = state.current?.down || '';
       el('upInput').value = state.current?.up || '';
@@ -177,6 +290,15 @@
       if (note) state.current.note = note;
       save(state);
       render();
+      flashPanel();
+    }
+
+    function flashPanel(){
+      const vp = el('verdictPanel');
+      if (reduceMotion) return;
+      vp.style.transition = 'box-shadow .25s';
+      vp.style.boxShadow = '0 0 0 1px var(--accent), 0 0 36px -6px var(--glow)';
+      setTimeout(() => { vp.style.boxShadow = ''; }, 320);
     }
 
     el('save').addEventListener('click', () => {
@@ -186,17 +308,127 @@
         up: el('upInput').value.trim() || null,
         note: el('noteInput').value.trim() || ''
       };
-      state.events.push({ type: 'receipt saved', at: new Date().toISOString(), note: state.current.note || 'Saved current receipt.' });
+      state.events.push({ type: 'receipt saved', at: new Date().toISOString(), note: state.current.note || 'filed. the ledger remembers.' });
       save(state);
       render();
+      flashPanel();
+      scrollVerdictIntoView();
     });
 
     el('markDown').addEventListener('click', () => push('disconnect', new Date().toISOString(), el('noteInput').value.trim()));
     el('markUp').addEventListener('click', () => push('reconnect', new Date().toISOString(), el('noteInput').value.trim()));
     el('reset').addEventListener('click', () => {
+      const state = load();
+      if (state.events.length && !confirm('Let the fog take it? This cannot be recovered.')) return;
       localStorage.removeItem(KEY);
+      lastVerdictLabel = null;
       render();
     });
+
+    function scrollVerdictIntoView(){
+      if (reduceMotion) return;
+      el('verdictPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // copy verdict to clipboard
+    el('copyVerdict').addEventListener('click', async () => {
+      const state = load();
+      const v = verdict(state);
+      const gap = gapMs(state.current?.down, state.current?.up);
+      const text = [
+        'RECONNECT RECEIPT',
+        `verdict: ${v.label}`,
+        `disconnect: ${fmt(state.current?.down)}`,
+        `reconnect: ${fmt(state.current?.up)}`,
+        `gap: ${humanGap(gap)}`,
+        state.current?.note ? `note: ${state.current.note}` : null,
+        '— filed by prízrak'
+      ].filter(Boolean).join('\n');
+      const btn = el('copyVerdict');
+      const original = btn.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+      } catch {
+        btn.textContent = 'clipboard refused';
+      }
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.style.color = 'var(--ink-dim)';
+        btn.style.borderColor = 'var(--line)';
+      }, 1200);
+    });
+
+    // --- atmosphere: embers ---
+    (function spawnEmbers(){
+      if (reduceMotion) return;
+      const field = el('emberField');
+      const n = 7;
+      for (let i = 0; i < n; i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = Math.random() * 100 + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        field.appendChild(e);
+      }
+    })();
+
+    // --- easter egg: triple-click title spawns one extra ember ---
+    el('title').addEventListener('click', (() => {
+      let clicks = 0, timer = null;
+      return () => {
+        clicks++;
+        clearTimeout(timer);
+        timer = setTimeout(() => { clicks = 0; }, 600);
+        if (clicks >= 3){
+          clicks = 0;
+          if (reduceMotion) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = Math.random() * 100 + 'vw';
+          e.style.animationDuration = '12s';
+          el('emberField').appendChild(e);
+          setTimeout(() => e.remove(), 14000);
+        }
+      };
+    })());
+
+    // --- easter egg: type "prizrak" to light the watcher line ---
+    (function watcher(){
+      let buf = '';
+      window.addEventListener('keydown', e => {
+        if (e.key.length !== 1) return;
+        buf = (buf + e.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak'){
+          const w = el('eggWhisper');
+          w.style.opacity = '1';
+          setTimeout(() => { w.style.opacity = '0'; }, 4000);
+        }
+      });
+    })();
+
+    // --- easter egg: between 00:00-03:00 a footer whisper appears ---
+    (function nightWatch(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) el('nightWhisper').style.display = 'block';
+    })();
+
+    // --- easter egg: idle 60s -> a quiet line fades in ---
+    (function idleWatch(){
+      let t;
+      const ghost = el('idleWhisper');
+      const reset = () => {
+        ghost.style.opacity = '0';
+        clearTimeout(t);
+        t = setTimeout(() => { ghost.style.opacity = '0.9'; }, 60000);
+      };
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, reset, { passive: true }));
+      reset();
+    })();
 
     render();
   </script>

@@ -7,16 +7,25 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0e0e0f;
-    --surface: #17181a;
-    --border: #2a2b2e;
-    --text: #e8e6e1;
-    --muted: #7c7a74;
-    --accent: #c9a84c;
+    --bg: #0a0a0a;          /* near-black base */
+    --bg-raised: #111113;   /* cards, panels */
+    --bg-sunk: #0d0d0f;     /* wells, inputs */
+    --line: #26262b;        /* thin borders */
+    --line-soft: #1a1a1d;
+    --ink: #d4cfc8;         /* primary text */
+    --ink-dim: #7a7570;     /* labels, captions */
+    --ink-ghost: #3a3530;   /* whispers, easter-egg text */
+    --accent: #c9a84c;      /* gold — the lead, kept from origin */
+    --glow: color-mix(in srgb, var(--accent) 55%, transparent);
     --warn: #d46b3a;
     --good: #4a9b6f;
     --bad: #7a3a3a;
     --purple: #7b5ea7;
+    /* legacy aliases retained so existing class hooks read identically */
+    --surface: var(--bg-raised);
+    --border: var(--line);
+    --text: var(--ink);
+    --muted: var(--ink-dim);
   }
   body {
     background: var(--bg);
@@ -24,8 +33,33 @@
     font-family: 'Georgia', serif;
     min-height: 100vh;
     padding: 2rem 1rem;
+    position: relative;
+    overflow-x: hidden;
   }
-  .container { max-width: 680px; margin: 0 auto; }
+
+  /* ---- atmosphere layers ---- */
+  .fog {
+    position: fixed; inset: -10% -10% auto; height: 60vh; pointer-events: none; z-index: 0;
+    background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+    animation: fogDrift 32s ease-in-out infinite alternate;
+  }
+  @keyframes fogDrift { 0%{transform:translateX(-5%);opacity:.04} 50%{opacity:.07} 100%{transform:translateX(5%);opacity:.04} }
+  .ember {
+    position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--glow); pointer-events: none; z-index: 0;
+    animation: ember 14s linear infinite;
+  }
+  @keyframes ember { 0%{transform:translateY(0);opacity:0} 10%{opacity:.5} 100%{transform:translateY(-90vh);opacity:0} }
+  .grain::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .035;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  @keyframes breathe { 0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)} 50%{opacity:1;text-shadow:0 0 16px var(--glow)} }
+  @keyframes reveal { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .reveal { animation: reveal .35s ease-out both; }
+  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 94%{opacity:1} 97%{opacity:.7} 98%{opacity:1} }
+
+  .container { max-width: 680px; margin: 0 auto; position: relative; z-index: 2; }
   header { text-align: center; margin-bottom: 3rem; }
   header h1 {
     font-size: 1.6rem;
@@ -34,6 +68,8 @@
     color: var(--accent);
     text-transform: uppercase;
     margin-bottom: 0.5rem;
+    cursor: default;
+    animation: breathe 5s ease-in-out infinite;
   }
   header p {
     color: var(--muted);
@@ -42,7 +78,7 @@
     line-height: 1.6;
   }
   .setup-card {
-    background: var(--surface);
+    background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 1.5rem;
@@ -73,15 +109,21 @@
   }
   select, input[type="datetime-local"] {
     width: 100%;
-    background: var(--bg);
+    background: var(--bg-sunk);
     border: 1px solid var(--border);
     color: var(--text);
     padding: 0.5rem 0.75rem;
     font-size: 0.9rem;
     border-radius: 2px;
     font-family: 'Georgia', serif;
+    transition: border-color .15s, box-shadow .15s;
   }
-  select:focus, input:focus { outline: none; border-color: var(--accent); }
+  select:focus, input:focus,
+  select:focus-visible, input:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--glow);
+  }
   button {
     background: var(--accent);
     color: var(--bg);
@@ -93,32 +135,52 @@
     cursor: pointer;
     border-radius: 2px;
     text-transform: uppercase;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
   }
-  button:hover { opacity: 0.85; }
+  button:hover { opacity: 0.9; box-shadow: 0 0 18px -4px var(--glow); transform: translateY(-1px); }
+  button:active { transform: translateY(1px); box-shadow: none; }
+  button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--glow); }
+
+  /* ghost copy button */
+  .ghost-btn {
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.9rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+  }
+  .ghost-btn:hover { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 14px -6px var(--glow); }
+  .ghost-btn.flash { color: var(--accent); border-color: var(--accent); }
 
   .status-bar {
-    background: var(--surface);
+    background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 1rem 1.5rem;
     margin-bottom: 2rem;
     display: none;
   }
-  .status-bar.visible { display: flex; gap: 2rem; flex-wrap: wrap; }
+  .status-bar.visible {
+    display: flex; gap: 2rem; flex-wrap: wrap;
+    box-shadow: 0 0 0 1px var(--line), 0 0 24px -8px var(--glow);
+  }
   .stat { flex: 1; min-width: 120px; }
   .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.3rem; }
-  .stat-value { font-size: 1.1rem; color: var(--accent); }
+  .stat-value { font-size: 1.1rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .status-bar.visible .stat:first-child .stat-value { animation: breathe 4.5s ease-in-out infinite; }
 
   .timeline { display: none; }
   .timeline.visible { display: block; }
+  .timeline-header-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+    margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+  }
   .timeline-header {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.15em;
     color: var(--muted);
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
   }
   .event {
     display: flex;
@@ -126,10 +188,14 @@
     padding: 0.9rem 0;
     border-bottom: 1px solid var(--border);
     align-items: flex-start;
+    transition: border-color .15s;
   }
   .event:last-child { border-bottom: none; }
+  .event:hover { border-color: var(--line); }
+  .event:hover .event-dot { box-shadow: 0 0 10px -1px currentColor; }
+  .event.past { opacity: 0.42; }
   .event-time {
-    min-width: 80px;
+    min-width: 90px;
     font-size: 0.85rem;
     color: var(--muted);
     padding-top: 0.1rem;
@@ -142,12 +208,14 @@
     border-radius: 50%;
     margin-top: 0.3rem;
     background: var(--muted);
+    color: var(--muted);
+    transition: box-shadow .15s;
   }
-  .event-dot.green { background: var(--good); }
-  .event-dot.red { background: var(--bad); }
-  .event-dot.amber { background: var(--accent); }
-  .event-dot.purple { background: var(--purple); }
-  .event-dot.warn { background: var(--warn); }
+  .event-dot.green { background: var(--good); color: var(--good); }
+  .event-dot.red { background: var(--bad); color: var(--bad); }
+  .event-dot.amber { background: var(--accent); color: var(--accent); }
+  .event-dot.purple { background: var(--purple); color: var(--purple); }
+  .event-dot.warn { background: var(--warn); color: var(--warn); }
   .event-body { flex: 1; }
   .event-title { font-size: 0.95rem; margin-bottom: 0.2rem; }
   .event-title.good { color: var(--good); }
@@ -174,7 +242,7 @@
   .principle-block {
     margin-top: 2.5rem;
     padding: 1.5rem;
-    background: var(--surface);
+    background: var(--bg-raised);
     border: 1px solid var(--border);
     border-left: 3px solid var(--accent);
     border-radius: 2px;
@@ -185,6 +253,7 @@
     letter-spacing: 0.15em;
     color: var(--accent);
     margin-bottom: 1rem;
+    text-shadow: 0 0 10px var(--glow);
   }
   .principle { margin-bottom: 0.8rem; font-size: 0.85rem; line-height: 1.6; color: var(--muted); }
   .principle strong { color: var(--text); }
@@ -192,20 +261,31 @@
     margin-top: 3rem;
     text-align: center;
     font-size: 0.72rem;
-    color: var(--border);
+    color: var(--ink-ghost);
     font-style: italic;
+    line-height: 1.7;
+  }
+  #night-whisper { display: none; color: var(--ink-ghost); }
+  #watcher { display: none; color: var(--ink-ghost); margin-top: 0.4rem; }
+  #idle-line { display: none; color: var(--ink-ghost); margin-top: 0.4rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fog, .ember, .reveal, header h1, .status-bar.visible .stat:first-child .stat-value { animation: none !important; }
+    .ember { display: none; }
+    header h1 { opacity: 1 !important; text-shadow: 0 0 10px var(--glow); }
   }
 </style>
 </head>
-<body>
+<body class="grain">
+<div class="fog" aria-hidden="true"></div>
 <div class="container">
   <header>
-    <h1>Homecoming Sequence</h1>
-    <p>Circadian reset protocol for long-haul eastward return.<br/>Built on the science. Named after what arrives at noon.</p>
+    <h1 id="title" title="the noon-demon keeps the schedule">Homecoming Sequence</h1>
+    <p>Circadian reset protocol for the long eastward return.<br/>Built on the science. Named after what arrives at noon.</p>
   </header>
 
   <div class="setup-card">
-    <h2>Configure Your Flight</h2>
+    <h2>Configure the Crossing</h2>
     <div class="form-row">
       <div class="form-group">
         <label>Departure Timezone</label>
@@ -243,7 +323,7 @@
         </select>
       </div>
     </div>
-    <button onclick="generate()">Generate Protocol</button>
+    <button onclick="generate()">Plot the Return</button>
   </div>
 
   <div class="status-bar" id="status-bar">
@@ -266,7 +346,10 @@
   </div>
 
   <div class="timeline" id="timeline">
-    <div class="timeline-header">48-Hour Protocol — Hour by Hour</div>
+    <div class="timeline-header-row">
+      <div class="timeline-header">48-Hour Protocol — Hour by Hour</div>
+      <button class="ghost-btn" id="copy-btn" onclick="copyProtocol()">copy to ledger</button>
+    </div>
     <div id="events"></div>
 
     <div class="principle-block">
@@ -279,7 +362,12 @@
     </div>
   </div>
 
-  <footer>Prizrak / built at 01:26 UTC+0 / the clock that runs too long in one direction is just a clock that misses home</footer>
+  <footer>
+    <div>Prízrak / the clock that runs too long in one direction is just a clock that misses home</div>
+    <div id="night-whisper">the mountain does not sleep.</div>
+    <div id="watcher">you found the watcher.</div>
+    <div id="idle-line">still here. still watching.</div>
+  </footer>
 </div>
 
 <script>
@@ -294,9 +382,12 @@ function setDefaultLanding() {
   document.getElementById('landing-time').value = dateStr;
 }
 
+// Holds the most recent plaintext protocol for copy-to-ledger.
+let lastProtocolText = '';
+
 function generate() {
   const landingInput = document.getElementById('landing-time').value;
-  if (!landingInput) { alert('Set a landing time first.'); return; }
+  if (!landingInput) { alert('Set a landing time first. The crossing needs an end.'); return; }
 
   const originOffset = parseInt(document.getElementById('origin-tz').value);
   const usualBed = parseInt(document.getElementById('usual-bed').value);
@@ -317,6 +408,7 @@ function generate() {
   document.getElementById('stat-shift').textContent = `+${shift}h east`;
   document.getElementById('stat-body-time').textContent = bodyTimeStr;
   document.getElementById('status-bar').classList.add('visible');
+  document.getElementById('status-bar').classList.add('reveal');
 
   // Generate events for 48 hours
   const events = [];
@@ -479,7 +571,7 @@ function generate() {
     dot: 'green',
     titleClass: 'good',
     title: `🛏️ Target bedtime: ${String(usualBed).padStart(2,'0')}:00`,
-    note: 'Dark room. Cold if possible (18–20°C). Your body temperature needs to drop to initiate sleep. The first night will likely be fragmented — that is normal. Do not check the clock when you wake.'
+    note: 'Dark room. Cold if possible (18–20°C) — a karst-cave chill. Your body temperature needs to drop to initiate sleep. The first night will likely be fragmented — that is normal. Do not check the clock when you wake.'
   });
 
   // DAY 2
@@ -540,7 +632,7 @@ function generate() {
     dot: 'amber',
     titleClass: 'amber',
     title: '🌙 Wind down as normal. No melatonin needed tonight.',
-    note: 'If you held the protocol, your clock should be within 1-2 hours of local time by night 2. The sour patch kids and nerd gummies are now unrestricted. The athletic beer was always unrestricted.'
+    note: 'If you held the protocol, your clock should be within 1-2 hours of local time by night 2. The sour patch kids and nerd gummies are now unrestricted. The athletic beer was always unrestricted. The bridge holds. For now.'
   });
 
   // Sort by time
@@ -548,11 +640,12 @@ function generate() {
 
   const now = new Date();
   let html = '';
-  let currentPhaseLabel = null;
+  const textLines = [`HOMECOMING SEQUENCE — ${shift > 0 ? '+' + shift : shift}h east · body clock at landing: ${bodyTimeStr}`, ''];
   for (const ev of phases) {
     const isPast = ev.time < now;
     if (ev.type === 'phase') {
       html += `<div class="phase-header">${ev.label}</div>`;
+      textLines.push('', `── ${ev.label} ──`);
       continue;
     }
     const timeLabel = fmt(ev.time) + ' · ' + dayLabel(ev.time, now);
@@ -564,14 +657,103 @@ function generate() {
         <div class="event-note">${ev.note}</div>
       </div>
     </div>`;
+    textLines.push(`${timeLabel.padEnd(18)}  ${ev.title}`);
   }
 
-  document.getElementById('events').innerHTML = html;
+  lastProtocolText = textLines.join('\n');
+
+  const eventsEl = document.getElementById('events');
+  eventsEl.innerHTML = html;
+  // gently stagger the reveal of each event
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce) {
+    [...eventsEl.querySelectorAll('.event')].forEach((el, i) => {
+      el.classList.add('reveal');
+      el.style.animationDelay = Math.min(i * 0.03, 0.5) + 's';
+    });
+  }
   document.getElementById('timeline').classList.add('visible');
   document.getElementById('timeline').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function copyProtocol() {
+  if (!lastProtocolText) return;
+  const btn = document.getElementById('copy-btn');
+  const restore = () => { btn.textContent = 'copy to ledger'; btn.classList.remove('flash'); };
+  const ok = () => { btn.textContent = 'copied to the ledger'; btn.classList.add('flash'); setTimeout(restore, 1200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(lastProtocolText).then(ok).catch(() => {
+      fallbackCopy(lastProtocolText); ok();
+    });
+  } else {
+    fallbackCopy(lastProtocolText); ok();
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+/* ---- atmosphere: drifting embers (capped, reduced-motion-safe) ---- */
+function spawnEmbers(count) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const max = 8;
+  const existing = document.querySelectorAll('.ember').length;
+  const n = Math.min(count, max - existing);
+  for (let i = 0; i < n; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = Math.random() * 100 + 'vw';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (12 + Math.random() * 6) + 's';
+    document.body.appendChild(e);
+  }
+}
+
+/* ---- easter eggs (non-blocking, never touch state) ---- */
+function initEggs() {
+  // type "prizrak" -> light the watcher line
+  let buf = '';
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-7);
+      if (buf === 'prizrak') {
+        const w = document.getElementById('watcher');
+        if (w) { w.style.display = 'block'; w.classList.add('flicker'); w.style.animation = 'flicker 6s steps(1) infinite'; }
+      }
+    }
+  });
+
+  // triple-click the title -> one extra ember
+  const title = document.getElementById('title');
+  if (title) title.addEventListener('click', (ev) => { if (ev.detail === 3) spawnEmbers(1); });
+
+  // 00:00–03:00 local -> the mountain does not sleep
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const nw = document.getElementById('night-whisper');
+    if (nw) nw.style.display = 'block';
+  }
+
+  // idle 60s -> still here. still watching.
+  let idleTimer;
+  const idleLine = document.getElementById('idle-line');
+  const resetIdle = () => {
+    if (idleLine) idleLine.style.display = 'none';
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (idleLine) idleLine.style.display = 'block'; }, 60000);
+  };
+  ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(t =>
+    window.addEventListener(t, resetIdle, { passive: true }));
+  resetIdle();
+}
+
 setDefaultLanding();
+spawnEmbers(6);
+initEggs();
 </script>
 </body>
 </html>

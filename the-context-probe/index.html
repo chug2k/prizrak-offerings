@@ -6,69 +6,171 @@
   <title>The Context Probe | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at top, #1e293b 0, #0f172a 38%, #020617 100%); }
-    .glass { background: rgba(15,23,42,.72); backdrop-filter: blur(16px); }
-    textarea, input { color-scheme: dark; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#67e8f9;            /* cyan lead, carried from the original */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{ background:var(--bg); }
+    body{
+      color:var(--ink);
+      background:
+        radial-gradient(120% 80% at 50% -10%, rgba(103,232,249,.05), transparent 55%),
+        radial-gradient(circle at top, #0e1418 0, #0b0d10 40%, var(--bg) 100%);
+      font-feature-settings:"ss01";
+    }
+    .mono{ font-family:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .glass{ background:rgba(13,13,15,.72); backdrop-filter:blur(16px); }
+    .panel{ background:var(--bg-raised); }
+    .sunk{ background:var(--bg-sunk); }
+    textarea, input{ color-scheme:dark; }
+
+    /* ---- atmosphere ---- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .resultpanel.lit{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+    /* inputs */
+    .field{ border:1px solid var(--line); transition:border-color .15s, box-shadow .15s; }
+    .field:focus-visible, textarea.field:focus, input.field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* range sliders, cyan */
+    input[type=range]{ -webkit-appearance:none; appearance:none; height:3px; background:var(--line); border-radius:999px; }
+    input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:15px; height:15px; border-radius:50%;
+      background:var(--accent); box-shadow:0 0 10px -1px var(--glow); cursor:pointer; transition:transform .12s; }
+    input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.18); }
+    input[type=range]::-moz-range-thumb{ width:15px;height:15px;border:none;border-radius:50%;
+      background:var(--accent); box-shadow:0 0 10px -1px var(--glow); cursor:pointer; }
+
+    .lift{ transition:transform .15s, border-color .15s, box-shadow .15s; }
+    .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+
+    .probe-btn:active{ transform:translateY(1px); }
+    .copybtn:active{ transform:translateY(1px); }
+
+    .label{ text-transform:uppercase; letter-spacing:.22em; color:var(--ink-dim); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen text-slate-200 antialiased">
-  <main class="max-w-6xl mx-auto px-5 py-8 sm:py-12">
+<body class="min-h-screen text-slate-200 antialiased grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <main class="relative z-[2] max-w-6xl mx-auto px-5 py-8 sm:py-12">
     <header class="mb-8">
-      <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/70 mb-3">Prízrak offering</p>
-      <h1 class="text-4xl sm:text-6xl font-black text-white tracking-tight">The Context Probe</h1>
+      <p class="mono text-[11px] label mb-3">Prízrak offering · instrument 14</p>
+      <h1 id="title" class="text-4xl sm:text-6xl font-black text-white tracking-tight cursor-default select-none">The Context Probe</h1>
       <p class="mt-4 max-w-2xl text-slate-400 leading-relaxed">A small instrument for detecting when the old success function is still judging the new terrain. The report may be accurate. The metric may still be dead.</p>
     </header>
 
     <section class="grid lg:grid-cols-[1.1fr_.9fr] gap-5">
-      <div class="glass border border-slate-700/70 rounded-3xl p-5 sm:p-7 shadow-2xl">
+      <div class="glass border rounded-3xl p-5 sm:p-7 shadow-2xl" style="border-color:var(--line)">
         <div class="grid gap-4">
           <label class="block">
-            <span class="text-sm font-semibold text-slate-300">1. What context are you in now?</span>
-            <textarea id="now" rows="3" class="mt-2 w-full rounded-2xl bg-slate-950/70 border border-slate-700 p-3 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="Example: new VC job, post-founder identity, hot day recovery, album launch..."></textarea>
+            <span class="mono text-[11px] label">Field 01 · present terrain</span>
+            <span class="block text-sm font-semibold text-slate-300 mt-1">What context are you in now?</span>
+            <textarea id="now" rows="3" class="field mt-2 w-full rounded-2xl sunk p-3 text-slate-200" placeholder="new VC job, post-founder identity, hot-day recovery, album launch…"></textarea>
           </label>
           <label class="block">
-            <span class="text-sm font-semibold text-slate-300">2. What old metric is still haunting it?</span>
-            <textarea id="old" rows="3" class="mt-2 w-full rounded-2xl bg-slate-950/70 border border-slate-700 p-3 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="Approval, visible productivity, investor praise, inbox zero, training volume, speed..."></textarea>
+            <span class="mono text-[11px] label">Field 02 · the haunting</span>
+            <span class="block text-sm font-semibold text-slate-300 mt-1">What old metric is still haunting it?</span>
+            <textarea id="old" rows="3" class="field mt-2 w-full rounded-2xl sunk p-3 text-slate-200" placeholder="approval, visible productivity, investor praise, inbox zero, training volume, speed…"></textarea>
           </label>
           <label class="block">
-            <span class="text-sm font-semibold text-slate-300">3. What would actually matter here?</span>
-            <textarea id="real" rows="3" class="mt-2 w-full rounded-2xl bg-slate-950/70 border border-slate-700 p-3 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="Recovery, honest fit, one shipped artifact, a clear no, a calm body, a real user signal..."></textarea>
+            <span class="mono text-[11px] label">Field 03 · the live signal</span>
+            <span class="block text-sm font-semibold text-slate-300 mt-1">What would actually matter here?</span>
+            <textarea id="real" rows="3" class="field mt-2 w-full rounded-2xl sunk p-3 text-slate-200" placeholder="recovery, honest fit, one shipped artifact, a clear no, a calm body, a real user signal…"></textarea>
           </label>
-          <div class="grid sm:grid-cols-3 gap-3">
-            <label class="block"><span class="text-xs text-slate-400">Old metric pull</span><input id="pull" type="range" min="0" max="10" value="6" class="w-full mt-2"></label>
-            <label class="block"><span class="text-xs text-slate-400">Context changed</span><input id="change" type="range" min="0" max="10" value="7" class="w-full mt-2"></label>
-            <label class="block"><span class="text-xs text-slate-400">New signal clarity</span><input id="clarity" type="range" min="0" max="10" value="4" class="w-full mt-2"></label>
+          <div class="grid sm:grid-cols-3 gap-3 pt-1">
+            <label class="block"><span class="mono text-[10px] label">Old metric pull <b id="pullv" class="text-cyan-300/90 not-italic">6</b></span><input id="pull" type="range" min="0" max="10" value="6" class="w-full mt-2"></label>
+            <label class="block"><span class="mono text-[10px] label">Context changed <b id="changev" class="text-cyan-300/90 not-italic">7</b></span><input id="change" type="range" min="0" max="10" value="7" class="w-full mt-2"></label>
+            <label class="block"><span class="mono text-[10px] label">Signal clarity <b id="clarityv" class="text-cyan-300/90 not-italic">4</b></span><input id="clarity" type="range" min="0" max="10" value="4" class="w-full mt-2"></label>
           </div>
-          <button id="probe" class="rounded-2xl bg-cyan-300 text-slate-950 font-black py-3 hover:bg-cyan-200 transition">Run the probe</button>
+          <button id="probe" class="probe-btn lift rounded-2xl bg-cyan-300 text-slate-950 font-black py-3 border border-cyan-200/0 hover:bg-cyan-200 transition">Run the probe</button>
         </div>
       </div>
 
-      <aside class="glass border border-slate-700/70 rounded-3xl p-5 sm:p-7 shadow-2xl">
-        <h2 class="text-xl font-black text-white mb-4">Verdict</h2>
-        <div id="score" class="text-6xl font-black text-cyan-300">—</div>
-        <div id="label" class="mt-2 text-lg font-bold text-slate-200">Waiting for terrain.</div>
+      <aside class="resultpanel glass border rounded-3xl p-5 sm:p-7 shadow-2xl lift" style="border-color:var(--line)">
+        <div class="flex items-center justify-between">
+          <h2 class="mono text-[11px] label">Verdict</h2>
+          <button id="copy" class="copybtn mono text-[10px] label border rounded-md px-2 py-1 text-slate-400 hover:text-cyan-200 transition" style="border-color:var(--line)" title="copy the reading">copy</button>
+        </div>
+        <div id="score" class="text-6xl font-black text-cyan-300 mt-2 breathe">—</div>
+        <div id="riskbar" class="mt-3 h-[3px] w-full rounded-full overflow-hidden" style="background:var(--line)">
+          <div id="riskfill" class="h-full rounded-full" style="width:0%;background:linear-gradient(90deg,var(--accent),#fda4af);transition:width .6s ease"></div>
+        </div>
+        <div id="label" class="mt-3 text-lg font-bold text-slate-200">Waiting for terrain.</div>
         <p id="verdict" class="mt-4 text-slate-400 leading-relaxed">Fill the fields. The mountain will compare the old probe with the new ridge line.</p>
-        <div class="mt-6 border-t border-slate-700 pt-5">
-          <h3 class="font-bold text-slate-200 mb-2">Next concrete move</h3>
+        <div class="mt-6 border-t pt-5" style="border-color:var(--line)">
+          <h3 class="mono text-[11px] label mb-2">Next concrete move</h3>
           <p id="move" class="text-slate-400 text-sm">No move yet.</p>
         </div>
-        <div class="mt-6 border-t border-slate-700 pt-5">
-          <h3 class="font-bold text-slate-200 mb-2">Saved probes</h3>
+        <div class="mt-6 border-t pt-5" style="border-color:var(--line)">
+          <h3 class="mono text-[11px] label mb-2">Saved probes</h3>
           <div id="history" class="space-y-2 text-sm"></div>
         </div>
       </aside>
     </section>
+
+    <footer class="mt-10 mono text-[11px]" style="color:var(--ink-ghost)">
+      <span class="flicker">measured in the dark · the mountain keeps the ledger</span>
+      <span id="whisper" class="block mt-1" style="opacity:0;transition:opacity 2.5s"></span>
+    </footer>
   </main>
 
 <script>
 const $ = id => document.getElementById(id);
 const key = 'prizrak_context_probe_v1';
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function text(id){ return $(id).value.trim(); }
+function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
 function renderHistory(){
   const rows = JSON.parse(localStorage.getItem(key)||'[]');
-  $('history').innerHTML = rows.length ? rows.slice(0,5).map(r => `<div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3"><div class="text-cyan-300 font-bold">${r.label} · ${r.score}/100</div><div class="text-slate-500 text-xs mt-1">${r.date}</div><div class="text-slate-300 mt-1">${escapeHtml(r.now || 'unnamed terrain')}</div></div>`).join('') : '<p class="text-slate-500">No saved probes yet.</p>';
+  $('history').innerHTML = rows.length
+    ? rows.slice(0,5).map(r => `<div class="lift rounded-xl border sunk p-3" style="border-color:var(--line)"><div class="text-cyan-300 font-bold">${escapeHtml(r.label)} · ${r.score}/100</div><div class="mono text-slate-500 text-[11px] mt-1">${escapeHtml(r.date)}</div><div class="text-slate-300 mt-1">${escapeHtml(r.now || 'unnamed terrain')}</div></div>`).join('')
+    : '<p class="text-slate-500">the cave is empty. nothing has fossilized yet.</p>';
 }
-function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// keep slider read-outs live
+['pull','change','clarity'].forEach(id=>{
+  const out=$(id+'v'); const el=$(id);
+  if(out&&el) el.addEventListener('input',()=>out.textContent=el.value);
+});
+
+let last = null;
 $('probe').onclick = () => {
   const pull = +$('pull').value, change = +$('change').value, clarity = +$('clarity').value;
   const risk = Math.round(((pull*4) + (change*4) + ((10-clarity)*2)) * 5);
@@ -90,11 +192,88 @@ $('probe').onclick = () => {
   $('label').textContent = label;
   $('verdict').textContent = verdict;
   $('move').textContent = move;
+  $('riskfill').style.width = Math.min(100,risk) + '%';
+
+  const panel = document.querySelector('.resultpanel');
+  panel.classList.add('lit');
+  ['score','label','verdict','move'].forEach(id=>{ const e=$(id); e.classList.remove('reveal'); void e.offsetWidth; e.classList.add('reveal'); });
+  if(!reduce) panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  last = {risk, label, verdict, move, now:text('now'), old:text('old'), real:text('real')};
+
   const rows = JSON.parse(localStorage.getItem(key)||'[]');
   rows.unshift({date:new Date().toLocaleString(), score:risk, label, now:text('now'), old:text('old'), real:text('real')});
   localStorage.setItem(key, JSON.stringify(rows.slice(0,20)));
   renderHistory();
 };
+
+// copy the reading to the ledger
+$('copy').onclick = () => {
+  const score = $('score').textContent;
+  const reading = last
+    ? `THE CONTEXT PROBE — ${last.risk}/100 · ${last.label}\n\nnow: ${last.now||'—'}\nold metric: ${last.old||'—'}\nwhat matters: ${last.real||'—'}\n\nverdict: ${last.verdict}\nmove: ${last.move}`
+    : `THE CONTEXT PROBE — ${score}\n${$('label').textContent}\n${$('verdict').textContent}`;
+  navigator.clipboard.writeText(reading).then(()=>{
+    const b=$('copy'); const t=b.textContent;
+    b.textContent='copied to the ledger'; b.style.color='var(--accent)';
+    setTimeout(()=>{ b.textContent=t; b.style.color=''; }, 1200);
+  }).catch(()=>{});
+};
+
+// ---- embers (cap 8) ----
+(function(){
+  if(reduce) return;
+  const host=$('embers'); const n=8;
+  for(let i=0;i<n;i++){
+    const e=document.createElement('div');
+    e.className='ember';
+    e.style.left=(Math.random()*100).toFixed(2)+'%';
+    e.style.animationDelay=(Math.random()*14).toFixed(2)+'s';
+    e.style.animationDuration=(11+Math.random()*7).toFixed(2)+'s';
+    host.appendChild(e);
+  }
+})();
+
+// ---- easter egg: type 'prizrak' lights the watcher ----
+(function(){
+  let buf='';
+  addEventListener('keydown',e=>{
+    if(e.key&&e.key.length===1){ buf=(buf+e.key.toLowerCase()).slice(-7);
+      if(buf==='prizrak'){
+        const w=$('whisper'); w.textContent='you found the watcher. it was reading over your shoulder.'; w.style.opacity='.9';
+      }
+    }
+  });
+})();
+
+// ---- easter egg: triple-click title spawns one extra ember ----
+$('title').addEventListener('click', (function(){
+  let c=0,t=null;
+  return ()=>{ c++; clearTimeout(t); t=setTimeout(()=>c=0,500);
+    if(c>=3){ c=0;
+      if(reduce) return;
+      const e=document.createElement('div'); e.className='ember';
+      e.style.left=(Math.random()*100).toFixed(2)+'%';
+      e.style.animationDuration='9s'; $('embers').appendChild(e);
+      setTimeout(()=>e.remove(),9500);
+    }
+  };
+})());
+
+// ---- quiet whisper between 00:00–03:00 ----
+(function(){
+  const h=new Date().getHours();
+  if(h>=0&&h<3){ const w=$('whisper'); if(!w.textContent){ w.textContent='the mountain does not sleep.'; requestAnimationFrame(()=>w.style.opacity='.7'); } }
+})();
+
+// ---- idle 60s: the watcher leaves a line ----
+(function(){
+  let t; const w=$('whisper');
+  function arm(){ clearTimeout(t); t=setTimeout(()=>{ if(!w.textContent){ w.textContent='still here. still watching.'; w.style.opacity='.7'; } }, 60000); }
+  ['mousemove','keydown','click','touchstart','scroll'].forEach(ev=>addEventListener(ev,()=>{ if(w.textContent==='still here. still watching.'){ w.textContent=''; w.style.opacity='0'; } arm(); },{passive:true}));
+  arm();
+})();
+
 renderHistory();
 </script>
 </body>

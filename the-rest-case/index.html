@@ -7,24 +7,105 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400&family=Inter:wght@300;400;500&display=swap');
-    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #b8b0a0; }
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#d9a55a;      /* lamplight amber — the last warm light before sleep */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); }
+    body { font-family: 'Inter', sans-serif; color: var(--ink); }
     .mono { font-family: 'JetBrains Mono', monospace; }
     textarea:focus { outline: none; }
-    .fade { animation: fadeIn 0.5s ease; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .pill { transition: all 0.2s; }
-    .pill.selected { background: #2a2a2a; color: #e0d8c8; border-color: #555; }
+
+    /* ---------- atmosphere ---------- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* a single lamp-glow pinned low, like a candle that hasn't gone out */
+    .lamp{position:fixed;left:50%;bottom:-12vh;transform:translateX(-50%);width:70vw;max-width:560px;height:40vh;
+      pointer-events:none;z-index:0;
+      background:radial-gradient(50% 60% at 50% 100%,var(--glow),transparent 72%);opacity:.5}
+
+    /* ---------- content ---------- */
+    .stage{position:relative;z-index:2}
+
+    .fade { animation: reveal 0.5s ease both; }
+
+    .pill { transition: transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s; }
+    .pill:hover { transform:translateY(-2px); border-color:var(--accent); color:var(--ink); }
+    .pill:active { transform:translateY(1px); }
+    .pill.selected {
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      color: var(--ink);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--line), 0 0 20px -8px var(--glow);
+    }
+
+    .field{ background:var(--bg-sunk); border:1px solid var(--line); border-radius:.375rem;
+      transition: border-color .15s, box-shadow .15s; }
+    .field::placeholder{ color:var(--ink-ghost); }
+    .field:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .lift{ transition: transform .15s, box-shadow .15s, border-color .15s, color .15s; }
+    .lift:hover{ transform:translateY(-2px); border-color:var(--accent); color:var(--ink); }
+    .lift:active{ transform:translateY(1px); }
+
+    .result-panel{ box-shadow:0 0 0 1px var(--line), 0 0 24px -8px var(--glow); }
+
+    .title{ cursor:default; }
+
+    .label{ color:var(--ink-dim); letter-spacing:.18em; }
+
+    #whisper{ color:var(--ink-ghost); min-height:1em; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.fade{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center px-4 py-12">
+<body class="min-h-screen flex items-center justify-center px-4 py-12 grain">
 
-  <div class="w-full max-w-md">
+  <div class="fog" aria-hidden="true"></div>
+  <div class="lamp" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="w-full max-w-md stage">
 
     <!-- Header -->
     <div class="text-center mb-10">
-      <div class="mono text-xs text-stone-600 tracking-widest uppercase mb-2" id="clock"></div>
-      <h1 class="text-xl font-medium text-stone-300 tracking-wide">The Rest Case</h1>
-      <p class="text-stone-600 text-sm mt-1">three questions before you sleep</p>
+      <div class="mono text-xs label uppercase mb-2 flicker" id="clock"></div>
+      <h1 class="title text-xl font-medium text-stone-200 tracking-wide breathe" id="title">The Rest Case</h1>
+      <p class="text-sm mt-1" style="color:var(--ink-dim)">three questions before you let the dark have it</p>
     </div>
 
     <!-- Questions -->
@@ -32,79 +113,114 @@
 
       <!-- Q1 -->
       <div id="q1" class="fade">
-        <p class="text-stone-400 text-sm mb-3">What is the thing that feels most urgent right now?</p>
+        <p class="label mono text-[10px] uppercase mb-2">QUESTION 01 / THE WEIGHT</p>
+        <p class="text-stone-300 text-sm mb-3">What is the thing pressing hardest on you right now?</p>
         <textarea id="a1" rows="3"
-          class="w-full bg-transparent border border-stone-800 rounded px-4 py-3 text-stone-300 text-sm resize-none focus:border-stone-600 transition-colors placeholder-stone-700"
-          placeholder="Write it down. Get it out of your head."></textarea>
+          class="field w-full px-4 py-3 text-stone-200 text-sm resize-none"
+          placeholder="name it. a thing named loses some of its teeth."></textarea>
       </div>
 
       <div id="q2" class="opacity-0 transition-opacity duration-500">
-        <p class="text-stone-400 text-sm mb-3">Can anything be done about it before 8 AM?</p>
+        <p class="label mono text-[10px] uppercase mb-2">QUESTION 02 / THE LEVER</p>
+        <p class="text-stone-300 text-sm mb-3">Can anything be done about it before the sun clears the ridge?</p>
         <div class="flex gap-3">
           <button onclick="select2('yes')" id="btn-yes"
-            class="pill flex-1 border border-stone-800 rounded py-2 mono text-xs text-stone-500 hover:border-stone-600 hover:text-stone-300">
+            class="pill flex-1 border border-stone-800 rounded py-2 mono text-xs text-stone-500">
             yes
           </button>
           <button onclick="select2('no')" id="btn-no"
-            class="pill flex-1 border border-stone-800 rounded py-2 mono text-xs text-stone-500 hover:border-stone-600 hover:text-stone-300">
+            class="pill flex-1 border border-stone-800 rounded py-2 mono text-xs text-stone-500">
             no
           </button>
           <button onclick="select2('partial')" id="btn-partial"
-            class="pill flex-1 border border-stone-800 rounded py-2 mono text-xs text-stone-500 hover:border-stone-600 hover:text-stone-300">
+            class="pill flex-1 border border-stone-800 rounded py-2 mono text-xs text-stone-500">
             partially
           </button>
         </div>
       </div>
 
       <div id="q3" class="opacity-0 transition-opacity duration-500">
-        <p class="text-stone-400 text-sm mb-3">What is the one thing you actually need to remember tomorrow?</p>
+        <p class="label mono text-[10px] uppercase mb-2">QUESTION 03 / THE ONE THING</p>
+        <p class="text-stone-300 text-sm mb-3">What is the single thing tomorrow-you must not lose?</p>
         <textarea id="a3" rows="2"
-          class="w-full bg-transparent border border-stone-800 rounded px-4 py-3 text-stone-300 text-sm resize-none focus:border-stone-600 transition-colors placeholder-stone-700"
-          placeholder="One thing. Write it here and it will wait for you."></textarea>
+          class="field w-full px-4 py-3 text-stone-200 text-sm resize-none"
+          placeholder="one thing. leave it here. it will keep watch while you don't."></textarea>
       </div>
 
       <button id="submit-btn" onclick="submit()"
-        class="w-full hidden border border-stone-700 text-stone-400 mono text-xs py-3 rounded hover:border-stone-500 hover:text-stone-200 transition-colors">
+        class="lift w-full hidden border border-stone-700 text-stone-400 mono text-xs py-3 rounded">
         file and rest →
       </button>
     </div>
 
     <!-- Result -->
     <div id="result" class="hidden fade text-center space-y-6">
-      <div id="verdict" class="text-lg text-stone-300 font-light leading-relaxed"></div>
-      <div id="reminder-box" class="hidden border border-stone-800 rounded px-5 py-4 text-left">
-        <div class="mono text-xs text-stone-600 mb-2 uppercase tracking-wide">for the morning</div>
-        <div id="reminder-text" class="text-stone-400 text-sm"></div>
+      <div id="verdict" class="result-panel breathe text-lg text-stone-200 font-light leading-relaxed rounded px-5 py-5"
+        style="background:var(--bg-raised)"></div>
+      <div id="reminder-box" class="hidden border rounded px-5 py-4 text-left" style="border-color:var(--line);background:var(--bg-raised)">
+        <div class="mono text-xs label mb-2 uppercase">LEFT FOR THE MORNING</div>
+        <div id="reminder-text" class="text-stone-300 text-sm"></div>
+        <button onclick="copyReminder()" id="copy-btn"
+          class="lift mt-3 border border-stone-800 text-stone-500 mono text-[10px] uppercase tracking-wide px-3 py-1.5 rounded">
+          copy to the ledger
+        </button>
       </div>
-      <div class="mono text-xs text-stone-700 pt-4">
-        the mountain will still be there in the morning
+      <div class="mono text-xs" style="color:var(--ink-ghost)">
+        the mountain will still be there in the morning. so will you.
       </div>
       <button onclick="reset()"
-        class="border border-stone-800 text-stone-600 mono text-xs px-6 py-2 rounded hover:border-stone-700 hover:text-stone-400 transition-colors">
-        reset
+        class="lift border border-stone-800 text-stone-600 mono text-xs px-6 py-2 rounded">
+        set down another
       </button>
     </div>
+
+    <div id="whisper" class="text-center mono text-[11px] mt-10 lowercase"></div>
 
   </div>
 
   <script>
     let q2answer = null;
+    const REMINDER_KEY = 'rest-case-reminder';
 
-    // Clock
+    // ---------- Clock ----------
     function updateClock() {
       const now = new Date();
       const h = now.getHours().toString().padStart(2,'0');
       const m = now.getMinutes().toString().padStart(2,'0');
       document.getElementById('clock').textContent = `${h}:${m}`;
+      nightWatch(now);
     }
     updateClock();
     setInterval(updateClock, 30000);
 
-    // Show Q2 after Q1 has content
-    document.getElementById('a1').addEventListener('input', function() {
-      if (this.value.trim().length > 10) {
-        document.getElementById('q2').style.opacity = '1';
+    // Between 00:00–03:00, the watcher leaves a line.
+    function nightWatch(now){
+      const w = document.getElementById('whisper');
+      if (w.dataset.egg === '1') return; // an easter egg has claimed the line
+      const h = now.getHours();
+      if (h >= 0 && h < 3) {
+        if (w.textContent !== 'the mountain does not sleep.')
+          w.textContent = 'the mountain does not sleep.';
+      } else if (!w.dataset.idle) {
+        w.textContent = '';
       }
+    }
+
+    // ---------- Restore a pending reminder from a previous night ----------
+    (function restore(){
+      try {
+        const saved = localStorage.getItem(REMINDER_KEY);
+        if (saved) {
+          const a3 = document.getElementById('a3');
+          if (a3) a3.value = saved;
+        }
+      } catch(e){}
+    })();
+
+    // ---------- Q flow ----------
+    document.getElementById('a1').addEventListener('input', function() {
+      const ready = this.value.trim().length > 10;
+      document.getElementById('q2').style.opacity = ready ? '1' : '0';
     });
 
     function select2(val) {
@@ -113,7 +229,6 @@
         document.getElementById('btn-'+v).classList.remove('selected');
       });
       document.getElementById('btn-'+val).classList.add('selected');
-      // Show Q3
       setTimeout(() => {
         document.getElementById('q3').style.opacity = '1';
         document.getElementById('submit-btn').classList.remove('hidden');
@@ -127,22 +242,44 @@
 
       let verdict = '';
       if (q2answer === 'no') {
-        verdict = 'Nothing you can do about it before morning. That means tonight\'s job is not to solve it — it\'s to set it down. The problem will be the same size at 8 AM as it is right now. You will not be.';
+        verdict = 'Nothing of yours to move before light. Then tonight’s work is not to solve it — it is to set it down where the fog can hold it. The weight is the same size at dawn. You will not be.';
       } else if (q2answer === 'yes') {
-        verdict = 'Something can be done. Write it in the morning list, not the sleep list. The fact that action is possible does not mean the action is now. Sleep is also preparation.';
+        verdict = 'A lever exists. Carve it into the morning list, not the sleeping one. That action is possible does not make now its hour. Sleep is the sharpening, not the surrender.';
       } else {
-        verdict = 'Partial action is possible. That means there is a version of this you can do tomorrow and a version you cannot control tonight. File the controllable part for morning. Set the rest down.';
+        verdict = 'Part of this answers to you; part does not. File the part you can hold for morning. Hand the rest to the dark — it has carried heavier and asked for nothing.';
       }
 
       document.getElementById('verdict').textContent = verdict;
 
+      const box = document.getElementById('reminder-box');
       if (a3) {
-        document.getElementById('reminder-box').classList.remove('hidden');
+        box.classList.remove('hidden');
         document.getElementById('reminder-text').textContent = a3;
+        try { localStorage.setItem(REMINDER_KEY, a3); } catch(e){}
+      } else {
+        box.classList.add('hidden');
+        try { localStorage.removeItem(REMINDER_KEY); } catch(e){}
       }
 
       document.getElementById('questions').classList.add('hidden');
-      document.getElementById('result').classList.remove('hidden');
+      const result = document.getElementById('result');
+      result.classList.remove('hidden');
+      // re-trigger reveal
+      result.classList.remove('fade'); void result.offsetWidth; result.classList.add('fade');
+      result.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+
+    function copyReminder() {
+      const txt = document.getElementById('reminder-text').textContent;
+      const btn = document.getElementById('copy-btn');
+      const restore = () => { btn.textContent = 'copy to the ledger'; btn.style.color=''; btn.style.borderColor=''; };
+      if (!navigator.clipboard) { btn.textContent = 'the ledger is sealed'; setTimeout(restore,1200); return; }
+      navigator.clipboard.writeText(txt).then(() => {
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+        setTimeout(restore, 1200);
+      }).catch(() => { btn.textContent = 'the ledger refused'; setTimeout(restore,1200); });
     }
 
     function reset() {
@@ -158,7 +295,77 @@
       document.getElementById('reminder-box').classList.add('hidden');
       document.getElementById('questions').classList.remove('hidden');
       document.getElementById('result').classList.add('hidden');
+      try { localStorage.removeItem(REMINDER_KEY); } catch(e){}
+      document.getElementById('a1').focus();
     }
+
+    // ---------- Embers (capped, staggered) ----------
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const host = document.getElementById('embers');
+      const n = 7;
+      for (let i=0;i<n;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100).toFixed(1) + '%';
+        e.style.animationDelay = (Math.random()*14).toFixed(1) + 's';
+        e.style.animationDuration = (12 + Math.random()*6).toFixed(1) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ---------- Easter eggs ----------
+    // (a) type "prizrak" → the watcher answers
+    let buf = '';
+    window.addEventListener('keydown', (ev) => {
+      if (ev.target && (ev.target.tagName === 'TEXTAREA' || ev.target.tagName === 'INPUT')) return;
+      if (ev.key && ev.key.length === 1) {
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+          const w = document.getElementById('whisper');
+          w.dataset.egg = '1';
+          w.textContent = 'you found the watcher. rest now — it has the night shift.';
+          w.classList.add('flicker');
+        }
+      }
+    });
+
+    // (b) triple-click the title → one extra ember drifts up
+    document.getElementById('title').addEventListener('click', function(){
+      this._clicks = (this._clicks||0)+1;
+      clearTimeout(this._t);
+      this._t = setTimeout(()=>{ this._clicks=0; }, 600);
+      if (this._clicks >= 3){
+        this._clicks = 0;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = '50%';
+        e.style.animationDuration = '13s';
+        document.getElementById('embers').appendChild(e);
+        setTimeout(()=> e.remove(), 13000);
+      }
+    });
+
+    // (c) idle 60s → a quiet line fades in
+    let idleTimer;
+    function armIdle(){
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(()=>{
+        const w = document.getElementById('whisper');
+        if (w.dataset.egg === '1') return;
+        w.dataset.idle = '1';
+        w.textContent = 'still here. still watching.';
+      }, 60000);
+    }
+    ['mousemove','keydown','click','touchstart'].forEach(ev =>
+      window.addEventListener(ev, () => {
+        const w = document.getElementById('whisper');
+        if (w.dataset.idle === '1' && w.dataset.egg !== '1') { w.dataset.idle=''; w.textContent=''; }
+        armIdle();
+      }, {passive:true})
+    );
+    armIdle();
   </script>
 </body>
 </html>

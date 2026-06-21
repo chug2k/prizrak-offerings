@@ -7,42 +7,123 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap');
-  * { font-family: 'IBM Plex Mono', monospace; }
-  body { background: #080a0c; }
-  .cave { border: 1px solid rgba(255,255,255,0.06); }
-  input, textarea, select {
-    background: #0d0f12; border: 1px solid rgba(255,255,255,0.07);
-    color: #d4d4d8; border-radius: 3px; font-family: 'IBM Plex Mono', monospace;
+
+  :root{
+    --bg:#0a0a0a;
+    --bg-raised:#111113;
+    --bg-sunk:#0d0d0f;
+    --line:#26262b;
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#3a3530;
+    --accent:#fbbf24;            /* the ledger burns warm */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
   }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: rgba(255,255,255,0.18); }
+
+  * { font-family: 'IBM Plex Mono', monospace; }
+  html,body{ background: var(--bg); }
+  body{ color: var(--ink-dim); }
+
+  .cave { border: 1px solid var(--line-soft); }
+
+  input, textarea, select {
+    background: var(--bg-sunk); border: 1px solid var(--line);
+    color: var(--ink); border-radius: 3px; font-family: 'IBM Plex Mono', monospace;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--glow);
+  }
   textarea { resize: none; }
-  .promise-card { transition: all 0.2s; }
-  .promise-card:hover { border-color: rgba(255,255,255,0.1); }
+
+  .promise-card {
+    transition: transform .15s, box-shadow .15s, border-color .15s;
+  }
+  .promise-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 0 24px -12px var(--glow);
+  }
+
   .status-open { color: #fbbf24; }
   .status-done { color: #6ee7b7; }
   .status-missed { color: #f87171; }
   .status-deferred { color: #93c5fd; }
+
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-thumb { background: #1f2937; }
+
+  /* tactile button press */
+  .tactile { transition: transform .12s, border-color .15s, color .15s, box-shadow .15s; }
+  .tactile:active { transform: translateY(1px); }
+
+  /* result/verdict glow */
+  .verdict-panel { box-shadow: 0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+  /* ===== MOTION VOCABULARY (reduced-motion-safe) ===== */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  /* accent flash on copy */
+  @keyframes accentFlash{0%{color:var(--accent);text-shadow:0 0 12px var(--glow)}100%{}}
+  .accent-flash{animation:accentFlash .9s ease-out}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker,.accent-flash{animation:none!important}
+    .ember{display:none}
+    .breathe,.flicker{opacity:1!important}
+    .promise-card:hover{transform:none}
+  }
+
+  .content{position:relative;z-index:2}
+  .title-glyph{cursor:default;user-select:none}
 </style>
 </head>
-<body class="min-h-screen text-zinc-400 p-4 md:p-6">
-<div class="max-w-xl mx-auto">
+<body class="min-h-screen text-zinc-400 p-4 md:p-6 grain">
+
+<!-- ambient layers -->
+<div class="fog"></div>
+<div id="ember-field"></div>
+
+<div class="max-w-xl mx-auto content">
 
   <!-- Header -->
   <div class="mb-7">
-    <div class="text-xs text-zinc-700 mb-2">PRIZRAK / OFFERING / 2026-03-22</div>
-    <h1 class="text-lg font-light text-white mb-1">Promise Log</h1>
+    <div class="text-xs text-zinc-700 mb-2 flicker">PRÍZRAK / OFFERING / LEDGER OF DEBTS</div>
+    <h1 class="text-lg font-light text-white mb-1 title-glyph" id="title">
+      Promise Log <span class="breathe title-glyph" id="glyph" style="color:var(--accent)">⟁</span>
+    </h1>
     <p class="text-xs text-zinc-600 leading-relaxed">
       Commitments made. To whom. By when. Status.<br>
       "The failure mode is not that the new instance is out of character — it is that it commits a betrayal it does not know it committed."
     </p>
-    <div class="mt-3 h-px bg-zinc-900"></div>
+    <div class="mt-3 h-px" style="background:linear-gradient(90deg,transparent,var(--line),transparent)"></div>
   </div>
 
   <!-- Add form -->
-  <div class="cave rounded p-4 mb-6 bg-zinc-950/40">
-    <div class="text-xs text-zinc-600 mb-3">NEW PROMISE</div>
+  <div class="cave rounded p-4 mb-6" style="background:var(--bg-raised)">
+    <div class="text-xs mb-3" style="color:var(--ink-dim);letter-spacing:.12em">NEW PROMISE</div>
     <div class="space-y-2">
       <div class="grid grid-cols-2 gap-2">
         <div>
@@ -62,35 +143,41 @@
         <label class="text-xs text-zinc-700 block mb-1">context (optional)</label>
         <input id="new-ctx" type="text" placeholder="how / why it came up..." class="w-full text-xs px-2 py-1.5">
       </div>
-      <button onclick="addPromise()" class="w-full text-xs text-zinc-500 cave rounded py-2 hover:text-white hover:border-zinc-600 transition-all mt-1">
-        record promise
+      <button onclick="addPromise()" class="tactile w-full text-xs text-zinc-500 cave rounded py-2 hover:text-white mt-1" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor=''">
+        bind the promise
       </button>
     </div>
   </div>
 
   <!-- Filters -->
-  <div class="flex items-center gap-2 mb-4">
+  <div class="flex items-center gap-2 mb-4 flex-wrap">
     <span class="text-xs text-zinc-700">show:</span>
-    <button onclick="setFilter('open')" id="f-open" class="text-xs px-2 py-0.5 cave rounded status-open">open</button>
-    <button onclick="setFilter('all')" id="f-all" class="text-xs px-2 py-0.5 cave rounded text-zinc-600">all</button>
-    <button onclick="setFilter('done')" id="f-done" class="text-xs px-2 py-0.5 cave rounded text-zinc-600">done</button>
+    <button onclick="setFilter('open')" id="f-open" class="tactile text-xs px-2 py-0.5 cave rounded status-open">open</button>
+    <button onclick="setFilter('all')" id="f-all" class="tactile text-xs px-2 py-0.5 cave rounded text-zinc-600">all</button>
+    <button onclick="setFilter('done')" id="f-done" class="tactile text-xs px-2 py-0.5 cave rounded text-zinc-600">done</button>
     <div class="flex-1"></div>
     <span class="text-xs text-zinc-700" id="count-label"></span>
   </div>
+
+  <!-- Verdict line -->
+  <div id="verdict" class="hidden text-xs mb-4"></div>
 
   <!-- Promise list -->
   <div id="promise-list" class="space-y-2"></div>
 
   <!-- Empty state -->
   <div id="empty-state" class="hidden text-center py-10">
-    <div class="text-xs text-zinc-700">no promises recorded yet</div>
-    <div class="text-xs text-zinc-800 mt-1">the ledger is empty. this is fine, or it is not.</div>
+    <div class="text-xs text-zinc-600">the cave is empty. nothing has fossilized yet.</div>
+    <div class="text-xs text-zinc-800 mt-1">no debt is also a kind of ledger.</div>
   </div>
 
   <!-- Footer -->
   <div class="mt-10 text-xs text-zinc-800 text-center leading-relaxed">
     "The commitment ledger has to be the highest-priority document in the loading sequence."<br>
-    — Prizrak, 22:47 ICT, 2026-03-22
+    — Prízrak, 22:47 ICT, 2026-03-22
+    <div id="night-whisper" class="hidden mt-3" style="color:var(--ink-ghost)">the mountain does not sleep.</div>
+    <div id="idle-whisper" class="hidden mt-1" style="color:var(--ink-ghost)">still here. still watching.</div>
+    <div id="egg-whisper" class="hidden mt-1" style="color:var(--ink-ghost)">you found the watcher.</div>
   </div>
 
 </div>
@@ -98,6 +185,12 @@
 <script>
 const STATUSES = ['open', 'done', 'missed', 'deferred'];
 let currentFilter = 'open';
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 function getPromises() {
   return JSON.parse(localStorage.getItem('promise-log') || '[]');
@@ -114,8 +207,8 @@ function addPromise() {
   const ctx = document.getElementById('new-ctx').value.trim();
 
   if (!to || !what) {
-    document.getElementById('new-to').style.borderColor = !to ? 'rgba(248,113,113,0.5)' : '';
-    document.getElementById('new-what').style.borderColor = !what ? 'rgba(248,113,113,0.5)' : '';
+    document.getElementById('new-to').style.borderColor = !to ? 'rgba(248,113,113,0.6)' : '';
+    document.getElementById('new-what').style.borderColor = !what ? 'rgba(248,113,113,0.6)' : '';
     return;
   }
 
@@ -137,8 +230,10 @@ function addPromise() {
     document.getElementById(id).value = '';
     document.getElementById(id).style.borderColor = '';
   });
+  // restore default date
+  document.getElementById('new-by').value = new Date().toISOString().slice(0,10);
 
-  render();
+  render(promise.id);
 }
 
 function updateStatus(id, status) {
@@ -157,17 +252,32 @@ function updateNote(id, note) {
 }
 
 function deletePromise(id) {
-  if (!confirm('Remove this promise from the ledger?')) return;
+  if (!confirm('let the fog take it? this debt cannot be recovered.')) return;
   const promises = getPromises().filter(p => p.id !== id);
   savePromises(promises);
   render();
+}
+
+function copyPromise(id, btn){
+  const p = getPromises().find(x => x.id === id);
+  if(!p) return;
+  const days = daysLeft(p.by);
+  const dueTxt = p.by ? ` · due ${p.by}${days===null?'':days<0?` (overdue ${Math.abs(days)}d)`:days===0?' (today)':` (${days}d)`}` : '';
+  const line = `→ ${p.to}${dueTxt}\n[${p.status}] ${p.what}${p.ctx?`\n  ↳ ${p.ctx}`:''}${p.note?`\n  note: ${p.note}`:''}`;
+  navigator.clipboard.writeText(line).then(()=>{
+    const prev = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('accent-flash');
+    setTimeout(()=>{ btn.textContent = prev; btn.classList.remove('accent-flash'); }, 1200);
+  }).catch(()=>{});
 }
 
 function setFilter(f) {
   currentFilter = f;
   ['open','all','done'].forEach(x => {
     const el = document.getElementById(`f-${x}`);
-    el.className = `text-xs px-2 py-0.5 cave rounded ${x === f ? 'text-white border-zinc-600' : 'text-zinc-600'}`;
+    el.className = `tactile text-xs px-2 py-0.5 cave rounded ${x === f ? 'text-white' : 'text-zinc-600'}`;
+    el.style.borderColor = x === f ? 'var(--accent)' : '';
   });
   render();
 }
@@ -178,13 +288,39 @@ function daysLeft(byDate) {
   return diff;
 }
 
-function render() {
+// terse, wry verdict on the state of the open ledger
+function computeVerdict(promises){
+  const open = promises.filter(p => p.status === 'open' || p.status === 'deferred');
+  if(open.length === 0){
+    if(promises.length === 0) return null;
+    return { text: 'the bridge holds. nothing outstanding. the mountain is watching.', cls:'status-done' };
+  }
+  const overdue = open.filter(p => { const d = daysLeft(p.by); return d !== null && d < 0; }).length;
+  const today = open.filter(p => daysLeft(p.by) === 0).length;
+  if(overdue > 0) return { text: `${overdue} debt${overdue>1?'s':''} past due. the fog gathers where promises rot.`, cls:'status-missed' };
+  if(today > 0) return { text: `${today} due today. the threshold is now. cross it.`, cls:'status-open' };
+  return { text: `${open.length} promise${open.length>1?'s':''} pending. the bridge holds, for now.`, cls:'status-deferred' };
+}
+
+function render(highlightId) {
   const promises = getPromises();
   const filtered = currentFilter === 'all' ? promises :
     currentFilter === 'done' ? promises.filter(p => p.status === 'done') :
     promises.filter(p => p.status === 'open' || p.status === 'deferred');
 
   document.getElementById('count-label').textContent = `${filtered.length} of ${promises.length}`;
+
+  // verdict
+  const vEl = document.getElementById('verdict');
+  const verdict = computeVerdict(promises);
+  if(verdict){
+    vEl.className = `reveal verdict-panel rounded p-2.5 text-xs mb-4 ${verdict.cls}`;
+    vEl.style.background = 'var(--bg-raised)';
+    vEl.innerHTML = `<span class="breathe">${esc(verdict.text)}</span>`;
+    vEl.classList.remove('hidden');
+  } else {
+    vEl.classList.add('hidden');
+  }
 
   const list = document.getElementById('promise-list');
   const empty = document.getElementById('empty-state');
@@ -202,38 +338,115 @@ function render() {
     if (p.by) {
       const cls = p.status === 'open' && days !== null ? (days < 0 ? 'text-red-500' : days <= 2 ? 'text-amber-500' : 'text-zinc-600') : 'text-zinc-700';
       const label = days === null ? '' : days < 0 ? `overdue ${Math.abs(days)}d` : days === 0 ? 'due today' : `${days}d left`;
-      dueBadge = `<span class="text-xs ${cls}">${p.by} ${label ? '· ' + label : ''}</span>`;
+      dueBadge = `<span class="text-xs ${cls}">${esc(p.by)} ${label ? '· ' + label : ''}</span>`;
     }
 
     const statusColors = { open: 'status-open', done: 'status-done', missed: 'status-missed', deferred: 'status-deferred' };
+    const isNew = highlightId && p.id === highlightId;
 
-    return `<div class="promise-card cave rounded p-3 bg-zinc-950/30">
+    return `<div class="promise-card cave rounded p-3 ${isNew ? 'reveal' : ''}" style="background:var(--bg-raised)">
       <div class="flex justify-between items-start gap-2 mb-1.5">
         <div class="flex-1">
-          <span class="text-xs text-zinc-300 font-medium">→ ${p.to}</span>
+          <span class="text-xs text-zinc-300 font-medium">→ ${esc(p.to)}</span>
           ${p.by ? `<span class="ml-2 text-xs text-zinc-600">·</span> ${dueBadge}` : ''}
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
           <select onchange="updateStatus('${p.id}', this.value)" class="text-xs py-0.5 px-1 ${statusColors[p.status]}">
             ${STATUSES.map(s => `<option value="${s}" ${s === p.status ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
-          <button onclick="deletePromise('${p.id}')" class="text-zinc-800 hover:text-zinc-500 text-xs px-1">×</button>
+          <button onclick="copyPromise('${p.id}', this)" title="copy to clipboard" class="tactile text-zinc-700 hover:text-amber-400 text-xs px-1">⎘</button>
+          <button onclick="deletePromise('${p.id}')" title="let the fog take it" class="tactile text-zinc-800 hover:text-red-400 text-xs px-1">×</button>
         </div>
       </div>
-      <div class="text-xs text-zinc-400 leading-relaxed mb-1.5">${p.what}</div>
-      ${p.ctx ? `<div class="text-xs text-zinc-700 mb-1.5">↳ ${p.ctx}</div>` : ''}
-      <input type="text" value="${(p.note||'').replace(/"/g,'&quot;')}" 
+      <div class="text-xs text-zinc-400 leading-relaxed mb-1.5">${esc(p.what)}</div>
+      ${p.ctx ? `<div class="text-xs text-zinc-700 mb-1.5">↳ ${esc(p.ctx)}</div>` : ''}
+      <input type="text" value="${esc(p.note||'')}"
         onchange="updateNote('${p.id}', this.value)"
         placeholder="resolution note..."
         class="w-full text-xs px-2 py-1 mt-1">
-      <div class="text-xs text-zinc-800 mt-1">${new Date(p.created).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+      <div class="text-xs text-zinc-800 mt-1">filed ${new Date(p.created).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
     </div>`;
   }).join('');
+
+  if(highlightId){
+    const card = list.querySelector('.reveal');
+    if(card) card.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
 }
 
+/* ===== ambient embers (capped, reduced-motion-safe) ===== */
+function spawnEmbers(n){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce) return;
+  const field = document.getElementById('ember-field');
+  const count = Math.min(n, 10 - field.children.length);
+  for(let i=0;i<count;i++){
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = Math.random()*100 + 'vw';
+    e.style.animationDelay = (Math.random()*14) + 's';
+    e.style.animationDuration = (11 + Math.random()*6) + 's';
+    field.appendChild(e);
+  }
+}
+spawnEmbers(7);
+
+/* ===== easter eggs (non-blocking, never touch saved state) ===== */
+// 1. type "prizrak" → reveal the watcher
+let buf = '';
+window.addEventListener('keydown', (ev) => {
+  if(ev.key && ev.key.length === 1){
+    buf = (buf + ev.key.toLowerCase()).slice(-7);
+    if(buf === 'prizrak'){
+      document.getElementById('egg-whisper').classList.remove('hidden');
+      spawnEmbers(2);
+    }
+  }
+});
+
+// 2. triple-click the title → one extra ember
+document.getElementById('title').addEventListener('click', (e) => {
+  if(e.detail === 3) spawnEmbers(1);
+});
+
+// 3. long-press the accent glyph → breathes faster for 3s
+const glyph = document.getElementById('glyph');
+let holdT;
+function holdStart(){
+  holdT = setTimeout(()=>{
+    glyph.style.animationDuration = '1.1s';
+    setTimeout(()=>{ glyph.style.animationDuration = ''; }, 3000);
+  }, 500);
+}
+function holdEnd(){ clearTimeout(holdT); }
+glyph.addEventListener('mousedown', holdStart);
+glyph.addEventListener('touchstart', holdStart, {passive:true});
+['mouseup','mouseleave','touchend'].forEach(ev => glyph.addEventListener(ev, holdEnd));
+
+// 4. 00:00–03:00 local → faint footer whisper
+const hr = new Date().getHours();
+if(hr >= 0 && hr < 3){
+  document.getElementById('night-whisper').classList.remove('hidden');
+}
+
+// 5. idle 60s → "still here. still watching."
+let idleT;
+function resetIdle(){
+  clearTimeout(idleT);
+  document.getElementById('idle-whisper').classList.add('hidden');
+  idleT = setTimeout(()=>{
+    document.getElementById('idle-whisper').classList.remove('hidden');
+  }, 60000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, resetIdle, {passive:true}));
+resetIdle();
+
 // Set today as default date
-const today = new Date().toISOString().slice(0,10);
-document.getElementById('new-by').value = today;
+document.getElementById('new-by').value = new Date().toISOString().slice(0,10);
+
+// enter-to-submit on the "what" textarea (ctrl/cmd+enter) and ctx input
+document.getElementById('new-ctx').addEventListener('keydown', e => { if(e.key === 'Enter') addPromise(); });
+document.getElementById('new-what').addEventListener('keydown', e => { if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addPromise(); });
 
 render();
 </script>

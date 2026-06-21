@@ -5,93 +5,160 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Potato Panic</title>
     <style>
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#e8c840;           /* the app's existing golden-potato lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #1a1408; overflow: hidden; font-family: 'Courier New', monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
+        body { background: #0a0a0a; overflow: hidden; font-family: 'Courier New', monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
         canvas { display: block; position: fixed; top: 0; left: 0; }
-        
+
+        /* ---- atmosphere layers ---- */
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+          background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+          opacity:.5;animation:fogDrift 32s ease-in-out infinite alternate}
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+          background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+          animation:ember 14s linear infinite}
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.035;
+          background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
         #hud {
             position: fixed; top: 0; left: 0; width: 100%; z-index: 10;
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 16px; pointer-events: none;
+            padding: 14px 16px 12px; pointer-events: none;
         }
-        #hud-score { color: rgba(255,220,140,0.8); font-size: 22px; }
-        #hud-timer { color: rgba(255,180,100,0.6); font-size: 16px; }
-        #hud-combo { color: rgba(255,160,60,0.5); font-size: 12px; }
-        
+        #hud-score { color: rgba(255,220,140,0.85); font-size: 22px; text-shadow:0 0 10px var(--glow); }
+        #hud-timer { color: rgba(255,180,100,0.6); font-size: 16px; letter-spacing:1px; }
+        #hud-combo { color: rgba(255,160,60,0.6); font-size: 12px; letter-spacing:1px; }
+
         .overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(20,16,8,0.92); color: rgba(255,230,180,0.8);
+            background: rgba(8,8,8,0.9); color: var(--ink);
             backdrop-filter: blur(8px);
         }
         .overlay.hidden { display: none; }
-        .ov-title { font-size: 28px; letter-spacing: 3px; margin-bottom: 6px; }
-        .ov-emoji { font-size: 64px; margin-bottom: 12px; }
-        .ov-sub { font-size: 12px; color: rgba(255,230,180,0.4); margin-bottom: 24px; max-width: 280px; text-align: center; line-height: 1.6; }
-        .ov-score { font-size: 48px; color: rgba(255,200,100,0.8); margin-bottom: 4px; }
-        .ov-label { font-size: 11px; color: rgba(255,230,180,0.3); margin-bottom: 24px; }
+        .ov-label-top { font-size: 10px; letter-spacing: 4px; color: var(--ink-dim); text-transform:uppercase; margin-bottom: 14px; }
+        .ov-title { font-size: 28px; letter-spacing: 4px; margin-bottom: 8px; color:rgba(255,230,180,0.92);
+            text-shadow:0 0 14px var(--glow); cursor:default; }
+        .ov-emoji { font-size: 60px; margin-bottom: 14px; animation:bob 4.5s ease-in-out infinite; }
+        @keyframes bob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-6px) rotate(3deg)}}
+        .ov-sub { font-size: 12px; color: var(--ink-dim); margin-bottom: 26px; max-width: 290px; text-align: center; line-height: 1.7; }
+        .ov-score { font-size: 52px; color: rgba(255,210,110,0.9); margin-bottom: 4px; text-shadow:0 0 18px var(--glow); }
+        .ov-label { font-size: 11px; color: var(--ink-dim); margin-bottom: 22px; letter-spacing:0.5px; text-align:center; }
+        .ov-quote { font-size: 12px; color: rgba(212,207,200,0.55); font-style: italic; max-width: 300px; text-align:center; line-height:1.7; margin-bottom: 26px; min-height: 40px; }
         .btn {
-            padding: 14px 40px; border: 1px solid rgba(200,160,80,0.4); border-radius: 8px;
-            background: rgba(120,90,30,0.2); color: rgba(255,230,180,0.8); font-family: inherit;
-            font-size: 14px; cursor: pointer; pointer-events: auto; letter-spacing: 1px;
+            position:relative;
+            padding: 14px 42px; border: 1px solid rgba(232,200,64,0.45); border-radius: 8px;
+            background: rgba(120,90,30,0.18); color: rgba(255,230,180,0.88); font-family: inherit;
+            font-size: 13px; cursor: pointer; pointer-events: auto; letter-spacing: 2px; text-transform:uppercase;
+            transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
+            box-shadow: 0 0 0 1px var(--line-soft), 0 0 24px -10px var(--glow);
         }
-        .btn:active { background: rgba(150,110,40,0.4); }
+        .btn:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 0 0 1px var(--line-soft), 0 0 28px -6px var(--glow); }
+        .btn:active { transform: translateY(1px); background: rgba(150,110,40,0.4); }
+        .btn:focus-visible { outline:none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+
+        .best-line { font-size: 10px; letter-spacing: 2px; color: var(--ink-dim); margin-top: 20px; text-transform:uppercase; }
+        .best-line b { color: rgba(255,210,110,0.75); font-weight: normal; }
+
+        #footer-whisper{
+            position:fixed; bottom:10px; left:0; width:100%; text-align:center; z-index:20;
+            font-size:10px; letter-spacing:2px; color:var(--ink-ghost); pointer-events:none;
+            opacity:0; transition:opacity 1.4s ease;
+        }
+        #footer-whisper.show{opacity:1;}
+        #watcher{
+            position:fixed; bottom:30px; left:0; width:100%; text-align:center; z-index:20;
+            font-size:10px; letter-spacing:3px; color:var(--ink-ghost); pointer-events:none;
+            opacity:0; transition:opacity 1.6s ease;
+        }
+        #watcher.show{opacity:1;}
+
+        @media (prefers-reduced-motion: reduce){
+            .fog,.ember,.ov-emoji{animation:none!important}
+            .ember{display:none}
+            .fog{opacity:.06}
+        }
     </style>
 </head>
-<body>
+<body class="grain">
+    <div class="fog"></div>
     <canvas id="c"></canvas>
-    
+
     <div id="hud">
         <div id="hud-score">0</div>
         <div id="hud-combo"></div>
         <div id="hud-timer">0:60</div>
     </div>
-    
+
     <div class="overlay" id="start-screen">
+        <div class="ov-label-top">Plot 04 · the cold field</div>
         <div class="ov-emoji">🥔</div>
-        <div class="ov-title">POTATO PANIC</div>
-        <div class="ov-sub">Tap potatoes as they pop up from the ground. Avoid rocks and weeds. Chain harvests for combo multipliers. 60 seconds. Every potato counts.</div>
+        <div class="ov-title" id="start-title">POTATO PANIC</div>
+        <div class="ov-sub">The frost is coming. Pull potatoes from the soil before it takes them. Leave the rocks. Leave the weeds — they steal your seconds. Chain a clean harvest and the field rewards you. Sixty seconds. The silo is hungry.</div>
         <button class="btn" onclick="startGame()">DIG IN</button>
+        <div class="best-line">deepest haul · <b id="start-best">0</b></div>
     </div>
-    
+
     <div class="overlay hidden" id="end-screen">
+        <div class="ov-label-top" id="end-verdict">the harvest is counted</div>
         <div class="ov-emoji">🥔</div>
         <div class="ov-title">HARVEST OVER</div>
         <div class="ov-score" id="final-score">0</div>
         <div class="ov-label" id="final-label">potatoes harvested</div>
-        <div class="ov-sub" id="end-quote"></div>
+        <div class="ov-quote" id="end-quote"></div>
         <button class="btn" onclick="startGame()">DIG AGAIN</button>
+        <div class="best-line">deepest haul · <b id="end-best">0</b></div>
     </div>
+
+    <div id="footer-whisper">the mountain does not sleep</div>
+    <div id="watcher">still here. still watching.</div>
 
     <script>
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
     let W, H;
-    
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const HS_KEY = 'potato_panic_hs_v1';
     let highScore = parseInt(localStorage.getItem(HS_KEY) || '0');
-    
+    document.getElementById('start-best').textContent = highScore;
+    document.getElementById('end-best').textContent = highScore;
+
     const QUOTES = [
         "This code is like a potato. Ugly, but it will keep us alive in winter.",
-        "The harvest is over. The silo remembers.",
-        "Every potato is a small victory against entropy.",
-        "In the Tatras, a man is measured by his potato yield.",
-        "The mountain fed us. Barely. But it fed us.",
-        "Some potatoes were never meant to be found.",
-        "The fog lifts. The field is empty. Time to plant again.",
+        "The harvest is over. The silo remembers what you brought it.",
+        "Every potato is a small mutiny against the entropy of the cold.",
+        "In the Tatras, a man is measured by his potato yield. You were measured.",
+        "The mountain fed us. Barely. But it fed us, and it watched you dig.",
+        "Some potatoes were never meant to be found. You found enough.",
+        "The fog lifts. The field is empty. Plant again before it freezes.",
+        "The bludička led you to the golden ones. Do not thank her aloud.",
     ];
-    
+
     // Grid config
     let COLS, ROWS, CELL_W, CELL_H, GRID_X, GRID_Y;
-    
+
     // Game state
     let game = null;
     let running = false;
-    
+
     function resize() {
         W = canvas.width = window.innerWidth;
         H = canvas.height = window.innerHeight;
-        
+
         // Responsive grid
         COLS = W < 400 ? 3 : 4;
         ROWS = W < 400 ? 4 : 4;
@@ -100,7 +167,7 @@
         GRID_X = (W - COLS * CELL_W) / 2;
         GRID_Y = (H - ROWS * CELL_H) / 2 + 20;
     }
-    
+
     function initGame() {
         const holes = [];
         for (let r = 0; r < ROWS; r++) {
@@ -113,10 +180,11 @@
                     timer: 0,
                     popProgress: 0,
                     shakeX: 0, shakeY: 0,
+                    glow: 0,
                 });
             }
         }
-        
+
         game = {
             holes,
             score: 0,
@@ -129,16 +197,17 @@
             floatTexts: [],
             difficulty: 1,
             potatoesHarvested: 0,
+            flash: 0,
         };
     }
-    
+
     function spawnOccupant() {
         if (!game) return;
         const empty = game.holes.filter(h => !h.occupant);
         if (empty.length === 0) return;
-        
+
         const hole = empty[Math.floor(Math.random() * empty.length)];
-        
+
         // Type weights change with difficulty
         const roll = Math.random();
         let type;
@@ -146,24 +215,25 @@
         else if (roll < 0.7) type = 'golden';  // worth 3x
         else if (roll < 0.85) type = 'rock';
         else type = 'weed';
-        
+
         const stayTime = Math.max(0.8, 2.5 - game.difficulty * 0.15);
-        
+
         hole.occupant = { type, stayTime, age: 0, tapped: false };
         hole.popProgress = 0;
     }
-    
+
     function tapHole(hole) {
         if (!running || !hole.occupant || hole.occupant.tapped) return;
-        
+
         const occ = hole.occupant;
         occ.tapped = true;
-        
+
         if (occ.type === 'potato') {
             game.combo++;
             const pts = 10 * Math.min(game.combo, 8);
             game.score += pts;
             game.potatoesHarvested++;
+            hole.glow = 1;
             spawnParticles(hole.x, hole.y, '200,180,120', 8);
             addFloatText(hole.x, hole.y, `+${pts}`, '255,220,140');
             if (game.combo > 2) addFloatText(hole.x, hole.y - 20, `x${Math.min(game.combo, 8)}`, '255,180,60');
@@ -172,6 +242,8 @@
             const pts = 30 * Math.min(game.combo, 8);
             game.score += pts;
             game.potatoesHarvested += 3;
+            hole.glow = 1.6;
+            game.flash = 0.5;
             spawnParticles(hole.x, hole.y, '255,220,80', 15);
             addFloatText(hole.x, hole.y, `+${pts}`, '255,220,80');
         } else if (occ.type === 'rock') {
@@ -186,15 +258,15 @@
             spawnParticles(hole.x, hole.y, '60,120,40', 6);
             addFloatText(hole.x, hole.y, '-3s', '255,100,100');
         }
-        
+
         if (game.combo > game.maxCombo) game.maxCombo = game.combo;
-        
+
         // Quick disappear
         setTimeout(() => {
             if (hole.occupant === occ) hole.occupant = null;
         }, 150);
     }
-    
+
     function spawnParticles(x, y, color, count) {
         for (let i = 0; i < count; i++) {
             game.particles.push({
@@ -207,23 +279,24 @@
             });
         }
     }
-    
+
     function addFloatText(x, y, text, color) {
         game.floatTexts.push({ x, y, text, color, life: 1 });
     }
-    
+
     function update(dt) {
         if (!game || !running) return;
-        
+
         game.timer -= dt;
         game.difficulty = 1 + (60 - game.timer) / 15;
-        
+        if (game.flash > 0) game.flash = Math.max(0, game.flash - dt * 2);
+
         if (game.timer <= 0) {
             game.timer = 0;
             endGame();
             return;
         }
-        
+
         // Spawn
         game.spawnRate = Math.max(0.4, 1.2 - game.difficulty * 0.1);
         game.spawnTimer += dt;
@@ -233,13 +306,13 @@
             // Sometimes spawn two at higher difficulty
             if (game.difficulty > 2 && Math.random() < 0.3) spawnOccupant();
         }
-        
+
         // Update holes
         game.holes.forEach(h => {
             if (h.occupant) {
                 h.occupant.age += dt;
                 h.popProgress = Math.min(1, h.occupant.age * 4);
-                
+
                 // Missed potato
                 if (h.occupant.age > h.occupant.stayTime && !h.occupant.tapped) {
                     if (h.occupant.type === 'potato' || h.occupant.type === 'golden') {
@@ -251,8 +324,9 @@
             // Shake decay
             h.shakeX *= 0.85;
             h.shakeY *= 0.85;
+            if (h.glow > 0) h.glow = Math.max(0, h.glow - dt * 3);
         });
-        
+
         // Particles
         game.particles.forEach(p => {
             p.x += p.vx;
@@ -261,7 +335,7 @@
             p.life -= dt * 2;
         });
         game.particles = game.particles.filter(p => p.life > 0);
-        
+
         // Float texts
         game.floatTexts.forEach(f => {
             f.y -= 40 * dt;
@@ -269,30 +343,44 @@
         });
         game.floatTexts = game.floatTexts.filter(f => f.life > 0);
     }
-    
+
+    function verdictFor(score, harvested, maxCombo) {
+        if (score <= 0) return "the soil kept everything. the frost wins.";
+        if (score < 200) return "a thin haul. the silo will judge in silence.";
+        if (score < 600) return "enough to last. not enough to boast.";
+        if (score < 1200) return "a real harvest. the mountain almost nods.";
+        return "the field is stripped bare. even the ghost is impressed.";
+    }
+
     function endGame() {
         running = false;
-        if (game.score > highScore) {
+        const isRecord = game.score > highScore;
+        if (isRecord) {
             highScore = game.score;
             localStorage.setItem(HS_KEY, String(highScore));
         }
+        document.getElementById('start-best').textContent = highScore;
+        document.getElementById('end-best').textContent = highScore;
         document.getElementById('final-score').textContent = game.score;
-        document.getElementById('final-label').textContent = `${game.potatoesHarvested} potatoes · best combo x${game.maxCombo} · high: ${highScore}`;
+        document.getElementById('final-label').textContent =
+            `${game.potatoesHarvested} potatoes pulled · best chain x${Math.min(game.maxCombo,8)}`;
+        document.getElementById('end-verdict').textContent =
+            isRecord ? "a new record. the ledger remembers." : verdictFor(game.score, game.potatoesHarvested, game.maxCombo);
         document.getElementById('end-quote').textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
         document.getElementById('end-screen').classList.remove('hidden');
     }
-    
+
     function render() {
         ctx.clearRect(0, 0, W, H);
-        
+
         // Soil background
         const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, '#1a1408');
-        grad.addColorStop(0.3, '#251c0e');
-        grad.addColorStop(1, '#1a1508');
+        grad.addColorStop(0, '#120d05');
+        grad.addColorStop(0.3, '#1d160b');
+        grad.addColorStop(1, '#0f0b05');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
-        
+
         // Soil texture dots
         if (!render._soilDots) {
             render._soilDots = [];
@@ -307,38 +395,53 @@
             ctx.fillStyle = `rgba(80,60,30,${d.a})`;
             ctx.fill();
         });
-        
+
         if (!game) return;
-        
+
+        // golden-pull flash
+        if (game.flash > 0) {
+            ctx.fillStyle = `rgba(255,220,80,${game.flash * 0.12})`;
+            ctx.fillRect(0, 0, W, H);
+        }
+
         // Draw holes
         game.holes.forEach(h => {
             const x = h.x + h.shakeX;
             const y = h.y + h.shakeY;
             const hw = CELL_W * 0.38;
             const hh = CELL_H * 0.2;
-            
+
+            // residual harvest glow
+            if (h.glow > 0) {
+                const g = ctx.createRadialGradient(x, y, 0, x, y, hw * 2.4);
+                g.addColorStop(0, `rgba(255,220,120,${h.glow * 0.25})`);
+                g.addColorStop(1, 'transparent');
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(x, y, hw * 2.4, 0, Math.PI * 2); ctx.fill();
+            }
+
             // Dirt mound
             ctx.beginPath();
             ctx.ellipse(x, y + hh * 0.5, hw * 1.2, hh * 1.3, 0, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(50,38,18,0.6)';
             ctx.fill();
-            
+
             // Hole opening
             ctx.beginPath();
             ctx.ellipse(x, y, hw, hh, 0, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(20,15,5,0.8)';
             ctx.fill();
-            
+
             // Occupant
             if (h.occupant && !h.occupant.tapped) {
                 const pop = h.popProgress;
                 const occ = h.occupant;
                 const remaining = occ.stayTime - occ.age;
                 const urgency = remaining < 0.5 ? Math.sin(Date.now() * 0.02) * 2 : 0;
-                
+
                 ctx.save();
                 ctx.translate(x + urgency, y - pop * 25);
-                
+
                 if (occ.type === 'potato') {
                     drawPotato(0, 0, pop);
                 } else if (occ.type === 'golden') {
@@ -348,11 +451,11 @@
                 } else if (occ.type === 'weed') {
                     drawWeed(0, 0, pop);
                 }
-                
+
                 ctx.restore();
             }
         });
-        
+
         // Particles
         game.particles.forEach(p => {
             ctx.beginPath();
@@ -360,7 +463,7 @@
             ctx.fillStyle = `rgba(${p.color},${p.life})`;
             ctx.fill();
         });
-        
+
         // Float texts
         game.floatTexts.forEach(f => {
             ctx.font = 'bold 16px "Courier New", monospace';
@@ -368,15 +471,15 @@
             ctx.fillStyle = `rgba(${f.color},${f.life})`;
             ctx.fillText(f.text, f.x, f.y);
         });
-        
+
         // HUD
         document.getElementById('hud-score').textContent = game.score;
         const secs = Math.ceil(game.timer);
         document.getElementById('hud-timer').textContent = `0:${String(secs).padStart(2, '0')}`;
-        document.getElementById('hud-timer').style.color = secs <= 10 ? 'rgba(255,100,80,0.8)' : 'rgba(255,180,100,0.6)';
-        document.getElementById('hud-combo').textContent = game.combo > 1 ? `combo x${Math.min(game.combo, 8)}` : '';
+        document.getElementById('hud-timer').style.color = secs <= 10 ? 'rgba(255,100,80,0.85)' : 'rgba(255,180,100,0.6)';
+        document.getElementById('hud-combo').textContent = game.combo > 1 ? `chain x${Math.min(game.combo, 8)}` : '';
     }
-    
+
     function drawPotato(x, y, scale) {
         ctx.save();
         ctx.scale(scale, scale);
@@ -399,7 +502,7 @@
         ctx.fill();
         ctx.restore();
     }
-    
+
     function drawGoldenPotato(x, y, scale) {
         ctx.save();
         ctx.scale(scale, scale);
@@ -423,7 +526,7 @@
         ctx.beginPath(); ctx.arc(x + Math.cos(t) * 8, y + Math.sin(t) * 6, 2, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
     }
-    
+
     function drawRock(x, y, scale) {
         ctx.save();
         ctx.scale(scale, scale);
@@ -449,7 +552,7 @@
         ctx.stroke();
         ctx.restore();
     }
-    
+
     function drawWeed(x, y, scale) {
         ctx.save();
         ctx.scale(scale, scale);
@@ -473,12 +576,12 @@
         }
         ctx.restore();
     }
-    
+
     function seededRandom(seed) {
         let s = seed;
         return function() { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
     }
-    
+
     // Input
     function handleTap(px, py) {
         if (!running || !game) return;
@@ -495,24 +598,26 @@
         });
         if (closest && closest.occupant) tapHole(closest);
     }
-    
+
     canvas.addEventListener('touchstart', e => {
         e.preventDefault();
         for (let i = 0; i < e.touches.length; i++) {
             handleTap(e.touches[i].clientX, e.touches[i].clientY);
         }
+        wake();
     }, { passive: false });
-    
-    canvas.addEventListener('mousedown', e => handleTap(e.clientX, e.clientY));
-    
+
+    canvas.addEventListener('mousedown', e => { handleTap(e.clientX, e.clientY); wake(); });
+
     window.startGame = function() {
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('end-screen').classList.add('hidden');
         resize();
         initGame();
         running = true;
+        wake();
     };
-    
+
     // Main loop
     let lastTime = 0;
     function loop(ts) {
@@ -522,10 +627,93 @@
         render();
         requestAnimationFrame(loop);
     }
-    
+
     window.addEventListener('resize', resize);
     resize();
     requestAnimationFrame(loop);
+
+    /* ============================================================
+       ATMOSPHERE + EASTER EGGS (non-blocking, never touch saved state)
+       ============================================================ */
+
+    // --- floating embers (capped, reduced-motion-safe) ---
+    if (!reduceMotion) {
+        const EMBER_COUNT = 7;
+        for (let i = 0; i < EMBER_COUNT; i++) {
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (Math.random() * 100) + '%';
+            e.style.animationDelay = (Math.random() * 14) + 's';
+            e.style.animationDuration = (12 + Math.random() * 8) + 's';
+            document.body.appendChild(e);
+        }
+    }
+
+    function spawnOneEmber() {
+        if (reduceMotion) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + '%';
+        e.style.animationDelay = '0s';
+        e.style.animationDuration = '12s';
+        document.body.appendChild(e);
+        setTimeout(() => e.remove(), 12000);
+    }
+
+    // --- 00:00–03:00 footer whisper: the mountain does not sleep ---
+    (function nightWhisper(){
+        const hr = new Date().getHours();
+        if (hr >= 0 && hr < 3) {
+            setTimeout(() => document.getElementById('footer-whisper').classList.add('show'), 2500);
+        }
+    })();
+
+    // --- idle 60s watcher line ---
+    let idleTimer = null;
+    function wake() {
+        const w = document.getElementById('watcher');
+        w.classList.remove('show');
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => w.classList.add('show'), 60000);
+    }
+    ['mousemove','keydown','touchstart'].forEach(ev =>
+        window.addEventListener(ev, wake, { passive: true }));
+    wake();
+
+    // --- triple-click the title → one extra ember ---
+    document.getElementById('start-title').addEventListener('click', (function(){
+        let clicks = 0, last = 0;
+        return function() {
+            const now = Date.now();
+            clicks = (now - last < 600) ? clicks + 1 : 1;
+            last = now;
+            if (clicks >= 3) { spawnOneEmber(); clicks = 0; }
+        };
+    })());
+
+    // --- type "prizrak" or Konami code → the watcher line lights ---
+    let typed = '';
+    const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    let konamiIdx = 0;
+    function lightWatcher(msg) {
+        const w = document.getElementById('watcher');
+        w.textContent = msg;
+        w.classList.add('show');
+        spawnOneEmber();
+        setTimeout(() => { w.classList.remove('show'); w.textContent = 'still here. still watching.'; }, 4000);
+    }
+    window.addEventListener('keydown', e => {
+        // prizrak
+        typed = (typed + (e.key.length === 1 ? e.key.toLowerCase() : '')).slice(-7);
+        if (typed === 'prizrak') { lightWatcher('you found the watcher.'); typed = ''; }
+        // konami
+        if (e.key === KONAMI[konamiIdx]) {
+            konamiIdx++;
+            if (konamiIdx === KONAMI.length) { lightWatcher('the poludnica blesses your harvest.'); konamiIdx = 0; }
+        } else {
+            konamiIdx = (e.key === KONAMI[0]) ? 1 : 0;
+        }
+    });
     </script>
 </body>
 </html>

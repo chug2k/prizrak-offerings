@@ -6,35 +6,109 @@
     <title>The Deferred Stack — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0d0d10; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
-        .item-enter { animation: slideIn 0.25s ease-out; }
-        @keyframes slideIn { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
-        .strike { text-decoration: line-through; opacity: 0.4; }
-        .verdict-glow { text-shadow: 0 0 20px currentColor; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#8aa6ff;            /* cool blue-violet: the lead, ties the carry/defer palette together */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        /* ---- motion vocabulary (reduced-motion-safe, guarded at the bottom) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+        .item-enter{animation:slideIn .25s ease-out}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        /* result panel: breathing glow */
+        .verdict-panel{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .strike{ text-decoration:line-through; opacity:.4; }
+
+        /* tactile inputs / buttons */
+        .field{ background:var(--bg-sunk); border:1px solid var(--line); transition:border-color .15s, box-shadow .15s; }
+        .field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+        .field::placeholder{ color:var(--ink-ghost); }
+
+        .btn{ transition:transform .15s, box-shadow .15s, border-color .15s, color .15s, background-color .15s; }
+        .btn:hover{ transform:translateY(-1px); border-color:var(--accent); }
+        .btn:active{ transform:translateY(1px); }
+        .btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        .card{ background:color-mix(in srgb, var(--bg-raised) 85%, transparent); border:1px solid var(--line);
+            transition:transform .15s, box-shadow .15s, border-color .15s; }
+
+        .cat-btn{ transition:transform .12s, border-color .15s, color .15s, background-color .15s; }
+        .cat-btn:hover{ transform:translateY(-1px); }
+        .cat-btn:active{ transform:translateY(1px); }
+        .cat-btn:focus-visible{ outline:none; box-shadow:0 0 0 1px var(--glow); }
+
+        .title-glow{ text-shadow:0 0 18px var(--glow); }
+
+        ::selection{ background:color-mix(in srgb, var(--accent) 35%, transparent); color:#fff; }
+
+        /* a thin spine on the left of each stacked item — the literal "stack" */
+        .spine{ position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px;
+            background:linear-gradient(to bottom, transparent, var(--accent), transparent); opacity:.35; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.item-enter,.title-glow{ animation:none!important }
+            .ember{ display:none } .breathe,.flicker{ opacity:1!important }
+            .btn:hover,.cat-btn:hover{ transform:none }
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-sans antialiased min-h-screen">
-    <div class="max-w-2xl mx-auto px-4 py-10">
+<body class="grain antialiased min-h-screen" style="font-family:ui-sans-serif,system-ui,sans-serif">
+    <div class="fog"></div>
+    <div id="emberfield"></div>
+
+    <div class="max-w-2xl mx-auto px-4 py-10 relative" style="z-index:2">
 
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-white mb-2">The Deferred Stack</h1>
-            <p class="text-sm text-zinc-500 leading-relaxed">Everything you moved to "later this week" has arrived at Saturday.<br>Log it. Sort it. Clear it or carry it.</p>
+            <p class="text-[10px] uppercase tracking-[0.3em] mb-3" style="color:var(--ink-dim)">PRÍZRAK · SATURDAY LEDGER</p>
+            <h1 id="apptitle" class="text-3xl font-bold text-white mb-2 title-glow select-none cursor-default">The Deferred Stack</h1>
+            <p class="text-sm leading-relaxed" style="color:var(--ink-dim)">Everything you moved to "later this week" has arrived at Saturday.<br>Log it. Sort it. Clear it or carry it. The ghost is counting.</p>
         </div>
 
         <!-- Intro -->
-        <div class="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 mb-6 text-xs text-zinc-500 leading-relaxed">
+        <div class="card rounded-lg p-4 mb-6 text-xs leading-relaxed" style="color:var(--ink-dim)">
             A deferred stack is not a failure. It is the week's honest residue — decisions held, tasks postponed, conversations avoided, things noticed but not acted on. Saturday is when the stack becomes visible. The question is not "why didn't you do these." The question is: which category does each one belong to now?
         </div>
 
         <!-- Add form -->
         <div class="mb-6">
             <div class="flex gap-2">
-                <input id="new-item" type="text" placeholder="What are you still carrying from this week?" 
-                    class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 placeholder-zinc-600">
-                <button id="add-btn" class="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-zinc-300 transition-all whitespace-nowrap">
+                <input id="new-item" type="text" placeholder="what are you still carrying from this week?"
+                    class="field flex-1 rounded-lg px-4 py-3 text-sm" style="color:var(--ink)">
+                <button id="add-btn" class="btn px-4 py-3 rounded-lg text-sm whitespace-nowrap" style="background:var(--bg-raised);border:1px solid var(--line);color:var(--ink)">
                     Add
                 </button>
             </div>
@@ -45,12 +119,12 @@
 
         <!-- Sort controls (shown after items added) -->
         <div id="sort-section" class="hidden mb-6">
-            <div class="border-t border-zinc-800 pt-6">
-                <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Sort each item into a category</p>
+            <div class="border-t pt-6" style="border-color:var(--line-soft)">
+                <p class="text-xs uppercase tracking-widest mb-3" style="color:var(--ink-dim)">Sort each item into a category</p>
                 <div class="flex flex-wrap gap-2 text-xs">
                     <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-red-900 text-red-400">🔴 Act now</div>
                     <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-900 text-amber-400">🟡 Schedule it</div>
-                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-700 text-zinc-400">⚫ Drop it</div>
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-zinc-400" style="border-color:var(--line)">⚫ Drop it</div>
                     <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-900 text-blue-400">🔵 Carry forward</div>
                 </div>
             </div>
@@ -61,14 +135,18 @@
 
         <!-- History -->
         <div id="history-section" class="hidden mt-10">
-            <div class="border-t border-zinc-800 pt-6">
+            <div class="border-t pt-6" style="border-color:var(--line-soft)">
                 <div class="flex items-center justify-between mb-3">
-                    <p class="text-xs text-zinc-600 uppercase tracking-widest">Previous weeks</p>
-                    <button id="clear-history" class="text-xs text-zinc-700 hover:text-zinc-500 transition-colors">clear</button>
+                    <p class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Previous weeks</p>
+                    <button id="clear-history" class="text-xs transition-colors" style="color:var(--ink-ghost)">let the fog take it</button>
                 </div>
                 <div id="history-entries" class="space-y-3"></div>
             </div>
         </div>
+
+        <!-- Footer whisper -->
+        <p id="footer-whisper" class="mt-12 text-center text-[11px] tracking-wide" style="color:var(--ink-ghost)">measured the week. it did not flinch.</p>
+        <p id="idle-whisper" class="mt-2 text-center text-[11px] tracking-wide opacity-0 transition-opacity duration-[1500ms]" style="color:var(--ink-ghost)"></p>
     </div>
 
     <script>
@@ -85,23 +163,23 @@
     const VERDICTS = {
         balanced: {
             color: 'text-emerald-400',
-            text: (counts) => `${counts.act} to act on, ${counts.drop} dropped, ${counts.carry} carried forward. The stack is being managed. The ones you dropped — if you meant it — are gone. The carry-forwards are known debts, not hidden ones.`
+            text: (counts) => `${counts.act} to act on, ${counts.drop} dropped, ${counts.carry} carried forward. The stack is being managed. The ones you dropped — if you meant it — are gone into the karst. The carry-forwards are known debts, not hidden ones. The bridge holds.`
         },
         heavy_act: {
             color: 'text-red-400',
-            text: (counts) => `${counts.act} items requiring immediate action is a high number for a Saturday. Either the week was genuinely dense, or the deferred stack has been deferring longer than one week. Check if "act now" is honest or if it is anxiety in disguise.`
+            text: (counts) => `${counts.act} items demanding immediate action — a heavy number for a Saturday. Either the week was genuinely dense, or this stack has been deferring far longer than one week. Check whether "act now" is honest, or whether it is the poludnica's panic wearing a deadline's coat.`
         },
         heavy_carry: {
             color: 'text-blue-400',
-            text: (counts) => `${counts.carry} carry-forwards. The stack did not clear — it migrated. This is not inherently wrong. But if the same items appeared last Saturday, the carry-forward is a loop, not a queue. Name the ones that have appeared more than twice.`
+            text: (counts) => `${counts.carry} carry-forwards. The stack did not clear — it migrated, the way snow migrates down the Tatras and waits. Not inherently wrong. But if the same items haunted last Saturday too, the carry-forward is a loop, not a queue. Name the ones that have walked in more than twice.`
         },
         heavy_drop: {
             color: 'text-zinc-400',
-            text: (counts) => `${counts.drop} items dropped. Good. Most deferred items do not survive contact with Saturday — the urgency was borrowed from the week's pressure, not from the item itself. What survives the drop test was real. What didn't was noise.`
+            text: (counts) => `${counts.drop} items dropped. Good. Most deferred things do not survive contact with Saturday — the urgency was borrowed from the week's pressure, not from the item itself. What survived the drop test was real. What didn't was a bludička: a light leading you nowhere.`
         },
         empty_cleared: {
             color: 'text-emerald-300',
-            text: () => `The stack is sorted. The week's residue has been classified. What you act on is chosen, not inherited. That is the difference between a managed stack and a haunted one.`
+            text: () => `The stack is sorted. The week's residue is classified. What you act on is chosen, not inherited. That is the difference between a managed stack and a haunted one. The mountain is watching, but it approves.`
         }
     };
 
@@ -192,28 +270,30 @@
 
         // Items
         if (!items.length) {
-            stack.innerHTML = `<div class="text-center py-8 text-zinc-700 text-sm">Stack is empty. Add what you're still carrying from this week.</div>`;
+            stack.innerHTML = `<div class="text-center py-10 text-sm" style="color:var(--ink-ghost)">the cave is empty. nothing has fossilized yet — add what you're still carrying from this week.</div>`;
             sortSection.classList.add('hidden');
             verdictSection.classList.add('hidden');
         } else {
             sortSection.classList.remove('hidden');
+            const counts0 = countCategories(items);
             stack.innerHTML = items.map(item => {
                 const cat = item.cat ? CATEGORIES[item.cat] : null;
                 return `
-                <div class="item-enter flex items-start gap-3 bg-zinc-900/40 border ${cat ? cat.border : 'border-zinc-800'} ${cat ? cat.bg : ''} rounded-lg p-3 transition-all">
+                <div class="item-enter relative flex items-start gap-3 card rounded-lg p-3 pl-4 ${cat ? cat.border : ''} ${cat ? cat.bg : ''}">
+                    <span class="spine"></span>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm ${item.cat === 'drop' ? 'strike text-zinc-600' : 'text-zinc-300'} leading-relaxed">${escHtml(item.text)}</p>
+                        <p class="text-sm ${item.cat === 'drop' ? 'strike text-zinc-600' : ''} leading-relaxed" ${item.cat === 'drop' ? '' : 'style="color:var(--ink)"'}>${escHtml(item.text)}</p>
                         <!-- Category buttons -->
                         <div class="flex flex-wrap gap-1.5 mt-2">
                             ${Object.entries(CATEGORIES).map(([k, c]) => `
-                                <button data-id="${item.id}" data-cat="${k}" 
-                                    class="cat-btn text-xs px-2 py-0.5 rounded border transition-all ${item.cat === k ? `${c.border} ${c.color} ${c.bg}` : 'border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400'}">
+                                <button data-id="${item.id}" data-cat="${k}"
+                                    class="cat-btn text-xs px-2 py-0.5 rounded border ${item.cat === k ? `${c.border} ${c.color} ${c.bg}` : 'border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400'}">
                                     ${c.icon} ${c.label}
                                 </button>
                             `).join('')}
                         </div>
                     </div>
-                    <button data-remove="${item.id}" class="text-zinc-700 hover:text-zinc-500 transition-colors text-xs mt-0.5 shrink-0">✕</button>
+                    <button data-remove="${item.id}" title="let the fog take this one" class="text-zinc-700 hover:text-zinc-400 transition-colors text-xs mt-0.5 shrink-0">✕</button>
                 </div>`;
             }).join('');
 
@@ -225,22 +305,30 @@
             if (verdict) {
                 verdictSection.classList.remove('hidden');
                 verdictSection.innerHTML = `
-                <div class="mt-2 bg-zinc-900/60 border border-zinc-800 rounded-lg p-4 fade-in">
-                    <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prízrak verdict</p>
-                    <p class="text-sm ${verdict.color} leading-relaxed">${verdict.text}</p>
+                <div class="verdict-panel mt-2 rounded-lg p-4 reveal" style="background:var(--bg-raised);border:1px solid var(--line)">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs uppercase tracking-widest flicker" style="color:var(--ink-dim)">Prízrak verdict</p>
+                        <button id="copy-verdict" class="btn text-[11px] px-2 py-1 rounded" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink-dim)">copy</button>
+                    </div>
+                    <p class="text-sm ${verdict.color} leading-relaxed breathe">${verdict.text}</p>
                     <div class="mt-4 flex gap-2">
-                        <button id="archive-btn" class="text-xs px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 transition-all">Archive & clear stack</button>
+                        <button id="archive-btn" class="btn text-xs px-3 py-2 rounded-lg" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink-dim)">Archive &amp; clear stack</button>
                     </div>
                 </div>`;
             } else if (allSorted && items.length) {
                 verdictSection.classList.remove('hidden');
                 verdictSection.innerHTML = `
-                <div class="mt-2 p-3 text-xs text-zinc-600 text-center">
-                    Stack sorted. <button id="archive-btn" class="text-zinc-500 hover:text-zinc-300 underline transition-colors">Archive & clear</button>
+                <div class="mt-2 p-3 text-xs text-center" style="color:var(--ink-dim)">
+                    Stack sorted. <button id="archive-btn" class="underline transition-colors" style="color:var(--ink)">Archive &amp; clear</button>
                 </div>`;
             } else {
-                verdictSection.classList.add('hidden');
-                verdictSection.innerHTML = '';
+                // not fully sorted: a quiet running tally so the ghost is visibly counting
+                const left = counts.unsorted;
+                verdictSection.classList.remove('hidden');
+                verdictSection.innerHTML = `
+                <div class="mt-2 p-3 text-xs text-center" style="color:var(--ink-ghost)">
+                    ${left} ${left === 1 ? 'item still unclassified' : 'items still unclassified'}. the ghost waits to deliver its verdict.
+                </div>`;
             }
         }
 
@@ -256,6 +344,30 @@
         });
         const archiveBtn = document.getElementById('archive-btn');
         if (archiveBtn) archiveBtn.addEventListener('click', archiveAndClear);
+        const copyBtn = document.getElementById('copy-verdict');
+        if (copyBtn) {
+            const verdictEl = copyBtn.closest('.verdict-panel').querySelector('p.breathe');
+            copyBtn.addEventListener('click', () => copyToLedger(copyBtn, verdictEl ? verdictEl.textContent : ''));
+        }
+    }
+
+    function copyToLedger(btn, text) {
+        const restore = btn.textContent;
+        const doFlash = () => {
+            btn.textContent = 'copied to the ledger';
+            btn.style.color = 'var(--accent)';
+            btn.style.borderColor = 'var(--accent)';
+            setTimeout(() => {
+                btn.textContent = restore;
+                btn.style.color = 'var(--ink-dim)';
+                btn.style.borderColor = 'var(--line)';
+            }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(doFlash).catch(doFlash);
+        } else {
+            doFlash();
+        }
     }
 
     function renderHistory() {
@@ -271,10 +383,10 @@
             }).join(' · ');
             const items = h.items || [];
             return `
-            <div class="border border-zinc-800 rounded-lg p-3">
+            <div class="card rounded-lg p-3">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs text-zinc-500">${h.date}</span>
-                    <span class="text-xs text-zinc-600">${h.total} items</span>
+                    <span class="text-xs" style="color:var(--ink-dim)">${h.date}</span>
+                    <span class="text-xs" style="color:var(--ink-ghost)">${h.total} ${h.total === 1 ? 'item' : 'items'}</span>
                 </div>
                 <div class="flex flex-wrap gap-2 mb-2">${pills}</div>
                 <div class="space-y-1">
@@ -312,6 +424,83 @@
         localStorage.removeItem(HISTORY_KEY);
         renderHistory();
     });
+
+    /* ---------- ambient embers (capped, reduced-motion-safe) ---------- */
+    (function embers(){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const field = document.getElementById('emberfield');
+        const COUNT = 8;
+        for (let i = 0; i < COUNT; i++){
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (5 + Math.random() * 90) + '%';
+            e.style.animationDelay = (Math.random() * 14) + 's';
+            e.style.animationDuration = (12 + Math.random() * 8) + 's';
+            field.appendChild(e);
+        }
+    })();
+
+    /* ---------- easter egg 1: type "prizrak" → the watcher answers ---------- */
+    (function watcher(){
+        let buf = '';
+        addEventListener('keydown', (e) => {
+            if (e.key.length !== 1) return;
+            buf = (buf + e.key.toLowerCase()).slice(-7);
+            if (buf === 'prizrak'){
+                const w = document.getElementById('footer-whisper');
+                w.textContent = 'you found the watcher. it was always counting.';
+                w.style.color = 'var(--accent)';
+                w.style.textShadow = '0 0 12px var(--glow)';
+                setTimeout(() => {
+                    w.textContent = 'measured the week. it did not flinch.';
+                    w.style.color = 'var(--ink-ghost)';
+                    w.style.textShadow = 'none';
+                }, 5000);
+            }
+        });
+    })();
+
+    /* ---------- easter egg 2: triple-click the title → one extra ember ---------- */
+    (function tripleEgg(){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const t = document.getElementById('apptitle');
+        t.addEventListener('click', (e) => {
+            if (e.detail === 3){
+                const field = document.getElementById('emberfield');
+                const ev = document.createElement('div');
+                ev.className = 'ember';
+                ev.style.left = (5 + Math.random() * 90) + '%';
+                ev.style.animationDuration = '11s';
+                field.appendChild(ev);
+                setTimeout(() => ev.remove(), 11000);
+            }
+        });
+    })();
+
+    /* ---------- nocturnal whisper: 00:00–03:00 local, the mountain does not sleep ---------- */
+    (function nocturnal(){
+        const hr = new Date().getHours();
+        if (hr >= 0 && hr < 3){
+            const w = document.getElementById('footer-whisper');
+            w.textContent = 'the mountain does not sleep. neither does the stack.';
+        }
+    })();
+
+    /* ---------- idle 60s → still here, still watching ---------- */
+    (function idle(){
+        let timer;
+        const line = document.getElementById('idle-whisper');
+        const arm = () => {
+            clearTimeout(timer);
+            line.style.opacity = '0';
+            timer = setTimeout(() => {
+                line.textContent = 'still here. still watching.';
+                line.style.opacity = '1';
+            }, 60000);
+        };
+        ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => addEventListener(ev, arm, { passive: true }));
+        arm();
+    })();
 
     render();
     </script>

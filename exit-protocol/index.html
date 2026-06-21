@@ -6,111 +6,208 @@
 <title>The Exit Protocol</title>
 <style>
   :root {
-    --bg: #111; --surface: #1a1a1a; --border: #2a2a2a;
-    --dim: #555; --mid: #888; --text: #ccc; --bright: #eee;
-    --green: #4a9e6a; --amber: #c4944a; --red: #c44a4a; --blue: #4a7a9e;
+    --bg:#0a0a0a;          /* near-black base */
+    --bg-raised:#111113;   /* cards, panels */
+    --bg-sunk:#0d0d0f;     /* wells, inputs */
+    --line:#26262b;        /* thin borders */
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;         /* primary text */
+    --ink-dim:#7a7570;     /* labels, captions */
+    --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+    --accent:#4a9e6a;      /* the door, the green light at the threshold */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+
+    /* phase markers — kept from the original protocol */
+    --red:#c44a4a; --amber:#c4944a; --blue:#4a7a9e;
+
+    /* legacy aliases retained for safety */
+    --surface:var(--bg-raised); --border:var(--line);
+    --dim:var(--ink-dim); --mid:#8b8680; --text:var(--ink); --bright:#eee;
+    --green:var(--accent);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
-  
-  .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
-  
-  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
-  h1 { font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); }
-  .subtitle { font-size: 0.8rem; color: var(--dim); margin-top: 8px; line-height: 1.5; }
-  
-  .phase { border: 1px solid var(--border); margin-bottom: 24px; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Courier New', monospace; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- atmosphere layers ---- */
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+    animation:ember 14s linear infinite}
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; position: relative; z-index: 2; }
+
+  header { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 {
+    font-size: 1.15rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink); cursor: default; display:inline-block;
+  }
+  h1 .door { color: var(--accent); }
+  .subtitle { font-size: 0.8rem; color: var(--ink-dim); margin-top: 10px; line-height: 1.6; }
+  .eyebrow { font-size: 0.6rem; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink-ghost); margin-bottom: 10px; }
+
+  .phase { border: 1px solid var(--line); margin-bottom: 24px; background: var(--bg-raised);
+    transition: border-color .15s, box-shadow .15s; }
+  .phase.open { box-shadow: 0 0 24px -16px var(--glow); }
   .phase-header {
     padding: 16px 20px;
     display: flex; justify-content: space-between; align-items: center;
     cursor: pointer; user-select: none;
+    transition: background .15s;
   }
-  .phase-header:hover { background: var(--surface); }
-  .phase-name { font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; }
-  .phase-status { font-size: 0.7rem; letter-spacing: 0.1em; }
+  .phase-header:hover { background: var(--bg-sunk); }
+  .phase-name { font-size: 0.75rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); }
+  .phase-meta { display:flex; align-items:center; gap:14px; }
+  .phase-tally { font-size: 0.62rem; letter-spacing: 0.12em; color: var(--ink-ghost); font-variant-numeric: tabular-nums; }
+  .phase-tally.sealed { color: var(--accent); }
+  .phase-status { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--ink-dim); }
   .phase-body { padding: 0 20px 20px; display: none; }
   .phase.open .phase-body { display: block; }
-  .phase.open .phase-header { border-bottom: 1px solid var(--border); }
-  
+  .phase.open .phase-header { border-bottom: 1px solid var(--line); }
+
   .check-item {
     display: flex; gap: 12px; padding: 12px 0;
-    border-bottom: 1px solid #1a1a1a;
+    border-bottom: 1px solid var(--line-soft);
     align-items: flex-start;
   }
   .check-item:last-child { border-bottom: none; }
-  
+
   .checkbox {
     width: 18px; height: 18px; min-width: 18px;
-    border: 1px solid var(--border); cursor: pointer;
+    border: 1px solid var(--line); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    margin-top: 2px; font-size: 0.7rem; color: var(--green);
+    margin-top: 2px; font-size: 0.7rem; color: var(--accent);
+    transition: border-color .15s, box-shadow .15s, transform .12s, background .15s;
   }
-  .checkbox.checked { border-color: var(--green); }
-  
-  .check-text { font-size: 0.85rem; line-height: 1.5; color: var(--text); }
-  .check-text.done { color: var(--dim); text-decoration: line-through; }
-  .check-note { font-size: 0.75rem; color: var(--dim); margin-top: 4px; font-style: italic; }
-  
-  .journal-section { margin-top: 32px; border: 1px solid var(--border); padding: 20px; }
-  .journal-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--mid); margin-bottom: 12px; }
-  
+  .checkbox:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .checkbox:active { transform: translateY(1px); }
+  .checkbox.checked { border-color: var(--accent); box-shadow: 0 0 12px -3px var(--glow); }
+  .checkbox:focus-visible { outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+  .check-text { font-size: 0.85rem; line-height: 1.55; color: var(--text); transition: color .2s; }
+  .check-text.done { color: var(--ink-dim); text-decoration: line-through; text-decoration-color: var(--ink-ghost); }
+  .check-note { font-size: 0.75rem; color: var(--ink-dim); margin-top: 5px; font-style: italic; line-height: 1.5; }
+
+  .journal-section { margin-top: 36px; border: 1px solid var(--line); padding: 20px; background: var(--bg-raised); }
+  .journal-label { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 12px; }
+
   textarea {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    width: 100%; background: var(--bg-sunk); border: 1px solid var(--line);
     color: var(--text); font-family: 'Courier New', monospace; font-size: 0.85rem;
-    padding: 12px; resize: vertical; min-height: 100px; outline: none;
+    padding: 12px; resize: vertical; min-height: 100px; outline: none; line-height: 1.55;
+    transition: border-color .15s, box-shadow .15s;
   }
-  textarea:focus { border-color: var(--dim); }
-  textarea::placeholder { color: #333; }
-  
-  .btn-row { display: flex; gap: 12px; margin-top: 12px; }
+  textarea:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+  textarea::placeholder { color: var(--ink-ghost); font-style: italic; }
+
+  .btn-row { display: flex; gap: 12px; margin-top: 12px; align-items:center; }
   button {
-    background: none; border: 1px solid var(--border); color: var(--mid);
-    font-family: 'Courier New', monospace; font-size: 0.75rem;
-    letter-spacing: 0.1em; text-transform: uppercase;
+    background: none; border: 1px solid var(--line); color: var(--ink-dim);
+    font-family: 'Courier New', monospace; font-size: 0.72rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
     padding: 10px 20px; cursor: pointer;
+    transition: transform .15s, box-shadow .15s, border-color .15s, color .15s, background .15s;
   }
-  button:hover { border-color: var(--mid); color: var(--bright); }
-  button.save { border-color: var(--green); color: var(--green); }
-  button.save:hover { background: var(--green); color: var(--bg); }
-  
-  .progress-bar { display: flex; height: 4px; gap: 2px; margin: 24px 0; }
-  .progress-seg { flex: 1; height: 100%; background: var(--border); }
-  .progress-seg.done { background: var(--green); }
-  
-  .counter { text-align: center; font-size: 0.75rem; color: var(--dim); margin-bottom: 24px; letter-spacing: 0.1em; }
-  
+  button:hover { border-color: var(--ink-dim); color: var(--bright); transform: translateY(-2px); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+  button.save { border-color: var(--accent); color: var(--accent); }
+  button.save:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); box-shadow: 0 0 18px -6px var(--glow); }
+
+  .progress-bar { display: flex; height: 4px; gap: 2px; margin: 24px 0 8px; }
+  .progress-seg { flex: 1; height: 100%; background: var(--line); transition: background .35s, box-shadow .35s; }
+  .progress-seg.done { background: var(--accent); box-shadow: 0 0 8px -2px var(--glow); }
+
+  .counter { text-align: center; font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 6px; letter-spacing: 0.14em; }
+  .verdict { text-align:center; font-size:0.68rem; color:var(--ink-ghost); margin-bottom: 24px; letter-spacing:0.1em; min-height: 1em; line-height:1.4; transition: color .4s; }
+  .verdict.lit { color: var(--accent); }
+
   .entries { margin-top: 24px; }
-  .entry { border-left: 2px solid var(--border); padding: 12px 16px; margin-bottom: 12px; }
-  .entry-date { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
-  .entry-text { font-size: 0.85rem; color: var(--mid); margin-top: 6px; white-space: pre-wrap; }
-  
-  footer { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 40px; font-size: 0.65rem; color: #2a2a2a; text-align: center; letter-spacing: 0.1em; }
+  .entries-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 4px; }
+  .entries-count { font-size:0.6rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--ink-ghost); }
+  .entry { border-left: 2px solid var(--line); padding: 12px 16px; margin-bottom: 12px;
+    transition: border-color .2s; }
+  .entry:hover { border-left-color: var(--accent); }
+  .entry-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .entry-date { font-size: 0.64rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  .entry-copy { background:none; border:none; padding:0 2px; color:var(--ink-ghost); font-size:0.6rem;
+    letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; transition:color .15s; }
+  .entry-copy:hover { color:var(--accent); transform:none; }
+  .entry-copy:focus-visible { outline:none; color:var(--accent); }
+  .entry-text { font-size: 0.85rem; color: var(--mid); margin-top: 6px; white-space: pre-wrap; line-height:1.55; }
+  .empty-ledger { font-size:0.75rem; color:var(--ink-ghost); font-style:italic; padding: 4px 0; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 44px; font-size: 0.64rem; color: var(--ink-ghost); text-align: center; letter-spacing: 0.12em; }
+  footer .night { display:block; margin-top:8px; color:var(--ink-ghost); opacity:0; transition:opacity 1.2s; }
+  footer .night.show { opacity:.7; }
+  #idle-whisper { text-align:center; font-size:0.65rem; color:var(--ink-ghost); letter-spacing:0.12em;
+    margin-top:16px; opacity:0; transition:opacity 1.4s; font-style:italic; min-height:1em; }
+  #idle-whisper.show { opacity:1; }
+  #watcher { text-align:center; font-size:0.65rem; color:var(--ink-ghost); letter-spacing:0.16em;
+    margin-top:10px; opacity:0; transition:opacity 1s; min-height:1em; }
+  #watcher.show { opacity:1; }
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+    .ember{display:none} .breathe,.flicker{opacity:1!important}
+  }
 </style>
 </head>
-<body>
+<body class="grain">
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
 <div class="container">
 
 <header>
-  <h1>The Exit Protocol</h1>
-  <div class="subtitle">A structured decompression sequence for leaving a role. Not a celebration. Not a mourning. A checklist for walking through the door correctly.</div>
+  <div class="eyebrow">Prízrak / Threshold Instrument 04</div>
+  <h1 id="title">The Exit <span class="door">Protocol</span></h1>
+  <div class="subtitle">A structured decompression sequence for leaving a role. Not a celebration. Not a mourning. A checklist for walking through the door correctly — while the mountain watches you go.</div>
 </header>
 
-<div class="counter" id="counter">0 / 0 complete</div>
+<div class="counter" id="counter">0 / 0 sealed</div>
+<div class="verdict" id="verdict"></div>
 <div class="progress-bar" id="progress"></div>
 
 <div id="phases"></div>
 
 <div class="journal-section">
-  <div class="journal-label">Exit Journal — Write what you need to write</div>
+  <div class="journal-label">Exit Journal — write what the door will not let you say</div>
   <textarea id="journal-input" placeholder="The building was not broken. It was built for someone else."></textarea>
   <div class="btn-row">
-    <button onclick="clearJournal()">Clear</button>
-    <button class="save" onclick="saveJournal()">Log Entry →</button>
+    <button onclick="clearJournal()">Let the fog take it</button>
+    <button class="save" onclick="saveJournal()">File to the ledger →</button>
   </div>
   <div class="entries" id="entries"></div>
 </div>
 
-<footer>Prizrak · You leave through the door you came in.</footer>
+<div id="watcher" aria-hidden="true"></div>
+<div id="idle-whisper" aria-hidden="true"></div>
+
+<footer>
+  Prízrak · you leave through the door you came in.
+  <span class="night" id="night-line">the mountain does not sleep.</span>
+</footer>
 
 </div>
 
@@ -166,26 +263,41 @@ const PHASES = [
   }
 ];
 
+// Verdicts — terse, with teeth. Keyed to how far through the threshold you are.
+function verdictFor(done, total) {
+  if (total === 0) return '';
+  if (done === 0) return 'the door is still shut. nothing has been crossed.';
+  const r = done / total;
+  if (done === total) return 'every latch undone. the threshold holds. walk through clean.';
+  if (r < 0.25) return 'the first locks give. the cold is honest. keep moving.';
+  if (r < 0.5) return 'the corridor lengthens behind you. do not look back yet.';
+  if (r < 0.75) return 'more than half crossed. the old building is a silhouette now.';
+  return 'almost out. the last steps are the loud ones. finish them.';
+}
+
 function loadState() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
 }
 function saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
+let _prevDone = -1;
+
 function render() {
   const state = loadState();
   const checks = state.checks || {};
   const phasesEl = document.getElementById('phases');
-  
+
   let totalItems = 0, doneItems = 0;
-  
+
   phasesEl.innerHTML = PHASES.map(phase => {
+    let phaseDone = 0, phaseTotal = 0;
     const itemsHtml = phase.items.map(item => {
-      totalItems++;
+      totalItems++; phaseTotal++;
       const done = checks[item.id] || false;
-      if (done) doneItems++;
+      if (done) { doneItems++; phaseDone++; }
       return `
         <div class="check-item">
-          <div class="checkbox ${done ? 'checked' : ''}" onclick="toggleCheck('${item.id}')">${done ? '✓' : ''}</div>
+          <div class="checkbox ${done ? 'checked' : ''}" tabindex="0" role="checkbox" aria-checked="${done}" onclick="toggleCheck('${item.id}')" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleCheck('${item.id}')}">${done ? '✓' : ''}</div>
           <div>
             <div class="check-text ${done ? 'done' : ''}">${item.text}</div>
             ${item.note ? `<div class="check-note">${item.note}</div>` : ''}
@@ -193,24 +305,32 @@ function render() {
         </div>
       `;
     }).join('');
-    
+
     const phaseOpen = state['phase_' + phase.id] !== false;
+    const sealed = phaseDone === phaseTotal && phaseTotal > 0;
     return `
       <div class="phase ${phaseOpen ? 'open' : ''}" id="phase-${phase.id}">
         <div class="phase-header" onclick="togglePhase('${phase.id}')" style="border-left: 3px solid ${phase.color}">
           <span class="phase-name">${phase.name}</span>
-          <span class="phase-status">${phaseOpen ? '▼' : '▶'}</span>
+          <span class="phase-meta">
+            <span class="phase-tally ${sealed ? 'sealed' : ''}">${sealed ? 'SEALED' : phaseDone + '/' + phaseTotal}</span>
+            <span class="phase-status">${phaseOpen ? '▼' : '▶'}</span>
+          </span>
         </div>
         <div class="phase-body">${itemsHtml}</div>
       </div>
     `;
   }).join('');
-  
-  document.getElementById('counter').textContent = `${doneItems} / ${totalItems} complete`;
-  
+
+  document.getElementById('counter').textContent = `${doneItems} / ${totalItems} sealed`;
+
+  const verdictEl = document.getElementById('verdict');
+  verdictEl.textContent = verdictFor(doneItems, totalItems);
+  verdictEl.classList.toggle('lit', doneItems === totalItems && totalItems > 0);
+  verdictEl.classList.toggle('breathe', doneItems === totalItems && totalItems > 0);
+
   const progressEl = document.getElementById('progress');
   progressEl.innerHTML = '';
-  let idx = 0;
   PHASES.forEach(phase => {
     phase.items.forEach(item => {
       const seg = document.createElement('div');
@@ -218,7 +338,11 @@ function render() {
       progressEl.appendChild(seg);
     });
   });
-  
+
+  // a checked item spawns one ember — the cold given off as a latch comes free
+  if (_prevDone !== -1 && doneItems > _prevDone) spawnEmber(true);
+  _prevDone = doneItems;
+
   renderEntries();
 }
 
@@ -250,22 +374,115 @@ function saveJournal() {
   saveState(state);
   input.value = '';
   renderEntries();
+  const e = document.getElementById('entries').querySelector('.entry');
+  if (e) { e.classList.add('reveal'); e.scrollIntoView({behavior:'smooth', block:'nearest'}); }
 }
 
 function clearJournal() { document.getElementById('journal-input').value = ''; }
+
+function copyEntry(idx, btn) {
+  const state = loadState();
+  const entries = state.entries || [];
+  const entry = entries[idx];
+  if (!entry) return;
+  navigator.clipboard.writeText(entry.text).then(() => {
+    const prev = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.style.color = 'var(--accent)';
+    setTimeout(() => { btn.textContent = prev; btn.style.color = ''; }, 1200);
+  }).catch(() => {});
+}
 
 function renderEntries() {
   const state = loadState();
   const entries = state.entries || [];
   const el = document.getElementById('entries');
-  el.innerHTML = entries.map(e => `
+  if (!entries.length) {
+    el.innerHTML = '<div class="entries-head"><span class="entries-count">the ledger</span></div><div class="empty-ledger">the cave is empty. nothing has fossilized yet.</div>';
+    return;
+  }
+  const head = `<div class="entries-head"><span class="entries-count">the ledger</span><span class="entries-count">${entries.length} entr${entries.length===1?'y':'ies'}</span></div>`;
+  el.innerHTML = head + entries.map((e, i) => `
     <div class="entry">
-      <div class="entry-date">${e.date}</div>
-      <div class="entry-text">${e.text}</div>
+      <div class="entry-head">
+        <div class="entry-date">${escapeHtml(e.date)}</div>
+        <button class="entry-copy" onclick="copyEntry(${i}, this)" aria-label="copy entry">copy</button>
+      </div>
+      <div class="entry-text">${escapeHtml(e.text)}</div>
     </div>
   `).join('');
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---- embers ---- */
+function prefersReduced() {
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+function spawnEmber(transient) {
+  if (prefersReduced()) return;
+  const field = document.getElementById('ember-field');
+  const e = document.createElement('div');
+  e.className = 'ember';
+  e.style.left = Math.random() * 100 + 'vw';
+  if (transient) {
+    e.style.animationDuration = (8 + Math.random() * 4) + 's';
+    e.addEventListener('animationend', () => e.remove());
+  } else {
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (12 + Math.random() * 8) + 's';
+  }
+  field.appendChild(e);
+}
+function seedEmbers() {
+  if (prefersReduced()) return;
+  for (let i = 0; i < 7; i++) spawnEmber(false);
+}
+
+/* ---- easter eggs (quiet, never touch saved state) ---- */
+// 1. type "prizrak" → the watcher answers
+let _buf = '';
+window.addEventListener('keydown', (ev) => {
+  if (ev.key && ev.key.length === 1) {
+    _buf = (_buf + ev.key.toLowerCase()).slice(-7);
+    if (_buf === 'prizrak') {
+      const w = document.getElementById('watcher');
+      w.textContent = 'you found the watcher. it was always at the door.';
+      w.classList.add('show');
+      spawnEmber(true);
+    }
+  }
+});
+
+// 2. triple-click the title → one extra ember leaves with you
+document.getElementById('title').addEventListener('click', (ev) => {
+  if (ev.detail === 3) spawnEmber(true);
+});
+
+// 3. between 00:00–03:00 local, the footer admits the mountain is awake
+(function nightWhisper(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) document.getElementById('night-line').classList.add('show');
+})();
+
+// 4. idle 60s → one line fades in, then yields on the next move
+let _idle;
+function resetIdle() {
+  const el = document.getElementById('idle-whisper');
+  el.classList.remove('show');
+  clearTimeout(_idle);
+  _idle = setTimeout(() => {
+    el.textContent = 'still here. still watching.';
+    el.classList.add('show');
+  }, 60000);
+}
+['mousemove','keydown','click','touchstart','scroll'].forEach(evt =>
+  window.addEventListener(evt, resetIdle, {passive:true}));
+
+seedEmbers();
+resetIdle();
 render();
 </script>
 </body>

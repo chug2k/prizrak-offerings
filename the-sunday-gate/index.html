@@ -7,15 +7,24 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0e0e10;
-      --surface: #161619;
-      --border: #27272f;
-      --text: #dcd8d0;
-      --muted: #5c5c68;
+      --bg: #0a0a0a;
+      --bg-raised: #111113;
+      --bg-sunk: #0d0d0f;
+      --line: #26262b;
+      --line-soft: #1a1a1d;
+      --ink: #d4cfc8;
+      --ink-dim: #7a7570;
+      --ink-ghost: #3a3530;
       --accent: #8a7fc0;
+      --glow: color-mix(in srgb, var(--accent) 55%, transparent);
       --warm: #c0976a;
-      --good: #7ab89a;
+      /* legacy aliases kept so nothing breaks */
+      --surface: var(--bg-raised);
+      --border: var(--line);
+      --text: var(--ink);
+      --muted: var(--ink-dim);
       --dim: #3a3a46;
+      --good: #7ab89a;
     }
     body {
       background: var(--bg);
@@ -26,7 +35,56 @@
       flex-direction: column;
       align-items: center;
       padding: 2.5rem 1rem 5rem;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* ---- ambient atmosphere layers ---- */
+    .fog {
+      position: fixed; inset: -10% -10% auto; height: 60vh;
+      pointer-events: none; z-index: 0;
+      background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+      animation: fogDrift 32s ease-in-out infinite alternate;
+    }
+    @keyframes fogDrift {
+      0% { transform: translateX(-5%); opacity: .04 }
+      50% { opacity: .07 }
+      100% { transform: translateX(5%); opacity: .04 }
+    }
+    .ember {
+      position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 6px var(--glow);
+      pointer-events: none; z-index: 0;
+      animation: ember 14s linear infinite;
+    }
+    @keyframes ember {
+      0% { transform: translateY(0); opacity: 0 }
+      10% { opacity: .5 }
+      100% { transform: translateY(-90vh); opacity: 0 }
+    }
+    .grain::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .035;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: .85; text-shadow: 0 0 8px var(--glow) }
+      50% { opacity: 1; text-shadow: 0 0 16px var(--glow) }
+    }
+    .breathe { animation: breathe 4.5s ease-in-out infinite; }
+    @keyframes reveal {
+      from { opacity: 0; transform: translateY(8px) }
+      to { opacity: 1; transform: translateY(0) }
+    }
+    .reveal { animation: reveal .35s ease-out both; }
+    @keyframes flicker {
+      0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 94%{opacity:1} 97%{opacity:.7} 98%{opacity:1}
+    }
+    .flicker { animation: flicker 6s steps(1) infinite; }
+
+    /* keep content above decorative layers */
+    .header, .gate-visual, .card, .btn, .result, .footnote, .idle-whisper { position: relative; z-index: 2; }
+
     .header {
       text-align: center;
       max-width: 520px;
@@ -38,6 +96,8 @@
       color: var(--accent);
       letter-spacing: 0.05em;
       margin-bottom: 0.5rem;
+      cursor: default;
+      user-select: none;
     }
     .header p {
       font-size: 0.8rem;
@@ -57,15 +117,27 @@
       text-transform: uppercase;
     }
     .gate-line { flex: 1; max-width: 80px; height: 1px; background: var(--dim); }
-    .gate-symbol { color: var(--accent); font-size: 1.2rem; }
+    .gate-symbol {
+      color: var(--accent); font-size: 1.2rem;
+      text-shadow: 0 0 10px var(--glow);
+      cursor: pointer; user-select: none;
+      transition: transform .3s ease;
+    }
+    .gate-symbol:hover { transform: scale(1.15); }
+    .gate-symbol.fast { animation: breathe 1.1s ease-in-out infinite; }
     .card {
-      background: var(--surface);
+      background: var(--bg-raised);
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 1.6rem;
       width: 100%;
       max-width: 520px;
       margin-bottom: 1rem;
+      transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .card:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 24px -10px var(--glow);
     }
     .card label {
       display: block;
@@ -86,7 +158,7 @@
     }
     .card textarea {
       width: 100%;
-      background: var(--bg);
+      background: var(--bg-sunk);
       border: 1px solid var(--border);
       border-radius: 3px;
       color: var(--text);
@@ -97,12 +169,12 @@
       resize: vertical;
       min-height: 70px;
       line-height: 1.5;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .card textarea:focus { border-color: var(--accent); }
+    .card textarea:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
     .card input[type="text"] {
       width: 100%;
-      background: var(--bg);
+      background: var(--bg-sunk);
       border: 1px solid var(--border);
       border-radius: 3px;
       color: var(--text);
@@ -110,9 +182,9 @@
       font-size: 0.9rem;
       padding: 0.65rem 0.8rem;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .card input[type="text"]:focus { border-color: var(--accent); }
+    .card input[type="text"]:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
     .energy-row {
       display: flex;
       align-items: center;
@@ -123,6 +195,7 @@
       flex: 1;
       accent-color: var(--accent);
     }
+    .energy-row input[type="range"]:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--glow); border-radius: 4px; }
     .energy-val { font-size: 0.9rem; color: var(--warm); min-width: 24px; text-align: right; }
     .energy-labels {
       display: flex;
@@ -144,26 +217,53 @@
       padding: 0.75rem;
       border-radius: 3px;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s;
       margin-bottom: 1.5rem;
     }
-    .btn:hover { background: var(--accent); color: var(--bg); }
+    .btn:hover { background: var(--accent); color: var(--bg); box-shadow: 0 0 24px -6px var(--glow); }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--glow); }
+    .btn:active { transform: translateY(1px); }
     .result { display: none; width: 100%; max-width: 520px; }
     .result.visible { display: block; }
     .result-card {
-      background: var(--surface);
+      background: var(--bg-raised);
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 2rem;
       margin-bottom: 1rem;
+      box-shadow: 0 0 0 1px var(--line), 0 0 28px -8px var(--glow);
+    }
+    .result-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.4rem;
     }
     .result-label {
       font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: var(--muted);
-      margin-bottom: 1.4rem;
+      margin: 0;
     }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink-dim);
+      font-family: 'Georgia', serif;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.32rem 0.6rem;
+      border-radius: 3px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .2s, color .2s, box-shadow .2s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .copy-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+    .copy-btn.flashed { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 16px -4px var(--glow); }
     .passage-block {
       border-left: 2px solid var(--accent);
       padding-left: 1rem;
@@ -204,7 +304,8 @@
       height: 100%;
       border-radius: 3px;
       background: linear-gradient(90deg, var(--muted), var(--accent));
-      transition: width 0.4s ease;
+      box-shadow: 0 0 12px -2px var(--glow);
+      transition: width 0.6s ease;
     }
     .energy-label-small { font-size: 0.72rem; color: var(--muted); min-width: 120px; }
     .verdict-block {
@@ -216,14 +317,16 @@
       font-size: 0.68rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: var(--muted);
+      color: var(--accent);
       margin-bottom: 0.6rem;
+      text-shadow: 0 0 8px var(--glow);
     }
     .verdict-text {
       font-size: 0.85rem;
-      color: var(--muted);
+      color: var(--ink);
       font-style: italic;
       line-height: 1.7;
+      opacity: 0.92;
     }
     .week-stamp {
       font-size: 0.7rem;
@@ -232,7 +335,7 @@
       margin-bottom: 1.4rem;
     }
     .history-card {
-      background: var(--surface);
+      background: var(--bg-raised);
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 1.4rem;
@@ -249,6 +352,7 @@
       padding: 0.7rem 0;
       border-bottom: 1px solid var(--border);
       font-size: 0.82rem;
+      transition: border-color .15s;
     }
     .history-entry:last-child { border-bottom: none; }
     .history-week { color: var(--muted); font-size: 0.7rem; margin-bottom: 0.2rem; }
@@ -262,18 +366,39 @@
       font-style: italic;
       line-height: 1.6;
     }
+    .ghost-line {
+      font-size: 0.68rem;
+      color: var(--ink-ghost);
+      text-align: center;
+      max-width: 520px;
+      margin-top: 1.2rem;
+      letter-spacing: 0.04em;
+      min-height: 1em;
+      transition: opacity 1.2s ease;
+      opacity: 0;
+    }
+    .ghost-line.lit { opacity: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fog, .ember, .breathe, .reveal, .flicker { animation: none !important; }
+      .ember { display: none; }
+      .breathe, .flicker { opacity: 1 !important; }
+      .gate-symbol.fast { animation: none !important; }
+    }
   </style>
 </head>
-<body>
+<body class="grain">
+  <div class="fog" aria-hidden="true"></div>
+
   <div class="header">
-    <h1>The Sunday Gate</h1>
+    <h1 class="breathe" id="title">The Sunday Gate</h1>
     <p>The village gate separates the field from the house. On Sunday evening, you pass through it. What you declare at the gate is what you carry into the week. What you leave outside stays outside.</p>
   </div>
 
   <div class="gate-visual">
     <div class="gate-line"></div>
     <span>weekend</span>
-    <div class="gate-symbol">⌇</div>
+    <div class="gate-symbol" id="gateSymbol" title="hold me">⌇</div>
     <span>week</span>
     <div class="gate-line"></div>
   </div>
@@ -315,7 +440,10 @@
 
   <div class="result" id="result">
     <div class="result-card">
-      <div class="result-label">Your Declaration at the Gate</div>
+      <div class="result-head">
+        <div class="result-label">Your Declaration at the Gate</div>
+        <button class="copy-btn" id="copyBtn" onclick="copyDeclaration()" type="button">copy to the ledger</button>
+      </div>
       <div class="week-stamp" id="week-stamp"></div>
 
       <div class="energy-display">
@@ -355,6 +483,8 @@
     <div class="footnote">The declaration at the gate is not a promise. It is a record of where you stood on this specific Sunday. The week will do what weeks do. What matters is that the declaration was honest.</div>
   </div>
 
+  <div class="ghost-line" id="ghostLine" aria-hidden="true"></div>
+
   <script>
     const STORAGE_KEY = 'prizrak_gate_v1';
 
@@ -383,18 +513,18 @@
       const hasHonesty = b.includes('honest') || b.includes('genuine') || b.includes('real') || b.includes('curious') || b.includes('care');
 
       if (isLow && hasDissatisfaction) {
-        return 'Low energy going in, and what you are carrying is the cost of sustained misalignment. The mountain notes: this is what a thin ring looks like from the inside. The wood is being laid down. Whether it is dense or brittle depends on whether the misalignment is temporary or structural.';
+        return 'Low energy going in, and what you carry is the cost of sustained misalignment. The mountain notes: this is what a thin ring looks like from the inside. The wood is being laid down now. Dense or brittle depends on whether this winter is a season or the climate. The gate does not decide that. You do.';
       }
       if (hasDissatisfaction) {
-        return 'You are bringing something honest. The controlled compliance or the pretending — naming it is the act of not letting it become unconscious. The week may not change. The naming means you were not fooled by it.';
+        return 'You are bringing something honest, and it has teeth. The compliance, the pretending — naming it is the one act that keeps it from going unconscious. The week may not bend. But you walked through the gate with your eyes open, and the poludnica favors no one who lies to themselves at noon.';
       }
       if (isHigh && hasHonesty) {
-        return 'Good energy, honest cargo. This is the combination that produces actual work rather than performed work. The gate is open. The declaration is clean.';
+        return 'Good energy, honest cargo. This is the rare combination that makes actual work instead of performed work. The gate is open. The declaration is clean. The bridge holds — for now. The mountain is watching, and for once it has nothing to correct.';
       }
       if (isMid) {
-        return 'Moderate energy, moderate clarity. The week is not won at the gate — but the gate is the moment when you could have lied to yourself and chose not to. That is what the declaration is for.';
+        return 'Moderate energy, moderate clarity. No week is won at the gate. But the gate is the threshold where you could have lied to yourself and chose not to. That refusal is small. It is also the whole point of the ritual.';
       }
-      return 'The gate is recorded. The week will see what the declaration was worth. Come back next Sunday with the evidence.';
+      return 'The gate is recorded. The week will weigh what the declaration was worth. Come back next Sunday with the evidence. The ledger keeps every crossing, even the quiet ones.';
     }
 
     function passThrough() {
@@ -414,7 +544,7 @@
       document.getElementById('weight-text').textContent = weight;
       document.getElementById('verdict-text').textContent = getVerdict(energy, bring, weight);
 
-      // Save
+      // Save — same key, same shape
       const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       history.unshift({ date: dateStr, weekend, weight, bring, leave, energy: parseInt(energy) });
       if (history.length > 12) history.pop();
@@ -427,15 +557,159 @@
         const hEntries = document.getElementById('history-entries');
         hEntries.innerHTML = history.slice(1, 6).map(h => `
           <div class="history-entry">
-            <div class="history-week">Sunday, ${h.date} · Energy ${h.energy}/10</div>
-            <div class="history-carry">${h.bring}</div>
+            <div class="history-week">Sunday, ${escapeHtml(h.date)} · Energy ${h.energy}/10</div>
+            <div class="history-carry">${escapeHtml(h.bring)}</div>
           </div>
         `).join('');
       }
 
-      document.getElementById('result').classList.add('visible');
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+      const result = document.getElementById('result');
+      result.classList.add('visible');
+      // re-trigger the reveal animation each crossing
+      const card = result.querySelector('.result-card');
+      card.classList.remove('reveal');
+      void card.offsetWidth;
+      card.classList.add('reveal');
+      result.scrollIntoView({ behavior: 'smooth' });
     }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    // ---- copy to the ledger ----
+    function copyDeclaration() {
+      const lines = [
+        document.getElementById('week-stamp').textContent,
+        '',
+        'Carrying through: ' + document.getElementById('carry-text').textContent,
+        'Left outside: ' + document.getElementById('leave-text').textContent,
+        'The weight ahead: ' + document.getElementById('weight-text').textContent,
+        'Energy going in: ' + document.getElementById('energy').value + '/10',
+        '',
+        'Prízrak — ' + document.getElementById('verdict-text').textContent
+      ];
+      const text = lines.join('\n');
+      const btn = document.getElementById('copyBtn');
+      const restore = () => { btn.textContent = 'copy to the ledger'; btn.classList.remove('flashed'); };
+      const ok = () => { btn.textContent = 'copied to the ledger'; btn.classList.add('flashed'); setTimeout(restore, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok).catch(() => {
+          btn.textContent = 'the fog refused it'; setTimeout(restore, 1200);
+        });
+      } else {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); document.body.removeChild(ta); ok();
+        } catch (e) {
+          btn.textContent = 'the fog refused it'; setTimeout(restore, 1200);
+        }
+      }
+    }
+
+    // ---- atmosphere: drifting embers (capped at 8) ----
+    (function spawnEmbers() {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = Math.random() * 100 + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        document.body.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg 1: triple-click the title spawns one extra ember ----
+    document.getElementById('title').addEventListener('click', (function () {
+      let count = 0, timer = null;
+      return function () {
+        count++;
+        clearTimeout(timer);
+        timer = setTimeout(() => { count = 0; }, 600);
+        if (count >= 3) {
+          count = 0;
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = Math.random() * 100 + 'vw';
+          e.style.animationDuration = '13s';
+          document.body.appendChild(e);
+          setTimeout(() => e.remove(), 13000);
+        }
+      };
+    })());
+
+    // ---- easter egg 2: long-press the gate glyph → it breathes faster for 3s ----
+    (function () {
+      const sym = document.getElementById('gateSymbol');
+      let held = null;
+      const start = () => { held = setTimeout(() => {
+        sym.classList.add('fast');
+        setTimeout(() => sym.classList.remove('fast'), 3000);
+      }, 450); };
+      const cancel = () => { clearTimeout(held); };
+      sym.addEventListener('mousedown', start);
+      sym.addEventListener('touchstart', start, { passive: true });
+      ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(ev => sym.addEventListener(ev, cancel));
+    })();
+
+    // ---- easter egg 3: type "prizrak" → light the watcher line ----
+    (function () {
+      const target = 'prizrak';
+      let buf = '';
+      window.addEventListener('keydown', (e) => {
+        if (e.key && e.key.length === 1) {
+          buf = (buf + e.key.toLowerCase()).slice(-target.length);
+          if (buf === target) {
+            const g = document.getElementById('ghostLine');
+            g.textContent = 'you found the watcher.';
+            g.classList.add('lit');
+          }
+        }
+      });
+    })();
+
+    // ---- easter egg 4: idle 60s → a quiet line fades in ----
+    (function () {
+      let idle = null;
+      const g = document.getElementById('ghostLine');
+      function arm() {
+        clearTimeout(idle);
+        idle = setTimeout(() => {
+          if (!g.classList.contains('lit')) {
+            g.textContent = 'still here. still watching.';
+            g.classList.add('lit');
+          }
+        }, 60000);
+      }
+      ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(ev =>
+        window.addEventListener(ev, () => {
+          if (g.textContent === 'still here. still watching.') { g.classList.remove('lit'); }
+          arm();
+        }, { passive: true })
+      );
+      arm();
+    })();
+
+    // ---- the mountain does not sleep: 00:00–03:00 footer whisper ----
+    (function () {
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const note = document.createElement('div');
+        note.className = 'footnote flicker';
+        note.style.color = 'var(--ink-ghost)';
+        note.style.marginTop = '0.6rem';
+        note.textContent = 'the mountain does not sleep.';
+        document.querySelector('.result') &&
+          document.querySelector('.result').insertAdjacentElement('afterend', note);
+      }
+    })();
   </script>
 </body>
 </html>

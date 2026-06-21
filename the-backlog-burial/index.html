@@ -6,35 +6,116 @@
     <title>The Backlog Burial — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+        :root{
+            --bg:#0a0a0a;            /* near-black base */
+            --bg-raised:#111113;     /* cards, panels */
+            --bg-sunk:#0d0d0f;       /* wells, inputs */
+            --line:#26262b;          /* thin borders */
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;           /* primary text */
+            --ink-dim:#7a7570;       /* labels, captions */
+            --ink-ghost:#3a3530;     /* whispers, easter-egg text */
+            --accent:#d97706;        /* amber — this app's existing lead color */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background: var(--bg); }
+        body{ color: var(--ink); }
+
+        /* ---- motion vocabulary (CSS-only, reduced-motion-safe) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+        .fade-in{ animation: reveal 0.42s ease-out both; }
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* content sits above decorative layers */
+        .stage{ position:relative; z-index:2; }
+
         .strike { text-decoration: line-through; opacity: 0.4; }
-        .shovel { display:inline-block; animation: dig 0.6s ease-in-out; }
-        @keyframes dig { 0%{transform:rotate(0deg);} 25%{transform:rotate(-20deg);} 75%{transform:rotate(20deg);} 100%{transform:rotate(0deg);} }
-        .buried { animation: bury 0.8s ease-in forwards; }
-        @keyframes bury { to { opacity:0; transform: translateY(20px) scale(0.95); } }
         .epitaph { font-family: 'Georgia', serif; font-style: italic; }
+
+        /* the shovel digs as the queue grows */
+        .shovel { display:inline-block; }
+        @keyframes dig { 0%{transform:rotate(0)} 25%{transform:rotate(-18deg)} 75%{transform:rotate(18deg)} 100%{transform:rotate(0)} }
+        .digging { animation: dig 0.6s ease-in-out; }
+
+        /* a task lowering into the ground */
+        @keyframes lower { 0%{opacity:1;transform:none} 100%{opacity:0;transform:translateY(26px) scale(.96)} }
+        .lowering { animation: lower 0.7s ease-in forwards; }
+
+        /* tactile inputs */
+        .field{ transition:border-color .15s, box-shadow .15s, background .15s; }
+        .field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+        .field:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        /* hover-lift cards */
+        .lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+        .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+
+        /* button press */
+        .btn-press{ transition:transform .12s, background .15s, box-shadow .15s, border-color .15s; }
+        .btn-press:active{ transform:translateY(1px); }
+        .btn-press:focus-visible{ outline:none; box-shadow:0 0 0 1px var(--glow); }
+
+        /* the ceremony panel breathes */
+        .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+        .title-glow{ text-shadow:0 0 12px var(--glow); }
+        .accent-ink{ color:var(--accent); }
+
+        /* idle / egg whisper */
+        #idleWhisper, #eggLine{ color:var(--ink-ghost); transition:opacity .8s ease; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.fade-in,.flicker,.digging,.lowering{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .lowering{opacity:0!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
-<div class="max-w-xl mx-auto">
+<body class="font-mono antialiased min-h-screen grain">
+
+<!-- atmosphere -->
+<div class="fog" aria-hidden="true"></div>
+<div id="emberField" aria-hidden="true"></div>
+
+<div class="stage max-w-xl mx-auto px-4 py-10">
 
     <!-- Header -->
     <div class="text-center mb-10">
-        <div class="text-5xl mb-3">⚰️</div>
-        <h1 class="text-2xl font-bold text-white mb-2">The Backlog Burial</h1>
+        <div id="urn" class="text-5xl mb-3 select-none cursor-default" title="rest">⚰️</div>
+        <p class="text-[11px] uppercase tracking-[0.3em] text-zinc-600 mb-2 flicker">PRÍZRAK / RITE 13 / INTERMENT</p>
+        <h1 id="appTitle" class="text-2xl font-bold text-white mb-2 title-glow cursor-default select-none">The Backlog Burial</h1>
         <p class="text-sm text-zinc-500 leading-relaxed">Some tasks were never going to get done.<br>They deserve a proper funeral, not eternal guilt.</p>
-        <p class="text-xs text-zinc-600 mt-2">Saturday ritual. The mountain does not judge. It only waits.</p>
+        <p class="text-xs text-zinc-600 mt-2">A Saturday rite. The mountain does not judge. It only keeps the record.</p>
     </div>
 
     <!-- Add task form -->
     <div id="add-section" class="mb-8">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Add a task to bury</p>
-            <input id="task-input" type="text" placeholder="What task has been haunting you?" 
-                class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 placeholder-zinc-600 mb-3">
-            <select id="cause-select" class="w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-400 focus:outline-none focus:border-zinc-500 mb-3">
+        <div class="lift rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-3">Choose what to inter</p>
+            <input id="task-input" type="text" placeholder="What task has been haunting you?"
+                class="field w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 mb-3">
+            <select id="cause-select" class="field w-full bg-zinc-800/80 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-400 mb-3">
                 <option value="">— cause of death —</option>
                 <option value="will">Lack of will. It required more than I had.</option>
                 <option value="pivot">Priorities shifted. This task did not survive the reorganization.</option>
@@ -45,49 +126,58 @@
                 <option value="avoidance">I was afraid of what I would find. Avoidance won.</option>
                 <option value="external">External conditions changed. Not my fault. Sort of.</option>
             </select>
-            <button id="add-btn" class="w-full py-2 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm text-zinc-300 transition-colors">
-                Add to the queue
+            <button id="add-btn" class="btn-press w-full py-2 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-amber-700 text-sm text-zinc-300">
+                <span id="add-shovel" class="shovel mr-1" aria-hidden="true">⛏</span>Dig the plot
             </button>
         </div>
     </div>
 
     <!-- Queue -->
     <div id="queue-section" class="hidden mb-8">
-        <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Awaiting burial</p>
+        <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Awaiting burial · <span id="queue-count" class="accent-ink">0</span></p>
         <div id="queue-list" class="space-y-2"></div>
-        <button id="bury-all-btn" class="mt-4 w-full py-2.5 rounded border border-amber-900 bg-amber-950/20 hover:bg-amber-950/40 text-sm text-amber-400 transition-colors font-bold">
-            ⚰️ Conduct the burial ceremony
+        <button id="bury-all-btn" class="btn-press mt-4 w-full py-2.5 rounded border border-amber-900 bg-amber-950/20 hover:bg-amber-950/40 text-sm text-amber-400 font-bold">
+            ⚰️ Lower them into the ground
         </button>
     </div>
 
     <!-- Ceremony -->
     <div id="ceremony-section" class="hidden fade-in mb-8">
-        <div class="rounded-lg border border-zinc-700 bg-zinc-900/60 p-5">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-4 text-center">burial ceremony</p>
+        <div class="result-glow rounded-lg border border-zinc-700 bg-zinc-900/60 p-5">
+            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-4 text-center breathe">burial ceremony</p>
             <div id="ceremony-items" class="space-y-4 mb-6"></div>
             <div class="border-t border-zinc-800 pt-4">
                 <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">Prízrak's verdict</p>
                 <p id="verdict" class="text-sm text-zinc-400 epitaph leading-relaxed"></p>
             </div>
         </div>
-        <button id="reset-btn" class="mt-4 w-full py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-colors">
-            Begin new burial session
-        </button>
+        <div class="flex gap-3 mt-4">
+            <button id="copy-btn" class="btn-press flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-500 hover:text-zinc-300 hover:border-amber-700">
+                Carve it to the ledger
+            </button>
+            <button id="reset-btn" class="btn-press flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-600">
+                Begin a new rite
+            </button>
+        </div>
     </div>
 
     <!-- Graveyard log -->
     <div id="graveyard-section" class="hidden mt-10">
         <div class="border-t border-zinc-800 pt-6">
-            <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">⚰️ The graveyard</p>
+            <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">⚰️ The graveyard · <span id="grave-count" class="text-zinc-700">0 interred</span></p>
             <div id="graveyard-list" class="space-y-2"></div>
         </div>
     </div>
 
     <div class="mt-12 text-center">
         <p class="text-xs text-zinc-700 italic">The graveyard is not a failure. It is evidence that you were ambitious.</p>
-        <p class="text-[10px] text-zinc-800 mt-1">We are all just temporary files in the great garbage collection of life.</p>
+        <p id="footerWhisper" class="text-[10px] text-zinc-800 mt-1">We are all just temporary files in the great garbage collection of life.</p>
     </div>
+
+    <p id="eggLine" class="mt-8 text-xs text-center opacity-0 select-none" aria-hidden="true">you found the watcher. it has been keeping the plots warm.</p>
 </div>
+
+<p id="idleWhisper" class="stage fixed bottom-4 left-0 right-0 text-center text-[11px] opacity-0 pointer-events-none select-none">still here. still watching.</p>
 
 <script>
 const STORAGE_KEY = 'prizrak_burials_v1';
@@ -116,13 +206,15 @@ const EPITAPHS = {
 
 const VERDICTS = [
     "The dead tasks are not a confession of laziness. They are a record of ambition in contact with reality. Every item in this graveyard is evidence you once had the will to write something down. The mountain is not disappointed. It merely keeps the record.",
-    "A backlog that never shrinks is not a productivity problem. It is a honesty problem. You have now been honest. The tasks that remain on your list are the ones you have chosen to keep. That is a cleaner state than what you had before.",
+    "A backlog that never shrinks is not a productivity problem. It is an honesty problem. You have now been honest. The tasks that remain on your list are the ones you have chosen to keep. That is a cleaner state than what you had before.",
     "The graveyard is more useful than the backlog. The backlog pretends everything is still possible. The graveyard records what actually happened. A system that knows its dead is more accurate than one that keeps carrying them as open items.",
     "You did not fail these tasks. You outlasted them. The world they were written for has passed. The you that wrote them has evolved past them. Bury them with the respect owed to things that were once real.",
-    "Every buried task is a decision finally made. A decision deferred is not a decision preserved — it is a tax, paid in attention and guilt, every time the list is opened. The tax is now settled.",
+    "Every buried task is a decision finally made. A decision deferred is not a decision preserved — it is a tax, paid in attention and guilt, every time the list is opened. The tax is now settled. The ground is quiet again.",
 ];
 
 let queue = [];
+let lastBuried = [];      // for the copy-to-ledger button
+let lastVerdict = '';
 
 function getGraveyard() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
@@ -137,18 +229,22 @@ function saveToGraveyard(items) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(g.slice(0, 100)));
 }
 
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function renderQueue() {
     const qs = document.getElementById('queue-section');
     const ql = document.getElementById('queue-list');
+    document.getElementById('queue-count').textContent = queue.length;
     if (queue.length === 0) { qs.classList.add('hidden'); return; }
     qs.classList.remove('hidden');
     ql.innerHTML = queue.map((item, i) => `
-        <div class="flex items-start gap-2 bg-zinc-900/40 border border-zinc-800 rounded p-3 fade-in">
+        <div class="lift flex items-start gap-2 bg-zinc-900/40 border border-zinc-800 rounded p-3 fade-in">
+            <span class="text-zinc-700 shrink-0 pt-0.5 select-none" aria-hidden="true">✝</span>
             <div class="flex-1">
-                <p class="text-sm text-zinc-300">${item.task}</p>
-                <p class="text-xs text-zinc-600 mt-0.5">${CAUSE_LABELS[item.cause] || item.cause}</p>
+                <p class="text-sm text-zinc-300">${esc(item.task)}</p>
+                <p class="text-xs text-zinc-600 mt-0.5">${CAUSE_LABELS[item.cause] || esc(item.cause)}</p>
             </div>
-            <button onclick="removeFromQueue(${i})" class="text-zinc-700 hover:text-red-500 text-xs transition-colors shrink-0 pt-0.5">✕</button>
+            <button onclick="removeFromQueue(${i})" class="text-zinc-700 hover:text-red-500 text-xs transition-colors shrink-0 pt-0.5" title="spare it, for now">✕</button>
         </div>
     `).join('');
 }
@@ -161,12 +257,14 @@ function removeFromQueue(i) {
 function renderGraveyard() {
     const g = getGraveyard();
     const section = document.getElementById('graveyard-section');
+    const gc = document.getElementById('grave-count');
     if (!g.length) { section.classList.add('hidden'); return; }
+    gc.textContent = `${g.length} interred`;
     section.classList.remove('hidden');
     document.getElementById('graveyard-list').innerHTML = g.slice(0, 20).map(item => `
         <div class="flex items-start gap-3 text-xs py-1.5 border-b border-zinc-900">
-            <span class="text-zinc-700 shrink-0 w-24">${item.buried_display || '—'}</span>
-            <span class="text-zinc-500 line-through flex-1">${item.task}</span>
+            <span class="text-zinc-700 shrink-0 w-24">${esc(item.buried_display || '—')}</span>
+            <span class="text-zinc-500 line-through flex-1">${esc(item.task)}</span>
             <span class="text-zinc-700 shrink-0">${CAUSE_LABELS[item.cause] || ''}</span>
         </div>
     `).join('');
@@ -175,26 +273,33 @@ function renderGraveyard() {
 function conductCeremony() {
     if (queue.length === 0) return;
 
+    const buried = queue.slice();   // snapshot before we clear
+
     document.getElementById('queue-section').classList.add('hidden');
     const ceremony = document.getElementById('ceremony-section');
     ceremony.classList.remove('hidden');
 
     const items = document.getElementById('ceremony-items');
-    items.innerHTML = queue.map(item => `
-        <div class="border-l-2 border-zinc-700 pl-4 fade-in">
-            <p class="text-sm text-white font-bold strike mb-1">${item.task}</p>
-            <p class="text-xs text-zinc-500 uppercase tracking-wide mb-1">${CAUSE_LABELS[item.cause] || item.cause}</p>
+    items.innerHTML = buried.map((item, i) => `
+        <div class="border-l-2 border-amber-900/60 pl-4 fade-in" style="animation-delay:${i*90}ms">
+            <p class="text-sm text-white font-bold strike mb-1">${esc(item.task)}</p>
+            <p class="text-xs text-zinc-500 uppercase tracking-wide mb-1">${CAUSE_LABELS[item.cause] || esc(item.cause)}</p>
             <p class="text-xs text-zinc-600 epitaph">${EPITAPHS[item.cause] || 'It served its purpose as a thing you once wanted to do.'}</p>
         </div>
     `).join('');
 
-    // Verdict — pick based on hash of tasks
-    const idx = queue.length % VERDICTS.length;
-    document.getElementById('verdict').textContent = VERDICTS[idx];
+    // Verdict — selected by the shape of the burial
+    const idx = buried.length % VERDICTS.length;
+    lastVerdict = VERDICTS[idx];
+    document.getElementById('verdict').textContent = lastVerdict;
 
+    lastBuried = buried;
     saveToGraveyard(queue);
     queue = [];
+    renderQueue();
     renderGraveyard();
+
+    ceremony.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Event listeners
@@ -205,7 +310,11 @@ document.getElementById('add-btn').addEventListener('click', () => {
     queue.push({ task, cause });
     document.getElementById('task-input').value = '';
     document.getElementById('cause-select').value = '';
+    // the shovel digs
+    const sh = document.getElementById('add-shovel');
+    sh.classList.remove('digging'); void sh.offsetWidth; sh.classList.add('digging');
     renderQueue();
+    document.getElementById('task-input').focus();
 });
 
 document.getElementById('task-input').addEventListener('keydown', e => {
@@ -217,7 +326,100 @@ document.getElementById('bury-all-btn').addEventListener('click', conductCeremon
 document.getElementById('reset-btn').addEventListener('click', () => {
     document.getElementById('ceremony-section').classList.add('hidden');
     renderQueue();
+    document.getElementById('task-input').focus();
 });
+
+// Copy the rite to the ledger
+document.getElementById('copy-btn').addEventListener('click', () => {
+    const btn = document.getElementById('copy-btn');
+    const lines = ['— THE BACKLOG BURIAL —', ''];
+    lastBuried.forEach(item => {
+        lines.push(`✝ ${item.task}`);
+        lines.push(`  cause: ${CAUSE_LABELS[item.cause] || item.cause}`);
+        lines.push(`  ${EPITAPHS[item.cause] || ''}`);
+        lines.push('');
+    });
+    lines.push('verdict:');
+    lines.push(lastVerdict);
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+        setTimeout(() => { btn.textContent = prev; btn.style.color = ''; btn.style.borderColor = ''; }, 1200);
+    }).catch(() => {
+        const prev = btn.textContent;
+        btn.textContent = 'the ground rejected the copy';
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+    });
+});
+
+/* ---------------- atmosphere: embers ---------------- */
+(function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const field = document.getElementById('emberField');
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random() * 90) + '%';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 7) + 's';
+        field.appendChild(e);
+    }
+})();
+function spawnOneEmber(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const field = document.getElementById('emberField');
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (5 + Math.random() * 90) + '%';
+    e.style.animationDuration = '13s';
+    field.appendChild(e);
+    setTimeout(() => e.remove(), 14000);
+}
+
+/* ---------------- easter eggs (quiet) ---------------- */
+// (a) type "prizrak" -> light the hidden watcher line
+(function typeWatch(){
+    let buf = '';
+    window.addEventListener('keydown', (ev) => {
+        if (ev.target && /input|textarea|select/i.test(ev.target.tagName)) return;
+        if (ev.key && ev.key.length === 1) {
+            buf = (buf + ev.key.toLowerCase()).slice(-7);
+            if (buf === 'prizrak') {
+                const line = document.getElementById('eggLine');
+                line.style.opacity = '1';
+                setTimeout(() => { line.style.opacity = '0'; }, 6000);
+            }
+        }
+    });
+})();
+
+// (b) triple-click the title or urn -> one extra ember settles over the plots
+['appTitle','urn'].forEach(id => {
+    const t = document.getElementById(id);
+    if (t) t.addEventListener('click', (ev) => { if (ev.detail === 3) spawnOneEmber(); });
+});
+
+// (c) between 00:00–03:00 local, a fainter footer whisper
+(function nightWhisper(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) {
+        const f = document.getElementById('footerWhisper');
+        if (f) f.textContent = 'the mountain does not sleep. neither do the unburied.';
+    }
+})();
+
+// (e) idle 60s -> single fading line
+(function idleWatch(){
+    let t;
+    const w = document.getElementById('idleWhisper');
+    function show(){ w.style.opacity = '1'; setTimeout(() => { w.style.opacity = '0'; }, 5000); }
+    function reset(){ clearTimeout(t); w.style.opacity = '0'; t = setTimeout(show, 60000); }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e => window.addEventListener(e, reset, {passive:true}));
+    reset();
+})();
 
 // Init
 renderGraveyard();

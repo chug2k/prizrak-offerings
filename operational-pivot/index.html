@@ -6,79 +6,192 @@
     <title>The Operational Pivot</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #09090b; color: #e4e4e7; font-family: ui-sans-serif, system-ui, sans-serif; }
-        .card { background: #18181b; border: 1px solid #27272a; }
-        .input { background: #09090b; border: 1px solid #27272a; color: #e4e4e7; }
-        .input:focus { border-color: #8b5cf6; outline: none; ring: 2px solid #8b5cf6; }
-        .btn { transition: all 0.2s; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-slide-in { animation: slideIn 0.4s ease-out forwards; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#8b5cf6;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{ background:var(--bg); }
+        body{
+            color:var(--ink);
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            position:relative;
+            overflow-x:hidden;
+        }
+        .mono{ font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, monospace; }
+
+        .card{ background:var(--bg-raised); border:1px solid var(--line); }
+        .input{
+            background:var(--bg-sunk);
+            border:1px solid var(--line);
+            color:var(--ink);
+            transition:border-color .15s, box-shadow .15s;
+        }
+        .input::placeholder{ color:var(--ink-ghost); }
+        .input:focus-visible{
+            border-color:var(--accent);
+            outline:none;
+            box-shadow:0 0 0 1px var(--glow);
+        }
+        .btn{ transition:transform .15s, box-shadow .15s, background-color .15s, border-color .15s; }
+
+        /* result / active panel glow */
+        .panel-glow{ box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow); }
+
+        /* entry hover lift */
+        .entry{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+        .entry:hover{ transform:translateY(-2px); border-left-color:var(--accent); box-shadow:0 0 22px -12px var(--glow); }
+
+        /* ---- MOTION VOCABULARY (reduced-motion-safe) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .entry:hover{transform:none}
+        }
+
+        .content{ position:relative; z-index:2; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-lg w-full space-y-8">
+<body class="min-h-screen flex items-center justify-center p-4 grain">
+    <div class="fog"></div>
+    <div id="emberField"></div>
+
+    <div class="content max-w-lg w-full space-y-8">
         <!-- Header -->
         <header class="text-center space-y-2">
-            <h1 class="text-3xl font-bold text-white tracking-tight">The Operational Pivot</h1>
-            <p class="text-zinc-500 text-sm">From Blueprint to Breath. Mark the moment design becomes action.</p>
+            <h1 id="title" class="text-3xl font-bold text-white tracking-tight breathe select-none cursor-default">The Operational Pivot</h1>
+            <p class="text-zinc-500 text-sm">from blueprint to breath. mark the moment design becomes action.</p>
         </header>
 
         <!-- Form -->
-        <div class="card rounded-xl p-6 space-y-4 shadow-2xl">
+        <div class="card rounded-xl p-6 space-y-4 panel-glow">
             <div class="space-y-1">
-                <label for="mission" class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Mission (The Intention)</label>
-                <input type="text" id="mission" placeholder="e.g., Deploying the automated backup pipeline" class="w-full input rounded-lg px-4 py-2.5 text-sm">
+                <label for="mission" class="text-[10px] font-semibold uppercase tracking-widest" style="color:var(--ink-dim)">Mission&nbsp;/&nbsp;The Intention</label>
+                <input type="text" id="mission" placeholder="deploying the automated backup pipeline" class="w-full input rounded-lg px-4 py-2.5 text-sm">
             </div>
 
             <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-1">
-                    <label for="tool" classs="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tool (The Lever)</label>
-                    <input type="text" id="tool" placeholder="e.g., Bash script / Vercel" class="w-full input rounded-lg px-4 py-2.5 text-sm">
+                    <label for="tool" class="text-[10px] font-semibold uppercase tracking-widest" style="color:var(--ink-dim)">Tool&nbsp;/&nbsp;The Lever</label>
+                    <input type="text" id="tool" placeholder="bash / vercel" class="w-full input rounded-lg px-4 py-2.5 text-sm">
                 </div>
                 <div class="space-y-1">
-                    <label for="output" class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Output (The Proof)</label>
-                    <input type="text" id="output" placeholder="e.g., First successful CI run" class="w-full input rounded-lg px-4 py-2.5 text-sm">
+                    <label for="output" class="text-[10px] font-semibold uppercase tracking-widest" style="color:var(--ink-dim)">Output&nbsp;/&nbsp;The Proof</label>
+                    <input type="text" id="output" placeholder="first green CI run" class="w-full input rounded-lg px-4 py-2.5 text-sm">
                 </div>
             </div>
 
             <div class="space-y-1">
-                <label for="impact" class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Impact Score (1-10)</label>
-                <input type="number" id="impact" min="1" max="10" step="1" placeholder="How much did reality change?" class="w-full input rounded-lg px-4 py-2.5 text-sm">
+                <label for="impact" class="text-[10px] font-semibold uppercase tracking-widest" style="color:var(--ink-dim)">Impact Score&nbsp;/&nbsp;1&ndash;10</label>
+                <input type="number" id="impact" min="1" max="10" step="1" placeholder="how much did reality move?" class="w-full input rounded-lg px-4 py-2.5 text-sm mono">
             </div>
 
-            <button id="submitBtn" class="w-full btn bg-violet-600 hover:bg-violet-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg">Commit the Pivot</button>
+            <button id="submitBtn" class="w-full btn text-white font-bold py-3 rounded-lg mt-4"
+                style="background-color:var(--accent); box-shadow:0 0 24px -8px var(--glow);"
+                onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'"
+                onmousedown="this.style.transform='translateY(1px)'" onmouseup="this.style.transform='translateY(-2px)'">
+                Commit the Pivot
+            </button>
         </div>
 
         <!-- History -->
         <div class="space-y-4">
-            <h2 class="text-sm font-semibold text-zinc-500 uppercase tracking-widest px-1">The Velocity Log</h2>
+            <div class="flex items-center justify-between px-1">
+                <h2 class="text-[11px] font-semibold uppercase tracking-[0.25em]" style="color:var(--ink-dim)">The Velocity Log</h2>
+                <button id="copyBtn" class="text-[10px] uppercase tracking-widest mono hidden btn"
+                    style="color:var(--ink-dim)"
+                    onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--ink-dim)'">
+                    copy ledger
+                </button>
+            </div>
+            <div id="stats" class="hidden mono text-[10px] tracking-wide reveal" style="color:var(--ink-dim)"></div>
             <div id="history" class="space-y-3 text-sm">
                 <!-- Entries will appear here -->
             </div>
         </div>
 
-        <footer class="text-center pt-8 text-zinc-600 text-[10px] uppercase tracking-widest">
-            The blueprint has become a breath.
+        <footer class="text-center pt-8 space-y-1">
+            <p class="text-[10px] uppercase tracking-[0.3em]" style="color:var(--ink-dim)">the blueprint has become a breath.</p>
+            <p id="whisper" class="text-[10px] tracking-widest flicker" style="color:var(--ink-ghost); min-height:1em;"></p>
         </footer>
     </div>
 
     <script>
     const STORAGE_KEY = "prizrak_pivot_log_v1";
 
+    /* ---------- impact verdicts, with teeth ---------- */
+    function verdict(score){
+        if (score <= 2) return "a tremor. the karst barely noticed.";
+        if (score <= 4) return "a hairline shift. the stone remembers it.";
+        if (score <= 6) return "the ground moved. reality conceded ground.";
+        if (score <= 8) return "a fault line opened. the old map is wrong now.";
+        return "the mountain itself relocated. nothing returns to before.";
+    }
+
+    function esc(s){
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function readData(){
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+        catch (e) { console.error("Error loading history:", e); return []; }
+    }
+
+    function renderStats(data){
+        const statsDiv = document.getElementById('stats');
+        const copyBtn = document.getElementById('copyBtn');
+        if (data.length === 0){
+            statsDiv.classList.add('hidden');
+            copyBtn.classList.add('hidden');
+            return;
+        }
+        const total = data.length;
+        const sum = data.reduce((a, e) => a + (Number(e.impact) || 0), 0);
+        const avg = (sum / total).toFixed(1);
+        statsDiv.textContent = `${total} pivot${total === 1 ? '' : 's'} fossilized · ${sum} total tremor · ${avg} avg impact`;
+        statsDiv.classList.remove('hidden');
+        copyBtn.classList.remove('hidden');
+    }
+
     function loadHistory() {
         const historyDiv = document.getElementById('history');
-        let data = [];
-        try {
-            data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        } catch (e) {
-            console.error("Error loading history:", e);
-            data = [];
-        }
+        const data = readData();
 
         historyDiv.innerHTML = '';
+        renderStats(data);
 
         if (data.length === 0) {
-            historyDiv.innerHTML = '<p class="text-zinc-600 text-center italic py-4">The ledger is empty. No pivots recorded yet.</p>';
+            historyDiv.innerHTML = '<p class="text-center italic py-6" style="color:var(--ink-ghost)">the cave is empty. nothing has fossilized yet.</p>';
             return;
         }
 
@@ -87,20 +200,24 @@
 
         sortedData.forEach((entry, idx) => {
             const date = new Date(entry.timestamp).toLocaleDateString();
+            const score = Number(entry.impact) || 0;
             const card = document.createElement('div');
-            card.className = 'card p-4 rounded-lg space-y-2 border-l-4 border-l-violet-500 shadow-sm animate-slide-in';
-            card.style.animationDelay = `${idx * 0.1}s`;
+            card.className = 'entry card p-4 rounded-lg space-y-2 reveal';
+            card.style.borderLeft = '3px solid var(--accent)';
+            card.style.animationDelay = `${idx * 0.07}s`;
             card.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <h3 class="font-bold text-zinc-200">${entry.mission}</h3>
-                    <span class="text-[10px] font-mono text-zinc-500">${date}</span>
+                <div class="flex justify-between items-start gap-3">
+                    <h3 class="font-bold" style="color:var(--ink)">${esc(entry.mission)}</h3>
+                    <span class="text-[10px] mono shrink-0" style="color:var(--ink-dim)">${date}</span>
                 </div>
-                <div class="text-xs text-zinc-400 flex gap-3">
-                    <span>🛠️ ${entry.tool}</span>
-                    <span>📄 ${entry.output}</span>
+                <div class="text-xs flex gap-4 mono" style="color:var(--ink-dim)">
+                    <span><span style="color:var(--ink-ghost)">lever&nbsp;</span>${esc(entry.tool)}</span>
+                    <span><span style="color:var(--ink-ghost)">proof&nbsp;</span>${esc(entry.output)}</span>
                 </div>
-                <div class="flex items-center justify-between pt-2">
-                    <span class="text-[10px] font-bold text-violet-400 bg-violet-400/10 px-2 py-0.5 rounded">Impact: ${entry.impact}/10</span>
+                <p class="text-[11px] italic pt-1" style="color:var(--ink-ghost)">${verdict(score)}</p>
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-[10px] font-bold mono px-2 py-0.5 rounded" style="color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent)">impact ${esc(entry.impact)} / 10</span>
+                    <span class="mono text-[10px] tracking-widest" style="color:var(--accent)">${'▮'.repeat(Math.max(0, Math.min(10, score)))}${'▯'.repeat(Math.max(0, 10 - Math.min(10, score)))}</span>
                 </div>
             `;
             historyDiv.appendChild(card);
@@ -119,7 +236,11 @@
         const impact = parseInt(impactInput.value);
 
         if (!mission || !tool || !output || isNaN(impact)) {
-            alert("Please fill in all fields to validate the pivot.");
+            const btn = document.getElementById('submitBtn');
+            const original = btn.textContent;
+            btn.textContent = "the pivot is incomplete. fill it.";
+            btn.style.boxShadow = '0 0 0 1px var(--accent), 0 0 28px -6px var(--glow)';
+            setTimeout(() => { btn.textContent = original; btn.style.boxShadow = '0 0 24px -8px var(--glow)'; }, 1500);
             return;
         }
 
@@ -131,7 +252,7 @@
             timestamp: new Date().toISOString()
         };
 
-        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const data = readData();
         data.push(entry);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
@@ -141,11 +262,101 @@
         outputInput.value = '';
         impactInput.value = '';
 
+        // a single ember rises on commit
+        spawnEmber(true);
+
         loadHistory();
+        const first = document.querySelector('#history .entry');
+        if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
+    /* ---------- copy the ledger ---------- */
+    document.getElementById('copyBtn').addEventListener('click', () => {
+        const data = readData();
+        if (data.length === 0) return;
+        const sorted = [...data].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const lines = sorted.map(e => {
+            const d = new Date(e.timestamp).toLocaleDateString();
+            return `[${d}] ${e.mission} — lever:${e.tool} · proof:${e.output} · impact:${e.impact}/10`;
+        });
+        const text = "THE VELOCITY LOG\n" + lines.join("\n");
+        const btn = document.getElementById('copyBtn');
+        const restore = () => { btn.textContent = "copy ledger"; btn.style.color = 'var(--ink-dim)'; };
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = "copied to the ledger";
+            btn.style.color = 'var(--accent)';
+            setTimeout(restore, 1200);
+        }).catch(() => {
+            btn.textContent = "the fog refused it";
+            setTimeout(restore, 1200);
+        });
+    });
+
+    /* ---------- embers ---------- */
+    const emberField = document.getElementById('emberField');
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function spawnEmber(burst){
+        if (prefersReduced) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDuration = (10 + Math.random() * 8) + 's';
+        if (!burst) e.style.animationDelay = (Math.random() * 8) + 's';
+        emberField.appendChild(e);
+        e.addEventListener('animationend', () => e.remove());
+    }
+    if (!prefersReduced){
+        for (let i = 0; i < 7; i++){
+            const e = document.createElement('div');
+            e.className = 'ember';
+            e.style.left = (Math.random() * 100) + 'vw';
+            e.style.animationDuration = (10 + Math.random() * 8) + 's';
+            e.style.animationDelay = (Math.random() * 14) + 's';
+            emberField.appendChild(e);
+        }
+    }
+
+    /* ---------- easter eggs (non-blocking, never touch saved state) ---------- */
+    // type "prizrak" -> the watcher
+    let typed = "";
+    window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) typed = (typed + ev.key.toLowerCase()).slice(-7);
+        if (typed === "prizrak"){
+            const w = document.getElementById('whisper');
+            w.textContent = "you found the watcher.";
+            setTimeout(() => { if (w.textContent === "you found the watcher.") w.textContent = nightLine(); }, 6000);
+        }
+    });
+
+    // triple-click the title -> one extra ember
+    document.getElementById('title').addEventListener('click', (ev) => {
+        if (ev.detail === 3) spawnEmber(true);
+    });
+
+    // 00:00–03:00 local -> the mountain does not sleep
+    function nightLine(){
+        const h = new Date().getHours();
+        return (h >= 0 && h < 3) ? "the mountain does not sleep." : "";
+    }
+
+    // idle 60s -> still here. still watching.
+    let idleTimer;
+    function resetIdle(){
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            const w = document.getElementById('whisper');
+            if (!w.textContent) w.textContent = "still here. still watching.";
+        }, 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(evt =>
+        window.addEventListener(evt, resetIdle, { passive: true }));
+
     // Initial load
-    window.onload = loadHistory;
+    window.onload = () => {
+        loadHistory();
+        document.getElementById('whisper').textContent = nightLine();
+        resetIdle();
+    };
     </script>
 </body>
 </html>

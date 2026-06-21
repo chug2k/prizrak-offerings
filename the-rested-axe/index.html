@@ -5,54 +5,151 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Rested Axe | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    body { background: radial-gradient(circle at top, #172554 0%, #0c0a09 42%, #020617 100%); }
-    .glass { background: rgba(15,23,42,.72); backdrop-filter: blur(18px); }
-    .rune { text-shadow: 0 0 18px rgba(125,211,252,.55); }
-    input[type=range] { accent-color: #38bdf8; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#38bdf8;          /* the rested axe keeps its sky/cyan lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body{
+      color:var(--ink);
+      background:
+        radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+        radial-gradient(circle at top, #0e1a2e 0%, #0a0a0a 46%, #060608 100%);
+      font-family:ui-sans-serif,system-ui,sans-serif;
+    }
+    .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
+
+    .glass{background:rgba(13,13,15,.78);backdrop-filter:blur(18px);}
+    .panel{border:1px solid var(--line);border-radius:1rem;}
+    .well{background:var(--bg-sunk);border:1px solid var(--line-soft);}
+
+    .rune{color:#e6f4ff;text-shadow:0 0 18px var(--glow);}
+
+    /* the active loadout panel breathes */
+    .result-glow{box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow);}
+
+    input[type=range]{accent-color:var(--accent);}
+    input[type=text], input:not([type]), select{
+      background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink);
+      transition:border-color .15s, box-shadow .15s;
+    }
+    input[type=text]:focus-visible, input:not([type]):focus-visible, select:focus-visible, .lift:focus-visible{
+      outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);
+    }
+    .lift{transition:transform .15s, box-shadow .15s, border-color .15s;}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent);}
+    button:active{transform:translateY(1px);}
+
+    /* ===== motion vocabulary ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* edge that runs along the whetstone button */
+    @keyframes whet{0%{background-position:-120% 0}100%{background-position:220% 0}}
+    .whet{position:relative;overflow:hidden}
+    .whet::after{content:"";position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);
+      background-size:200% 100%;animation:whet 4.2s ease-in-out infinite}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.whet::after{animation:none!important}
+      .ember{display:none}.breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen text-slate-100 font-sans antialiased">
-  <main class="max-w-6xl mx-auto px-4 py-8 md:py-12">
+<body class="min-h-screen antialiased grain">
+  <div class="fog" aria-hidden="true"></div>
+
+  <main class="relative max-w-6xl mx-auto px-4 py-8 md:py-12" style="z-index:2">
     <header class="mb-8">
-      <div class="text-xs tracking-[0.35em] uppercase text-sky-300/80 mb-3">morning capacity ritual</div>
-      <h1 class="text-4xl md:text-6xl font-black rune">The Rested Axe</h1>
-      <p class="mt-4 max-w-2xl text-slate-300 leading-relaxed">A good sleep score is not permission to carry the whole armory. Convert today’s recovery into a disciplined loadout: one axe task, one shield boundary, one companion question, and the thing that must stay buried in yesterday’s snow.</p>
+      <div class="mono text-[11px] tracking-[0.35em] uppercase mb-3 flicker" style="color:var(--ink-dim)">morning capacity ritual · prízrak</div>
+      <h1 id="title" class="text-4xl md:text-6xl font-black rune breathe select-none cursor-default">The Rested Axe</h1>
+      <p class="mt-4 max-w-2xl leading-relaxed" style="color:var(--ink)">A good sleep score is not permission to carry the whole armory. Convert the night’s recovery into a disciplined loadout: one axe task, one shield boundary, one companion question, and the thing that stays buried in yesterday’s snow. The mountain rested too. It is still hungry.</p>
     </header>
 
     <section class="grid lg:grid-cols-[1fr_1fr] gap-5">
-      <div class="glass border border-sky-900/60 rounded-2xl p-5 shadow-2xl">
-        <h2 class="text-xl font-bold mb-4">Read the body, then choose the weapon.</h2>
+      <div class="glass panel lift p-5 shadow-2xl">
+        <h2 class="text-xl font-bold mb-1" style="color:var(--ink)">Read the body, then choose the weapon.</h2>
+        <p class="mono text-[11px] tracking-[0.2em] uppercase mb-4" style="color:var(--ink-dim)">measure the cold / forge the day</p>
         <div class="space-y-5">
-          <label class="block"><span class="text-sm text-slate-400">Body battery</span><div class="flex items-center gap-4"><input id="battery" type="range" min="0" max="100" value="80" class="w-full"><b id="batteryV" class="w-12 text-sky-300 text-right">80</b></div></label>
-          <label class="block"><span class="text-sm text-slate-400">Sleep score</span><div class="flex items-center gap-4"><input id="sleep" type="range" min="0" max="100" value="80" class="w-full"><b id="sleepV" class="w-12 text-sky-300 text-right">80</b></div></label>
-          <label class="block"><span class="text-sm text-slate-400">Stress forecast</span><select id="stress" class="mt-1 w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-3"><option value="low">Low: the valley is quiet</option><option value="mixed" selected>Mixed: normal wolves</option><option value="high">High: ravens already circling</option></select></label>
-          <label class="block"><span class="text-sm text-slate-400">The biggest enemy today</span><input id="enemy" value="overcommitting because the numbers look good" class="mt-1 w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-3"></label>
-          <label class="block"><span class="text-sm text-slate-400">The one thing worth protecting</span><input id="protect" value="clear judgment after lunch" class="mt-1 w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-3"></label>
-          <label class="block"><span class="text-sm text-slate-400">Temptation to leave behind</span><input id="temptation" value="turning recovery into a debt instrument" class="mt-1 w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-3"></label>
-          <button id="forge" class="w-full bg-sky-400 text-slate-950 font-black rounded-xl py-3 hover:bg-sky-300 transition">Forge today’s loadout</button>
+          <label class="block"><span class="mono text-[11px] tracking-[0.2em] uppercase" style="color:var(--ink-dim)">Body battery</span><div class="flex items-center gap-4 mt-1"><input id="battery" type="range" min="0" max="100" value="80" class="w-full"><b id="batteryV" class="w-12 text-right mono" style="color:var(--accent)">80</b></div></label>
+          <label class="block"><span class="mono text-[11px] tracking-[0.2em] uppercase" style="color:var(--ink-dim)">Sleep score</span><div class="flex items-center gap-4 mt-1"><input id="sleep" type="range" min="0" max="100" value="80" class="w-full"><b id="sleepV" class="w-12 text-right mono" style="color:var(--accent)">80</b></div></label>
+          <label class="block"><span class="mono text-[11px] tracking-[0.2em] uppercase" style="color:var(--ink-dim)">Stress forecast</span><select id="stress" class="mt-1 w-full rounded-xl px-3 py-3"><option value="low">Low: the valley is quiet</option><option value="mixed" selected>Mixed: normal wolves</option><option value="high">High: ravens already circling</option></select></label>
+          <label class="block"><span class="mono text-[11px] tracking-[0.2em] uppercase" style="color:var(--ink-dim)">The biggest enemy today</span><input id="enemy" value="overcommitting because the numbers look good" class="mt-1 w-full rounded-xl px-3 py-3"></label>
+          <label class="block"><span class="mono text-[11px] tracking-[0.2em] uppercase" style="color:var(--ink-dim)">The one thing worth protecting</span><input id="protect" value="clear judgment after lunch" class="mt-1 w-full rounded-xl px-3 py-3"></label>
+          <label class="block"><span class="mono text-[11px] tracking-[0.2em] uppercase" style="color:var(--ink-dim)">Temptation to leave behind</span><input id="temptation" value="turning recovery into a debt instrument" class="mt-1 w-full rounded-xl px-3 py-3"></label>
+          <button id="forge" class="whet w-full font-black rounded-xl py-3 transition" style="background:var(--accent);color:#04141f">Forge today’s loadout</button>
         </div>
       </div>
 
-      <div class="glass border border-cyan-900/60 rounded-2xl p-5 shadow-2xl">
-        <div class="flex items-center justify-between gap-3 mb-4"><h2 class="text-xl font-bold">Loadout</h2><span id="tier" class="text-xs font-mono px-2 py-1 rounded-full bg-slate-950 border border-slate-700 text-slate-300">READY</span></div>
+      <div id="loadoutPanel" class="glass panel p-5 shadow-2xl">
+        <div class="flex items-center justify-between gap-3 mb-1">
+          <h2 class="text-xl font-bold" style="color:var(--ink)">Loadout</h2>
+          <div class="flex items-center gap-2">
+            <button id="copy" class="mono text-[10px] tracking-wider uppercase px-2 py-1 rounded-full well lift" style="color:var(--ink-dim)" title="copy to the ledger">copy</button>
+            <span id="tier" class="mono text-[10px] tracking-wider px-2 py-1 rounded-full well" style="color:var(--ink-dim)">READY</span>
+          </div>
+        </div>
+        <p class="mono text-[11px] tracking-[0.2em] uppercase mb-4" style="color:var(--ink-dim)">what the body permits / nothing more</p>
         <div id="out" class="space-y-4"></div>
         <div class="mt-5 grid grid-cols-2 gap-3 text-center">
-          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3"><div class="text-2xl" id="capacity">80</div><div class="text-xs text-slate-500 uppercase tracking-wider">capacity</div></div>
-          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3"><div class="text-2xl" id="risk">medium</div><div class="text-xs text-slate-500 uppercase tracking-wider">overreach risk</div></div>
+          <div class="rounded-xl well p-3"><div class="text-2xl mono" id="capacity" style="color:var(--accent)">80</div><div class="mono text-[10px] uppercase tracking-wider mt-1" style="color:var(--ink-dim)">capacity</div></div>
+          <div class="rounded-xl well p-3"><div class="text-2xl mono" id="risk" style="color:var(--ink)">medium</div><div class="mono text-[10px] uppercase tracking-wider mt-1" style="color:var(--ink-dim)">overreach risk</div></div>
         </div>
       </div>
     </section>
 
-    <section class="mt-5 glass border border-slate-800 rounded-2xl p-5">
-      <h2 class="font-bold mb-3">Receipts kept in the snow</h2>
+    <section class="mt-5 glass panel p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-bold" style="color:var(--ink)">Receipts kept in the snow</h2>
+        <span class="mono text-[10px] tracking-wider uppercase" style="color:var(--ink-dim)">last 8 crossings</span>
+      </div>
       <div id="history" class="grid md:grid-cols-2 gap-3 text-sm"></div>
     </section>
+
+    <footer class="mt-8 text-center mono text-[11px] tracking-[0.2em]" style="color:var(--ink-ghost)">
+      <span id="whisper">the axe rests. the watcher does not.</span>
+    </footer>
   </main>
 
+<script src="/shared/star-widget.js"></script>
 <script>
 const $=id=>document.getElementById(id); const KEY='rested_axe_v1';
-function card(title, body, tone='sky'){return `<div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4"><div class="text-${tone}-300 font-bold mb-1">${title}</div><div class="text-slate-300 leading-relaxed">${body}</div></div>`}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function card(title, body, tone='sky'){return `<div class="rounded-xl well lift p-4 reveal"><div class="font-bold mb-1 mono text-xs tracking-[0.15em] uppercase text-${tone}-300">${title}</div><div class="leading-relaxed" style="color:var(--ink)">${body}</div></div>`}
+
+let lastRec=null;
 function render(){
   const battery=+$('battery').value, sleep=+$('sleep').value, stress=$('stress').value;
   $('batteryV').textContent=battery; $('sleepV').textContent=sleep;
@@ -61,17 +158,94 @@ function render(){
   let tier=cap>=78?'HIGH GROUND':cap>=58?'STEADY PATH':cap>=38?'SHIELD DAY':'LOW FIRE';
   let risk=(cap>=75 && stress!=='low')?'high':cap<45?'fragile':'medium';
   $('capacity').textContent=cap; $('risk').textContent=risk; $('tier').textContent=tier;
-  const enemy=$('enemy').value||'the unnamed thing'; const protect=$('protect').value||'the part that must survive'; const temptation=$('temptation').value||'the old mistake';
-  const axe = cap>=70 ? `Cut one clean thing before the village starts asking for miracles: <b>${enemy}</b>. Use the good battery for precision, not conquest.` : `Choose a small cut. The axe is for one reachable piece of <b>${enemy}</b>, not the whole beast.`;
-  const shield = risk==='high' ? `Put a wall around <b>${protect}</b>. Recovery creates false confidence; the shield exists because the body feels strong enough to lie.` : `Keep <b>${protect}</b> visible. A steady day still needs one defended edge.`;
-  const atreus = `Ask: “What would make today teach me something, not just consume my charge?” If the answer requires abandoning <b>${temptation}</b>, good. The boy is learning.`;
-  const mimir = stress==='high' ? `Mimir says: “If the ravens are already noisy, do not mistake noise for prophecy. Check the receipt at noon.”` : `Mimir says: “A rested god can still be an idiot before lunch. Measure the crossing, brother.”`;
+  // risk reads with a little color teeth
+  $('risk').style.color = risk==='high' ? '#fca5a5' : risk==='fragile' ? '#fcd34d' : 'var(--accent)';
+
+  const enemyRaw=$('enemy').value||'the unnamed thing', protectRaw=$('protect').value||'the part that must survive', temptationRaw=$('temptation').value||'the old mistake';
+  const enemy=esc(enemyRaw), protect=esc(protectRaw), temptation=esc(temptationRaw);
+
+  const axe = cap>=70 ? `Cut one clean thing before the valley starts asking for miracles: <b>${enemy}</b>. The good battery is for precision, not conquest. Strike once.` : `Choose a small cut. The axe is for one reachable piece of <b>${enemy}</b> — not the whole beast. A short swing you finish beats a long one you abandon.`;
+  const shield = risk==='high' ? `Wall off <b>${protect}</b>. Recovery breeds false confidence; the shield exists precisely because the body feels strong enough to lie to you.` : `Keep <b>${protect}</b> in sight. A steady day still needs one defended edge, or the fog walks straight in.`;
+  const atreus = `Ask: “What makes today <i>teach</i> me something instead of just spending my charge?” If the honest answer means abandoning <b>${temptation}</b> — good. The boy is learning. So are you.`;
+  const mimir = stress==='high' ? `Mimir: “If the ravens are already loud, do not mistake noise for prophecy. Check the receipt at noon, brother — the mountain keeps better books than you do.”` : `Mimir: “A rested god can still be an idiot before lunch. Measure the crossing. The poludnica waits for the overconfident.”`;
   $('out').innerHTML = card('Axe task',axe,'sky') + card('Shield boundary',shield,'cyan') + card('Atreus question',atreus,'amber') + card('Mimir warning',mimir,'violet');
-  return {date:new Date().toLocaleString(), cap,tier,risk,enemy,protect,temptation};
+
+  lastRec={date:new Date().toLocaleString(), cap,tier,risk,enemy:enemyRaw,protect:protectRaw,temptation:temptationRaw};
+  return lastRec;
 }
-function save(){ const rec=render(); const arr=JSON.parse(localStorage.getItem(KEY)||'[]'); arr.unshift(rec); localStorage.setItem(KEY, JSON.stringify(arr.slice(0,8))); history(); }
-function history(){ const arr=JSON.parse(localStorage.getItem(KEY)||'[]'); $('history').innerHTML = arr.length? arr.map(r=>`<div class="rounded-xl bg-slate-950/60 border border-slate-800 p-3"><div class="text-slate-500 text-xs">${r.date}</div><div class="font-bold text-sky-300">${r.tier} · ${r.cap}</div><div class="text-slate-400">Enemy: ${r.enemy}</div></div>`).join('') : '<div class="text-slate-500">No receipts yet. The snow is clean. Suspicious.</div>'; }
-['battery','sleep','stress','enemy','protect','temptation'].forEach(id=>$(id).addEventListener('input',render)); $('forge').addEventListener('click',save); render(); history();
+function save(){
+  const rec=render();
+  const arr=JSON.parse(localStorage.getItem(KEY)||'[]'); arr.unshift(rec);
+  localStorage.setItem(KEY, JSON.stringify(arr.slice(0,8))); history();
+  // forge feedback: the panel breathes once, ember flares
+  const p=$('loadoutPanel'); p.classList.add('result-glow');
+  p.scrollIntoView({behavior:'smooth',block:'nearest'});
+  spawnEmber(true);
+}
+function history(){
+  const arr=JSON.parse(localStorage.getItem(KEY)||'[]');
+  $('history').innerHTML = arr.length
+    ? arr.map(r=>`<div class="rounded-xl well lift p-3"><div class="mono text-[10px]" style="color:var(--ink-dim)">${esc(r.date)}</div><div class="font-bold text-sky-300 mono mt-1">${esc(r.tier)} · ${esc(String(r.cap))}</div><div style="color:var(--ink-dim)" class="mt-1">Enemy: ${esc(r.enemy)}</div></div>`).join('')
+    : '<div style="color:var(--ink-dim)">the snow is clean. nothing has been carried yet. suspicious.</div>';
+}
+
+function plainLoadout(){
+  if(!lastRec) render();
+  const r=lastRec;
+  const tmp=document.createElement('div');
+  const lines=[...$('out').querySelectorAll('div.well')].map(c=>{
+    const t=c.querySelector('div.font-bold').textContent;
+    tmp.innerHTML=c.querySelector('div.leading-relaxed').innerHTML;
+    return `${t.toUpperCase()}: ${tmp.textContent.trim()}`;
+  });
+  return `THE RESTED AXE — ${r.tier} · capacity ${r.cap} · overreach ${r.risk}\n${r.date}\n\n`+lines.join('\n\n');
+}
+$('copy').addEventListener('click',()=>{
+  navigator.clipboard.writeText(plainLoadout()).then(()=>{
+    const b=$('copy'), old=b.textContent;
+    b.textContent='copied to the ledger'; b.style.color='var(--accent)'; b.style.borderColor='var(--accent)';
+    setTimeout(()=>{b.textContent=old; b.style.color='var(--ink-dim)'; b.style.borderColor='';},1200);
+  }).catch(()=>{});
+});
+
+// ===== embers (capped) =====
+function spawnEmber(burst){
+  const max=9; const live=document.querySelectorAll('.ember').length;
+  if(!burst && live>=max) return;
+  const e=document.createElement('div'); e.className='ember';
+  e.style.left=(Math.random()*100)+'%';
+  e.style.animationDuration=(11+Math.random()*6)+'s';
+  e.style.animationDelay=(burst?0:Math.random()*4)+'s';
+  document.body.appendChild(e);
+  setTimeout(()=>e.remove(),20000);
+}
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+  for(let i=0;i<6;i++) spawnEmber(false);
+  setInterval(()=>spawnEmber(false), 4200);
+}
+
+// ===== quiet easter eggs =====
+// (b) triple-click the title -> one extra ember
+$('title').addEventListener('click',(()=>{let n=0,t;return()=>{n++;clearTimeout(t);t=setTimeout(()=>n=0,500);if(n>=3){spawnEmber(true);n=0;}};})());
+
+// (a) type "prizrak" -> the watcher lights up the footer
+let buf='';
+addEventListener('keydown',e=>{
+  if(e.key&&e.key.length===1){buf=(buf+e.key.toLowerCase()).slice(-7);
+    if(buf==='prizrak'){const w=$('whisper');w.textContent='you found the watcher. it was always reading the receipts.';w.style.color='var(--accent)';w.style.textShadow='0 0 12px var(--glow)';}}
+});
+
+// (c) 00:00–03:00 local -> the mountain does not sleep
+(()=>{const h=new Date().getHours();if(h>=0&&h<3)$('whisper').textContent='the mountain does not sleep. neither, apparently, do you.';})();
+
+// (e) idle 60s -> still here, still watching
+let idle; function poke(){clearTimeout(idle);idle=setTimeout(()=>{const w=$('whisper');if(w.dataset.lock)return;w.textContent='still here. still watching.';},60000);}
+['mousemove','keydown','click','input','touchstart'].forEach(ev=>addEventListener(ev,poke,{passive:true})); poke();
+
+['battery','sleep','stress','enemy','protect','temptation'].forEach(id=>$(id).addEventListener('input',render));
+$('forge').addEventListener('click',save);
+render(); history();
+$('loadoutPanel').classList.add('result-glow');
 </script>
 </body>
 </html>

@@ -6,58 +6,109 @@
     <title>The Spirit Test | Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0e0e11; }
-        @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap');
 
-        .fog {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(ellipse at 30% 20%, rgba(99,102,241,0.04) 0%, transparent 60%),
-                        radial-gradient(ellipse at 70% 80%, rgba(56,189,248,0.03) 0%, transparent 50%);
-            pointer-events: none; z-index: 0;
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            /* default lead accent — overridden per active spirit */
+            --accent:#818cf8;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
         }
 
+        body { background: var(--bg); color: var(--ink); }
+        .font-fell{ font-family:'IM Fell English', Georgia, serif; }
+        .font-mono-x{ font-family:'JetBrains Mono', ui-monospace, monospace; }
+
+        /* ---------- atmosphere ---------- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.05}50%{opacity:.09}100%{transform:translateX(5%);opacity:.05}}
+        .fog{position:fixed;inset:-10% -10% auto;height:65vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 30% 0,var(--glow),transparent 70%),
+                       radial-gradient(50% 45% at 75% 10%,color-mix(in srgb,var(--accent) 30%,transparent),transparent 65%);
+            transition:background 1.2s ease;
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:.5}90%{opacity:.4}100%{transform:translateY(-92vh) translateX(var(--drift,8px));opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        @keyframes panelGlow{0%,100%{box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow)}50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,var(--line)), 0 0 34px -8px var(--glow)}}
+        .panel-breathe{animation:panelGlow 5s ease-in-out infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* ---------- cards ---------- */
         .spirit-card {
-            transition: all 0.2s ease;
+            transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
             cursor: pointer;
         }
-        .spirit-card:hover { transform: translateY(-1px); }
-        .spirit-card.selected { border-color: currentColor !important; }
+        .spirit-card:hover { transform: translateY(-2px); }
+        .spirit-card:has(input:checked){ box-shadow:0 0 0 1px currentColor, 0 0 18px -10px currentColor; }
 
         .blud-color { color: #f59e0b; }
-        .blud-border { border-color: rgba(245,158,11,0.4); }
-        .blud-bg { background: rgba(245,158,11,0.06); }
-        .blud-selected { background: rgba(245,158,11,0.12); border-color: #f59e0b !important; }
+        .blud-border { border-color: rgba(245,158,11,0.35); }
+        .blud-bg { background: rgba(245,158,11,0.05); }
+        .blud-border:hover{ border-color:#f59e0b; }
 
         .chuh-color { color: #ef4444; }
-        .chuh-border { border-color: rgba(239,68,68,0.4); }
-        .chuh-bg { background: rgba(239,68,68,0.06); }
-        .chuh-selected { background: rgba(239,68,68,0.12); border-color: #ef4444 !important; }
+        .chuh-border { border-color: rgba(239,68,68,0.35); }
+        .chuh-bg { background: rgba(239,68,68,0.05); }
+        .chuh-border:hover{ border-color:#ef4444; }
 
         .povi-color { color: #818cf8; }
-        .povi-border { border-color: rgba(129,140,248,0.4); }
-        .povi-bg { background: rgba(129,140,248,0.06); }
-        .povi-selected { background: rgba(129,140,248,0.12); border-color: #818cf8 !important; }
+        .povi-border { border-color: rgba(129,140,248,0.35); }
+        .povi-bg { background: rgba(129,140,248,0.05); }
+        .povi-border:hover{ border-color:#818cf8; }
 
-        .result-enter { animation: fadeUp 0.5s ease-out; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .result-enter { animation: reveal 0.5s ease-out both; }
 
-        .glow-amber { box-shadow: 0 0 20px rgba(245,158,11,0.15); }
-        .glow-red { box-shadow: 0 0 20px rgba(239,68,68,0.15); }
-        .glow-indigo { box-shadow: 0 0 20px rgba(129,140,248,0.15); }
+        .glow-amber { box-shadow: 0 0 0 1px rgba(245,158,11,0.3), 0 0 30px -8px rgba(245,158,11,0.4); }
+        .glow-red { box-shadow: 0 0 0 1px rgba(239,68,68,0.3), 0 0 30px -8px rgba(239,68,68,0.4); }
+        .glow-indigo { box-shadow: 0 0 0 1px rgba(129,140,248,0.3), 0 0 30px -8px rgba(129,140,248,0.4); }
+
+        /* focus visibility */
+        input[type=text]:focus-visible, textarea:focus-visible, button:focus-visible{
+            outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+        }
+        .ghost-line{ color:var(--ink-ghost); }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.panel-breathe,.result-enter{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 min-h-screen relative">
+<body class="text-zinc-300 min-h-screen relative grain">
     <div class="fog"></div>
+    <div id="ember-field" aria-hidden="true"></div>
 
     <div class="relative z-10 max-w-2xl mx-auto px-4 py-10 sm:py-16">
 
         <!-- Header -->
         <div class="text-center mb-10">
-            <p class="text-xs font-mono text-zinc-600 tracking-widest uppercase mb-3">Carpathian Diagnostic</p>
-            <h1 class="text-3xl font-bold text-white mb-2">The Spirit Test</h1>
+            <p class="text-xs font-mono-x text-zinc-600 tracking-[0.25em] uppercase mb-3 flicker">Carpathian Diagnostic · No. 09</p>
+            <h1 id="app-title" class="text-3xl font-bold text-white mb-2 breathe select-none" title="the ghost keeps a taxonomy of your disorientations">The Spirit Test</h1>
             <p class="text-zinc-500 text-sm leading-relaxed max-w-md mx-auto">
                 Three mountain spirits. Three kinds of disorientation. The countermeasure depends on which one has you.
-                Select what is currently true.
+                Mark what is currently true — the ghost will name the thing.
             </p>
         </div>
 
@@ -67,26 +118,26 @@
             <!-- Blud Section -->
             <div class="mb-6">
                 <div class="flex items-center gap-2 mb-3">
-                    <span class="text-lg">🌀</span>
-                    <h2 class="text-sm font-bold blud-color tracking-wide">THE BLUD — Spirit of Circles</h2>
-                    <span class="text-xs text-zinc-600 font-mono">(the loop)</span>
+                    <span class="text-lg select-none">🌀</span>
+                    <h2 class="text-sm font-bold blud-color tracking-wide font-mono-x">THE BLUD — Spirit of Circles</h2>
+                    <span class="text-xs text-zinc-600 font-mono-x">(the loop)</span>
                 </div>
                 <div class="grid gap-2" id="blud-symptoms">
-                    <label class="spirit-card blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card blud-color blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="blud1" class="blud-check mt-0.5 accent-amber-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">I keep returning to the same decision. I've circled this question before.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">I keep returning to the same decision. I've circled this question before.</span>
                     </label>
-                    <label class="spirit-card blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card blud-color blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="blud2" class="blud-check mt-0.5 accent-amber-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">The path feels familiar but I'm not getting closer. I trust my premise but the destination keeps receding.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">The path feels familiar but I'm not getting closer. I trust my premise but the destination keeps receding.</span>
                     </label>
-                    <label class="spirit-card blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card blud-color blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="blud3" class="blud-check mt-0.5 accent-amber-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">I know something is wrong but I can't locate the wrong assumption. My logic is correct. The conclusion keeps being wrong.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">I know something is wrong but I can't locate the wrong assumption. My logic is correct. The conclusion keeps being wrong.</span>
                     </label>
-                    <label class="spirit-card blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card blud-color blud-border blud-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="blud4" class="blud-check mt-0.5 accent-amber-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">I've made this plan before. Or something very close to it. The landmarks are the same.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">I've made this plan before. Or something very close to it. The landmarks are the same.</span>
                     </label>
                 </div>
             </div>
@@ -94,26 +145,26 @@
             <!-- Chuhaister Section -->
             <div class="mb-6">
                 <div class="flex items-center gap-2 mb-3">
-                    <span class="text-lg">🌲</span>
-                    <h2 class="text-sm font-bold chuh-color tracking-wide">THE CHUHAISTER — The Forest Giant</h2>
-                    <span class="text-xs text-zinc-600 font-mono">(the confrontation)</span>
+                    <span class="text-lg select-none">🌲</span>
+                    <h2 class="text-sm font-bold chuh-color tracking-wide font-mono-x">THE CHUHAISTER — The Forest Giant</h2>
+                    <span class="text-xs text-zinc-600 font-mono-x">(the confrontation)</span>
                 </div>
                 <div class="grid gap-2" id="chuh-symptoms">
-                    <label class="spirit-card chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card chuh-color chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="chuh1" class="chuh-check mt-0.5 accent-red-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">Something specific and large is blocking the way. I know exactly what it is. It is not subtle.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">Something specific and large is blocking the way. I know exactly what it is. It is not subtle.</span>
                     </label>
-                    <label class="spirit-card chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card chuh-color chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="chuh2" class="chuh-check mt-0.5 accent-red-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">I'm performing confidence I don't have. The confrontation requires more inventory than I've taken stock of.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">I'm performing confidence I don't have. The confrontation requires more inventory than I've taken stock of.</span>
                     </label>
-                    <label class="spirit-card chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card chuh-color chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="chuh3" class="chuh-check mt-0.5 accent-red-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">I've been avoiding the direct approach. There's a thing I need to do or say and I keep doing adjacent things instead.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">I've been avoiding the direct approach. There's a thing I need to do or say and I keep doing adjacent things instead.</span>
                     </label>
-                    <label class="spirit-card chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card chuh-color chuh-border chuh-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="chuh4" class="chuh-check mt-0.5 accent-red-500 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">The problem is known. The solution is roughly known. The only remaining question is whether I will do it.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">The problem is known. The solution is roughly known. The only remaining question is whether I will do it.</span>
                     </label>
                 </div>
             </div>
@@ -121,40 +172,40 @@
             <!-- Povitruľa Section -->
             <div class="mb-8">
                 <div class="flex items-center gap-2 mb-3">
-                    <span class="text-lg">🌫️</span>
-                    <h2 class="text-sm font-bold povi-color tracking-wide">THE POVITRUĽA — The Air Spirit</h2>
-                    <span class="text-xs text-zinc-600 font-mono">(the dissolution)</span>
+                    <span class="text-lg select-none">🌫️</span>
+                    <h2 class="text-sm font-bold povi-color tracking-wide font-mono-x">THE POVITRUĽA — The Air Spirit</h2>
+                    <span class="text-xs text-zinc-600 font-mono-x">(the dissolution)</span>
                 </div>
                 <div class="grid gap-2" id="povi-symptoms">
-                    <label class="spirit-card povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card povi-color povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="povi1" class="povi-check mt-0.5 accent-indigo-400 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">The days are blending. I can't clearly distinguish what last Tuesday was for versus this Tuesday.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">The days are blending. I can't clearly distinguish what last Tuesday was for versus this Tuesday.</span>
                     </label>
-                    <label class="spirit-card povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card povi-color povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="povi2" class="povi-check mt-0.5 accent-indigo-400 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">Nothing is wrong on paper. Metrics are fine. There's no crisis. But I feel like I'm not building toward anything specific.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">Nothing is wrong on paper. Metrics are fine. There's no crisis. But I feel like I'm not building toward anything specific.</span>
                     </label>
-                    <label class="spirit-card povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card povi-color povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="povi3" class="povi-check mt-0.5 accent-indigo-400 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">My effort is high. My trace is low. I cannot point to a permanent artifact from the last two weeks.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">My effort is high. My trace is low. I cannot point to a permanent artifact from the last two weeks.</span>
                     </label>
-                    <label class="spirit-card povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
+                    <label class="spirit-card povi-color povi-border povi-bg border rounded-lg px-4 py-3 flex items-start gap-3 group">
                         <input type="checkbox" value="povi4" class="povi-check mt-0.5 accent-indigo-400 shrink-0">
-                        <span class="text-sm text-zinc-400 group-hover:text-zinc-300">I am busy. I am not sure what I am building. These feel like the same thing recently.</span>
+                        <span class="text-sm text-zinc-400 group-hover:text-zinc-200 transition-colors">I am busy. I am not sure what I am building. These feel like the same thing recently.</span>
                     </label>
                 </div>
             </div>
 
             <!-- Context question -->
             <div class="mb-8">
-                <label class="block text-xs font-mono text-zinc-500 mb-2 tracking-wide">OPTIONAL — describe the situation in one sentence:</label>
-                <input type="text" id="context-input" placeholder="e.g. 'third week circling whether to leave the firm'" 
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-600">
+                <label class="block text-xs font-mono-x text-zinc-500 mb-2 tracking-wide">OPTIONAL — describe the situation in one sentence:</label>
+                <input type="text" id="context-input" placeholder="e.g. 'third week circling whether to leave the firm'"
+                    class="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-3 text-sm text-zinc-300 transition-colors placeholder-zinc-600">
             </div>
 
             <!-- Submit -->
             <button id="run-test" onclick="classify()"
-                class="w-full py-3 rounded-lg border border-zinc-600 text-zinc-300 text-sm font-mono hover:border-zinc-400 hover:text-white transition-all hover:bg-zinc-800/50">
+                class="w-full py-3 rounded-lg border border-zinc-600 text-zinc-300 text-sm font-mono-x transition-all hover:border-zinc-400 hover:text-white hover:bg-zinc-800/50 active:translate-y-px">
                 Identify the spirit
             </button>
         </div>
@@ -165,14 +216,17 @@
         <!-- History -->
         <div id="history-section" class="mt-10 hidden">
             <div class="border-t border-zinc-800 pt-6">
-                <h3 class="text-xs font-mono text-zinc-600 tracking-widest uppercase mb-4">Past tests</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xs font-mono-x text-zinc-600 tracking-[0.25em] uppercase">The Ledger</h3>
+                    <span id="ledger-tally" class="text-[10px] font-mono-x text-zinc-700"></span>
+                </div>
                 <div id="history-list" class="space-y-2"></div>
             </div>
         </div>
 
         <!-- Reset -->
         <div id="reset-section" class="mt-6 text-center hidden">
-            <button onclick="reset()" class="text-xs font-mono text-zinc-600 hover:text-zinc-400 transition-colors underline underline-offset-2">
+            <button onclick="reset()" class="text-xs font-mono-x text-zinc-600 hover:text-zinc-400 transition-colors underline underline-offset-2 active:translate-y-px">
                 Run another test
             </button>
         </div>
@@ -180,6 +234,9 @@
         <footer class="mt-16 text-center">
             <p class="text-xs text-zinc-700">The taxonomy matters because the countermeasure depends on the spirit.</p>
             <p class="text-[10px] text-zinc-800 mt-1">Prízrak · Carpathian Diagnostic Series · 2026-03-30</p>
+            <p id="night-whisper" class="text-[10px] ghost-line mt-2 hidden flicker">the mountain does not sleep.</p>
+            <p id="idle-whisper" class="text-[10px] ghost-line mt-2 hidden">still here. still watching.</p>
+            <p id="egg-whisper" class="text-[10px] ghost-line mt-2 hidden">you found the watcher. the taxonomy was always for you.</p>
         </footer>
     </div>
 
@@ -190,6 +247,7 @@
             subtitle: "You are in a loop.",
             icon: "🌀",
             color: "amber",
+            accentHex: "#f59e0b",
             colorClass: "blud-color",
             borderClass: "border-amber-500/40",
             bgClass: "bg-amber-500/5",
@@ -208,6 +266,7 @@
             subtitle: "You are in confrontation.",
             icon: "🌲",
             color: "red",
+            accentHex: "#ef4444",
             colorClass: "chuh-color",
             borderClass: "border-red-500/40",
             bgClass: "bg-red-500/5",
@@ -226,6 +285,7 @@
             subtitle: "You are dissolving.",
             icon: "🌫️",
             color: "indigo",
+            accentHex: "#818cf8",
             colorClass: "povi-color",
             borderClass: "border-indigo-500/40",
             bgClass: "bg-indigo-500/5",
@@ -243,6 +303,12 @@
 
     const STORAGE_KEY = "prizrak_spirit_tests_v1";
 
+    const ACCENT_HEX = { blud:"#f59e0b", chuhaister:"#ef4444", "povitruľa":"#818cf8" };
+
+    function setAccent(hex){
+        document.documentElement.style.setProperty('--accent', hex);
+    }
+
     function getChecked(cls) {
         return [...document.querySelectorAll(`.${cls}:checked`)].length;
     }
@@ -256,12 +322,12 @@
 
         if (total === 0) {
             const btn = document.getElementById("run-test");
-            btn.textContent = "Select at least one symptom.";
+            btn.textContent = "the cave is empty. mark at least one truth.";
             btn.classList.add("border-red-800", "text-red-400");
             setTimeout(() => {
                 btn.textContent = "Identify the spirit";
                 btn.classList.remove("border-red-800", "text-red-400");
-            }, 2000);
+            }, 2200);
             return;
         }
 
@@ -271,12 +337,14 @@
         const primary = sorted[0][0];
         const secondary = sorted[1][1] > 0 ? sorted[1][0] : null;
 
-        // Map key
-        const spiritKey = { blud: "blud", chuhaister: "chuhaister", "povitruľa": "povitruľa" };
+        // Resolve spirit data (tolerant of the ľ character)
         const primaryData = SPIRITS[primary] || SPIRITS[primary.replace("ľ","l")] || SPIRITS.blud;
         const secondaryData = secondary ? (SPIRITS[secondary] || SPIRITS[secondary.replace("ľ","l")]) : null;
 
-        // Save to history
+        // Shift the whole atmosphere toward the diagnosed spirit
+        setAccent(ACCENT_HEX[primary] || primaryData.accentHex || "#818cf8");
+
+        // Save to history — exact legacy shape, do not change
         const record = {
             date: new Date().toISOString(),
             primary,
@@ -305,14 +373,14 @@
 
         const contextHtml = context ? `
             <div class="mt-4 px-4 py-2.5 rounded bg-zinc-800/40 border border-zinc-700/50">
-                <p class="text-xs text-zinc-500 italic">"${context}"</p>
+                <p class="text-xs text-zinc-500 italic font-fell">"${escapeHtml(context)}"</p>
             </div>
         ` : "";
 
         const secondaryHtml = secondary ? `
             <div class="mt-4 p-4 rounded-lg border border-zinc-700/50 bg-zinc-800/30">
-                <p class="text-xs font-mono text-zinc-500 mb-1 tracking-wide">SECONDARY SIGNAL — ${secondary.icon} ${secondary.name.toUpperCase()}</p>
-                <p class="text-xs text-zinc-500">${secondary.description.split(".")[0]}.</p>
+                <p class="text-xs font-mono-x text-zinc-500 mb-1 tracking-wide">SECONDARY SIGNAL — ${secondary.icon} ${secondary.name.toUpperCase()}</p>
+                <p class="text-xs text-zinc-500">${secondary.description.split(".")[0]}. Two spirits in the fog at once. Name the loud one first.</p>
             </div>
         ` : "";
 
@@ -323,14 +391,18 @@
         document.getElementById("phase-result").innerHTML = `
             <div class="result-enter">
                 <!-- Primary verdict -->
-                <div class="border ${pb} ${pbg} rounded-xl p-6 mb-4 ${primary.glowClass}">
+                <div class="border ${pb} ${pbg} rounded-xl p-6 mb-4 panel-breathe">
                     <div class="flex items-start gap-3 mb-4">
-                        <span class="text-3xl">${primary.icon}</span>
-                        <div>
-                            <p class="text-xs font-mono text-zinc-500 tracking-widest uppercase mb-0.5">Primary Spirit</p>
+                        <span class="text-3xl breathe select-none">${primary.icon}</span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-mono-x text-zinc-500 tracking-[0.25em] uppercase mb-0.5">The spirit is named</p>
                             <h2 class="text-xl font-bold ${pc}">${primary.name}</h2>
-                            <p class="text-sm text-zinc-400 mt-0.5">${primary.subtitle}</p>
+                            <p class="text-sm text-zinc-400 mt-0.5 font-fell italic">${primary.subtitle}</p>
                         </div>
+                        <button onclick="copyVerdict(this)" data-verdict='${escapeAttr(buildVerdictText(primary, scores, context))}'
+                            class="ml-auto shrink-0 text-[10px] font-mono-x text-zinc-600 border border-zinc-700 rounded px-2 py-1 hover:border-zinc-500 hover:text-zinc-300 transition-colors active:translate-y-px">
+                            copy
+                        </button>
                     </div>
 
                     ${contextHtml}
@@ -338,7 +410,7 @@
                     <p class="text-sm text-zinc-400 leading-relaxed mt-4">${primary.description}</p>
 
                     <div class="mt-5 pt-4 border-t border-zinc-700/50">
-                        <p class="text-xs font-mono ${pc} tracking-wide mb-2 uppercase">Countermeasure</p>
+                        <p class="text-xs font-mono-x ${pc} tracking-wide mb-2 uppercase">Countermeasure</p>
                         <p class="text-sm text-zinc-300 leading-relaxed">${primary.countermeasure}</p>
                     </div>
                 </div>
@@ -347,7 +419,7 @@
 
                 <!-- Questions -->
                 <div class="mt-5 p-4 rounded-lg border border-zinc-800 bg-zinc-900/40">
-                    <p class="text-xs font-mono text-zinc-500 mb-3 tracking-wide uppercase">Questions for the mountain</p>
+                    <p class="text-xs font-mono-x text-zinc-500 mb-3 tracking-wide uppercase">Questions for the mountain</p>
                     <ul class="space-y-2 list-disc list-inside">
                         ${questionsHtml}
                     </ul>
@@ -355,14 +427,14 @@
 
                 <!-- CTA -->
                 <div class="mt-4 p-4 rounded-lg border ${pb} bg-zinc-900/60">
-                    <p class="text-xs font-mono text-zinc-600 mb-2 tracking-wide">BEFORE YOU CLOSE THIS TAB</p>
+                    <p class="text-xs font-mono-x text-zinc-600 mb-2 tracking-wide">BEFORE THE FOG TAKES THIS TAB</p>
                     <p class="text-sm ${pc}">${primary.cta}</p>
-                    <textarea id="response-text" placeholder="Write it here. The mountain is listening." 
-                        class="mt-3 w-full bg-transparent border-0 border-t border-zinc-700/50 pt-3 text-sm text-zinc-400 focus:outline-none placeholder-zinc-700 resize-none" rows="3"></textarea>
+                    <textarea id="response-text" placeholder="Write it here. The mountain is listening."
+                        class="mt-3 w-full bg-transparent border-0 border-t border-zinc-700/50 pt-3 text-sm text-zinc-400 placeholder-zinc-700 resize-none focus:outline-none" rows="3"></textarea>
                 </div>
 
                 <!-- Score breakdown -->
-                <div class="mt-4 flex gap-3 text-xs font-mono text-zinc-600">
+                <div class="mt-4 flex gap-3 text-xs font-mono-x text-zinc-600">
                     <span>🌀 ${scores.blud} Blud</span>
                     <span>🌲 ${scores.chuh} Chuhaister</span>
                     <span>🌫️ ${scores.povi} Povitruľa</span>
@@ -370,8 +442,59 @@
             </div>
         `;
 
-        document.getElementById("phase-result").classList.remove("hidden");
+        const resultEl = document.getElementById("phase-result");
+        resultEl.classList.remove("hidden");
         renderHistory();
+        try { resultEl.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e){}
+    }
+
+    function buildVerdictText(primary, scores, context){
+        const lines = [
+            "PRÍZRAK · THE SPIRIT TEST",
+            "the spirit is named: " + primary.name + " — " + primary.subtitle,
+            context ? "situation: \"" + context + "\"" : null,
+            "",
+            "countermeasure: " + primary.countermeasure,
+            "",
+            "tally — blud " + scores.blud + " · chuhaister " + scores.chuh + " · povitruľa " + scores.povi,
+            "the countermeasure depends on the spirit."
+        ].filter(Boolean);
+        return lines.join("\n");
+    }
+
+    function copyVerdict(btn){
+        const text = btn.getAttribute("data-verdict") || "";
+        const restore = btn.textContent;
+        const finish = () => {
+            btn.textContent = "copied to the ledger";
+            btn.classList.add("text-zinc-200","border-zinc-400");
+            setTimeout(() => {
+                btn.textContent = restore;
+                btn.classList.remove("text-zinc-200","border-zinc-400");
+            }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(finish).catch(() => fallbackCopy(text, finish));
+        } else {
+            fallbackCopy(text, finish);
+        }
+    }
+
+    function fallbackCopy(text, cb){
+        try {
+            const ta = document.createElement("textarea");
+            ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+            document.body.appendChild(ta); ta.select();
+            document.execCommand("copy"); document.body.removeChild(ta);
+        } catch(e){}
+        if (cb) cb();
+    }
+
+    function escapeHtml(s){
+        return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+    }
+    function escapeAttr(s){
+        return String(s).replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/\n/g, "&#10;");
     }
 
     function getHistory() {
@@ -388,22 +511,33 @@
         const spiritIcons = { blud: "🌀", chuhaister: "🌲", "povitruľa": "🌫️" };
         const spiritColors = { blud: "text-amber-600", chuhaister: "text-red-600", "povitruľa": "text-indigo-500" };
 
+        // Quiet tally — which spirit visits most
+        const counts = { blud:0, chuhaister:0, "povitruľa":0 };
+        history.forEach(r => { if (counts[r.primary] !== undefined) counts[r.primary]++; });
+        const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+        const tallyEl = document.getElementById("ledger-tally");
+        if (tallyEl) {
+            tallyEl.textContent = (top && top[1] > 0)
+                ? (history.length + " entries · " + top[0] + " visits most")
+                : (history.length + " entries");
+        }
+
         document.getElementById("history-list").innerHTML = history.map(r => {
             const d = new Date(r.date);
-            const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + 
+            const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
                           " " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
             const icon = spiritIcons[r.primary] || "?";
             const color = spiritColors[r.primary] || "text-zinc-500";
             return `
                 <div class="flex items-start gap-3 text-xs">
-                    <span class="shrink-0 text-base">${icon}</span>
+                    <span class="shrink-0 text-base select-none">${icon}</span>
                     <div class="min-w-0">
-                        <span class="${color} font-mono">${r.primary.toUpperCase()}</span>
+                        <span class="${color} font-mono-x">${escapeHtml(String(r.primary).toUpperCase())}</span>
                         <span class="text-zinc-700 mx-1.5">·</span>
                         <span class="text-zinc-600">${label}</span>
-                        ${r.context ? `<p class="text-zinc-700 mt-0.5 truncate italic">"${r.context}"</p>` : ""}
+                        ${r.context ? `<p class="text-zinc-700 mt-0.5 truncate italic font-fell">"${escapeHtml(r.context)}"</p>` : ""}
                     </div>
-                    <div class="shrink-0 font-mono text-zinc-800 ml-auto">${r.scores.blud}·${r.scores.chuh}·${r.scores.povi}</div>
+                    <div class="shrink-0 font-mono-x text-zinc-800 ml-auto">${r.scores.blud}·${r.scores.chuh}·${r.scores.povi}</div>
                 </div>
             `;
         }).join("");
@@ -416,8 +550,89 @@
         document.getElementById("phase-result").classList.add("hidden");
         document.getElementById("phase-result").innerHTML = "";
         document.getElementById("reset-section").classList.add("hidden");
+        setAccent("#818cf8");
         renderHistory();
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(e){}
     }
+
+    /* ---------- atmosphere: embers ---------- */
+    (function spawnEmbers(){
+        const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+        if (reduce) return;
+        const field = document.getElementById("ember-field");
+        if (!field) return;
+        const N = 8;
+        for (let i = 0; i < N; i++) {
+            const e = document.createElement("div");
+            e.className = "ember";
+            e.style.left = (Math.random() * 100) + "vw";
+            e.style.animationDelay = (Math.random() * 14) + "s";
+            e.style.animationDuration = (12 + Math.random() * 8) + "s";
+            e.style.setProperty("--drift", (Math.random() * 30 - 15) + "px");
+            field.appendChild(e);
+        }
+    })();
+
+    /* ---------- easter egg: type "prizrak" ---------- */
+    (function watcherEgg(){
+        let buf = "";
+        const target = "prizrak";
+        window.addEventListener("keydown", (ev) => {
+            if (ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
+            const k = (ev.key || "").toLowerCase();
+            if (k.length !== 1) return;
+            buf = (buf + k).slice(-target.length);
+            if (buf === target) {
+                const el = document.getElementById("egg-whisper");
+                if (el) el.classList.remove("hidden");
+            }
+        });
+    })();
+
+    /* ---------- easter egg: triple-click the title spawns one ember ---------- */
+    (function titleEgg(){
+        const t = document.getElementById("app-title");
+        if (!t) return;
+        const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+        t.addEventListener("click", (ev) => {
+            if (ev.detail === 3 && !reduce) {
+                const field = document.getElementById("ember-field");
+                if (!field) return;
+                const e = document.createElement("div");
+                e.className = "ember";
+                e.style.left = (40 + Math.random() * 20) + "vw";
+                e.style.animationDuration = "11s";
+                e.style.setProperty("--drift", (Math.random() * 30 - 15) + "px");
+                field.appendChild(e);
+                setTimeout(() => { e.remove(); }, 11000);
+            }
+        });
+    })();
+
+    /* ---------- nocturnal whisper: 00:00–03:00 local ---------- */
+    (function nightWhisper(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) {
+            const el = document.getElementById("night-whisper");
+            if (el) el.classList.remove("hidden");
+        }
+    })();
+
+    /* ---------- idle whisper: 60s of stillness ---------- */
+    (function idleWhisper(){
+        const el = document.getElementById("idle-whisper");
+        if (!el) return;
+        let timer = null;
+        const arm = () => {
+            clearTimeout(timer);
+            el.classList.add("hidden");
+            timer = setTimeout(() => { el.classList.remove("hidden"); }, 60000);
+        };
+        ["mousemove","keydown","scroll","click","touchstart"].forEach(evt =>
+            window.addEventListener(evt, arm, { passive: true })
+        );
+        arm();
+    })();
 
     // Init
     renderHistory();

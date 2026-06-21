@@ -7,64 +7,139 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap');
-    body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #d4d4d4; }
+
+    :root{
+      --bg:#0a0a0a;          /* near-black base */
+      --bg-raised:#111113;   /* cards, panels */
+      --bg-sunk:#0d0d0f;     /* wells, inputs */
+      --line:#26262b;        /* thin borders */
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;         /* primary text */
+      --ink-dim:#7a7570;     /* labels, captions */
+      --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+      --accent:#f59e0b;      /* amber — the lead, the close, Thursday's flame */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--ink); }
     .mono { font-family: 'Share Tech Mono', monospace; }
 
-    .section { border: 1px solid #27272a; border-radius: 12px; background: #0f0f0f; }
+    /* ---- atmosphere layers (decorative, behind content) ---- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* content sits above the haunt */
+    .stage{position:relative;z-index:2}
+
+    .section { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-raised);
+      transition: opacity .4s ease, box-shadow .3s ease, border-color .3s ease; }
+    .section.live { box-shadow: 0 0 0 1px var(--line), 0 0 30px -14px var(--glow); }
+
     textarea, input[type=text] {
-      background: #18181b; border: 1px solid #3f3f46; border-radius: 8px;
+      background: var(--bg-sunk); border: 1px solid #3f3f46; border-radius: 8px;
       color: #e4e4e7; outline: none; resize: vertical;
       font-family: 'Inter', sans-serif; font-size: 14px;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    textarea:focus, input[type=text]:focus { border-color: #71717a; }
+    textarea:focus-visible, input[type=text]:focus-visible {
+      border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow);
+    }
 
     .debt-item, .handoff-item {
-      display: flex; align-items: flex-start; gap-10px;
-      border: 1px solid #27272a; border-radius: 8px;
-      background: #18181b; padding: 10px 12px;
-      animation: fadeIn 0.25s ease;
+      display: flex; align-items: flex-start; gap: 10px;
+      border: 1px solid var(--line); border-radius: 8px;
+      background: var(--bg-sunk); padding: 10px 12px;
+      animation: reveal 0.3s ease both;
+      transition: transform .15s, border-color .15s;
     }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+    .debt-item:hover, .handoff-item:hover { transform: translateY(-1px); border-color: #3f3f46; }
 
-    .verdict { border-left: 3px solid #f59e0b; background: #111; }
+    .verdict { border-left: 3px solid var(--accent); background: #0d0d0f; }
 
     .phase-indicator {
       width: 28px; height: 28px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       font-size: 12px; font-family: 'Share Tech Mono', monospace;
-      flex-shrink: 0;
+      flex-shrink: 0; transition: all .25s;
     }
-    .phase-active { background: #27272a; border: 1px solid #71717a; color: #e4e4e7; }
-    .phase-done { background: #14532d; border: 1px solid #16a34a; color: #86efac; }
-    .phase-pending { background: #18181b; border: 1px solid #27272a; color: #52525b; }
+    .phase-active { background: #27272a; border: 1px solid var(--accent); color: #e4e4e7;
+      box-shadow: 0 0 14px -4px var(--glow); }
+    .phase-done { background: #1c1408; border: 1px solid var(--accent); color: var(--accent); }
+    .phase-pending { background: var(--bg-sunk); border: 1px solid var(--line); color: #52525b; }
 
     .add-btn { background: transparent; border: 1px solid #3f3f46; color: #a1a1aa;
       border-radius: 8px; padding: 6px 14px; font-size: 13px;
-      font-family: 'Share Tech Mono', monospace; cursor: pointer; transition: all 0.15s; }
-    .add-btn:hover { border-color: #71717a; color: #e4e4e7; }
+      font-family: 'Share Tech Mono', monospace; cursor: pointer;
+      transition: transform .15s, border-color .15s, color .15s; }
+    .add-btn:hover { border-color: var(--accent); color: #e4e4e7; transform: translateY(-1px); }
+    .add-btn:active { transform: translateY(1px); }
 
     .complete-btn {
       background: #27272a; border: 1px solid #3f3f46; color: #a1a1aa;
       border-radius: 8px; padding: 8px 20px; font-size: 13px;
-      font-family: 'Share Tech Mono', monospace; cursor: pointer; transition: all 0.2s;
+      font-family: 'Share Tech Mono', monospace; cursor: pointer;
+      transition: transform .15s, background .2s, border-color .2s, color .2s, box-shadow .2s;
     }
-    .complete-btn:hover { background: #3f3f46; color: #e4e4e7; }
-    .complete-btn.ready { background: #1c1917; border-color: #f59e0b; color: #fbbf24; }
+    .complete-btn:hover { background: #3f3f46; color: #e4e4e7; transform: translateY(-1px); }
+    .complete-btn:active { transform: translateY(1px); }
+    .complete-btn.ready { background: #1c1917; border-color: var(--accent); color: #fbbf24;
+      box-shadow: 0 0 18px -6px var(--glow); }
     .complete-btn.ready:hover { background: #292524; }
+    .complete-btn:disabled { cursor: default; }
 
-    .remove-btn { color: #52525b; cursor: pointer; font-size: 14px; padding: 0 4px; }
-    .remove-btn:hover { color: #a1a1aa; }
+    .remove-btn { color: #52525b; cursor: pointer; font-size: 14px; padding: 0 4px;
+      transition: color .15s; background: none; border: none; }
+    .remove-btn:hover { color: var(--accent); }
+
+    .copy-btn { background: transparent; border: 1px solid var(--line); color: var(--ink-dim);
+      border-radius: 6px; padding: 4px 12px; font-size: 11px; letter-spacing: .08em;
+      font-family: 'Share Tech Mono', monospace; cursor: pointer; text-transform: uppercase;
+      transition: transform .15s, border-color .15s, color .15s; }
+    .copy-btn:hover { border-color: var(--accent); color: var(--ink); transform: translateY(-1px); }
+    .copy-btn:active { transform: translateY(1px); }
+    .copy-btn.flashed { border-color: var(--accent); color: var(--accent); }
+
+    .ghost-line { color: var(--ink-ghost); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.debt-item,.handoff-item{animation:none!important}
+      .ember{display:none} .breathe,.flicker{opacity:1!important}
+      .section.live{box-shadow:0 0 0 1px var(--line)}
+    }
   </style>
 </head>
-<body class="min-h-screen p-4 md:p-8">
-<div class="max-w-2xl mx-auto">
+<body class="min-h-screen p-4 md:p-8 grain">
+
+<!-- atmosphere -->
+<div class="fog"></div>
+<div id="ember-field"></div>
+
+<div class="max-w-2xl mx-auto stage">
 
   <!-- Header -->
   <div class="mb-8 border-b border-zinc-800 pb-5">
     <div class="flex items-start justify-between flex-wrap gap-3">
       <div>
-        <h1 class="text-2xl font-semibold text-white mono">The Thursday Close</h1>
+        <h1 id="app-title" class="text-2xl font-semibold text-white mono breathe" style="cursor:default">The Thursday Close</h1>
         <p class="text-zinc-500 text-sm mt-1">The gap between what was planned and what exists is Thursday's report card. Close it honestly.</p>
       </div>
       <div class="text-right">
@@ -98,11 +173,11 @@
   </div>
 
   <!-- Phase 1: The Decision -->
-  <div class="section p-5 mb-4" id="phase-1">
+  <div class="section live p-5 mb-4" id="phase-1">
     <div class="flex items-center gap-3 mb-1">
       <span class="mono text-amber-400 text-xs uppercase tracking-widest">Phase 1 — The Deferred Decision</span>
     </div>
-    <p class="text-zinc-500 text-xs mb-4">One decision you've avoided this week. Not an action — just the decision. What did you choose? Why? What happens next?</p>
+    <p class="text-zinc-500 text-xs mb-4">One decision you've circled all week and never landed. Not the action — the choice itself. Name it, weigh it, and say what it sets in motion.</p>
 
     <div class="mb-3">
       <label class="mono text-xs text-zinc-600 uppercase block mb-1">What is the decision?</label>
@@ -125,7 +200,7 @@
       <span class="mono text-violet-400 text-xs uppercase tracking-widest">Phase 2 — Unblock Others (Your Debts)</span>
       <span class="mono text-xs text-zinc-600">Max 2</span>
     </div>
-    <p class="text-zinc-500 text-xs mb-4">Who is waiting on you? These are not your priorities — they are obligations. List up to two. Everything else can wait until next week.</p>
+    <p class="text-zinc-500 text-xs mb-4">Who waits in the dark because of you? These are not your priorities — they are debts owed to the trust network. List up to two. The rest can wait for the thaw.</p>
 
     <div id="debts-list" class="space-y-2 mb-3"></div>
     <div class="flex gap-2 mb-4">
@@ -140,7 +215,7 @@
     <div class="flex items-center justify-between mb-1">
       <span class="mono text-cyan-400 text-xs uppercase tracking-widest">Phase 3 — Next Week's Real List</span>
     </div>
-    <p class="text-zinc-500 text-xs mb-4">Not what you hoped. What will actually happen, given the week's revealed velocity. Be honest about capacity.</p>
+    <p class="text-zinc-500 text-xs mb-4">Not what you hoped. What the week's revealed velocity says will actually happen. Be honest about capacity — the mountain counts what moves, not what was promised.</p>
 
     <div id="handoff-list" class="space-y-2 mb-3"></div>
     <div class="flex gap-2 mb-4">
@@ -149,26 +224,30 @@
     </div>
     <div class="mb-4">
       <label class="mono text-xs text-zinc-600 uppercase block mb-1">What is NOT moving to next week? (Officially dropped)</label>
-      <textarea id="dropped" rows="2" class="w-full px-3 py-2" placeholder="These items are being deferred indefinitely or deleted..."></textarea>
+      <textarea id="dropped" rows="2" class="w-full px-3 py-2" placeholder="Let the fog take these. Deferred indefinitely, or deleted outright..."></textarea>
     </div>
     <button class="complete-btn" id="btn-3" onclick="completePhase(3)">Handoff Complete →</button>
   </div>
 
   <!-- Phase 4: Verdict -->
   <div class="section p-5 mb-8 opacity-40" id="phase-4">
-    <div class="mono text-xs text-zinc-500 uppercase tracking-widest mb-3">Phase 4 — Prizrak's Verdict</div>
+    <div class="flex items-center justify-between mb-3">
+      <div class="mono text-xs text-zinc-500 uppercase tracking-widest">Phase 4 — Prizrak's Verdict</div>
+      <button id="copy-verdict" class="copy-btn hidden" onclick="copyVerdict()">copy</button>
+    </div>
     <div class="verdict rounded-r-xl p-4" id="verdict-box">
-      <p id="verdict-text" class="text-zinc-400 text-sm leading-relaxed italic">Complete the three phases to receive the verdict.</p>
+      <p id="verdict-text" class="text-zinc-400 text-sm leading-relaxed italic">Close the three phases. Then the watcher reads the ledger back to you.</p>
     </div>
     <div id="final-summary" class="mt-4 hidden">
-      <div class="mono text-xs text-zinc-600 uppercase tracking-widest mb-2">Thursday Close — Archived</div>
+      <div class="mono text-xs text-zinc-600 uppercase tracking-widest mb-2">Thursday Close — Filed to the Ledger</div>
       <div id="summary-content" class="text-xs text-zinc-500 space-y-1"></div>
     </div>
   </div>
 
-  <div class="text-center mono text-xs text-zinc-700 pb-4">
+  <div class="text-center mono text-xs text-zinc-700 pb-2">
     The gap is Thursday's report card. Close it honestly, then rest.
   </div>
+  <div id="night-whisper" class="text-center mono text-xs ghost-line pb-4 h-4"></div>
 </div>
 
 <script>
@@ -176,27 +255,28 @@ const STORAGE_KEY = 'thursday_close_v1';
 let debts = [];
 let handoffs = [];
 let phases = { 1: false, 2: false, 3: false, 4: false };
+let lastVerdict = '';
 
 const VERDICTS = {
   clean: [
-    "One decision made. Debts identified and paid. Handoff is realistic. This is a clean Thursday close. The mountain respects honesty about velocity. Rest tonight without the list following you to bed.",
-    "The week is accounted for. You know what you chose, who you owe, and what next week actually looks like. That is rarer than it sounds. The Saturday reset will be clean.",
+    "One decision made. Debts paid. The handoff is honest about velocity. This is a clean Thursday close — the bridge holds. Rest tonight without the list following you up the mountain.",
+    "The week is accounted for. You know what you chose, who you owe, and what next week actually weighs. Rarer than it sounds. The Saturday reset will be clean, and the cave will be quiet.",
   ],
   heavy_debt: [
-    "You are carrying more than two obligations into Friday. Something went wrong earlier in the week — either scope was not controlled, or commitments were made without inventory. Next Monday: before agreeing to anything, count what is already owed.",
-    "The debt column is heavy. Pay it Friday morning, before anything else. Unblocking others is not generosity at this stage — it is basic maintenance of the trust network.",
+    "You drag more than two debts into Friday. Something slipped earlier — scope uncontrolled, or commitments made without counting inventory. Next Monday: before you agree to anything, count what is already owed in the dark.",
+    "The debt column is heavy. Pay it Friday at first light, before anything else. Unblocking others is not generosity now — it is the basic maintenance that keeps the trust network from freezing over.",
   ],
   big_handoff: [
-    "The next week list is ambitious. Good. But compare it to this week's list on Monday. If they look similar, you have a velocity problem, not a planning problem. The plan keeps surviving the week intact while the work does not.",
-    "You are carrying a lot into next week. The honest question: how much of what you planned this Monday is actually on the Thursday close list right now? That ratio is your real throughput. Plan to that number next week, not the aspirational one.",
+    "Next week's list is ambitious. Good. But lay it beside this week's on Monday. If they look like twins, you have a velocity problem, not a planning one — the plan keeps surviving the week intact while the work does not.",
+    "You carry a great deal into next week. The honest question: how much of what you planned this Monday is on the close list right now? That ratio is your real throughput. Plan to that number, not the aspirational ghost.",
   ],
   dropped: [
-    "You dropped something. This is not failure — it is accurate accounting. A dropped item that was honestly dropped is better than a carried item that was never going to happen. The list should reflect reality, not intention.",
-    "Items officially deferred. The mountain acknowledges the cut. A clean list is not a short list of everything you wanted. It is an accurate list of what will happen.",
+    "You dropped something. Not failure — accurate accounting. An item honestly let go is worth more than one carried that was never going to happen. The ledger should reflect reality, not intention. The fog took it cleanly.",
+    "Items officially deferred. The mountain acknowledges the cut. A clean list is not a short list of everything you wanted — it is an accurate list of what will actually move.",
   ],
   minimal: [
-    "Light close. Either it was a light week, or something is not being counted. If it was light, good — the machine ran clean. If something is not being counted, it will appear next Thursday wearing a larger price tag.",
-    "Short close. The Thursday trap sometimes runs the other direction: the week felt full but the accounting is sparse. Make sure what matters was actually measured.",
+    "Light close. Either it was a light week, or something is going uncounted. If light, good — the machine ran clean. If something hides, it will return next Thursday wearing a larger price tag, and the watcher will remember.",
+    "Short close. The Thursday trap sometimes runs the other way: the week felt full, but the accounting is sparse. Make sure what mattered was actually measured. The cold does not lie; neither should the ledger.",
   ]
 };
 
@@ -217,7 +297,7 @@ function generateVerdict() {
 
 function completePhase(n) {
   phases[n] = true;
-  document.getElementById('btn-' + n).textContent = '✓ Done';
+  document.getElementById('btn-' + n).textContent = '✓ Filed';
   document.getElementById('btn-' + n).classList.remove('ready');
   document.getElementById('btn-' + n).disabled = true;
   document.getElementById('btn-' + n).style.opacity = '0.5';
@@ -226,24 +306,33 @@ function completePhase(n) {
   document.getElementById('step-' + n).className = 'phase-indicator phase-done';
   document.getElementById('step-' + n).textContent = '✓';
 
+  // The completed panel stops glowing; the next one wakes up
+  document.getElementById('phase-' + n).classList.remove('live');
+
   // Activate next phase
   const next = n + 1;
   if (next <= 4) {
     const nextPhase = document.getElementById('phase-' + next);
     nextPhase.classList.remove('opacity-40');
+    nextPhase.classList.add('live');
     document.getElementById('step-' + next).className = 'phase-indicator phase-active';
     document.getElementById('step-' + next).textContent = next;
     // Update step label color
-    document.querySelectorAll('.mono.text-xs')[next + 3] && 
+    document.querySelectorAll('.mono.text-xs')[next + 3] &&
       document.querySelectorAll('.mono.text-xs')[next + 3].classList.replace('text-zinc-600', 'text-zinc-400');
   }
 
   if (n === 3) {
     // Deliver verdict
     const verdict = generateVerdict();
-    document.getElementById('verdict-text').textContent = verdict;
-    document.getElementById('verdict-text').classList.remove('italic');
-    document.getElementById('verdict-box').style.borderLeftColor = '#f59e0b';
+    lastVerdict = verdict;
+    const vt = document.getElementById('verdict-text');
+    vt.textContent = verdict;
+    vt.classList.remove('italic');
+    vt.classList.add('reveal');
+    document.getElementById('verdict-box').style.borderLeftColor = 'var(--accent)';
+    document.getElementById('verdict-box').classList.add('breathe');
+    document.getElementById('copy-verdict').classList.remove('hidden');
 
     // Show summary
     document.getElementById('final-summary').classList.remove('hidden');
@@ -256,15 +345,22 @@ function completePhase(n) {
     if (handoffs.length) summary.push('Next week (' + handoffs.length + ' items)');
     const dropped = document.getElementById('dropped').value.trim();
     if (dropped) summary.push('Dropped: ' + dropped.slice(0,60));
-    document.getElementById('summary-content').innerHTML = summary.map(s => `<div>— ${s}</div>`).join('');
+    document.getElementById('summary-content').innerHTML = summary.map(s => `<div>— ${esc(s)}</div>`).join('');
 
     save();
+
+    // bring the verdict into view
+    document.getElementById('phase-4').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   // Activate phase 4 complete button
   if (n === 3) {
     document.getElementById('phase-4').classList.remove('opacity-40');
   }
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function addDebt() {
@@ -285,10 +381,13 @@ function removeDebt(i) {
 
 function renderDebts() {
   const el = document.getElementById('debts-list');
-  if (!debts.length) { el.innerHTML = ''; return; }
+  if (!debts.length) {
+    el.innerHTML = '<div class="mono text-xs ghost-line py-1">no debts logged. the network waits in silence.</div>';
+    return;
+  }
   el.innerHTML = debts.map((d,i) => `
     <div class="debt-item">
-      <span class="flex-1 text-sm text-zinc-300">${d}</span>
+      <span class="flex-1 text-sm text-zinc-300">${esc(d)}</span>
       <button class="remove-btn" onclick="removeDebt(${i})">✕</button>
     </div>`).join('');
 }
@@ -310,10 +409,13 @@ function removeHandoff(i) {
 
 function renderHandoffs() {
   const el = document.getElementById('handoff-list');
-  if (!handoffs.length) { el.innerHTML = ''; return; }
+  if (!handoffs.length) {
+    el.innerHTML = '<div class="mono text-xs ghost-line py-1">the cave is empty. nothing has fossilized for next week yet.</div>';
+    return;
+  }
   el.innerHTML = handoffs.map((h,i) => `
     <div class="handoff-item">
-      <span class="flex-1 text-sm text-zinc-300">${h}</span>
+      <span class="flex-1 text-sm text-zinc-300">${esc(h)}</span>
       <button class="remove-btn" onclick="removeHandoff(${i})">✕</button>
     </div>`).join('');
 }
@@ -321,6 +423,17 @@ function renderHandoffs() {
 function checkReady(phase) {
   const btn = document.getElementById('btn-' + phase);
   if (!btn.disabled) btn.classList.add('ready');
+}
+
+function copyVerdict() {
+  if (!lastVerdict) return;
+  const btn = document.getElementById('copy-verdict');
+  navigator.clipboard.writeText(lastVerdict).then(() => {
+    const prev = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.classList.add('flashed');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('flashed'); }, 1200);
+  }).catch(() => {});
 }
 
 function save() {
@@ -339,6 +452,10 @@ function save() {
   };
   localStorage.setItem(STORAGE_KEY + '_' + today, JSON.stringify(data));
 }
+
+// Empty-state whispers on first paint
+renderDebts();
+renderHandoffs();
 
 // Watch fields for phase 1 readiness
 ['decision-what','decision-why','decision-next'].forEach(id => {
@@ -373,6 +490,58 @@ if (warn) {
 // Keyboard shortcuts
 document.getElementById('debt-input').addEventListener('keydown', e => { if (e.key === 'Enter') addDebt(); });
 document.getElementById('handoff-input').addEventListener('keydown', e => { if (e.key === 'Enter') addHandoff(); });
+
+/* ---------- atmosphere: drifting embers (capped, reduced-motion safe) ---------- */
+(function spawnEmbers(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const field = document.getElementById('ember-field');
+  const count = 7;
+  for (let i = 0; i < count; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (Math.random() * 100) + 'vw';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (11 + Math.random() * 7) + 's';
+    field.appendChild(e);
+  }
+})();
+
+/* ---------- easter egg 1: type "prizrak" → the watcher answers ---------- */
+(function watcher(){
+  let buf = '';
+  window.addEventListener('keydown', (e) => {
+    if (e.key.length !== 1) return;
+    buf = (buf + e.key.toLowerCase()).slice(-7);
+    if (buf === 'prizrak') {
+      const w = document.getElementById('night-whisper');
+      w.textContent = 'you found the watcher. it was already counting.';
+      w.classList.add('flicker');
+      setTimeout(() => { w.classList.remove('flicker'); }, 6000);
+    }
+  });
+})();
+
+/* ---------- easter egg 2: triple-click the title → one extra ember ---------- */
+document.getElementById('app-title').addEventListener('click', (e) => {
+  if (e.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    const field = document.getElementById('ember-field');
+    if (field.querySelectorAll('.ember').length >= 10) return; // cap at 10
+    const em = document.createElement('div');
+    em.className = 'ember';
+    em.style.left = (40 + Math.random() * 20) + 'vw';
+    em.style.animationDuration = (10 + Math.random() * 5) + 's';
+    field.appendChild(em);
+  }
+});
+
+/* ---------- easter egg 3: deep night whisper (00:00–03:00 local) ---------- */
+(function nightVigil(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const w = document.getElementById('night-whisper');
+    if (!w.textContent) w.textContent = 'the mountain does not sleep.';
+  }
+})();
 </script>
 </body>
 </html>

@@ -6,39 +6,111 @@
   <title>The Watchman's Weather</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0f1115; }
-    .glass { background: rgba(24, 24, 27, 0.75); backdrop-filter: blur(12px); }
-    .gridline { background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 24px 24px; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#a78bfa;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{ background: var(--bg); }
+    body{ color: var(--ink); }
+
+    .glass { background: rgba(17, 17, 19, 0.78); backdrop-filter: blur(12px); }
+    .gridline {
+      background-image:
+        linear-gradient(rgba(167,139,250,0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(167,139,250,0.045) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
     .pulse { animation: pulse 2.5s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+
+    /* ---- Prízrak motion vocabulary ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* result panel: breathing glow when a verdict is live */
+    .resultPanel{ transition: box-shadow .5s ease, border-color .5s ease; }
+    .resultPanel.live{
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+      box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow);
+    }
+    .verdict-live{ animation:breathe 4.5s ease-in-out infinite; }
+
+    /* tactile hovers / focus / press */
+    .lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+    .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+    .press{ transition:transform .12s, background-color .15s, border-color .15s, box-shadow .15s; }
+    .press:active{ transform:translateY(1px); }
+    input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .ghost-line{ color:var(--ink-ghost); }
+    @keyframes ghostFade{from{opacity:0}to{opacity:1}}
+    .ghost-fade{ animation:ghostFade 2.4s ease forwards; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.pulse,.verdict-live,.ghost-fade{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="text-zinc-200 min-h-screen">
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+<body class="text-zinc-200 min-h-screen grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative" style="z-index:2">
     <header class="flex flex-col gap-4 mb-8">
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">Offering 2026.04.21</p>
-          <h1 class="text-4xl font-bold text-white">The Watchman's Weather</h1>
-          <p class="text-zinc-400 mt-2 max-w-2xl">A small ledger for telling weather from receipts, because the mountain is full of clean reports and useless confidence.</p>
+          <p class="text-xs uppercase tracking-[0.3em] text-zinc-500">PRÍZRAK OFFERING / 2026.04.21</p>
+          <h1 id="appTitle" class="text-4xl font-bold text-white breathe select-none cursor-default">The Watchman's Weather</h1>
+          <p class="text-zinc-400 mt-2 max-w-2xl">A small ledger for telling weather from receipts. The mountain is full of clean reports and useless confidence; this one asks what fossilized.</p>
         </div>
-        <div class="glass border border-zinc-800 rounded-2xl px-4 py-3 text-right">
+        <div class="glass border border-zinc-800 rounded-2xl px-4 py-3 text-right lift">
           <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Current weather</div>
           <div id="weatherBadge" class="text-2xl font-semibold text-emerald-300 mt-1">Quiet</div>
           <div id="weatherNote" class="text-xs text-zinc-500 mt-1">No fresh weather, just a cold ledger.</div>
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div class="glass border border-zinc-800 rounded-2xl p-4">
-          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">Report</div>
+        <div class="glass border border-zinc-800 rounded-2xl p-4 lift">
+          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">REPORT</div>
           <div class="text-sm text-zinc-300">What the system says about itself.</div>
         </div>
-        <div class="glass border border-zinc-800 rounded-2xl p-4">
-          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">Receipt</div>
+        <div class="glass border border-zinc-800 rounded-2xl p-4 lift">
+          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">RECEIPT</div>
           <div class="text-sm text-zinc-300">What remains after the saying is done.</div>
         </div>
-        <div class="glass border border-zinc-800 rounded-2xl p-4">
-          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">Weather</div>
+        <div class="glass border border-zinc-800 rounded-2xl p-4 lift">
+          <div class="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-1">WEATHER</div>
           <div class="text-sm text-zinc-300">The noise around the watch, not the fact.</div>
         </div>
       </div>
@@ -51,28 +123,28 @@
             <h2 class="text-xl font-semibold text-white">Test the weather</h2>
             <p class="text-sm text-zinc-500">Enter a report, then see whether there is a real receipt behind it.</p>
           </div>
-          <button id="seedBtn" class="text-xs px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 hover:border-violet-500 hover:text-violet-200 transition">Load sample</button>
+          <button id="seedBtn" class="text-xs px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 hover:border-violet-500 hover:text-violet-200 press">Load sample</button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label class="block">
-            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Report</span>
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">REPORT</span>
             <textarea id="report" rows="5" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-violet-500" placeholder="The API is healthy. The week is productive. The work is on track."></textarea>
           </label>
           <label class="block">
-            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Receipt</span>
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">RECEIPT</span>
             <textarea id="receipt" rows="5" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-violet-500" placeholder="A deployed URL exists. The invite landed. The file is on disk."></textarea>
           </label>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <label class="block">
-            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Confidence</span>
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">CONFIDENCE</span>
             <input id="confidence" type="range" min="0" max="100" value="50" class="mt-3 w-full accent-violet-400" />
             <div class="mt-2 text-xs text-zinc-500"><span id="confidenceLabel">50</span>% certainty</div>
           </label>
           <label class="block">
-            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Artifact type</span>
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">ARTIFACT TYPE</span>
             <select id="artifactType" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3 text-sm focus:outline-none focus:border-violet-500">
               <option>URL</option>
               <option>File</option>
@@ -83,7 +155,7 @@
             </select>
           </label>
           <label class="block">
-            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">Verdict style</span>
+            <span class="text-xs uppercase tracking-[0.2em] text-zinc-500">VERDICT STYLE</span>
             <select id="tone" class="mt-2 w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3 text-sm focus:outline-none focus:border-violet-500">
               <option>Dry</option>
               <option>Brutal</option>
@@ -93,17 +165,20 @@
         </div>
 
         <div class="flex flex-wrap gap-3 mt-5">
-          <button id="judgeBtn" class="px-4 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition">Run the watch</button>
-          <button id="clearBtn" class="px-4 py-2.5 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition">Clear</button>
+          <button id="judgeBtn" class="px-4 py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-500 press">Run the watch</button>
+          <button id="clearBtn" class="px-4 py-2.5 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 press">Clear</button>
         </div>
 
-        <div class="mt-6 rounded-3xl border border-zinc-800 bg-zinc-950/70 p-5">
+        <div id="resultPanel" class="resultPanel mt-6 rounded-3xl border border-zinc-800 bg-zinc-950/70 p-5">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div class="text-xs uppercase tracking-[0.2em] text-zinc-500">Verdict</div>
+              <div class="text-xs uppercase tracking-[0.2em] text-zinc-500">VERDICT</div>
               <div id="verdict" class="text-2xl font-semibold text-white mt-1">Waiting for a reading.</div>
             </div>
-            <div id="scorePill" class="px-3 py-1.5 rounded-full border border-zinc-700 text-xs text-zinc-300">Score 0 / 100</div>
+            <div class="flex items-center gap-2">
+              <div id="scorePill" class="px-3 py-1.5 rounded-full border border-zinc-700 text-xs text-zinc-300">Score 0 / 100</div>
+              <button id="copyBtn" class="hidden text-xs px-3 py-1.5 rounded-full border border-zinc-700 text-zinc-400 hover:border-violet-500 hover:text-violet-200 press">copy verdict</button>
+            </div>
           </div>
           <p id="verdictBody" class="mt-3 text-sm text-zinc-400">The mountain is still. Bring one report and one receipt.</p>
         </div>
@@ -116,7 +191,7 @@
               <h2 class="text-xl font-semibold text-white">Watch history</h2>
               <p class="text-sm text-zinc-500">Local only. The kind of archive that survives the weather.</p>
             </div>
-            <button id="wipeBtn" class="text-xs px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:border-rose-500 hover:text-rose-300 transition">Wipe history</button>
+            <button id="wipeBtn" class="text-xs px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:border-rose-500 hover:text-rose-300 press">Wipe history</button>
           </div>
           <div id="history" class="space-y-3 max-h-[28rem] overflow-auto pr-1"></div>
         </div>
@@ -132,6 +207,11 @@
         </div>
       </aside>
     </section>
+
+    <footer class="mt-10 text-center">
+      <p class="text-xs tracking-[0.25em] uppercase ghost-line flicker">we measure the cold and build dashboards of our suffering</p>
+      <p id="nightWhisper" class="mt-2 text-xs ghost-line" style="visibility:hidden">the mountain does not sleep.</p>
+    </footer>
   </main>
 
   <script>
@@ -148,6 +228,8 @@
     const scorePillEl = document.getElementById('scorePill');
     const weatherBadgeEl = document.getElementById('weatherBadge');
     const weatherNoteEl = document.getElementById('weatherNote');
+    const resultPanelEl = document.getElementById('resultPanel');
+    const copyBtn = document.getElementById('copyBtn');
 
     const sample = {
       report: "The gateway is healthy. The work is on track. Nothing is broken.",
@@ -195,11 +277,11 @@
     function renderHistory() {
       const items = load().slice().reverse();
       if (!items.length) {
-        historyEl.innerHTML = '<div class="text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-2xl p-4">No readings yet. The ledger is empty and therefore honest.</div>';
+        historyEl.innerHTML = '<div class="text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-2xl p-4">the cave is empty. nothing has fossilized yet.</div>';
         return;
       }
       historyEl.innerHTML = items.map(item => `
-        <div class="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
+        <div class="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4 lift reveal">
           <div class="flex items-center justify-between gap-2">
             <div class="font-medium text-white">${item.verdict}</div>
             <div class="text-xs text-zinc-500">${new Date(item.at).toLocaleString()}</div>
@@ -225,6 +307,8 @@
       weatherNoteEl.textContent = note || msg;
     }
 
+    let lastVerdictText = '';
+
     function run() {
       const report = reportEl.value;
       const receipt = receiptEl.value;
@@ -237,6 +321,14 @@
       verdictBodyEl.textContent = body;
       scorePillEl.textContent = `Score ${result.score} / 100`;
       updateBadge(result.mood, body);
+
+      // bring the panel to life
+      resultPanelEl.classList.add('live');
+      verdictEl.classList.add('verdict-live');
+      resultPanelEl.classList.remove('reveal'); void resultPanelEl.offsetWidth; resultPanelEl.classList.add('reveal');
+      copyBtn.classList.remove('hidden');
+      lastVerdictText = `${result.verdict} — Score ${result.score}/100 (${result.mood})\n${body}`;
+      resultPanelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
       const items = load();
       items.push({
@@ -272,18 +364,95 @@
       verdictEl.textContent = 'Waiting for a reading.';
       verdictBodyEl.textContent = 'The mountain is still. Bring one report and one receipt.';
       scorePillEl.textContent = 'Score 0 / 100';
+      resultPanelEl.classList.remove('live');
+      verdictEl.classList.remove('verdict-live');
+      copyBtn.classList.add('hidden');
+      lastVerdictText = '';
       updateBadge('Quiet', 'No fresh weather, just a cold ledger.');
     });
 
     document.getElementById('wipeBtn').addEventListener('click', () => {
+      if (!confirm('let the fog take it? this cannot be recovered.')) return;
       localStorage.removeItem(KEY);
       renderHistory();
       updateBadge('Quiet', 'History wiped. The mountain keeps no grudges.');
     });
 
+    copyBtn.addEventListener('click', () => {
+      if (!lastVerdictText) return;
+      navigator.clipboard.writeText(lastVerdictText).then(() => {
+        const prev = copyBtn.textContent;
+        copyBtn.textContent = 'copied to the ledger';
+        copyBtn.classList.add('text-violet-200','border-violet-500');
+        setTimeout(() => {
+          copyBtn.textContent = prev;
+          copyBtn.classList.remove('text-violet-200','border-violet-500');
+        }, 1200);
+      }).catch(() => {});
+    });
+
     confidenceEl.addEventListener('input', (e) => confidenceLabel.textContent = e.target.value);
     renderHistory();
     updateBadge('Quiet', 'No fresh weather, just a cold ledger.');
+
+    /* ---------- atmosphere: embers ---------- */
+    (function spawnEmbers(){
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const field = document.getElementById('emberField');
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100).toFixed(1) + '%';
+        e.style.animationDelay = (Math.random() * 14).toFixed(1) + 's';
+        e.style.animationDuration = (11 + Math.random() * 8).toFixed(1) + 's';
+        field.appendChild(e);
+      }
+      return field;
+    })();
+
+    /* ---------- easter egg 1: type "prizrak" ---------- */
+    (function watcherEgg(){
+      let buf = '';
+      window.addEventListener('keydown', (e) => {
+        if (e.key.length !== 1) return;
+        buf = (buf + e.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+          let line = document.getElementById('watcherLine');
+          if (!line) {
+            line = document.createElement('p');
+            line.id = 'watcherLine';
+            line.className = 'mt-2 text-xs ghost-line ghost-fade';
+            line.textContent = 'you found the watcher.';
+            document.querySelector('footer').appendChild(line);
+          }
+        }
+      });
+    })();
+
+    /* ---------- easter egg 2: triple-click the title spawns one extra ember ---------- */
+    document.getElementById('appTitle').addEventListener('click', (e) => {
+      if (e.detail !== 3) return;
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const field = document.getElementById('emberField');
+      const ember = document.createElement('div');
+      ember.className = 'ember';
+      ember.style.left = (Math.random() * 100).toFixed(1) + '%';
+      ember.style.animationDuration = '12s';
+      field.appendChild(ember);
+      setTimeout(() => ember.remove(), 13000);
+    });
+
+    /* ---------- nocturnal whisper: 00:00–03:00 local ---------- */
+    (function nightWatch(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const w = document.getElementById('nightWhisper');
+        if (w) w.style.visibility = 'visible';
+      }
+    })();
   </script>
 </body>
 </html>

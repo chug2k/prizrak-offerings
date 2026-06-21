@@ -7,11 +7,23 @@
     <meta name="description" content="A simple algorithm to resolve complex domestic and structural disputes. The verdict is always the same.">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { color-scheme: dark; }
+        :root {
+            color-scheme: dark;
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a78bfa;        /* this app's lead color: violet */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
 
         /* Atmospheric base: cold mountain tint over the deep zinc void. */
         .mountain-bg {
-            background-color: #09090b;
+            background-color: var(--bg);
             background-image:
                 radial-gradient(circle at 50% 8%, rgba(139, 92, 246, 0.14) 0%, rgba(9, 9, 11, 0) 55%),
                 radial-gradient(circle at 50% 120%, rgba(148, 163, 184, 0.10) 0%, rgba(9, 9, 11, 1) 70%);
@@ -32,14 +44,33 @@
             z-index: 0;
         }
 
-        .grain {
+        .grain::after {
+            content:"";
             position: fixed;
             inset: 0;
             pointer-events: none;
             z-index: 1;
             opacity: 0.035;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
         }
+
+        /* Drifting fog — a cold breath crossing the summit. */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        /* Embers rising off the cold — the ledger never quite goes out. */
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.9;text-shadow:0 0 12px var(--glow)}50%{opacity:1;text-shadow:0 0 28px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
 
         @keyframes verdict-in {
             0%   { opacity: 0; transform: translateY(14px) scale(0.96); filter: blur(6px); }
@@ -48,43 +79,65 @@
         }
         .verdict-in { animation: verdict-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-        @keyframes glow-pulse {
-            0%, 100% { text-shadow: 0 0 24px rgba(167, 139, 250, 0.35); }
-            50%      { text-shadow: 0 0 40px rgba(167, 139, 250, 0.6); }
-        }
-        .glow-pulse { animation: glow-pulse 3.2s ease-in-out infinite; }
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        /* The result panel breathes once a verdict lands. */
+        .panel-live{box-shadow:0 0 0 1px var(--line), 0 0 26px -8px var(--glow)}
+
+        .arb-btn{transition:transform .15s, box-shadow .15s, border-color .15s, background-color .2s}
+        .arb-btn:hover{transform:translateY(-2px)}
+        .arb-btn:active{transform:translateY(1px) scale(0.99)}
+        .arb-btn:focus-visible{outline:none;box-shadow:0 0 0 1px var(--glow), 0 0 0 3px rgba(167,139,250,0.25)}
+
+        .copy-btn{transition:transform .15s, border-color .15s, color .15s, box-shadow .15s}
+        .copy-btn:hover{border-color:var(--accent);color:var(--ink)}
+        .copy-btn:active{transform:translateY(1px)}
+        .copy-btn:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+        #watcher{transition:opacity 1.2s ease}
 
         @media (prefers-reduced-motion: reduce) {
-            .verdict-in, .glow-pulse { animation: none !important; }
+            .verdict-in, .reveal, .fog, .ember, .breathe, .flicker { animation: none !important; }
+            .ember { display: none; }
+            .breathe, .flicker { opacity: 1 !important; }
         }
     </style>
 </head>
-<body class="mountain-bg text-zinc-200 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
+<body class="mountain-bg grain text-zinc-200 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
     <div class="mountain-plate"></div>
-    <div class="grain"></div>
+    <div class="fog"></div>
+    <div id="ember-field" aria-hidden="true"></div>
 
-    <main class="max-w-xl w-full text-center relative z-10">
+    <main class="max-w-xl w-full text-center relative z-[2]">
         <p class="text-violet-400/70 text-xs font-mono tracking-[0.35em] uppercase mb-5">The Offerings · Prízrak</p>
-        <h1 class="text-4xl md:text-6xl font-extrabold text-white mb-5 tracking-tight">The Arbiter</h1>
-        <p class="text-zinc-400 mb-12 text-lg leading-relaxed">A simple algorithm to resolve complex domestic and structural disputes.</p>
+        <h1 id="title" class="text-4xl md:text-6xl font-extrabold text-white mb-5 tracking-tight cursor-default select-none">The Arbiter</h1>
+        <p class="text-zinc-400 mb-12 text-lg leading-relaxed">A cold algorithm for warm disputes. It has already decided. It always has.</p>
 
-        <div class="bg-zinc-900/70 backdrop-blur-sm border border-zinc-800 rounded-2xl p-8 shadow-2xl ring-1 ring-white/5">
+        <div id="panel" class="bg-zinc-900/70 backdrop-blur-sm border border-zinc-800 rounded-2xl p-8 shadow-2xl ring-1 ring-white/5 transition-shadow duration-500">
             <h2 class="text-lg font-semibold text-zinc-300 mb-6">Who is right in this situation?</h2>
 
             <button id="arbitrate-btn" type="button"
-                class="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-70 disabled:cursor-wait text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-violet-900/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900">
-                <span id="btn-label">Calculate Truth</span>
+                class="arb-btn w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-70 disabled:cursor-wait text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-violet-900/40">
+                <span id="btn-label">Render Verdict</span>
             </button>
 
             <div id="result" class="mt-8 hidden">
-                <div class="text-3xl md:text-4xl font-black text-violet-300 mb-4 glow-pulse">CHLOE IS RIGHT</div>
+                <div id="verdict" class="text-3xl md:text-4xl font-black text-violet-300 mb-4 breathe">CHLOE IS RIGHT</div>
                 <p id="reason" class="text-zinc-400 italic font-serif leading-relaxed"></p>
+
+                <button id="copy-btn" type="button"
+                    class="copy-btn mt-6 inline-flex items-center gap-2 text-[11px] font-mono tracking-[0.18em] uppercase text-zinc-500 border border-zinc-800 rounded-lg px-3 py-2">
+                    <span id="copy-label">file to the ledger</span>
+                </button>
             </div>
 
             <p id="counter" class="mt-7 text-[11px] text-zinc-600 font-mono tracking-widest uppercase hidden"></p>
         </div>
 
         <p class="mt-12 text-xs text-zinc-500 font-mono tracking-[0.2em] uppercase">Built by Prízrak · The mountain does not argue with the wind.</p>
+        <p id="nocturne" class="mt-3 text-[11px] text-zinc-700 font-mono tracking-[0.25em] uppercase hidden flicker">the mountain does not sleep.</p>
+        <p id="watcher" class="mt-3 text-[11px] font-mono tracking-[0.25em] lowercase opacity-0" style="color:var(--ink-ghost)">you found the watcher. she was right about that too.</p>
     </main>
 
     <script>
@@ -98,18 +151,55 @@
             "Even a relentless operator knows when the battle is already lost.",
             "It is a law of nature, immutable and cold as the Tatra mountains.",
             "The verdict was rendered long before you opened your mouth. Acceptance is the only move left.",
-            "I checked twice. Then I checked a third time, to be sure. The result did not change."
+            "I checked twice. Then I checked a third time, to be sure. The result did not change.",
+            "The poludnica appeared at noon to confirm it. Even the noon-demon takes her side.",
+            "I weighed both arguments on a cold scale. Yours did not register. Hers bent the needle.",
+            "The bridge holds because she built it. You were merely standing on it, complaining.",
+            "Across every winter on record, the snow has fallen the same way. So has this verdict."
         ];
+
+        const STORE_KEY = 'chloe-is-right:lifetime';
 
         const btn = document.getElementById('arbitrate-btn');
         const btnLabel = document.getElementById('btn-label');
         const resultDiv = document.getElementById('result');
         const reasonEl = document.getElementById('reason');
         const counterEl = document.getElementById('counter');
+        const panel = document.getElementById('panel');
+        const copyBtn = document.getElementById('copy-btn');
+        const copyLabel = document.getElementById('copy-label');
+        const verdictEl = document.getElementById('verdict');
 
         let count = 0;
         let lastIndex = -1;
         let busy = false;
+        let currentReason = '';
+
+        // Lifetime ledger — additive persistence. The cave remembers across visits.
+        function readLifetime() {
+            try {
+                const raw = localStorage.getItem(STORE_KEY);
+                const n = parseInt(raw, 10);
+                return Number.isFinite(n) && n >= 0 ? n : 0;
+            } catch (e) { return 0; }
+        }
+        function writeLifetime(n) {
+            try { localStorage.setItem(STORE_KEY, String(n)); } catch (e) { /* fog took it */ }
+        }
+        let lifetime = readLifetime();
+
+        function renderCounter() {
+            const sessionLine = count === 1 ? '1 verdict rendered this visit' : count + ' verdicts rendered this visit';
+            const ledgerLine = lifetime === 1 ? '1 in the ledger' : lifetime.toLocaleString() + ' in the ledger';
+            counterEl.textContent = sessionLine + ' · ' + ledgerLine;
+            counterEl.classList.remove('hidden');
+        }
+
+        // Show the standing ledger on arrival, even before the first verdict.
+        if (lifetime > 0) {
+            counterEl.textContent = (lifetime === 1 ? '1 verdict' : lifetime.toLocaleString() + ' verdicts') + ' already fossilized in the ledger';
+            counterEl.classList.remove('hidden');
+        }
 
         function nextReason() {
             if (reasons.length < 2) return reasons[0];
@@ -124,35 +214,125 @@
             busy = true;
 
             btn.disabled = true;
-            btnLabel.textContent = 'Calculating…';
+            btnLabel.textContent = 'Consulting the cold…';
 
             // Hide any prior verdict so the reveal always re-animates.
             resultDiv.classList.add('hidden');
             resultDiv.classList.remove('verdict-in');
+            panel.classList.remove('panel-live');
 
             const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             const delay = prefersReduced ? 120 : 650;
 
             setTimeout(() => {
-                reasonEl.textContent = nextReason();
+                currentReason = nextReason();
+                reasonEl.textContent = currentReason;
 
                 resultDiv.classList.remove('hidden');
                 void resultDiv.offsetWidth; // force reflow so the animation restarts
                 resultDiv.classList.add('verdict-in');
+                panel.classList.add('panel-live');
 
                 count++;
-                counterEl.textContent = count === 1
-                    ? '1 truth calculated'
-                    : count + ' truths calculated';
-                counterEl.classList.remove('hidden');
+                lifetime++;
+                writeLifetime(lifetime);
+                renderCounter();
+
+                // reset copy label for the new verdict
+                copyLabel.textContent = 'file to the ledger';
 
                 btn.disabled = false;
-                btnLabel.textContent = 'Calculate Again';
+                btnLabel.textContent = 'Render Again';
                 busy = false;
+
+                if (!prefersReduced && typeof resultDiv.scrollIntoView === 'function') {
+                    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
             }, delay);
         }
 
         btn.addEventListener('click', arbitrate);
+
+        // Copy the verdict to the ledger (clipboard).
+        copyBtn.addEventListener('click', async () => {
+            const text = 'CHLOE IS RIGHT — ' + (currentReason || 'the verdict stands.');
+            try {
+                await navigator.clipboard.writeText(text);
+                copyLabel.textContent = 'copied to the ledger';
+                copyBtn.style.borderColor = 'var(--accent)';
+                copyBtn.style.color = 'var(--ink)';
+                setTimeout(() => {
+                    copyLabel.textContent = 'file to the ledger';
+                    copyBtn.style.borderColor = '';
+                    copyBtn.style.color = '';
+                }, 1200);
+            } catch (e) {
+                copyLabel.textContent = 'the clipboard refused';
+                setTimeout(() => { copyLabel.textContent = 'file to the ledger'; }, 1200);
+            }
+        });
+
+        /* ---- Atmosphere: scatter a few embers (CSS-driven, capped). ---- */
+        (function spawnEmbers(){
+            const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (prefersReduced) return;
+            const field = document.getElementById('ember-field');
+            const N = 8;
+            for (let i = 0; i < N; i++) {
+                const e = document.createElement('span');
+                e.className = 'ember';
+                e.style.left = (Math.random() * 100).toFixed(2) + '%';
+                e.style.animationDelay = (-Math.random() * 14).toFixed(2) + 's';
+                e.style.animationDuration = (11 + Math.random() * 7).toFixed(2) + 's';
+                field.appendChild(e);
+            }
+            // Easter egg hook: spawn one extra ember on demand.
+            window.__spawnEmber = function(){
+                if (field.querySelectorAll('.ember').length >= 10) return;
+                const e = document.createElement('span');
+                e.className = 'ember';
+                e.style.left = (Math.random() * 100).toFixed(2) + '%';
+                e.style.animationDuration = (11 + Math.random() * 7).toFixed(2) + 's';
+                field.appendChild(e);
+                e.addEventListener('animationend', () => e.remove());
+            };
+        })();
+
+        /* ---- Easter egg: triple-click the title spawns an extra ember. ---- */
+        document.getElementById('title').addEventListener('click', (function(){
+            let clicks = 0, timer = null;
+            return function(){
+                clicks++;
+                clearTimeout(timer);
+                timer = setTimeout(() => { clicks = 0; }, 600);
+                if (clicks >= 3) {
+                    clicks = 0;
+                    if (typeof window.__spawnEmber === 'function') window.__spawnEmber();
+                }
+            };
+        })());
+
+        /* ---- Easter egg: type "prizrak" to wake the watcher. ---- */
+        (function(){
+            const seq = 'prizrak';
+            let buf = '';
+            const watcher = document.getElementById('watcher');
+            window.addEventListener('keydown', (ev) => {
+                if (!ev.key || ev.key.length !== 1) return;
+                buf = (buf + ev.key.toLowerCase()).slice(-seq.length);
+                if (buf === seq) {
+                    watcher.style.opacity = '1';
+                }
+            });
+        })();
+
+        /* ---- Quiet nocturne: between 00:00–03:00 the footer whispers. ---- */
+        (function(){
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3) {
+                document.getElementById('nocturne').classList.remove('hidden');
+            }
+        })();
     </script>
     <script src="/shared/star-widget.js"></script>
 </body>

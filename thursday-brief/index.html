@@ -7,12 +7,22 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0c0c0b;
+      --bg: #0a0a0a;
+      --bg-raised: #111113;
+      --bg-sunk: #0d0d0f;
       --surface: #121311;
+      --line: #26262b;
+      --line-soft: #1a1a1d;
       --border: #1d1e1c;
+      --ink: #d4cfc8;
+      --ink-dim: #7a7570;
+      --ink-ghost: #3a3530;
       --text: #bcbfb8;
       --muted: #4f524c;
       --white: #e2e5dc;
+      /* lead accent: this app's amber (today / the threshold of the week) */
+      --accent: #c4a050;
+      --glow: color-mix(in srgb, var(--accent) 55%, transparent);
       --green: #4a7a56;
       --green-light: #6aaa7a;
       --amber: #8a7030;
@@ -23,7 +33,9 @@
       --blue-light: #6090b8;
     }
     body {
-      background: var(--bg);
+      background:
+        radial-gradient(120% 80% at 50% -10%, rgba(196,160,80,0.05), transparent 60%),
+        var(--bg);
       color: var(--text);
       font-family: 'Courier New', Courier, monospace;
       min-height: 100vh;
@@ -31,7 +43,43 @@
       flex-direction: column;
       align-items: center;
       padding: 48px 20px 80px;
+      position: relative;
     }
+
+    /* ── atmosphere ───────────────────────────────── */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none} .breathe,.flicker{opacity:1!important}
+      body{background:var(--bg)}
+    }
+
+    /* keep content above atmosphere */
+    .header, .week-strip, .cards, .triage-row, .save-row, .history, .footer {
+      position: relative; z-index: 2;
+    }
+
     .header {
       text-align: center;
       margin-bottom: 52px;
@@ -39,7 +87,7 @@
     .day-tag {
       font-size: 10px;
       letter-spacing: 4px;
-      color: var(--muted);
+      color: var(--ink-dim);
       text-transform: uppercase;
       margin-bottom: 10px;
     }
@@ -49,10 +97,13 @@
       color: var(--white);
       margin-bottom: 4px;
       letter-spacing: 1px;
+      cursor: default;
+      user-select: none;
     }
+    h1 .glyph { color: var(--accent); }
     .subhead {
       font-size: 12px;
-      color: var(--muted);
+      color: var(--ink-dim);
       font-style: italic;
     }
 
@@ -70,12 +121,17 @@
       font-size: 10px;
       letter-spacing: 1px;
       text-transform: uppercase;
-      border: 1px solid var(--border);
-      color: var(--muted);
+      border: 1px solid var(--line-soft);
+      color: var(--ink-dim);
+      transition: border-color .15s, color .15s, box-shadow .15s;
     }
-    .week-day.past   { border-color: var(--border); color: var(--border); }
-    .week-day.today  { border-color: var(--amber); color: var(--amber-light); background: rgba(138,112,48,0.1); }
-    .week-day.future { border-color: var(--border); color: var(--muted); }
+    .week-day.past   { border-color: var(--line-soft); color: #2a2b28; }
+    .week-day.today  {
+      border-color: var(--accent); color: var(--accent);
+      background: rgba(196,160,80,0.08);
+      box-shadow: 0 0 0 1px var(--line), 0 0 18px -6px var(--glow);
+    }
+    .week-day.future { border-color: var(--line-soft); color: var(--ink-dim); }
 
     .cards {
       width: 100%;
@@ -86,9 +142,11 @@
       margin-bottom: 36px;
     }
     .card {
-      border-left: 3px solid var(--border);
-      padding: 0 0 0 20px;
+      border-left: 3px solid var(--line-soft);
+      padding: 8px 0 8px 20px;
+      transition: border-color .15s, transform .15s;
     }
+    .card:focus-within { transform: translateX(2px); }
     .card.carry  { border-color: var(--amber); }
     .card.drop   { border-color: var(--red); }
     .card.want   { border-color: var(--green); }
@@ -107,7 +165,7 @@
 
     .card-q {
       font-size: 13px;
-      color: var(--white);
+      color: var(--ink);
       margin-bottom: 10px;
       line-height: 1.5;
     }
@@ -115,7 +173,7 @@
       width: 100%;
       background: transparent;
       border: none;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--line);
       color: var(--text);
       font-family: 'Courier New', Courier, monospace;
       font-size: 13px;
@@ -123,9 +181,12 @@
       padding: 4px 0;
       outline: none;
       resize: none;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    textarea:focus, input[type="text"]:focus { border-color: var(--muted); }
+    textarea:focus-visible, input[type="text"]:focus-visible {
+      border-color: var(--accent);
+      box-shadow: 0 1px 0 0 var(--glow);
+    }
     textarea::placeholder, input[type="text"]::placeholder { color: var(--muted); font-style: italic; }
 
     .triage-row {
@@ -137,7 +198,7 @@
       font-size: 9px;
       letter-spacing: 3px;
       text-transform: uppercase;
-      color: var(--muted);
+      color: var(--ink-dim);
       margin-bottom: 12px;
     }
     .triage-items { display: flex; flex-direction: column; gap: 6px; }
@@ -146,11 +207,12 @@
       align-items: center;
       gap: 10px;
       padding: 8px 12px;
-      border: 1px solid var(--border);
+      border: 1px solid var(--line);
       cursor: pointer;
-      transition: all 0.15s;
+      transition: transform .15s, border-color 0.15s, background 0.15s, box-shadow .15s;
     }
-    .triage-item:hover { border-color: var(--muted); }
+    .triage-item:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .triage-item:active { transform: translateY(1px); }
     .triage-item.yes  { border-color: var(--green); background: rgba(74,122,86,0.1); }
     .triage-item.no   { border-color: var(--red);   background: rgba(122,56,56,0.1); opacity: 0.6; }
     .triage-item.defer{ border-color: var(--amber); background: rgba(138,112,48,0.1); }
@@ -159,9 +221,9 @@
       border: 1px solid var(--muted); flex-shrink: 0;
       transition: all 0.15s;
     }
-    .triage-item.yes   .triage-dot { background: var(--green-light); border-color: var(--green); }
+    .triage-item.yes   .triage-dot { background: var(--green-light); border-color: var(--green); box-shadow: 0 0 6px rgba(106,170,122,.5); }
     .triage-item.no    .triage-dot { background: var(--red-light);   border-color: var(--red); }
-    .triage-item.defer .triage-dot { background: var(--amber-light); border-color: var(--amber); }
+    .triage-item.defer .triage-dot { background: var(--amber-light); border-color: var(--amber); box-shadow: 0 0 6px var(--glow); }
     .triage-text { flex: 1; font-size: 12px; }
     .triage-state {
       font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
@@ -170,12 +232,15 @@
     .triage-item.no    .triage-state { color: var(--red-light); }
     .triage-item.defer .triage-state { color: var(--amber-light); }
     .add-triage {
-      background: none; border: 1px dashed var(--border);
-      color: var(--muted); font-family: 'Courier New'; font-size: 10px;
-      padding: 6px 12px; cursor: pointer; transition: all 0.15s;
+      background: none; border: 1px dashed var(--line);
+      color: var(--ink-dim); font-family: 'Courier New'; font-size: 10px;
+      padding: 6px 12px; cursor: pointer;
+      transition: transform .15s, border-color 0.15s, color 0.15s;
       letter-spacing: 1px; margin-top: 8px; width: 100%;
     }
-    .add-triage:hover { border-color: var(--muted); color: var(--text); }
+    .add-triage:hover { border-color: var(--accent); color: var(--text); }
+    .add-triage:active { transform: translateY(1px); }
+    .add-triage:focus-visible { outline: none; border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--glow); }
 
     .save-row {
       width: 100%;
@@ -183,43 +248,81 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
       margin-bottom: 48px;
     }
+    .save-left { display: flex; align-items: center; gap: 14px; }
     .close-btn {
-      background: rgba(74,122,86,0.15);
-      border: 1px solid var(--green);
-      color: var(--green-light);
+      background: rgba(196,160,80,0.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
       font-family: 'Courier New';
       font-size: 11px;
       letter-spacing: 2px;
       text-transform: uppercase;
       padding: 10px 20px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: transform .12s, background 0.15s, box-shadow .15s;
     }
-    .close-btn:hover { background: rgba(74,122,86,0.3); }
-    .status-txt { font-size: 11px; color: var(--muted); font-style: italic; }
+    .close-btn:hover { background: rgba(196,160,80,0.22); box-shadow: 0 0 22px -6px var(--glow); }
+    .close-btn:active { transform: translateY(1px); }
+    .close-btn:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--glow); }
+    .status-txt { font-size: 11px; color: var(--ink-dim); font-style: italic; }
+    .copy-btn {
+      background: none; border: 1px solid var(--line);
+      color: var(--ink-dim); font-family: 'Courier New'; font-size: 9px;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 6px 10px; cursor: pointer;
+      transition: transform .12s, border-color .15s, color .15s, box-shadow .15s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .copy-btn:active { transform: translateY(1px); }
+    .copy-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+    .copy-btn.flash { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 18px -4px var(--glow); }
 
     .history { width: 100%; max-width: 560px; }
     .hist-hdr {
       display: flex; justify-content: space-between;
       font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 12px;
-      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      color: var(--ink-dim); margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--line);
     }
-    .clr-btn { background: none; border: none; color: var(--muted); font-family: 'Courier New'; font-size: 9px; cursor: pointer; letter-spacing: 1px; }
+    .clr-btn { background: none; border: none; color: var(--ink-dim); font-family: 'Courier New'; font-size: 9px; cursor: pointer; letter-spacing: 1px; transition: color .15s; }
     .clr-btn:hover { color: var(--red-light); }
-    .hist-row { border-bottom: 1px solid var(--border); padding: 10px 0; }
-    .hist-date { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
-    .hist-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .clr-btn:focus-visible { outline: none; color: var(--red-light); }
+    .hist-row { border-bottom: 1px solid var(--line-soft); padding: 10px 0; transition: border-color .15s; }
+    .hist-row:hover { border-color: var(--line); }
+    .hist-date { font-size: 10px; color: var(--ink-dim); margin-bottom: 4px; }
+    .hist-body { font-size: 12px; color: var(--ink-dim); line-height: 1.6; }
     .hist-body b { color: var(--text); }
+
+    .footer {
+      width: 100%; max-width: 560px;
+      margin-top: 40px; padding-top: 16px;
+      border-top: 1px solid var(--line-soft);
+      text-align: center;
+    }
+    .footer-line {
+      font-size: 10px; letter-spacing: 1px; color: var(--ink-ghost);
+      font-style: italic;
+    }
+    .ghost-line {
+      display: block; margin-top: 8px;
+      font-size: 10px; letter-spacing: 1px; color: var(--ink-ghost);
+      min-height: 14px; opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+    .ghost-line.show { opacity: 1; }
   </style>
 </head>
-<body>
+<body class="grain">
+
+<div class="fog" aria-hidden="true"></div>
+<div id="embers" aria-hidden="true"></div>
 
 <div class="header">
-  <div class="day-tag" id="day-tag">Thursday · Q2</div>
-  <h1>Thursday Brief</h1>
+  <div class="day-tag flicker" id="day-tag">Thursday · Q2</div>
+  <h1 id="title">Thursday <span class="glyph breathe">Brief</span></h1>
   <div class="subhead" id="date-sub">--</div>
 </div>
 
@@ -236,7 +339,7 @@
   <div class="card drop">
     <div class="card-label">Drop</div>
     <div class="card-q">One thing you're deliberately not carrying forward.</div>
-    <input type="text" id="drop" placeholder="What you're leaving at Wednesday's door." />
+    <input type="text" id="drop" placeholder="What you leave at the threshold." />
   </div>
 
   <div class="card want">
@@ -248,7 +351,7 @@
   <div class="card honest">
     <div class="card-label">Honest Condition</div>
     <div class="card-q">Where is the energy actually at, walking in?</div>
-    <textarea id="condition" rows="2" placeholder="Two words or twenty. Just accurate."></textarea>
+    <textarea id="condition" rows="2" placeholder="Two words or twenty. Just accurate. The ghost prefers accurate."></textarea>
   </div>
 
 </div>
@@ -260,7 +363,10 @@
 </div>
 
 <div class="save-row">
-  <div class="status-txt" id="status">unsaved</div>
+  <div class="save-left">
+    <div class="status-txt" id="status">unsaved</div>
+    <button class="copy-btn" id="copy-btn" onclick="copyBrief()">copy</button>
+  </div>
   <button class="close-btn" onclick="closeEntry()">Lock In</button>
 </div>
 
@@ -272,24 +378,34 @@
   <div id="hist-list"></div>
 </div>
 
+<div class="footer">
+  <div class="footer-line" id="footer-line">the week turns. the ledger remembers.</div>
+  <span class="ghost-line" id="ghost-line"></span>
+</div>
+
 <script>
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const STATES = ['','yes','no','defer'];
   const STATE_LABELS = { '':'·', yes:'do', no:'skip', defer:'later' };
 
+  function quarter(m){ return 'Q' + (Math.floor(m/3)+1); }
+
   function init() {
     const now = new Date();
     const dow = now.getDay(); // 0=Sun
     document.getElementById('day-tag').textContent =
-      DAYS[dow] + ' · Q2 · ' + now.getDate() + ' ' + MONTHS[now.getMonth()];
+      DAYS[dow] + ' · ' + quarter(now.getMonth()) + ' · ' + now.getDate() + ' ' + MONTHS[now.getMonth()];
+
+    // Monday of the current week
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((dow + 6) % 7));
     document.getElementById('date-sub').textContent =
-      'Week of April ' + (now.getDate() - ((dow + 6) % 7));
+      'Week of ' + MONTHS[monday.getMonth()] + ' ' + monday.getDate();
 
     // Week strip Mon–Fri
     const strip = document.getElementById('week-strip');
     const weekDays = ['Mon','Tue','Wed','Thu','Fri'];
-    // today's day index in Mon-Fri (0-4), Sun=6→-1, Mon=0, Tue=1...
     const todayIdx = dow === 0 ? 6 : dow - 1;
     weekDays.forEach((d, i) => {
       const el = document.createElement('div');
@@ -297,10 +413,16 @@
       el.textContent = d;
       strip.appendChild(el);
     });
+
+    // Between 00:00–03:00 the mountain does not sleep
+    const h = now.getHours();
+    if (h >= 0 && h < 3) {
+      document.getElementById('footer-line').textContent = 'the mountain does not sleep.';
+    }
   }
   init();
 
-  // Triage
+  // ── Triage ──────────────────────────────────────
   let triageItems = [];
 
   function addTriageItem(text='', state='') {
@@ -323,7 +445,7 @@
   function renderTriage() {
     const c = document.getElementById('triage-list');
     c.innerHTML = triageItems.map(item => `
-      <div class="triage-item ${item.state}" onclick="cycleState(${item.id})">
+      <div class="triage-item ${item.state} reveal" onclick="cycleState(${item.id})">
         <div class="triage-dot"></div>
         <input type="text" class="triage-text" data-tid="${item.id}"
           value="${esc(item.text)}" placeholder="task or item..."
@@ -357,7 +479,7 @@
       ts: new Date().toISOString()
     };
     localStorage.setItem(KEY, JSON.stringify(s));
-    document.getElementById('status').textContent = 'draft saved';
+    document.getElementById('status').textContent = 'filed. the ledger remembers.';
   }
 
   function closeEntry() {
@@ -370,7 +492,7 @@
       ts: new Date().toISOString()
     };
     if (!s.carry && !s.drop && !s.want && !s.triage.length) {
-      document.getElementById('status').textContent = 'nothing to lock';
+      document.getElementById('status').textContent = 'nothing to lock. the cave is empty.';
       return;
     }
     const hist = loadHist();
@@ -383,11 +505,15 @@
     localStorage.removeItem(KEY);
     renderTriage();
     renderHist(hist);
-    document.getElementById('status').textContent = 'locked ' + new Date().toLocaleTimeString();
+    document.getElementById('status').textContent = 'locked in. the bridge holds — for now.';
   }
 
   function loadHist() { try { return JSON.parse(localStorage.getItem(HIST)||'[]'); } catch(e){ return []; } }
-  function clearHist() { if(confirm('Clear all briefs?')){ localStorage.removeItem(HIST); renderHist([]); } }
+  function clearHist() {
+    if (confirm('let the fog take every brief? this cannot be recovered.')) {
+      localStorage.removeItem(HIST); renderHist([]);
+    }
+  }
 
   function renderHist(hist) {
     const sec = document.getElementById('history');
@@ -409,7 +535,49 @@
     }).join('');
   }
 
-  // Load
+  // ── Copy the brief to the ledger ─────────────────
+  function copyBrief() {
+    const lines = [];
+    const carry = document.getElementById('carry').value.trim();
+    const drop = document.getElementById('drop').value.trim();
+    const want = document.getElementById('want').value.trim();
+    const condition = document.getElementById('condition').value.trim();
+    lines.push('THURSDAY BRIEF — ' + new Date().toLocaleDateString());
+    if (carry)     lines.push('carry: ' + carry);
+    if (drop)      lines.push('drop: ' + drop);
+    if (want)      lines.push('want: ' + want);
+    if (condition) lines.push('condition: ' + condition);
+    const triageLines = triageItems
+      .filter(x => x.text.trim())
+      .map(x => '  [' + (STATE_LABELS[x.state] || '·') + '] ' + x.text.trim());
+    if (triageLines.length) { lines.push('triage:'); lines.push(...triageLines); }
+
+    const text = lines.join('\n');
+    const btn = document.getElementById('copy-btn');
+    const done = () => {
+      btn.textContent = 'copied to the ledger';
+      btn.classList.add('flash');
+      setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('flash'); }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+  function fallbackCopy(text, done) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta); done();
+    } catch(e) {
+      document.getElementById('copy-btn').textContent = 'copy failed';
+      setTimeout(() => { document.getElementById('copy-btn').textContent = 'copy'; }, 1200);
+    }
+  }
+
+  // ── Load draft ──────────────────────────────────
   function loadDraft() {
     try {
       const raw = localStorage.getItem(KEY);
@@ -420,7 +588,7 @@
       if (s.want)      document.getElementById('want').value = s.want;
       if (s.condition) document.getElementById('condition').value = s.condition;
       if (s.triage)    triageItems = s.triage;
-      document.getElementById('status').textContent = 'draft from ' + new Date(s.ts).toLocaleTimeString();
+      document.getElementById('status').textContent = 'draft recovered from ' + new Date(s.ts).toLocaleTimeString();
     } catch(e) {}
   }
 
@@ -431,6 +599,81 @@
   loadDraft();
   renderTriage();
   renderHist(loadHist());
+
+  // ── Embers (atmosphere) ─────────────────────────
+  (function spawnEmbers(){
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    const host = document.getElementById('embers');
+    const count = 7;
+    for (let i = 0; i < count; i++) {
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (5 + Math.random() * 90) + '%';
+      e.style.animationDuration = (11 + Math.random() * 7) + 's';
+      e.style.animationDelay = (-Math.random() * 14) + 's';
+      host.appendChild(e);
+    }
+  })();
+
+  // ── Easter egg 1: triple-click the title → one extra ember ──
+  document.getElementById('title').addEventListener('click', (function(){
+    let clicks = 0, timer = null;
+    return function(){
+      clicks++;
+      clearTimeout(timer);
+      timer = setTimeout(() => { clicks = 0; }, 500);
+      if (clicks >= 3) {
+        clicks = 0;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) return;
+        const host = document.getElementById('embers');
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random() * 90) + '%';
+        e.style.animationDuration = (10 + Math.random() * 5) + 's';
+        host.appendChild(e);
+        setTimeout(() => { if (e.parentNode) e.parentNode.removeChild(e); }, 16000);
+      }
+    };
+  })());
+
+  // ── Easter egg 2: type "prizrak" → the watcher answers ──
+  (function(){
+    const word = 'prizrak';
+    let buf = '';
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key.length !== 1) return;
+      const t = ev.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      buf = (buf + ev.key.toLowerCase()).slice(-word.length);
+      if (buf === word) {
+        const g = document.getElementById('ghost-line');
+        g.textContent = 'you found the watcher. it was already watching.';
+        g.classList.add('show');
+        setTimeout(() => g.classList.remove('show'), 6000);
+      }
+    });
+  })();
+
+  // ── Easter egg 3: idle 60s → a quiet line surfaces ──
+  (function(){
+    let idle = null;
+    const g = document.getElementById('ghost-line');
+    function arm(){
+      clearTimeout(idle);
+      idle = setTimeout(() => {
+        if (!g.classList.contains('show')) {
+          g.textContent = 'still here. still watching.';
+          g.classList.add('show');
+          setTimeout(() => g.classList.remove('show'), 6000);
+        }
+      }, 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(e =>
+      window.addEventListener(e, arm, { passive: true }));
+    arm();
+  })();
 </script>
 </body>
 </html>

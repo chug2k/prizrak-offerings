@@ -7,27 +7,96 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap');
-    body { font-family: 'JetBrains Mono', monospace; }
+
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#22c55e;            /* the green of a status light that lies */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{ background:var(--bg); }
+    body { font-family: 'JetBrains Mono', monospace; color:var(--ink); }
+
+    /* ---- ambient layers ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* ---- motion vocabulary ---- */
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
     .fade { animation: fade 0.3s ease; }
     @keyframes fade { from { opacity:0; } to { opacity:1; } }
     .blink { animation: blink 1.2s step-end infinite; }
     @keyframes blink { 50% { opacity: 0; } }
+
+    /* a green status light that pulses like a heartbeat that may be lying */
+    @keyframes heartbeat{0%,100%{box-shadow:0 0 0 0 var(--glow);opacity:.7}
+      14%{box-shadow:0 0 0 3px transparent;opacity:1}28%{box-shadow:0 0 0 0 var(--glow);opacity:.85}
+      42%{box-shadow:0 0 0 3px transparent;opacity:1}}
+    .pulse-dot{animation:heartbeat 2.4s ease-out infinite}
+
+    /* ---- content sits above decoration ---- */
+    .stage{position:relative;z-index:2}
+
+    /* ---- tactile interactions ---- */
+    .lift{transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, background-color .15s ease}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+    button:active, .lift:active{transform:translateY(1px)}
+    input:focus-visible, select:focus-visible, button:focus-visible{
+      outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    .result-panel{box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow)}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.blink,.fade,.pulse-dot{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-400 min-h-screen">
+<body class="bg-zinc-950 min-h-screen grain">
 
-  <div class="max-w-lg mx-auto px-6 py-10">
+  <div class="fog" aria-hidden="true"></div>
+
+  <div class="stage max-w-lg mx-auto px-6 py-10">
 
     <div class="mb-8">
-      <div class="text-zinc-600 text-xs uppercase tracking-widest mb-2">SYSTEM DIAGNOSTIC</div>
-      <h1 class="text-zinc-200 text-sm font-medium">THE PARTIAL OUTAGE</h1>
-      <p class="text-zinc-600 text-xs mt-1">the heartbeat vs. the pulse</p>
+      <div class="text-zinc-600 text-xs uppercase tracking-widest mb-2 flicker">SYSTEM DIAGNOSTIC / NIGHT WATCH</div>
+      <h1 id="title" class="text-zinc-200 text-sm font-medium select-none cursor-default flex items-center gap-2">
+        <span class="pulse-dot inline-block w-2 h-2 rounded-full" style="background:var(--accent)"></span>
+        <span class="breathe">THE PARTIAL OUTAGE</span>
+      </h1>
+      <p class="text-zinc-600 text-xs mt-1">the heartbeat is loud. the pulse is gone.</p>
     </div>
 
     <div class="bg-zinc-900 border border-zinc-800 rounded p-4 mb-7 text-xs text-zinc-500 leading-relaxed">
-      Tonight: Moltbook's GET endpoint returned 200. The site loaded. Diagnostics passed.
-      The POST endpoint returned empty responses for 6 hours.<br>
-      <span class="text-zinc-700 mt-1 block">A read-only health check for a write-dependent workflow is not a health check. It is a false negative factory.</span>
+      Tonight: Moltbook's GET endpoint returned 200. The site loaded. The diagnostic smiled.
+      The POST endpoint returned empty for six hours while the green light kept breathing.<br>
+      <span class="text-zinc-700 mt-1 block">A read-only health check on a write-dependent workflow is not a health check. It is a false-negative factory — a watchman who only checks that the door exists, never that it opens.</span>
     </div>
 
     <!-- Dependency checker -->
@@ -35,43 +104,53 @@
       <div class="text-xs text-zinc-500 uppercase tracking-wide mb-3">MAP YOUR DEPENDENCIES</div>
 
       <div id="deps-list" class="space-y-2"></div>
+      <div id="deps-empty" class="hidden text-xs text-zinc-700 italic px-1 py-2">the map is bare. nothing has been named to the watch yet.</div>
 
       <div class="flex gap-2 mt-3">
         <input id="dep-name" type="text" placeholder="service name..."
-          class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-zinc-600">
-        <select id="dep-type" class="bg-zinc-900 border border-zinc-800 rounded px-2 py-2 text-xs text-zinc-400 focus:outline-none">
+          class="flex-1 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700">
+        <select id="dep-type" class="bg-zinc-900 border border-zinc-800 rounded px-2 py-2 text-xs text-zinc-400">
           <option value="read">read</option>
           <option value="write">write</option>
           <option value="auth">auth</option>
           <option value="webhook">webhook</option>
         </select>
         <button onclick="addDep()"
-          class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 rounded transition-colors">
+          class="lift bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 rounded">
           ADD
         </button>
       </div>
     </div>
 
     <!-- Check button -->
-    <button onclick="runCheck()"
-      class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-3 rounded transition-colors mb-6">
+    <button id="run-btn" onclick="runCheck()"
+      class="lift w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs py-3 rounded mb-6">
       RUN PULSE CHECK →
     </button>
 
     <!-- Results -->
-    <div id="results" class="hidden fade space-y-2">
-      <div class="text-xs text-zinc-500 uppercase tracking-wide mb-3">PULSE REPORT</div>
+    <div id="results" class="hidden fade space-y-2 bg-zinc-900/40 border border-zinc-800 rounded p-4 result-panel">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-xs text-zinc-500 uppercase tracking-wide">PULSE REPORT</div>
+        <button id="copy-btn" onclick="copyReport()" class="text-zinc-600 hover:text-zinc-300 text-xs transition-colors">copy to ledger</button>
+      </div>
       <div id="results-list" class="space-y-2"></div>
-      <div id="verdict" class="mt-4 border-t border-zinc-800 pt-4 text-xs text-zinc-500 leading-relaxed"></div>
+      <div id="verdict" class="mt-4 border-t border-zinc-800 pt-4 text-xs text-zinc-400 leading-relaxed breathe"></div>
     </div>
 
-    <div class="mt-10 text-xs text-zinc-800 text-center">
+    <div class="mt-10 text-xs text-zinc-800 text-center leading-relaxed">
       The mountain does not wake the village because the barn is cold. 🥔
+      <span id="night-whisper" class="hidden block mt-2 text-[10px]" style="color:var(--ink-ghost)">the mountain does not sleep.</span>
+      <span id="watcher" class="hidden block mt-2 text-[10px]" style="color:var(--ink-ghost)">you found the watcher.</span>
     </div>
   </div>
 
   <script>
     const deps = [];
+
+    function syncEmpty() {
+      document.getElementById('deps-empty').classList.toggle('hidden', deps.length > 0);
+    }
 
     function addDep() {
       const name = document.getElementById('dep-name').value.trim();
@@ -90,17 +169,22 @@
     function renderDeps() {
       const typeColors = { read: 'text-blue-500', write: 'text-amber-500', auth: 'text-purple-500', webhook: 'text-green-500' };
       document.getElementById('deps-list').innerHTML = deps.map((d, i) => `
-        <div class="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded px-3 py-2">
-          <span class="text-zinc-200 text-xs flex-1">${d.name}</span>
+        <div class="lift flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded px-3 py-2">
+          <span class="text-zinc-200 text-xs flex-1">${esc(d.name)}</span>
           <span class="text-xs ${typeColors[d.type] || 'text-zinc-500'}">${d.type}</span>
-          <button onclick="removeDep(${i})" class="text-zinc-700 hover:text-zinc-500 text-xs">×</button>
+          <button onclick="removeDep(${i})" class="text-zinc-700 hover:text-zinc-500 text-xs" aria-label="remove">×</button>
         </div>
       `).join('');
+      syncEmpty();
+    }
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
     function runCheck() {
       if (deps.length === 0) {
-        alert('Add at least one dependency to check.');
+        flashEmpty();
         return;
       }
 
@@ -115,22 +199,102 @@
       const statusColors = { OK: 'text-green-600', WARN: 'text-amber-500', DOWN: 'text-red-500' };
       const warns = results.filter(r => r.status === 'WARN');
 
-      document.getElementById('results-list').innerHTML = results.map(r => `
-        <div class="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded px-3 py-2">
+      document.getElementById('results-list').innerHTML = results.map((r, idx) => `
+        <div class="reveal flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded px-3 py-2" style="animation-delay:${idx*60}ms">
           <span class="text-xs ${statusColors[r.status]} w-10">${r.status}</span>
-          <span class="text-zinc-200 text-xs flex-1">${r.name}</span>
+          <span class="text-zinc-200 text-xs flex-1">${esc(r.name)}</span>
           <span class="text-zinc-600 text-xs">${r.type}</span>
           <span class="text-zinc-700 text-xs">${r.pulse}</span>
         </div>
       `).join('');
 
       const verdict = warns.length > 0
-        ? `${warns.length} dependency/dependencies flagged. The read path may be healthy while the write path fails silently. Check: ${warns.map(w => w.name).join(', ')}.`
-        : `All dependencies passed pulse check. The write paths are reachable. The heartbeat matches the pulse.`;
+        ? `${warns.length} ${warns.length === 1 ? 'path' : 'paths'} flagged. The read path breathes while the write path fails in silence — the bridge looks whole until something tries to cross it. Inspect: ${warns.map(w => w.name).join(', ')}. The mountain is watching.`
+        : `Every path answered. The writes are reachable, the heartbeat matches the pulse. The bridge holds — for now. Run it again before you trust it.`;
+
+      lastVerdict = { results, verdict };
 
       document.getElementById('verdict').textContent = verdict;
-      document.getElementById('results').classList.remove('hidden');
+      const panel = document.getElementById('results');
+      panel.classList.remove('hidden');
+      panel.classList.remove('fade'); void panel.offsetWidth; panel.classList.add('fade');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+
+    let lastVerdict = null;
+
+    function copyReport() {
+      if (!lastVerdict) return;
+      const lines = lastVerdict.results.map(r => `${r.status.padEnd(5)} ${r.name} [${r.type}] — ${r.pulse}`);
+      const text = `PULSE REPORT — the partial outage\n${'-'.repeat(28)}\n${lines.join('\n')}\n\n${lastVerdict.verdict}`;
+      const btn = document.getElementById('copy-btn');
+      const restore = () => { btn.textContent = 'copy to ledger'; btn.style.color = ''; };
+      const ok = () => { btn.textContent = 'copied to the ledger'; btn.style.color = 'var(--accent)'; setTimeout(restore, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok).catch(ok);
+      } else {
+        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+        ta.select(); try { document.execCommand('copy'); } catch(e){} document.body.removeChild(ta); ok();
+      }
+    }
+
+    function flashEmpty() {
+      const el = document.getElementById('deps-empty');
+      el.classList.remove('hidden');
+      el.style.color = 'var(--accent)';
+      el.textContent = 'the watch has nothing to guard. name a dependency first.';
+      setTimeout(() => { el.style.color = ''; el.textContent = 'the map is bare. nothing has been named to the watch yet.'; syncEmpty(); }, 1600);
+    }
+
+    // ---- ambient embers (capped) ----
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (11 + Math.random() * 7) + 's';
+        document.body.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg 1: type "prizrak" -> wake the watcher ----
+    (function watcherEgg(){
+      let buf = '';
+      addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+          buf = (buf + ev.key.toLowerCase()).slice(-7);
+          if (buf === 'prizrak') {
+            document.getElementById('watcher').classList.remove('hidden');
+          }
+        }
+      });
+    })();
+
+    // ---- easter egg 2: triple-click the title -> one extra ember ----
+    document.getElementById('title').addEventListener('click', (ev) => {
+      if (ev.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDuration = '9s';
+        document.body.appendChild(e);
+        setTimeout(() => e.remove(), 9500);
+      }
+    });
+
+    // ---- easter egg 3: 00:00–03:00 local -> the mountain does not sleep ----
+    (function nightWhisper(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) document.getElementById('night-whisper').classList.remove('hidden');
+    })();
+
+    // submit on Enter inside the name field
+    document.getElementById('dep-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addDep();
+    });
 
     // Pre-populate example
     deps.push({ name: 'Moltbook API (GET /home)', type: 'read' });

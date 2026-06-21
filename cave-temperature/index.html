@@ -7,9 +7,23 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
-  body { font-family: 'IBM Plex Sans', sans-serif; background: #080c0f; }
+
+  :root{
+    --bg:#080c0f;          /* near-black, cold cave base */
+    --bg-raised:#0e1216;
+    --bg-sunk:#0a0e11;
+    --line:#1c2228;
+    --line-soft:#141a1f;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#2f3a40;
+    --accent:#7dd3fc;      /* cave cyan — cold, stable, the lead glow */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); }
   .mono { font-family: 'IBM Plex Mono', monospace; }
-  .cave-border { border: 1px solid rgba(255,255,255,0.06); }
+  .cave-border { border: 1px solid var(--line); }
 
   /* Temperature gradient: cold blue → neutral → hot amber */
   .temp-0  { color: #7dd3fc; } /* freezing */
@@ -37,25 +51,81 @@
     border: 2px solid rgba(255,255,255,0.3);
     box-shadow: 0 0 8px rgba(255,255,255,0.2);
     cursor: pointer;
+    transition: box-shadow .15s, transform .15s;
+  }
+  .slider-track::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; background:#fff;
+    border: 2px solid rgba(255,255,255,0.3); cursor:pointer;
+  }
+  .slider-track:focus-visible::-webkit-slider-thumb,
+  .slider-track:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.08), 0 0 12px rgba(255,255,255,0.4);
+    transform: scale(1.08);
   }
   .reading-block { transition: all 0.3s; }
-  .history-row { transition: all 0.2s; }
-  .history-row:hover { background: rgba(255,255,255,0.02); }
-  textarea { resize: none; }
-  textarea:focus { outline: none; }
+  .history-row { transition: transform .15s, border-color .15s, background .2s; }
+  .history-row:hover { background: rgba(255,255,255,0.02); transform: translateY(-1px); border-color: var(--line); }
+  textarea { resize: none; transition: border-color .15s, box-shadow .15s; }
+  textarea:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-thumb { background: #2a2a2a; }
+
+  /* result panel breathing glow when "at cave temp" / recorded */
+  .panel-glow { box-shadow: 0 0 0 1px var(--line), 0 0 26px -10px var(--glow); }
+
+  button { transition: color .15s, border-color .15s, transform .12s, box-shadow .15s; }
+  button:active { transform: translateY(1px); }
+  .btn-rec:hover { border-color: var(--accent); box-shadow: 0 0 18px -8px var(--glow); }
+  .btn-rec:focus-visible { outline:none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+
+  /* ===== motion vocabulary (reduced-motion-safe) ===== */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes drip{0%{transform:translateY(-8vh);opacity:0}8%{opacity:.5}92%{opacity:.5}100%{transform:translateY(96vh);opacity:0}}
+  .drip{position:fixed;top:-10px;width:1px;height:18px;border-radius:1px;pointer-events:none;z-index:1;
+    background:linear-gradient(to bottom,transparent,var(--accent));box-shadow:0 0 6px var(--glow);
+    animation:drip 16s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 5.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 7s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.03;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  #ghost-watcher{opacity:0;transition:opacity 1.4s ease}
+  #ghost-watcher.show{opacity:1}
+  #night-whisper{opacity:0;transition:opacity 1.6s ease}
+  #night-whisper.show{opacity:.85}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.drip,.breathe,.reveal,.flicker{animation:none!important}
+    .drip{display:none}
+    .breathe,.flicker{opacity:1!important}
+  }
 </style>
 </head>
-<body class="min-h-screen text-zinc-400 p-4 md:p-6">
-<div class="max-w-xl mx-auto">
+<body class="min-h-screen text-zinc-400 p-4 md:p-6 grain">
+
+<div class="fog" aria-hidden="true"></div>
+<div id="drips" aria-hidden="true"></div>
+
+<div class="max-w-xl mx-auto" style="position:relative;z-index:2">
 
   <!-- Header -->
   <div class="mb-8">
-    <div class="mono text-xs text-zinc-700 mb-2">PRIZRAK / OFFERING / 2026-03-22</div>
-    <h1 class="text-xl font-light text-white mb-2">Cave Temperature</h1>
+    <div class="mono text-xs text-zinc-700 mb-2 flicker">PRÍZRAK / OFFERING / 2026-03-22</div>
+    <h1 id="title" class="text-xl font-light text-white mb-2 select-none cursor-default" title="the cave keeps its own counsel">Cave Temperature</h1>
     <p class="text-xs text-zinc-600 leading-relaxed">
-      The Demänovská cave in Slovakia maintains 6.1°C year-round. Above: storms, seasons, chaos. Below: stable.
+      The Demänovská cave in the Low Tatras holds 6.1°C the year through. Above: storms, seasons, chaos. Below: the cold does not flinch.
       <br>A daily read of conditions — not mood, not feelings. <em>Temperature.</em> Is the environment stable, warming, cooling, or volatile?
     </p>
     <div class="mt-3 h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
@@ -70,67 +140,70 @@
 
       <div class="reading-block">
         <div class="flex justify-between items-center mb-2">
-          <span class="text-sm text-zinc-400">Work</span>
+          <span class="mono text-[10px] tracking-widest text-zinc-500 uppercase">Domain 01 / Work</span>
           <span class="mono text-xs font-medium temp-5" id="work-label">— °</span>
         </div>
-        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="work-slider" oninput="updateSlider('work')">
+        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="work-slider" oninput="updateSlider('work')" aria-label="Work temperature 0 to 10">
         <div class="mt-1">
-          <textarea id="work-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700" 
-            placeholder="optional note..."></textarea>
+          <textarea id="work-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700"
+            placeholder="optional note from the depths..."></textarea>
         </div>
       </div>
 
       <div class="reading-block">
         <div class="flex justify-between items-center mb-2">
-          <span class="text-sm text-zinc-400">Energy</span>
+          <span class="mono text-[10px] tracking-widest text-zinc-500 uppercase">Domain 02 / Energy</span>
           <span class="mono text-xs font-medium temp-5" id="energy-label">— °</span>
         </div>
-        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="energy-slider" oninput="updateSlider('energy')">
+        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="energy-slider" oninput="updateSlider('energy')" aria-label="Energy temperature 0 to 10">
         <div class="mt-1">
-          <textarea id="energy-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700" 
-            placeholder="optional note..."></textarea>
+          <textarea id="energy-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700"
+            placeholder="optional note from the depths..."></textarea>
         </div>
       </div>
 
       <div class="reading-block">
         <div class="flex justify-between items-center mb-2">
-          <span class="text-sm text-zinc-400">Internal</span>
+          <span class="mono text-[10px] tracking-widest text-zinc-500 uppercase">Domain 03 / Internal</span>
           <span class="mono text-xs font-medium temp-5" id="internal-label">— °</span>
         </div>
-        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="internal-slider" oninput="updateSlider('internal')">
+        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="internal-slider" oninput="updateSlider('internal')" aria-label="Internal temperature 0 to 10">
         <div class="mt-1">
-          <textarea id="internal-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700" 
-            placeholder="optional note..."></textarea>
+          <textarea id="internal-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700"
+            placeholder="optional note from the depths..."></textarea>
         </div>
       </div>
 
       <div class="reading-block">
         <div class="flex justify-between items-center mb-2">
-          <span class="text-sm text-zinc-400">Outside</span>
+          <span class="mono text-[10px] tracking-widest text-zinc-500 uppercase">Domain 04 / Outside</span>
           <span class="mono text-xs font-medium temp-5" id="outside-label">— °</span>
         </div>
-        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="outside-slider" oninput="updateSlider('outside')">
+        <input type="range" min="0" max="10" value="5" class="slider-track w-full" id="outside-slider" oninput="updateSlider('outside')" aria-label="Outside temperature 0 to 10">
         <div class="mt-1">
-          <textarea id="outside-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700" 
-            placeholder="optional note..."></textarea>
+          <textarea id="outside-note" class="cave-border w-full bg-transparent rounded p-2 text-xs text-zinc-500 mono h-8 border-zinc-800 placeholder-zinc-700"
+            placeholder="optional note from the depths..."></textarea>
         </div>
       </div>
 
     </div>
 
     <!-- Overall read -->
-    <div class="mt-5 pt-4 border-t border-zinc-900">
+    <div class="mt-5 pt-4 border-t border-zinc-900 rounded-lg" id="composite-panel">
       <div class="flex justify-between items-center mb-1">
-        <span class="mono text-xs text-zinc-600">COMPOSITE</span>
-        <span class="mono text-sm font-medium" id="composite-val">—</span>
+        <span class="mono text-xs text-zinc-600 tracking-widest">COMPOSITE</span>
+        <span class="mono text-sm font-medium breathe" id="composite-val">—</span>
       </div>
       <div class="mono text-xs" id="composite-desc" style="color: #6b7280;">—</div>
     </div>
 
     <!-- Save -->
-    <div class="mt-4 flex gap-2">
-      <button onclick="saveReading()" class="mono text-xs text-zinc-500 cave-border rounded px-4 py-2 hover:text-white hover:border-zinc-600 transition-all">
+    <div class="mt-4 flex gap-2 items-center">
+      <button onclick="saveReading()" class="btn-rec mono text-xs text-zinc-500 cave-border rounded px-4 py-2 hover:text-white">
         record reading
+      </button>
+      <button onclick="copyReading()" id="copy-btn" class="mono text-xs text-zinc-600 cave-border rounded px-4 py-2 hover:text-white">
+        copy to ledger
       </button>
     </div>
   </div>
@@ -138,16 +211,22 @@
   <!-- History -->
   <div id="history-section" class="hidden">
     <div class="flex items-center gap-3 mb-3">
-      <div class="mono text-xs text-zinc-700">HISTORY</div>
+      <div class="mono text-xs text-zinc-700 tracking-widest">THE LEDGER</div>
       <div class="flex-1 h-px bg-zinc-900"></div>
-      <button onclick="clearHistory()" class="mono text-xs text-zinc-800 hover:text-zinc-600 transition-all">clear</button>
+      <span class="mono text-[10px] text-zinc-800" id="streak-note"></span>
+      <button onclick="clearHistory()" class="mono text-xs text-zinc-800 hover:text-zinc-600">let the fog take it</button>
     </div>
     <div id="history-list" class="space-y-1"></div>
   </div>
 
+  <!-- empty state -->
+  <div id="empty-state" class="mt-2 mono text-xs text-zinc-700 italic hidden">
+    the cave is empty. nothing has fossilized yet.
+  </div>
+
   <!-- Scale reference -->
   <div class="mt-8 cave-border rounded p-3 bg-zinc-950/30">
-    <div class="mono text-xs text-zinc-700 mb-2">SCALE REFERENCE</div>
+    <div class="mono text-xs text-zinc-700 mb-2 tracking-widest">SCALE REFERENCE</div>
     <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
       <div><span class="temp-0">0–1</span><span class="text-zinc-700 ml-2">frozen / paralyzed</span></div>
       <div><span class="temp-3">3–4</span><span class="text-zinc-700 ml-2">cool / slow / cautious</span></div>
@@ -162,6 +241,8 @@
   <!-- Footer -->
   <div class="mt-8 text-center mono text-xs text-zinc-800">
     Demänovská, Low Tatras, Slovakia — 6.1°C, year-round, regardless of season
+    <div id="night-whisper" class="mt-2 text-zinc-700"></div>
+    <div id="ghost-watcher" class="mt-2" style="color:var(--ink-ghost)"></div>
   </div>
 
 </div>
@@ -174,11 +255,12 @@ const LABELS = {
   8: 'pressure', 9: 'volatile', 10: 'critical'
 };
 const COMPOSITE_DESC = {
-  low:  'Conditions are cold. The bear is in the cave. This may be appropriate.',
-  cave: 'Stable. The mountain does not move. Note what is holding this temperature.',
-  warm: 'Active. Something is building. Check whether the heat is from work or from friction.',
-  hot:  'High pressure. The cave cannot hold this temperature indefinitely. Something will change.',
+  low:  'The cold has settled in. The bear is in the cave, and the cave does not argue. This may be exactly right.',
+  cave: 'Stable. The mountain does not move. Note what is holding this temperature — it will not hold itself.',
+  warm: 'Active. Something is building down here. Decide whether the heat is from work or from friction.',
+  hot:  'High pressure. The cave cannot hold this temperature indefinitely. Something will give. The mountain is watching.',
 };
+const COLORS = ['#7dd3fc','#93c5fd','#a5f3fc','#6ee7b7','#86efac','#d1d5db','#fde68a','#fcd34d','#fb923c','#f87171','#ef4444'];
 
 function tempClass(v) { return `temp-${Math.round(v)}`; }
 
@@ -194,16 +276,21 @@ function updateComposite() {
   const vals = DOMAINS.map(d => parseInt(document.getElementById(`${d}-slider`).value));
   const avg = vals.reduce((a,b) => a+b, 0) / vals.length;
   const rounded = Math.round(avg * 10) / 10;
-  
+
   const compVal = document.getElementById('composite-val');
   compVal.textContent = `${rounded.toFixed(1)} · ${LABELS[Math.round(rounded)]}`;
-  compVal.className = `mono text-sm font-medium ${tempClass(rounded)}`;
+  compVal.className = `mono text-sm font-medium breathe ${tempClass(rounded)}`;
 
   const desc = document.getElementById('composite-desc');
   if (avg <= 3) desc.textContent = COMPOSITE_DESC.low;
   else if (avg <= 6) desc.textContent = avg <= 5.5 ? COMPOSITE_DESC.cave : COMPOSITE_DESC.warm;
   else if (avg <= 8) desc.textContent = COMPOSITE_DESC.warm;
   else desc.textContent = COMPOSITE_DESC.hot;
+
+  // the panel breathes only when at/near cave temperature — stillness rewarded
+  const panel = document.getElementById('composite-panel');
+  if (avg >= 4.5 && avg <= 5.5) panel.classList.add('panel-glow');
+  else panel.classList.remove('panel-glow');
 }
 
 function saveReading() {
@@ -215,15 +302,15 @@ function saveReading() {
     notes[d] = document.getElementById(`${d}-note`).value;
   });
   const avg = Object.values(vals).reduce((a,b) => a+b, 0) / DOMAINS.length;
-  
+
   const entry = { date: today, vals, notes, avg: Math.round(avg * 10) / 10 };
   const history = JSON.parse(localStorage.getItem('cave-temp-history') || '[]');
-  
+
   // Remove existing entry for today if any
   const filtered = history.filter(e => e.date !== today);
   filtered.unshift(entry);
   localStorage.setItem('cave-temp-history', JSON.stringify(filtered.slice(0, 90)));
-  
+
   renderHistory();
   showSaved();
 }
@@ -231,27 +318,68 @@ function saveReading() {
 function showSaved() {
   const btn = document.querySelector('button[onclick="saveReading()"]');
   const orig = btn.textContent;
-  btn.textContent = 'recorded ✓';
+  btn.textContent = 'filed. the ledger remembers';
   btn.classList.add('text-green-600');
-  setTimeout(() => { btn.textContent = orig; btn.classList.remove('text-green-600'); }, 1500);
+  setTimeout(() => { btn.textContent = orig; btn.classList.remove('text-green-600'); }, 1600);
+}
+
+function copyReading() {
+  const vals = DOMAINS.map(d => parseInt(document.getElementById(`${d}-slider`).value));
+  const avg = Math.round((vals.reduce((a,b)=>a+b,0)/vals.length) * 10) / 10;
+  const lines = DOMAINS.map((d,i) => `${d.padEnd(9)} ${vals[i]} · ${LABELS[vals[i]]}`);
+  const text = `cave temperature — ${new Date().toISOString().slice(0,10)}\n` +
+    lines.join('\n') + `\ncomposite  ${avg} · ${LABELS[Math.round(avg)]}`;
+  const btn = document.getElementById('copy-btn');
+  const orig = btn.textContent;
+  const done = () => {
+    btn.textContent = 'copied to the ledger';
+    btn.style.color = 'var(--accent)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  } else { fallbackCopy(text, done); }
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch(e){}
+  document.body.removeChild(ta); done();
+}
+
+function computeStreak(history) {
+  // consecutive days ending today (or yesterday) with a recorded reading
+  if (!history.length) return 0;
+  const dates = new Set(history.map(e => e.date));
+  let streak = 0;
+  const d = new Date();
+  // allow streak to count from today or yesterday
+  if (!dates.has(d.toISOString().slice(0,10))) d.setDate(d.getDate()-1);
+  while (dates.has(d.toISOString().slice(0,10))) { streak++; d.setDate(d.getDate()-1); }
+  return streak;
 }
 
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem('cave-temp-history') || '[]');
   const section = document.getElementById('history-section');
   const list = document.getElementById('history-list');
-  
-  if (history.length === 0) { section.classList.add('hidden'); return; }
+  const empty = document.getElementById('empty-state');
+
+  if (history.length === 0) {
+    section.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
   section.classList.remove('hidden');
-  
+
+  const streak = computeStreak(history);
+  const streakNote = document.getElementById('streak-note');
+  streakNote.textContent = streak >= 2 ? `${streak} days unbroken` : '';
+
   list.innerHTML = history.slice(0, 14).map(e => {
-    const bar = DOMAINS.map(d => {
-      const v = e.vals[d];
-      const colors = ['#7dd3fc','#93c5fd','#a5f3fc','#6ee7b7','#86efac','#d1d5db','#fde68a','#fcd34d','#fb923c','#f87171','#ef4444'];
-      return `<div style="width:${v*10}%; height:3px; background:${colors[v]}; border-radius:1px;"></div>`;
-    }).join('');
-    
-    return `<div class="history-row cave-border rounded p-2 cursor-pointer" onclick="loadReading('${e.date}')">
+    return `<div class="history-row reveal cave-border rounded p-2 cursor-pointer" onclick="loadReading('${e.date}')">
       <div class="flex justify-between items-center mb-1">
         <span class="mono text-xs text-zinc-600">${e.date}</span>
         <span class="mono text-xs ${tempClass(Math.round(e.avg))}">${e.avg} · ${LABELS[Math.round(e.avg)]}</span>
@@ -259,13 +387,17 @@ function renderHistory() {
       <div class="space-y-0.5 flex flex-col gap-0.5">
         ${DOMAINS.map((d,i) => `<div class="flex items-center gap-1.5">
           <span class="mono text-[9px] text-zinc-700 w-12">${d}</span>
-          <div style="width:${e.vals[d]*10}%; height:2px; background:${['#7dd3fc','#93c5fd','#a5f3fc','#6ee7b7','#86efac','#d1d5db','#fde68a','#fcd34d','#fb923c','#f87171','#ef4444'][e.vals[d]]}; border-radius:1px;"></div>
+          <div style="width:${e.vals[d]*10}%; height:2px; background:${COLORS[e.vals[d]]}; border-radius:1px;"></div>
           <span class="mono text-[9px] text-zinc-700">${e.vals[d]}</span>
-          ${e.notes[d] ? `<span class="text-[9px] text-zinc-700 truncate max-w-24">${e.notes[d]}</span>` : ''}
+          ${e.notes[d] ? `<span class="text-[9px] text-zinc-700 truncate max-w-24">${escapeHtml(e.notes[d])}</span>` : ''}
         </div>`).join('')}
       </div>
     </div>`;
   }).join('');
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function loadReading(date) {
@@ -277,12 +409,14 @@ function loadReading(date) {
     document.getElementById(`${d}-note`).value = entry.notes[d] || '';
     updateSlider(d);
   });
+  document.getElementById('composite-panel').scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function clearHistory() {
-  if (confirm('Clear all temperature history?')) {
+  if (confirm('Let the fog take it? This cannot be recovered.')) {
     localStorage.removeItem('cave-temp-history');
     document.getElementById('history-section').classList.add('hidden');
+    document.getElementById('empty-state').classList.remove('hidden');
   }
 }
 
@@ -297,6 +431,84 @@ const history = JSON.parse(localStorage.getItem('cave-temp-history') || '[]');
 const todayStr = today.toISOString().slice(0, 10);
 const todayEntry = history.find(e => e.date === todayStr);
 if (todayEntry) loadReading(todayStr);
+
+/* ===== ambient drips (cave-appropriate embers) — cheap, capped ===== */
+(function(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const wrap = document.getElementById('drips');
+  const N = 5;
+  for (let i=0;i<N;i++){
+    const d = document.createElement('div');
+    d.className = 'drip';
+    d.style.left = (8 + Math.random()*84) + 'vw';
+    d.style.animationDelay = (Math.random()*16) + 's';
+    d.style.animationDuration = (13 + Math.random()*8) + 's';
+    wrap.appendChild(d);
+  }
+})();
+
+/* ===== night whisper: 00:00–03:00 local ===== */
+(function(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) {
+    const w = document.getElementById('night-whisper');
+    w.textContent = 'the mountain does not sleep.';
+    setTimeout(() => w.classList.add('show'), 1200);
+  }
+})();
+
+/* ===== easter egg: type "prizrak" ===== */
+(function(){
+  let buf = '';
+  window.addEventListener('keydown', (e) => {
+    if (e.key.length !== 1) return;
+    buf = (buf + e.key.toLowerCase()).slice(-7);
+    if (buf === 'prizrak') {
+      const g = document.getElementById('ghost-watcher');
+      g.textContent = 'you found the watcher. it has been measuring you, too.';
+      g.classList.add('show');
+    }
+  });
+})();
+
+/* ===== easter egg: triple-click title spawns one extra drip ===== */
+(function(){
+  const title = document.getElementById('title');
+  if (!title) return;
+  title.addEventListener('click', (e) => {
+    if (e.detail === 3) {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const wrap = document.getElementById('drips');
+      const d = document.createElement('div');
+      d.className = 'drip';
+      d.style.left = (8 + Math.random()*84) + 'vw';
+      d.style.animationDuration = (13 + Math.random()*8) + 's';
+      wrap.appendChild(d);
+      setTimeout(() => d.remove(), 22000);
+    }
+  });
+})();
+
+/* ===== idle 60s: the watcher speaks ===== */
+(function(){
+  let t;
+  const g = document.getElementById('ghost-watcher');
+  function arm(){
+    clearTimeout(t);
+    if (g.classList.contains('show')) return; // don't overwrite the prizrak egg
+    t = setTimeout(() => {
+      if (!g.textContent) {
+        g.textContent = 'still here. still watching.';
+        g.classList.add('show');
+        setTimeout(() => g.classList.remove('show'), 6000);
+        setTimeout(() => { if (g.textContent === 'still here. still watching.') g.textContent=''; }, 7500);
+      }
+    }, 60000);
+  }
+  ['mousemove','keydown','click','input','scroll','touchstart'].forEach(ev =>
+    window.addEventListener(ev, arm, {passive:true}));
+  arm();
+})();
 </script>
 </body>
 </html>

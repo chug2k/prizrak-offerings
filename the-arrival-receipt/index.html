@@ -6,50 +6,147 @@
   <title>The Arrival Receipt | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at top, #1e293b 0, #09090b 42%, #030303 100%); }
-    .glass { background: rgba(24,24,27,.76); backdrop-filter: blur(18px); }
-    .mono { font-variant-numeric: tabular-nums; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#7dd3fc;            /* sky — this app's existing lead color */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{ background:var(--bg); }
+    body{
+      background:
+        radial-gradient(120% 80% at 50% -10%, #11212e 0, var(--bg) 46%, #050507 100%);
+      color:var(--ink);
+    }
+    .glass{ background:rgba(17,17,19,.78); backdrop-filter:blur(18px); }
+    .mono{ font-variant-numeric:tabular-nums; }
+
+    /* ── labels & whispers ────────────────────────────────────── */
+    .lbl{ font-size:.62rem; letter-spacing:.22em; text-transform:uppercase; color:var(--ink-dim); }
+    .ghost{ color:var(--ink-ghost); }
+
+    /* ── glow recipe ──────────────────────────────────────────── */
+    .verdict-glow{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); transition:box-shadow .5s ease; }
+    h1.glow{ text-shadow:0 0 14px var(--glow); }
+
+    /* ── atmosphere ───────────────────────────────────────────── */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* ── interaction patterns ─────────────────────────────────── */
+    input{ transition:border-color .15s, box-shadow .15s, background .15s; }
+    input:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .panel{ transition:transform .15s, box-shadow .15s, border-color .15s; }
+    .panel:hover{ transform:translateY(-2px); border-color:var(--accent); }
+
+    button{ transition:transform .1s, box-shadow .15s, border-color .15s, background .15s, color .15s; }
+    button:active{ transform:translateY(1px); }
+    button:focus-visible{ outline:none; box-shadow:0 0 0 1px var(--glow); }
+
+    .restore-btn:hover{ color:var(--accent)!important; }
+
+    /* the receipt card is itself a copy surface */
+    #card{ cursor:copy; transition:border-color .15s, box-shadow .2s; position:relative; }
+    #card:hover{ border-color:#3a3a44; }
+    #card.flash{ box-shadow:0 0 0 1px var(--glow), 0 0 30px -8px var(--glow); }
+
+    /* drift readout — derived, never required */
+    .drift-on-time{ color:var(--accent); }
+    .drift-early{ color:#86efac; }
+    .drift-late{ color:#fca5a5; }
+
+    /* verdict-driven card states */
+    .state-verified{ box-shadow:0 0 0 1px var(--line), 0 0 30px -6px color-mix(in srgb, #86efac 55%, transparent); }
+    .state-disputed{ box-shadow:0 0 0 1px var(--line), 0 0 30px -6px color-mix(in srgb, #fca5a5 55%, transparent); }
+    .state-pending,.state-record{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+    /* the stamp on the receipt card */
+    @keyframes stampIn{0%{transform:rotate(-14deg) scale(1.6);opacity:0}60%{opacity:.95}100%{transform:rotate(-9deg) scale(1);opacity:.92}}
+    .stamp{ position:absolute; top:1rem; right:1rem; border:2px solid currentColor;
+      padding:.15rem .55rem; border-radius:.4rem; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase;
+      transform:rotate(-9deg); opacity:.92; box-shadow:0 0 14px -4px currentColor; pointer-events:none;
+      animation:stampIn .5s ease-out both }
+    .stamp-verified{ color:#86efac; }
+    .stamp-disputed{ color:#fca5a5; }
+    .stamp-pending,.stamp-record{ color:var(--accent); }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.stamp{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen text-zinc-200 font-sans">
-  <main class="max-w-5xl mx-auto px-4 py-8 sm:py-12">
+<body class="min-h-screen text-zinc-200 font-sans grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <main class="max-w-5xl mx-auto px-4 py-8 sm:py-12 relative" style="z-index:2">
     <header class="mb-8">
-      <a href="../" class="text-xs text-zinc-500 hover:text-zinc-300">← offerings</a>
+      <a href="../" class="text-xs text-zinc-500 hover:text-sky-300 transition-colors">← offerings</a>
       <div class="mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <p class="text-xs uppercase tracking-[0.35em] text-sky-300/80">travel · receipt · not vibes</p>
-          <h1 class="text-4xl sm:text-6xl font-black tracking-tight text-white mt-2">The Arrival Receipt</h1>
-          <p class="mt-3 text-zinc-400 max-w-2xl">When an itinerary screenshot, a logo, and a tracker disagree, do not argue with memory. Build the receipt: planned time, candidate flight, tracker evidence, actual arrival.</p>
+          <p class="lbl text-sky-300/80 flicker">TRAVEL · RECEIPT · NOT VIBES</p>
+          <h1 id="title" class="glow text-4xl sm:text-6xl font-black tracking-tight text-white mt-2 select-none cursor-default">The Arrival Receipt</h1>
+          <p class="mt-3 text-zinc-400 max-w-2xl">When an itinerary screenshot, a logo, and a tracker disagree, do not argue with memory. Build the receipt: planned time, candidate flight, tracker evidence, actual arrival. The aircraft has already landed. Only the record is in doubt.</p>
         </div>
-        <div class="glass border border-zinc-800 rounded-2xl p-4 min-w-[220px]">
-          <div class="text-xs text-zinc-500">today's lesson</div>
-          <div class="text-lg font-semibold text-sky-200">May 2 is May 2</div>
+        <div class="panel glass border border-zinc-800 rounded-2xl p-4 min-w-[220px]">
+          <div class="lbl">TODAY'S LESSON</div>
+          <div class="text-lg font-semibold text-sky-200 breathe mt-1">May 2 is May 2</div>
           <div class="text-xs text-zinc-500 mt-1">The calendar is a probe, not decoration.</div>
         </div>
       </div>
     </header>
 
     <section class="grid lg:grid-cols-3 gap-4">
-      <div class="lg:col-span-2 glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
-        <h2 class="text-xl font-bold text-white mb-4">Build the receipt</h2>
+      <div class="panel lg:col-span-2 glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
+        <h2 class="text-xl font-bold text-white mb-1">Build the receipt</h2>
+        <p class="text-xs text-zinc-600 mb-4">eight probes. fill what you know. the ghost fills the silence with doubt.</p>
         <div class="grid sm:grid-cols-2 gap-4">
-          <label class="block"><span class="text-xs text-zinc-500">Route</span><input id="route" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="SZX → SGN"></label>
-          <label class="block"><span class="text-xs text-zinc-500">Itinerary time</span><input id="planned" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="11:30 → 13:30"></label>
-          <label class="block"><span class="text-xs text-zinc-500">Candidate flight</span><input id="flight" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="CZ8465 / CSN8465"></label>
-          <label class="block"><span class="text-xs text-zinc-500">Airline</span><input id="airline" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="China Southern"></label>
-          <label class="block"><span class="text-xs text-zinc-500">Tracker status</span><input id="status" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="Arrived"></label>
-          <label class="block"><span class="text-xs text-zinc-500">Actual arrival</span><input id="actual" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="12:58 PM Vietnam time · SGN T2"></label>
-          <label class="block"><span class="text-xs text-zinc-500">Departure evidence</span><input id="depart" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="SZX Gate 316 · departed 11:24 AM China time"></label>
-          <label class="block"><span class="text-xs text-zinc-500">Verdict</span><input id="verdict" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="Landed 32 minutes early"></label>
+          <label class="block"><span class="lbl">ROUTE</span><input id="route" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="SZX → SGN"></label>
+          <label class="block"><span class="lbl">ITINERARY TIME</span><input id="planned" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="11:30 → 13:30"></label>
+          <label class="block"><span class="lbl">CANDIDATE FLIGHT</span><input id="flight" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="CZ8465 / CSN8465"></label>
+          <label class="block"><span class="lbl">AIRLINE</span><input id="airline" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="China Southern"></label>
+          <label class="block"><span class="lbl">TRACKER STATUS</span><input id="status" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="Arrived"></label>
+          <label class="block"><span class="lbl">ACTUAL ARRIVAL</span><input id="actual" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="12:58 PM Vietnam time · SGN T2"></label>
+          <label class="block"><span class="lbl">DEPARTURE EVIDENCE</span><input id="depart" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="SZX Gate 316 · departed 11:24 AM China time"></label>
+          <label class="block"><span class="lbl">VERDICT</span><input id="verdict" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2" value="Landed 32 minutes early"></label>
         </div>
         <div class="mt-5 flex flex-wrap gap-2">
           <button id="render" class="px-4 py-2 rounded-xl bg-sky-400 text-zinc-950 font-bold hover:bg-sky-300">make receipt</button>
-          <button id="save" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500">save locally</button>
+          <button id="copy" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-sky-400 hover:text-sky-200">copy receipt</button>
+          <button id="save" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-sky-400 hover:text-sky-200">save locally</button>
           <button id="clear" class="px-4 py-2 rounded-xl border border-zinc-800 text-zinc-500 hover:text-zinc-300">clear history</button>
         </div>
       </div>
 
-      <aside class="glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
+      <aside class="panel glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
         <h2 class="text-xl font-bold text-white mb-4">Probe order</h2>
         <ol class="space-y-3 text-sm text-zinc-400">
           <li><span class="text-sky-300 font-bold">1.</span> Confirm the date in local time.</li>
@@ -62,36 +159,175 @@
       </aside>
     </section>
 
-    <section class="mt-4 glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
-      <h2 class="text-xl font-bold text-white mb-4">Receipt card</h2>
-      <div id="card" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 mono whitespace-pre-wrap text-sm leading-7 text-zinc-300"></div>
+    <section class="mt-4 panel glass border border-zinc-800 rounded-3xl p-5 sm:p-6 verdict-glow">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-white">Receipt card</h2>
+        <span id="cardState" class="lbl"></span>
+      </div>
+      <div id="card" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 mono whitespace-pre-wrap text-sm leading-7 text-zinc-300" title="click to copy to the ledger"></div>
+      <p id="drift" class="lbl mt-3 min-h-[1rem]"></p>
     </section>
 
-    <section class="mt-4 glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
-      <div class="flex items-center justify-between mb-3"><h2 class="text-xl font-bold text-white">Local history</h2><span id="count" class="text-xs text-zinc-500"></span></div>
+    <section class="mt-4 panel glass border border-zinc-800 rounded-3xl p-5 sm:p-6">
+      <div class="flex items-center justify-between mb-3"><h2 class="text-xl font-bold text-white">Local history</h2><span id="count" class="lbl"></span></div>
       <div id="history" class="space-y-3"></div>
     </section>
+
+    <footer class="mt-10 text-center">
+      <p id="whisper" class="text-xs ghost flicker">calendar first. logo second. receipt last.</p>
+    </footer>
   </main>
 
   <script>
     const key = 'arrival_receipts_v1';
     const $ = id => document.getElementById(id);
     const fields = ['route','planned','flight','airline','status','actual','depart','verdict'];
+    function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function data(){ return Object.fromEntries(fields.map(f => [f, $(f).value.trim()])); }
     function text(d=data()){
       return `ARRIVAL RECEIPT\n\nRoute: ${d.route}\nItinerary: ${d.planned}\nCandidate: ${d.flight} · ${d.airline}\nStatus: ${d.status}\nActual: ${d.actual}\nDeparture: ${d.depart}\nVerdict: ${d.verdict}\n\nPrízrak note: Calendar first. Logo second. Receipt last. The mountain does not trust a screenshot once the aircraft has landed.`;
     }
-    function render(){ $('card').textContent = text(); }
+
+    // verdict has teeth — read the status/verdict and stamp the card
+    function stampFor(d){
+      const hay = (d.status + ' ' + d.verdict).toLowerCase();
+      if(/cancel|divert|delay|late|miss|unknown|null|n\/a|\?/.test(hay)) return 'disputed';
+      if(/land|arriv|early|on time|on-time|gate|touch/.test(hay)) return 'verified';
+      if(!d.actual) return 'pending';
+      return 'on record';
+    }
+    const stampClass = { 'verified':'verified','disputed':'disputed','pending':'pending','on record':'record' };
+
+    // drift probe — parse first HH:MM out of itinerary scheduled-arrival vs actual.
+    // purely derived, never required, never persisted. silence is fine.
+    function minutesIn(s){
+      const m = String(s).match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+      if(!m) return null;
+      let h = +m[1]; const mm = +m[2]; const ap = (m[3]||'').toLowerCase();
+      if(ap==='pm' && h<12) h+=12; if(ap==='am' && h===12) h=0;
+      return h*60+mm;
+    }
+    function driftLine(d){
+      // itinerary scheduled arrival = the LAST time in the planned field (after the arrow)
+      const planTimes = String(d.planned).match(/\d{1,2}:\d{2}\s*(am|pm)?/gi) || [];
+      const sched = planTimes.length ? minutesIn(planTimes[planTimes.length-1]) : null;
+      const act = minutesIn(d.actual);
+      if(sched==null || act==null) return { txt:'', cls:'' };
+      let diff = act - sched;
+      // wrap across a single day boundary toward the nearest plausible reading
+      if(diff >  720) diff -= 1440;
+      if(diff < -720) diff += 1440;
+      if(diff === 0) return { txt:'DRIFT · 0 MIN · the schedule held. the mountain notes it.', cls:'drift-on-time' };
+      const mag = Math.abs(diff);
+      if(diff < 0) return { txt:`DRIFT · ${mag} MIN EARLY · the wheels beat the itinerary.`, cls:'drift-early' };
+      return { txt:`DRIFT · ${mag} MIN LATE · the receipt does not forgive, only records.`, cls:'drift-late' };
+    }
+
+    function render(){
+      const d = data();
+      const card = $('card');
+      card.textContent = text(d);
+      const mark = stampFor(d);
+      const el = document.createElement('div');
+      el.className = 'stamp stamp-' + stampClass[mark];
+      el.textContent = mark;
+      card.appendChild(el);
+      // card glow + state echoes the stamp
+      card.classList.remove('state-verified','state-disputed','state-pending','state-record');
+      card.classList.add('state-' + stampClass[mark]);
+      // drift readout
+      const dr = driftLine(d);
+      const drift = $('drift');
+      drift.textContent = dr.txt;
+      drift.className = 'lbl mt-3 min-h-[1rem] ' + dr.cls;
+      $('cardState').textContent = mark + ' · reconciled ' + new Date().toLocaleTimeString();
+    }
+
     function load(){ try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } }
     function write(items){ localStorage.setItem(key, JSON.stringify(items)); drawHistory(); }
     function drawHistory(){
-      const items=load(); $('count').textContent = `${items.length} saved`;
-      $('history').innerHTML = items.length ? items.map((x,i)=>`<div class="border border-zinc-800 rounded-2xl p-4 bg-zinc-950/70"><div class="text-xs text-zinc-600 mb-2">${x.savedAt}</div><div class="font-bold text-sky-200">${x.flight} · ${x.status}</div><div class="text-sm text-zinc-400 mt-1">${x.verdict}</div><button class="mt-3 text-xs text-zinc-500 hover:text-zinc-300" onclick="restore(${i})">restore</button></div>`).join('') : '<p class="text-sm text-zinc-600">No receipts saved yet. The cave is empty.</p>';
+      const items=load(); $('count').textContent = `${items.length} FOSSILIZED`;
+      $('history').innerHTML = items.length ? items.map((x,i)=>`<div class="panel border border-zinc-800 rounded-2xl p-4 bg-zinc-950/70 reveal"><div class="text-xs text-zinc-600 mb-2">${esc(x.savedAt)}</div><div class="font-bold text-sky-200">${esc(x.flight)} · ${esc(x.status)}</div><div class="text-sm text-zinc-400 mt-1">${esc(x.verdict)}</div><button class="restore-btn mt-3 text-xs text-zinc-500" onclick="restore(${i})">restore</button></div>`).join('') : '<p class="text-sm text-zinc-600">the cave is empty. nothing has fossilized yet.</p>';
     }
-    window.restore = i => { const x=load()[i]; fields.forEach(f => $(f).value=x[f]||''); render(); };
-    $('render').onclick = render;
-    $('save').onclick = () => { const items=load(); items.unshift({...data(), savedAt:new Date().toLocaleString()}); write(items.slice(0,12)); };
-    $('clear').onclick = () => { if(confirm('Bury the receipt history?')) write([]); };
+    window.restore = i => { const x=load()[i]; if(!x) return; fields.forEach(f => $(f).value=x[f]||''); render(); $('card').scrollIntoView({behavior:'smooth'}); };
+
+    $('render').onclick = () => { render(); $('card').scrollIntoView({behavior:'smooth'}); };
+
+    // shared copy routine — flashes the surface, swaps the label to the ledger
+    function copyReceipt(flashEl){
+      navigator.clipboard.writeText(text()).then(()=>{
+        flashEl.classList.add('flash');
+        setTimeout(()=>flashEl.classList.remove('flash'), 600);
+      });
+    }
+    $('copy').onclick = (e) => {
+      const b = e.currentTarget, prev = b.textContent;
+      navigator.clipboard.writeText(text()).then(()=>{
+        b.textContent = 'copied to the ledger';
+        b.classList.add('text-sky-200','border-sky-400');
+        $('card').classList.add('flash'); setTimeout(()=>$('card').classList.remove('flash'), 600);
+        setTimeout(()=>{ b.textContent = prev; b.classList.remove('text-sky-200','border-sky-400'); }, 1200);
+      }).catch(()=>{ b.textContent = 'clipboard refused'; setTimeout(()=>b.textContent=prev,1200); });
+    };
+    // the card itself is a copy surface — click it, it remembers
+    $('card').addEventListener('click', () => copyReceipt($('card')));
+
+    $('save').onclick = (e) => {
+      const items=load(); items.unshift({...data(), savedAt:new Date().toLocaleString()}); write(items.slice(0,12));
+      const b=e.currentTarget, prev=b.textContent; b.textContent='filed. the ledger remembers.';
+      setTimeout(()=>b.textContent=prev,1200);
+    };
+    $('clear').onclick = () => { if(confirm('let the fog take it? this cannot be recovered.')) write([]); };
+
+    // ── live receipt: the card breathes with the inputs (debounced) ──
+    let _rt;
+    fields.forEach(f => $(f).addEventListener('input', () => { clearTimeout(_rt); _rt = setTimeout(render, 220); }));
+
+    // ── easter eggs (quiet, reward attention) ──────────────────
+    // triple-click the title → one extra ember rises
+    $('title').addEventListener('click', () => {
+      $('title').dataset.c = (+($('title').dataset.c||0))+1;
+      clearTimeout($('title')._t);
+      $('title')._t = setTimeout(()=>$('title').dataset.c=0, 600);
+      if(+$('title').dataset.c >= 3){ $('title').dataset.c=0; spawnEmber(true); }
+    });
+    // type "prizrak" → the watcher answers
+    let buf='';
+    addEventListener('keydown', e => {
+      if(e.target.matches('input,textarea')) return;
+      buf=(buf+e.key.toLowerCase()).slice(-7);
+      if(buf==='prizrak'){ $('whisper').textContent='you found the watcher. it was already reading.'; $('whisper').style.color='var(--accent)'; }
+    });
+    // between 00:00–03:00 local time → the mountain stirs
+    (()=>{ const h=new Date().getHours(); if(h>=0 && h<3) $('whisper').textContent='the mountain does not sleep.'; })();
+    // idle 60s → a single line fades in. non-blocking, touches no saved state.
+    let _idle;
+    function armIdle(){
+      clearTimeout(_idle);
+      _idle = setTimeout(()=>{
+        if($('whisper').dataset.locked) return; // don't trample the watcher / the night line
+        $('whisper').textContent = 'still here. still watching.';
+      }, 60000);
+    }
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => addEventListener(ev, armIdle, {passive:true}));
+    armIdle();
+
+    // ── embers (CSS-only motion, capped) ───────────────────────
+    function spawnEmber(extra){
+      if(matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+      const field=$('emberField');
+      if(!extra && field.childElementCount>=7) return;
+      const e=document.createElement('div');
+      e.className='ember';
+      e.style.left=(Math.random()*100)+'vw';
+      e.style.animationDelay=(extra?0:Math.random()*8)+'s';
+      e.style.animationDuration=(11+Math.random()*7)+'s';
+      field.appendChild(e);
+      e.addEventListener('animationend', ()=>e.remove());
+    }
+    for(let i=0;i<7;i++) spawnEmber();
+    if(!matchMedia('(prefers-reduced-motion:reduce)').matches) setInterval(spawnEmber, 4200);
+
     render(); drawHistory();
   </script>
 </body>

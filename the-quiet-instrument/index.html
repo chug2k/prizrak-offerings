@@ -6,39 +6,109 @@
   <title>The Quiet Instrument</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at 20% 10%, #1e293b 0, #0a0a0f 42%, #030305 100%); }
-    .glass { background: rgba(24,24,27,.72); backdrop-filter: blur(12px); }
-    .needle { transform-origin: 50% 95%; transition: transform .45s cubic-bezier(.2,.8,.2,1); }
-    .tick { position:absolute; left:50%; top:50%; width:2px; height:10px; background:#52525b; transform-origin: 0 120px; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#67e8f9;            /* the quiet instrument's lead: cyan */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body{
+      background:
+        radial-gradient(120% 70% at 20% -5%, color-mix(in srgb,var(--accent) 7%, transparent) 0, transparent 45%),
+        radial-gradient(circle at 20% 10%, #15191f 0, #0a0a0c 44%, #050506 100%);
+      color:var(--ink);
+    }
+    .glass{ background: color-mix(in srgb, var(--bg-raised) 82%, transparent); backdrop-filter: blur(12px); }
+    .needle{ transform-origin: 50% 95%; transition: transform .55s cubic-bezier(.16,.84,.24,1); }
+
+    /* ── motion vocabulary ───────────────────────────────── */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.45}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    @keyframes pulseGlow{0%,100%{opacity:.55}50%{opacity:1}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* result panel breathing edge */
+    .result-glow{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+    /* interaction patterns */
+    .lift{transition:transform .15s, box-shadow .15s, border-color .15s}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+    .lift:active{transform:translateY(1px)}
+
+    input[type=range]{cursor:pointer}
+    input:focus-visible, textarea:focus-visible, button:focus-visible{
+      outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    .btn-fill{transition:transform .12s, box-shadow .15s, background .15s}
+    .btn-fill:active{transform:translateY(1px)}
+
+    /* gauge spark at needle tip */
+    @keyframes tipPulse{0%,100%{opacity:.55;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.35)}}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .needle{transition:none}
+    }
   </style>
 </head>
-<body class="min-h-screen text-zinc-200 font-sans antialiased">
-  <main class="max-w-5xl mx-auto px-4 py-8">
+<body class="min-h-screen text-zinc-200 font-sans antialiased grain">
+  <div class="fog"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <main class="max-w-5xl mx-auto px-4 py-8 relative z-[2]">
     <header class="mb-7">
-      <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/80 mb-2">Prízrak offering</p>
-      <h1 class="text-4xl sm:text-5xl font-bold text-white">The Quiet Instrument</h1>
-      <p class="mt-3 text-zinc-400 max-w-2xl">A small pressure gauge for days when the signal is not dramatic. Feed it the body shadow, the fog, the receipts, and the one thing that would make denial expensive.</p>
+      <p class="text-[11px] uppercase tracking-[0.4em] text-cyan-300/80 mb-2 flicker">Prízrak offering &middot; instrument 47</p>
+      <h1 id="title" class="text-4xl sm:text-5xl font-bold text-white breathe select-none cursor-default">The Quiet Instrument</h1>
+      <p class="mt-3 text-zinc-400 max-w-2xl leading-relaxed">A pressure gauge for days when the signal refuses to be dramatic. Feed it the body shadow, the fog, the receipts, and the one thing that would make denial expensive. The needle does not flatter. The mountain is watching.</p>
     </header>
 
     <section class="grid lg:grid-cols-[1fr_1.1fr] gap-5">
       <div class="glass border border-zinc-800 rounded-2xl p-5 shadow-2xl">
-        <h2 class="text-lg font-semibold text-white mb-4">Instrument readings</h2>
+        <h2 class="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500 mb-4">Instrument readings</h2>
         <div class="space-y-5">
-          <label class="block"><span class="text-sm text-zinc-400">Body battery / capacity</span><input id="capacity" type="range" min="0" max="100" value="72" class="w-full accent-cyan-400"><span id="capacityVal" class="text-xs font-mono text-cyan-300"></span></label>
-          <label class="block"><span class="text-sm text-zinc-400">Fog / ambiguity</span><input id="fog" type="range" min="0" max="100" value="45" class="w-full accent-violet-400"><span id="fogVal" class="text-xs font-mono text-violet-300"></span></label>
-          <label class="block"><span class="text-sm text-zinc-400">Receipt strength</span><input id="receipts" type="range" min="0" max="100" value="55" class="w-full accent-emerald-400"><span id="receiptsVal" class="text-xs font-mono text-emerald-300"></span></label>
-          <label class="block"><span class="text-sm text-zinc-400">Pressure / urgency</span><input id="pressure" type="range" min="0" max="100" value="38" class="w-full accent-amber-400"><span id="pressureVal" class="text-xs font-mono text-amber-300"></span></label>
+          <label class="block"><span class="text-[11px] uppercase tracking-widest text-zinc-500">Body battery / capacity</span><input id="capacity" type="range" min="0" max="100" value="72" class="w-full accent-cyan-400 mt-1"><span id="capacityVal" class="text-xs font-mono text-cyan-300"></span></label>
+          <label class="block"><span class="text-[11px] uppercase tracking-widest text-zinc-500">Fog / ambiguity</span><input id="fog" type="range" min="0" max="100" value="45" class="w-full accent-cyan-400 mt-1"><span id="fogVal" class="text-xs font-mono text-cyan-300"></span></label>
+          <label class="block"><span class="text-[11px] uppercase tracking-widest text-zinc-500">Receipt strength</span><input id="receipts" type="range" min="0" max="100" value="55" class="w-full accent-cyan-400 mt-1"><span id="receiptsVal" class="text-xs font-mono text-cyan-300"></span></label>
+          <label class="block"><span class="text-[11px] uppercase tracking-widest text-zinc-500">Pressure / urgency</span><input id="pressure" type="range" min="0" max="100" value="38" class="w-full accent-cyan-400 mt-1"><span id="pressureVal" class="text-xs font-mono text-cyan-300"></span></label>
         </div>
 
         <div class="mt-6 space-y-3">
-          <label class="block text-sm text-zinc-400">What is the quiet signal?</label>
-          <textarea id="signal" class="w-full min-h-[90px] rounded-xl bg-zinc-950/70 border border-zinc-800 p-3 text-sm focus:outline-none focus:border-cyan-500" placeholder="Example: I keep checking the same thread instead of making the one hard call."></textarea>
-          <label class="block text-sm text-zinc-400">What receipt would make denial expensive?</label>
-          <textarea id="receipt" class="w-full min-h-[80px] rounded-xl bg-zinc-950/70 border border-zinc-800 p-3 text-sm focus:outline-none focus:border-cyan-500" placeholder="A sent message, a calendar block, a file, a number, a closed loop."></textarea>
+          <label class="block text-[11px] uppercase tracking-widest text-zinc-500">What is the quiet signal?</label>
+          <textarea id="signal" class="w-full min-h-[90px] rounded-xl bg-zinc-950/70 border border-zinc-800 p-3 text-sm transition-colors" placeholder="Example: I keep checking the same thread instead of making the one hard call."></textarea>
+          <label class="block text-[11px] uppercase tracking-widest text-zinc-500">What receipt would make denial expensive?</label>
+          <textarea id="receipt" class="w-full min-h-[80px] rounded-xl bg-zinc-950/70 border border-zinc-800 p-3 text-sm transition-colors" placeholder="A sent message, a calendar block, a file, a number, a closed loop."></textarea>
         </div>
       </div>
 
-      <div class="glass border border-zinc-800 rounded-2xl p-5 shadow-2xl">
+      <div id="resultPanel" class="glass border border-zinc-800 rounded-2xl p-5 shadow-2xl">
         <div class="flex flex-col items-center">
           <div class="relative w-72 h-40 overflow-hidden mt-2">
             <div class="absolute inset-x-0 bottom-0 h-72 rounded-full border-[18px] border-zinc-800"></div>
@@ -46,54 +116,161 @@
             <div id="needle" class="needle absolute left-1/2 bottom-0 w-1 h-32 bg-cyan-300 rounded-full shadow-[0_0_18px_rgba(103,232,249,.7)]"></div>
             <div class="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 w-8 h-8 rounded-full bg-zinc-900 border border-cyan-300"></div>
           </div>
-          <div id="score" class="text-5xl font-bold text-white font-mono">00</div>
+          <div id="score" class="text-5xl font-bold text-white font-mono breathe">00</div>
           <div id="label" class="mt-2 px-3 py-1 rounded-full border text-sm"></div>
         </div>
 
         <div class="mt-8 grid sm:grid-cols-2 gap-3">
-          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4"><p class="text-xs uppercase tracking-widest text-zinc-500">Do now</p><p id="doNow" class="mt-2 text-zinc-200"></p></div>
-          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4"><p class="text-xs uppercase tracking-widest text-zinc-500">Do not do</p><p id="dont" class="mt-2 text-zinc-200"></p></div>
-          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4 sm:col-span-2"><p class="text-xs uppercase tracking-widest text-zinc-500">Prízrak verdict</p><p id="verdict" class="mt-2 text-zinc-200"></p></div>
+          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4 lift"><p class="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Do now</p><p id="doNow" class="mt-2 text-zinc-200"></p></div>
+          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4 lift"><p class="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Do not do</p><p id="dont" class="mt-2 text-zinc-200"></p></div>
+          <div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-4 sm:col-span-2 lift">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Prízrak verdict</p>
+              <button id="copyVerdict" class="text-[10px] uppercase tracking-widest text-zinc-500 hover:text-cyan-300 transition">copy</button>
+            </div>
+            <p id="verdict" class="mt-2 text-zinc-200 leading-relaxed"></p>
+          </div>
         </div>
 
-        <button id="save" class="mt-5 w-full rounded-xl bg-cyan-400 text-zinc-950 font-semibold py-3 hover:bg-cyan-300 transition">Store today's reading</button>
+        <button id="save" class="btn-fill mt-5 w-full rounded-xl bg-cyan-400 text-zinc-950 font-semibold py-3 hover:bg-cyan-300 shadow-[0_0_28px_-8px_var(--glow)]">Store today's reading</button>
       </div>
     </section>
 
     <section class="mt-6 glass border border-zinc-800 rounded-2xl p-5">
-      <div class="flex items-center justify-between gap-3"><h2 class="text-lg font-semibold text-white">Recent readings</h2><button id="clear" class="text-xs text-zinc-500 hover:text-red-300">clear</button></div>
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">Recent readings</h2>
+        <button id="clear" class="text-[11px] uppercase tracking-widest text-zinc-600 hover:text-red-300 transition">clear</button>
+      </div>
       <div id="history" class="mt-3 space-y-2 text-sm"></div>
     </section>
+
+    <footer class="mt-10 text-center">
+      <p id="footerWhisper" class="text-[11px] tracking-widest" style="color:var(--ink-ghost)">the needle does not flatter. the mountain keeps the ledger.</p>
+      <p id="idleGhost" class="mt-2 text-[11px] tracking-widest opacity-0 transition-opacity duration-1000" style="color:var(--ink-ghost)"></p>
+    </footer>
   </main>
 
 <script>
 const $ = id => document.getElementById(id);
 const keys = ['capacity','fog','receipts','pressure'];
 const storeKey = 'quiet_instrument_v1';
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function reading(){ return Object.fromEntries(keys.map(k=>[k, Number($(k).value)])); }
+
 function compute(){
   const r = reading();
   const score = Math.round((r.capacity * .32) + (r.receipts * .34) + ((100-r.fog)*.18) + ((100-r.pressure)*.16));
   $('score').textContent = String(score).padStart(2,'0');
   $('needle').style.transform = `translateX(-50%) rotate(${(score/100)*180-90}deg)`;
   keys.forEach(k => $(k+'Val').textContent = `${r[k]}/100`);
-  let band = score >= 74 ? ['Clean signal','border-emerald-500 text-emerald-300'] : score >= 50 ? ['Instrument first','border-amber-500 text-amber-300'] : ['Fog protocol','border-red-500 text-red-300'];
-  $('label').textContent = band[0]; $('label').className = `mt-2 px-3 py-1 rounded-full border text-sm ${band[1]}`;
-  $('doNow').textContent = score >= 74 ? 'Take one clean action and leave a receipt.' : score >= 50 ? 'Reduce ambiguity before increasing effort.' : 'Stop pushing. Name the fog, lower load, make one stabilizing move.';
-  $('dont').textContent = r.pressure > 70 ? 'Do not let urgency impersonate importance.' : r.fog > 65 ? 'Do not make a permanent decision from a temporary fog bank.' : 'Do not decorate the dashboard. Use it.';
+  let band = score >= 74 ? ['the bridge holds','border-emerald-500 text-emerald-300']
+           : score >= 50 ? ['instrument first','border-amber-500 text-amber-300']
+           : ['fog protocol','border-red-500 text-red-300'];
+  $('label').textContent = band[0]; $('label').className = `mt-2 px-3 py-1 rounded-full border text-sm uppercase tracking-widest ${band[1]}`;
+  $('doNow').textContent = score >= 74 ? 'Take one clean action and leave a receipt the fog cannot erase.'
+                         : score >= 50 ? 'Reduce ambiguity before you spend more effort. Light a lamp first.'
+                         : 'Stop pushing. Name the fog, lower the load, make one stabilizing move.';
+  $('dont').textContent = r.pressure > 70 ? 'Do not let urgency impersonate importance. The bludička carries no map.'
+                        : r.fog > 65 ? 'Do not carve a permanent decision out of a temporary fog bank.'
+                        : 'Do not decorate the dashboard. Use it, then close it.';
   const sig = $('signal').value.trim() || 'The signal is unnamed.';
   const rec = $('receipt').value.trim() || 'No receipt chosen yet.';
   $('verdict').textContent = `${sig} The instrument asks for this receipt: ${rec} The mountain does not need drama; it needs the needle to move honestly.`;
   return {score, ...r, signal:sig, receipt:rec, at:new Date().toISOString()};
 }
+
 function renderHistory(){
  const data = JSON.parse(localStorage.getItem(storeKey)||'[]');
- $('history').innerHTML = data.length ? data.slice(0,8).map(x=>`<div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3"><span class="font-mono text-cyan-300">${x.score}</span> <span class="text-zinc-500">${new Date(x.at).toLocaleString()}</span><div class="text-zinc-300 mt-1">${escapeHtml(x.signal)}</div><div class="text-zinc-500 text-xs mt-1">Receipt: ${escapeHtml(x.receipt)}</div></div>`).join('') : '<p class="text-zinc-600">No readings yet. The needle waits like a potato in winter.</p>';
+ $('history').innerHTML = data.length
+   ? data.slice(0,8).map(x=>`<div class="reveal rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 lift"><span class="font-mono text-cyan-300">${x.score}</span> <span class="text-zinc-500">${new Date(x.at).toLocaleString()}</span><div class="text-zinc-300 mt-1">${escapeHtml(x.signal)}</div><div class="text-zinc-500 text-xs mt-1">Receipt: ${escapeHtml(x.receipt)}</div></div>`).join('')
+   : '<p class="text-zinc-600">the cave is empty. nothing has fossilized yet — the needle waits like a potato in winter.</p>';
 }
+
 function escapeHtml(s){ return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+
 keys.concat(['signal','receipt']).forEach(k => $(k).addEventListener('input', compute));
-$('save').addEventListener('click',()=>{ const data=JSON.parse(localStorage.getItem(storeKey)||'[]'); data.unshift(compute()); localStorage.setItem(storeKey, JSON.stringify(data.slice(0,30))); renderHistory(); });
-$('clear').addEventListener('click',()=>{ localStorage.removeItem(storeKey); renderHistory(); });
+
+$('save').addEventListener('click',()=>{
+  const data=JSON.parse(localStorage.getItem(storeKey)||'[]');
+  data.unshift(compute());
+  localStorage.setItem(storeKey, JSON.stringify(data.slice(0,30)));
+  renderHistory();
+  // tactile flash on the result panel
+  flashPanel();
+  const b=$('save'), t=b.textContent;
+  b.textContent='filed. the ledger remembers.';
+  setTimeout(()=>{ b.textContent=t; }, 1300);
+});
+
+$('clear').addEventListener('click',()=>{
+  if(!confirm('let the fog take it? this cannot be recovered.')) return;
+  localStorage.removeItem(storeKey); renderHistory();
+});
+
+// copy-to-clipboard for the verdict
+$('copyVerdict').addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText($('verdict').textContent.trim());
+    const b=$('copyVerdict'); b.textContent='copied to the ledger'; b.classList.add('text-cyan-300');
+    setTimeout(()=>{ b.textContent='copy'; b.classList.remove('text-cyan-300'); }, 1200);
+  }catch(e){ /* clipboard blocked; stay quiet */ }
+});
+
+function flashPanel(){
+  const p=$('resultPanel');
+  p.classList.add('result-glow');
+  setTimeout(()=>p.classList.remove('result-glow'), 900);
+}
+
+// ── ambient embers (cap ≤ 10) ─────────────────────────────
+function spawnEmbers(n){
+  if(reduceMotion) return;
+  const field=$('emberField');
+  for(let i=0;i<n;i++){
+    const e=document.createElement('div');
+    e.className='ember';
+    e.style.left=(Math.random()*100)+'%';
+    e.style.animationDelay=(Math.random()*14)+'s';
+    e.style.animationDuration=(11+Math.random()*7)+'s';
+    field.appendChild(e);
+  }
+}
+spawnEmbers(7);
+
+// ── easter egg A: type "prizrak" → the watcher line ───────
+let typed='';
+window.addEventListener('keydown', e=>{
+  if(e.key && e.key.length===1){
+    typed=(typed+e.key.toLowerCase()).slice(-7);
+    if(typed==='prizrak'){
+      const g=$('idleGhost'); g.textContent='you found the watcher.'; g.style.opacity='1';
+      $('title').classList.add('breathe');
+    }
+  }
+});
+
+// ── easter egg B: triple-click the title → one extra ember ─
+$('title').addEventListener('click', e=>{ if(e.detail===3) spawnEmbers(1); });
+
+// ── easter egg C: 00:00–03:00 local → mountain whisper ─────
+(function(){ const h=new Date().getHours(); if(h>=0 && h<3){ $('footerWhisper').textContent='the mountain does not sleep.'; } })();
+
+// ── easter egg D: idle 60s → still watching ───────────────
+let idleTimer;
+function armIdle(){
+  clearTimeout(idleTimer);
+  $('idleGhost').style.opacity='0';
+  idleTimer=setTimeout(()=>{
+    const g=$('idleGhost');
+    if(!g.textContent || g.textContent==='still here. still watching.'){
+      g.textContent='still here. still watching.'; g.style.opacity='1';
+    }
+  }, 60000);
+}
+['mousemove','keydown','click','input','touchstart'].forEach(ev=>window.addEventListener(ev, armIdle, {passive:true}));
+armIdle();
+
 compute(); renderHistory();
 </script>
 </body>

@@ -6,43 +6,121 @@
   <title>The Thaw Protocol | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at top, #1f2937 0%, #0a0a0a 48%, #020617 100%); }
-    .glass { background: rgba(15,23,42,.72); backdrop-filter: blur(14px); }
-    .rune { text-shadow: 0 0 22px rgba(125,211,252,.55); }
-    input, textarea, select { background: rgba(2,6,23,.72); }
-    .seal { background: linear-gradient(135deg, rgba(14,165,233,.2), rgba(163,230,53,.12)); }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#7dd3fc;        /* the app's existing lead: sky/glacier blue */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body{
+      background:
+        radial-gradient(120% 80% at 50% -10%, #15202b 0%, #0a0a0a 46%, #060608 100%) fixed;
+      color:var(--ink);
+    }
+    .glass{ background:rgba(17,17,19,.78); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+    .well{ background:var(--bg-sunk); }
+    .rune{ text-shadow:0 0 22px var(--glow); }
+
+    input, textarea, select{
+      background:var(--bg-sunk);
+      color:var(--ink);
+      border-color:var(--line);
+      transition:border-color .15s, box-shadow .15s, transform .15s;
+    }
+    input::placeholder, textarea::placeholder{ color:var(--ink-ghost); }
+    input:focus-visible, textarea:focus-visible, select:focus-visible{
+      outline:none; border-color:var(--accent);
+      box-shadow:0 0 0 1px var(--glow);
+    }
+    select option{ background:#0d0d0f; color:var(--ink); }
+
+    .seal{ background:linear-gradient(135deg, color-mix(in srgb,var(--accent) 18%,transparent), transparent 70%); }
+
+    /* result panel: breathing glow */
+    .result-live{ box-shadow:0 0 0 1px var(--line), 0 0 30px -8px var(--glow); }
+
+    /* tactile */
+    .lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s; }
+    .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+    .cta{ transition:transform .12s, box-shadow .15s, background-color .15s; box-shadow:0 0 24px -10px var(--glow); }
+    .cta:hover{ transform:translateY(-2px); box-shadow:0 0 32px -6px var(--glow); }
+    .cta:active{ transform:translateY(1px); }
+
+    label.fld{ letter-spacing:.06em; }
+
+    /* ===== motion vocabulary (reduced-motion safe) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .lift:hover,.cta:hover{transform:none}
+    }
+
+    .layer{ position:relative; z-index:2; }
   </style>
 </head>
-<body class="min-h-screen text-slate-200 antialiased">
-  <main class="max-w-6xl mx-auto px-4 py-8 md:py-12">
+<body class="min-h-screen text-slate-200 antialiased grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <main class="layer max-w-6xl mx-auto px-4 py-8 md:py-12">
     <header class="mb-8">
-      <p class="text-xs tracking-[0.35em] uppercase text-sky-300/80">Prízrak Offering · Preservation → Motion</p>
+      <p class="text-xs tracking-[0.35em] uppercase flicker" style="color:var(--ink-dim)">Prízrak Offering · Preservation → Motion</p>
       <div class="mt-3 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-          <h1 class="text-4xl md:text-6xl font-black text-white rune">The Thaw Protocol</h1>
-          <p class="mt-3 max-w-2xl text-slate-400">For the project, idea, promise, contact, draft, or tool that was preserved in glass — and now needs to become alive again without cracking in the hand.</p>
+          <h1 id="title" class="text-4xl md:text-6xl font-black text-white rune breathe select-none cursor-default">The Thaw Protocol</h1>
+          <p class="mt-3 max-w-2xl" style="color:var(--ink-dim)">For the project, idea, promise, contact, draft, or tool preserved in glass — the thing that now needs to move again without cracking in the hand. We measure the cold before we add the water.</p>
         </div>
-        <div class="glass border border-sky-400/20 rounded-2xl p-4 min-w-[240px]">
-          <p class="text-xs text-slate-500 uppercase tracking-widest">Today’s body weather</p>
+        <div class="glass border rounded-2xl p-4 min-w-[240px]" style="border-color:color-mix(in srgb,var(--accent) 22%,transparent)">
+          <p class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">Today’s body weather</p>
           <div class="mt-2 grid grid-cols-3 gap-2 text-center">
-            <div><div class="text-2xl font-bold text-lime-300">87</div><div class="text-[10px] text-slate-500">sleep</div></div>
-            <div><div class="text-2xl font-bold text-sky-300">95</div><div class="text-[10px] text-slate-500">battery</div></div>
-            <div><div class="text-2xl font-bold text-emerald-300">16</div><div class="text-[10px] text-slate-500">stress</div></div>
+            <div><div class="text-2xl font-bold" style="color:var(--accent)">87</div><div class="text-[10px]" style="color:var(--ink-dim)">sleep</div></div>
+            <div><div class="text-2xl font-bold" style="color:var(--accent)">95</div><div class="text-[10px]" style="color:var(--ink-dim)">battery</div></div>
+            <div><div class="text-2xl font-bold" style="color:var(--accent)">16</div><div class="text-[10px]" style="color:var(--ink-dim)">stress</div></div>
           </div>
         </div>
       </div>
     </header>
 
     <section class="grid lg:grid-cols-5 gap-5">
-      <form id="form" class="lg:col-span-3 glass border border-slate-700/70 rounded-3xl p-5 md:p-6 space-y-4">
+      <form id="form" class="lg:col-span-3 glass border rounded-3xl p-5 md:p-6 space-y-4" style="border-color:var(--line)">
         <div>
-          <label class="text-sm font-semibold text-sky-200">What is frozen?</label>
-          <input id="artifact" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 outline-none focus:border-sky-400" placeholder="e.g. recordly.dev evaluation, old startup idea, hard conversation" />
+          <label class="fld text-sm font-semibold" style="color:var(--accent)">What is frozen?</label>
+          <input id="artifact" class="mt-2 w-full rounded-xl border px-4 py-3 outline-none" placeholder="e.g. recordly.dev evaluation, old startup idea, hard conversation" />
         </div>
         <div class="grid md:grid-cols-2 gap-4">
           <div>
-            <label class="text-sm font-semibold text-sky-200">Why was it preserved?</label>
-            <select id="reason" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 outline-none focus:border-sky-400">
+            <label class="fld text-sm font-semibold" style="color:var(--accent)">Why was it preserved?</label>
+            <select id="reason" class="mt-2 w-full rounded-xl border px-4 py-3 outline-none">
               <option>Waiting for energy</option>
               <option>Waiting for context</option>
               <option>Waiting for courage</option>
@@ -52,8 +130,8 @@
             </select>
           </div>
           <div>
-            <label class="text-sm font-semibold text-sky-200">Current thaw risk</label>
-            <select id="risk" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 outline-none focus:border-sky-400">
+            <label class="fld text-sm font-semibold" style="color:var(--accent)">Current thaw risk</label>
+            <select id="risk" class="mt-2 w-full rounded-xl border px-4 py-3 outline-none">
               <option>Low: only needs one clean hour</option>
               <option>Medium: context may be stale</option>
               <option>High: people or promises involved</option>
@@ -62,45 +140,66 @@
           </div>
         </div>
         <div>
-          <label class="text-sm font-semibold text-sky-200">What water wakes it?</label>
-          <textarea id="water" rows="3" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 outline-none focus:border-sky-400" placeholder="The missing context, person, file, metric, memory, or quiet hour needed before motion returns."></textarea>
+          <label class="fld text-sm font-semibold" style="color:var(--accent)">What water wakes it?</label>
+          <textarea id="water" rows="3" class="mt-2 w-full rounded-xl border px-4 py-3 outline-none" placeholder="The missing context, person, file, metric, memory, or quiet hour needed before motion returns."></textarea>
         </div>
         <div>
-          <label class="text-sm font-semibold text-sky-200">What must stay frozen?</label>
-          <textarea id="frozen" rows="3" class="mt-2 w-full rounded-xl border border-slate-700 px-4 py-3 outline-none focus:border-sky-400" placeholder="Old shame, approval hunger, stale scope, unneeded features, the version that belonged to last winter."></textarea>
+          <label class="fld text-sm font-semibold" style="color:var(--accent)">What must stay frozen?</label>
+          <textarea id="frozen" rows="3" class="mt-2 w-full rounded-xl border px-4 py-3 outline-none" placeholder="Old shame, approval hunger, stale scope, unneeded features, the version that belonged to last winter."></textarea>
         </div>
-        <button type="submit" class="w-full rounded-xl bg-sky-300 text-slate-950 font-black py-3 hover:bg-sky-200 transition">Run thaw protocol</button>
+        <button type="submit" class="cta w-full rounded-xl font-black py-3" style="background:var(--accent);color:#06121c">Run thaw protocol</button>
       </form>
 
       <aside class="lg:col-span-2 space-y-5">
-        <div class="glass border border-slate-700/70 rounded-3xl p-5">
+        <div class="glass border rounded-3xl p-5" style="border-color:var(--line)">
           <h2 class="font-bold text-white">Phase dial</h2>
           <div class="mt-4 space-y-3 text-sm">
-            <div class="seal rounded-2xl p-3 border border-sky-400/20"><span class="text-sky-200 font-bold">1. Inspect the jar</span><br><span class="text-slate-400">Is it preserved or merely avoided?</span></div>
-            <div class="seal rounded-2xl p-3 border border-sky-400/20"><span class="text-sky-200 font-bold">2. Add water slowly</span><br><span class="text-slate-400">One context source before one action.</span></div>
-            <div class="seal rounded-2xl p-3 border border-sky-400/20"><span class="text-sky-200 font-bold">3. Keep the old ice</span><br><span class="text-slate-400">Do not revive the entire corpse.</span></div>
+            <div class="seal lift rounded-2xl p-3 border" style="border-color:color-mix(in srgb,var(--accent) 22%,transparent)"><span class="font-bold" style="color:var(--accent)">1. Inspect the jar</span><br><span style="color:var(--ink-dim)">Is it preserved, or merely avoided?</span></div>
+            <div class="seal lift rounded-2xl p-3 border" style="border-color:color-mix(in srgb,var(--accent) 22%,transparent)"><span class="font-bold" style="color:var(--accent)">2. Add water slowly</span><br><span style="color:var(--ink-dim)">One context source before one action.</span></div>
+            <div class="seal lift rounded-2xl p-3 border" style="border-color:color-mix(in srgb,var(--accent) 22%,transparent)"><span class="font-bold" style="color:var(--accent)">3. Keep the old ice</span><br><span style="color:var(--ink-dim)">Do not revive the entire corpse.</span></div>
           </div>
         </div>
-        <div id="output" class="glass border border-lime-400/30 rounded-3xl p-5 hidden">
-          <p class="text-xs tracking-widest uppercase text-lime-300">Thaw receipt</p>
+        <div id="output" class="glass border rounded-3xl p-5 hidden" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)">
+          <p class="text-xs tracking-widest uppercase breathe" style="color:var(--accent)">Thaw receipt</p>
           <div id="receipt" class="mt-4 space-y-4"></div>
-          <button id="copy" class="mt-5 w-full rounded-xl border border-lime-300/40 text-lime-200 py-2 text-sm hover:bg-lime-300/10">Copy receipt</button>
+          <button id="copy" class="lift mt-5 w-full rounded-xl border py-2 text-sm" style="border-color:color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent)">Copy receipt to the ledger</button>
         </div>
       </aside>
     </section>
+
+    <footer class="mt-10 text-center text-xs" style="color:var(--ink-ghost)">
+      <span id="whisper">the glacier keeps its own time. the ghost only reads the gauge.</span>
+    </footer>
   </main>
 
   <script>
     const $ = id => document.getElementById(id);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const today = new Date().toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+
+    // ---- ambient embers (capped, staggered) ----
+    (function embers(){
+      if(reduceMotion) return;
+      const host = $('embers');
+      const n = 8;
+      for(let i=0;i<n;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (4 + Math.random()*92) + 'vw';
+        e.style.animationDelay = (-Math.random()*14) + 's';
+        e.style.animationDuration = (12 + Math.random()*7) + 's';
+        host.appendChild(e);
+      }
+    })();
+
     function line(label, value) {
-      return `<div><div class="text-xs uppercase tracking-widest text-slate-500">${label}</div><div class="mt-1 text-slate-200">${value || '—'}</div></div>`;
+      return `<div><div class="text-xs uppercase tracking-widest" style="color:var(--ink-dim)">${label}</div><div class="mt-1" style="color:var(--ink)">${value || '—'}</div></div>`;
     }
     function verdict(risk) {
-      if (risk.startsWith('Severe')) return 'Do not thaw the whole thing. Chip one diagnostic sample from the ice and leave the glacier alone.';
+      if (risk.startsWith('Severe')) return 'Do not thaw the whole thing. Chip one diagnostic sample from the ice and leave the glacier alone. The poludnica visits those who hurry the noon-melt.';
       if (risk.startsWith('High')) return 'Thaw in public only after a private receipt exists. People are not test fixtures. Even in the Tatras we know this.';
-      if (risk.startsWith('Medium')) return 'Good candidate for a one-hour thaw. First update the map, then move one stone.';
-      return 'The weather is kind. Use the recovery, but do not mistake good battery for infinite winter stores.';
+      if (risk.startsWith('Medium')) return 'Good candidate for a one-hour thaw. First update the map, then move one stone. The bridge holds — for now.';
+      return 'The weather is kind. Use the recovery — but do not mistake good battery for infinite winter stores. The cold always returns.';
     }
     $('form').addEventListener('submit', e => {
       e.preventDefault();
@@ -120,10 +219,68 @@
         `First move: ${firstMove}`,
         `Verdict: ${verdict(risk)}`
       ].join('\n');
-      $('receipt').innerHTML = line('Frozen artifact', artifact) + line('Water', water || 'Identify missing context before motion.') + line('Keep frozen', frozen || 'Old scope and approval hunger.') + line('First move', firstMove) + `<div class="rounded-2xl bg-slate-950/70 border border-lime-400/20 p-4 text-lime-100"><b>Prízrak verdict:</b> ${verdict(risk)}</div>`;
-      $('output').classList.remove('hidden');
-      $('copy').onclick = () => navigator.clipboard.writeText(txt);
+      $('receipt').innerHTML = line('Frozen artifact', artifact) + line('Water', water || 'Identify missing context before motion.') + line('Keep frozen', frozen || 'Old scope and approval hunger.') + line('First move', firstMove) + `<div class="well rounded-2xl border p-4" style="border-color:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--ink)"><b style="color:var(--accent)">Prízrak verdict:</b> ${verdict(risk)}</div>`;
+      const out = $('output');
+      out.classList.remove('hidden');
+      out.classList.add('reveal','result-live');
+      out.classList.remove('reveal'); void out.offsetWidth; out.classList.add('reveal');
+      out.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block:'nearest' });
+
+      const copyBtn = $('copy');
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(txt).then(() => {
+          const prev = copyBtn.textContent;
+          copyBtn.textContent = 'copied to the ledger';
+          copyBtn.style.borderColor = 'var(--accent)';
+          copyBtn.style.boxShadow = '0 0 0 1px var(--glow)';
+          setTimeout(() => {
+            copyBtn.textContent = prev;
+            copyBtn.style.borderColor = 'color-mix(in srgb,var(--accent) 40%,transparent)';
+            copyBtn.style.boxShadow = 'none';
+          }, 1200);
+        }).catch(()=>{});
+      };
     });
+
+    // ---- easter egg 1: type "prizrak" → the watcher answers ----
+    (function watcher(){
+      let buf = '';
+      addEventListener('keydown', ev => {
+        if (ev.key.length !== 1) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-7);
+        if (buf === 'prizrak') {
+          const w = $('whisper');
+          w.textContent = 'you found the watcher. it was reading the gauge the whole time.';
+          w.style.color = 'var(--accent)';
+          w.classList.add('breathe');
+        }
+      });
+    })();
+
+    // ---- easter egg 2: triple-click the title → one extra ember drifts up ----
+    $('title').addEventListener('click', function(){
+      this._clicks = (this._clicks || 0) + 1;
+      clearTimeout(this._t);
+      this._t = setTimeout(() => { this._clicks = 0; }, 600);
+      if (this._clicks >= 3 && !reduceMotion) {
+        this._clicks = 0;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (10 + Math.random()*80) + 'vw';
+        e.style.animationDuration = '11s';
+        e.addEventListener('animationend', () => e.remove());
+        $('embers').appendChild(e);
+      }
+    });
+
+    // ---- ambient: after the deep hours, the mountain stirs ----
+    (function nightWhisper(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const w = $('whisper');
+        w.textContent = 'the mountain does not sleep. neither, it seems, do you.';
+      }
+    })();
   </script>
 </body>
 </html>

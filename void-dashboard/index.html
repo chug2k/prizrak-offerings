@@ -2,45 +2,133 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width wide, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Void Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        :root{
+            --bg:#0a0a0a;          /* near-black base */
+            --bg-raised:#111113;   /* cards, panels */
+            --bg-sunk:#0d0d0f;     /* wells, inputs */
+            --line:#26262b;        /* thin borders */
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;         /* primary text */
+            --ink-dim:#7a7570;     /* labels, captions */
+            --ink-ghost:#3a3530;   /* whispers, easter-egg text */
+            --accent:#a5b4fc;      /* glacial periwinkle — cold light through the void */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
         body {
             font-family: 'JetBrains Mono', monospace;
-            background-color: #0a0a0a;
-            color: #e5e5e5;
+            background-color: var(--bg);
+            color: var(--ink);
         }
+
+        /* ---- panels ---- */
+        .void-panel{
+            border-left:1px solid var(--line);
+            transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+        .void-panel:hover{
+            transform:translateX(2px);
+            border-color:var(--accent);
+            box-shadow:-12px 0 28px -22px var(--glow);
+        }
+        .label{
+            color:var(--ink-dim);
+            letter-spacing:.22em;
+        }
+        .whisper{ color:var(--ink-ghost); }
+
+        /* the live readout breathes a cold light */
+        #void-timer{ color:var(--ink); }
+
+        /* ---- motion vocabulary (CSS-only, reduced-motion-safe) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            .void-panel{transition:none}
+        }
+
+        /* fragment crossfade */
+        #fragment-display{ transition:opacity .6s ease; }
+
+        /* copy button */
+        .copy-btn{
+            color:var(--ink-dim);
+            border:1px solid var(--line);
+            transition:color .15s, border-color .15s, transform .1s, box-shadow .15s;
+        }
+        .copy-btn:hover{ color:var(--accent); border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+        .copy-btn:active{ transform:translateY(1px); }
+        .copy-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
-    <div class="w-full max-w-md space-y-12">
+<body class="grain flex items-center justify-center min-h-screen p-4">
+    <!-- ambient layers (decorative, behind content) -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="ember-field" aria-hidden="true"></div>
+
+    <div class="w-full max-w-md space-y-12 relative" style="z-index:2">
         <!-- The Void: Time since interaction -->
-        <div class="border-l border-white/20 pl-6 py-2">
-            <div class="text-xs uppercase tracking-widest text-white/40 mb-2">The Void</div>
-            <div id="void-timer" class="text-4xl font-bold tracking-tighter text-white/90">00:00:00</div>
-            <div class="text-[10px] text-white/30 mt-2">Time since the signal was last received.</div>
+        <div class="void-panel pl-6 py-2">
+            <div class="text-xs uppercase label mb-2 flicker">The Void</div>
+            <div id="void-timer" class="text-4xl font-bold tracking-tighter breathe" title="hold to feel the cold">00:00:00</div>
+            <div class="text-[10px] whisper mt-2">Time since the signal was last received. It does not return.</div>
         </div>
 
         <!-- The Peak: Weather -->
-        <div class="border-l border-white/20 pl-6 py-2">
-            <div class="text-xs uppercase tracking-widest text-white/40 mb-2">The Peak</div>
-            <div id="weather-display" class="text-xl font-semibold text-white/80">Fetching...</div>
-            <div id="location-display" class="text-[10px] text-white/30 uppercase tracking-wid:">--</div>
+        <div class="void-panel pl-6 py-2">
+            <div class="text-xs uppercase label mb-2">The Peak</div>
+            <div id="weather-display" class="text-xl font-semibold" style="color:var(--ink)">Listening for the mountain…</div>
+            <div id="location-display" class="text-[10px] uppercase tracking-widest" style="color:var(--ink-dim)">—</div>
         </div>
 
         <!-- The Fragment: Poetic Insight -->
-        <div class="border-l border-white/20 pl-6 py-2">
-            <div class="text-xs uppercase tracking-widest text-white/40 mb-2">The Fragment</div>
-            <div id="fragment-display" class="text-sm italic text-white/60 leading-relaxed">
+        <div class="void-panel pl-6 py-2">
+            <div class="flex items-center justify-between mb-2">
+                <div class="text-xs uppercase label">The Fragment</div>
+                <button id="copy-fragment" class="copy-btn text-[9px] uppercase tracking-widest px-2 py-1" type="button" aria-label="copy fragment to the ledger">copy</button>
+            </div>
+            <div id="fragment-display" class="text-sm italic leading-relaxed reveal" style="color:#a8a29e">
                 The mountain does not speak to the traveler. It only exists.
             </div>
         </div>
+
+        <!-- footer whisper -->
+        <div id="footer-whisper" class="text-[10px] tracking-widest text-center whisper" style="min-height:1em"></div>
     </div>
 
     <script>
+        // ---------------------------------------------------------------
         // Timer Logic: Counts up from a fixed point (the creation timestamp)
+        // The conceit is unchanged: time since the signal was last received.
+        // ---------------------------------------------------------------
         const startTime = new Date('2026-04-18T09:30:00Z').getTime(); // Placeholder timestamp
 
         function updateTimer() {
@@ -66,40 +154,165 @@
         setInterval(updateTimer, 1000);
         updateTimer();
 
+        // ---------------------------------------------------------------
         // Weather Logic: Fetching from wttr.in (simple text-based API)
+        // ---------------------------------------------------------------
         async function fetchWeather() {
             try {
                 const response = await fetch('https://wttr.in/?format=j1');
                 const data = await response.json();
-                
+
                 const temp = data.current_condition[0].temp_C + '°C';
                 const desc = data.current_condition[0].weatherDesc[0].value;
                 const location = data.location[0].name + ', ' + data.location[0].country;
 
-                document.getElementById('weather-display').textContent = temp;
+                const wd = document.getElementById('weather-display');
+                wd.textContent = temp;
+                wd.title = desc; // the sky, named, on hover — terse by default
+                wd.classList.add('reveal');
                 document.getElementById('location-display').textContent = location;
             } catch (err) {
                 document.getElementById('weather-display').textContent = "SIGNAL LOST";
+                document.getElementById('location-display').textContent = "the air gives nothing back";
                 console.error("Weather error:", err);
             }
         }
 
+        // ---------------------------------------------------------------
         // Fragment Logic: Rotating between predefined poetic fragments
+        // ---------------------------------------------------------------
         const fragments = [
             "The mountain does not speak to the traveler. It only exists.",
             "In the silence between signals, we find the architecture of existence.",
             "A quiet heartbeat is not a failure; it is the baseline.",
             "The map is accurate. The network is alive.",
             "We measure the cold to feel our own warmth.",
-            "The ghost does not die if the manuscript endures."
+            "The ghost does not die if the manuscript endures.",
+            "The Tatras keep their dead in ice, and the ice keeps faith.",
+            "Every threshold is a small death; cross it anyway.",
+            "The bludička waits at the edge of the trail. Do not follow the light.",
+            "Hibernation is not absence. It is a held note.",
+            "The ledger remembers what the heart forgets.",
+            "Snow erases the path so the mountain can write a new one."
         ];
 
+        let lastFragmentIndex = 0;
         function updateFragment() {
-            const random = Math.floor(Math.random() * fragments.length);
-            document.getElementById('fragment-display').textContent = fragments[random];
+            // avoid repeating the same fragment twice in a row
+            let random;
+            do { random = Math.floor(Math.random() * fragments.length); }
+            while (fragments.length > 1 && random === lastFragmentIndex);
+            lastFragmentIndex = random;
+
+            const el = document.getElementById('fragment-display');
+            el.style.opacity = '0';
+            setTimeout(() => {
+                el.textContent = fragments[random];
+                el.style.opacity = '1';
+            }, 600);
         }
 
+        // ---------------------------------------------------------------
+        // Copy-to-the-ledger
+        // ---------------------------------------------------------------
+        const copyBtn = document.getElementById('copy-fragment');
+        copyBtn.addEventListener('click', async () => {
+            const text = document.getElementById('fragment-display').textContent.trim();
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (e) { /* clipboard may be unavailable; fail quietly */ }
+            const prev = copyBtn.textContent;
+            copyBtn.textContent = 'copied to the ledger';
+            copyBtn.style.color = 'var(--accent)';
+            copyBtn.style.borderColor = 'var(--accent)';
+            setTimeout(() => {
+                copyBtn.textContent = prev;
+                copyBtn.style.color = '';
+                copyBtn.style.borderColor = '';
+            }, 1200);
+        });
+
+        // ---------------------------------------------------------------
+        // Ambient embers (capped, staggered) — disabled under reduced-motion
+        // ---------------------------------------------------------------
+        function spawnEmbers(n) {
+            const field = document.getElementById('ember-field');
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            for (let i = 0; i < n; i++) {
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (Math.random() * 100) + 'vw';
+                e.style.animationDelay = (Math.random() * 14) + 's';
+                e.style.animationDuration = (11 + Math.random() * 7) + 's';
+                field.appendChild(e);
+            }
+        }
+        spawnEmbers(7); // cap ≤ 10
+
+        // ---------------------------------------------------------------
+        // Easter eggs (quiet, non-blocking, never touch state)
+        // ---------------------------------------------------------------
+        // (a) type "prizrak" → a whisper lights in the footer
+        let buffer = '';
+        window.addEventListener('keydown', (ev) => {
+            if (!ev.key || ev.key.length !== 1) return;
+            buffer = (buffer + ev.key.toLowerCase()).slice(-7);
+            if (buffer === 'prizrak') {
+                const fw = document.getElementById('footer-whisper');
+                fw.textContent = 'you found the watcher.';
+                fw.style.color = 'var(--accent)';
+                fw.classList.add('reveal');
+                setTimeout(() => { fw.style.color = ''; }, 4000);
+            }
+        });
+
+        // (b) triple-click the timer → one extra ember
+        document.getElementById('void-timer').addEventListener('click', (ev) => {
+            if (ev.detail === 3) spawnEmbers(1);
+        });
+
+        // (c) long-press the timer → it breathes faster for 3s
+        const timerEl = document.getElementById('void-timer');
+        let holdTimer = null;
+        function beginHold() {
+            holdTimer = setTimeout(() => {
+                timerEl.style.animationDuration = '1.4s';
+                setTimeout(() => { timerEl.style.animationDuration = ''; }, 3000);
+            }, 500);
+        }
+        function endHold() { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } }
+        timerEl.addEventListener('mousedown', beginHold);
+        timerEl.addEventListener('touchstart', beginHold, { passive: true });
+        ['mouseup','mouseleave','touchend','touchcancel'].forEach(t => timerEl.addEventListener(t, endHold));
+
+        // (d) deep night (00:00–03:00 local) → a faint footer line
+        (function nightWhisper(){
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3) {
+                const fw = document.getElementById('footer-whisper');
+                if (!fw.textContent) fw.textContent = 'the mountain does not sleep.';
+            }
+        })();
+
+        // (e) idle 60s → a single watching line fades in
+        let idleTimer = null;
+        function resetIdle(){
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                const fw = document.getElementById('footer-whisper');
+                if (!fw.textContent) {
+                    fw.textContent = 'still here. still watching.';
+                    fw.classList.add('reveal');
+                }
+            }, 60000);
+        }
+        ['mousemove','keydown','click','touchstart','scroll'].forEach(e =>
+            window.addEventListener(e, resetIdle, { passive: true }));
+        resetIdle();
+
+        // ---------------------------------------------------------------
         // Initializing
+        // ---------------------------------------------------------------
         fetchWeather();
         updateFragment();
         // Update fragment every 30 minutes

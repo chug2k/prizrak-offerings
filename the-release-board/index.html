@@ -5,78 +5,186 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The Release Board</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          },
+          colors: {
+            bg: '#0a0a0a',
+            raised: '#111113',
+            sunk: '#0d0d0f',
+            line: '#26262b',
+            'line-soft': '#1a1a1d',
+            ink: '#d4cfc8',
+            dim: '#7a7570',
+            ghost: '#3a3530',
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <style>
-    body { background: radial-gradient(circle at top, #171717 0%, #0a0a0a 60%); }
-    .glow { text-shadow: 0 0 18px rgba(255,255,255,.12); }
-    .card { box-shadow: 0 20px 70px rgba(0,0,0,.35); }
+    :root{
+      color-scheme: dark;
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#fbbf24;            /* the app's existing lead: amber */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html, body { background: var(--bg); }
+    body {
+      color: var(--ink);
+      background:
+        radial-gradient(70% 50% at 18% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+        radial-gradient(60% 45% at 88% 6%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 55%),
+        var(--bg);
+      background-attachment: fixed;
+    }
+
+    /* ── ambient motion (reduced-motion guard at the bottom) ── */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:62vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.86;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .4s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.04;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .stage{position:relative;z-index:2}
+
+    .glow { text-shadow: 0 0 18px var(--glow); }
+    .card { box-shadow: 0 20px 70px rgba(0,0,0,.35); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+
+    /* interactive lift + accent edge */
+    .lift{transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+    .lift:active{transform:translateY(1px)}
+
+    .result-glow{box-shadow:0 0 0 1px var(--line),0 0 30px -8px var(--glow)}
+
+    button:focus-visible, a:focus-visible, [tabindex]:focus-visible{
+      outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
     .pill.active { background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.45); color: #fde68a; }
-    .track.active { border-color: rgba(251,191,36,.55); background: rgba(251,191,36,.06); }
+    .track.active { border-color: rgba(251,191,36,.55); background: rgba(251,191,36,.06);
+      box-shadow:0 0 0 1px rgba(251,191,36,.20), 0 0 26px -10px var(--glow); }
+
+    /* a thin needle that drops down the spine of the pinned track */
+    .track.active::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:2px;border-radius:2px;
+      background:linear-gradient(var(--accent),transparent);box-shadow:0 0 8px var(--glow)}
+    .track{position:relative}
+
+    .copied-flash{ color: var(--accent) !important; border-color: var(--accent) !important; }
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .lift:hover{transform:none}
+    }
   </style>
 </head>
-<body class="min-h-screen text-zinc-200 font-sans">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+<body class="min-h-screen text-ink grain">
+  <!-- ambient layers -->
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <div class="stage max-w-7xl mx-auto px-4 sm:px-6 py-8">
     <header class="mb-8 grid lg:grid-cols-[1.2fr_.8fr] gap-5 items-start">
-      <div class="card bg-zinc-900/70 border border-zinc-800 rounded-3xl p-6 sm:p-8">
-        <div class="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-amber-300 mb-3">
-          <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-          album launch machine
+      <div class="card bg-raised/80 border border-line rounded-3xl p-6 sm:p-8">
+        <div class="flex items-center gap-2 font-mono text-[0.65rem] uppercase tracking-[0.28em] text-amber-300 mb-3">
+          <span class="h-2 w-2 rounded-full bg-amber-400 breathe"></span>
+          the ledger of a launch
         </div>
-        <h1 class="text-4xl sm:text-6xl font-black tracking-tight text-white leading-[0.92] glow">The Release Board</h1>
-        <p class="mt-4 text-zinc-400 max-w-2xl leading-relaxed">
-          Turn <span class="text-zinc-200">H100s and Burn Rate</span> into an actual posting rhythm. Pick a track, choose a format, and the board tells you what to ship next.
+        <h1 id="boardTitle" class="text-4xl sm:text-6xl font-black tracking-tight text-white leading-[0.92] glow select-none cursor-default" title="we measure the cold and build dashboards of our suffering">The Release Board</h1>
+        <p class="mt-4 text-dim max-w-2xl leading-relaxed">
+          Turn <span class="text-ink">H100s and Burn Rate</span> into a posting rhythm with teeth.
+          Pin a track, choose a format, and the board tells you which wound to open next.
         </p>
         <div class="mt-5 flex flex-wrap gap-2" id="formatFilters"></div>
         <div class="mt-6 flex flex-wrap gap-3">
-          <button id="nextBtn" class="px-4 py-2 rounded-xl bg-amber-400 text-zinc-950 font-semibold hover:bg-amber-300 transition">Next best move</button>
-          <button id="resetBtn" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition">Reset board</button>
-          <a href="https://open.spotify.com/artist/1HRZ5DqpUe3QL6QtqSp0Dx" target="_blank" rel="noreferrer" class="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition">Spotify</a>
+          <button id="nextBtn" class="lift px-4 py-2 rounded-xl bg-amber-400 text-zinc-950 font-semibold hover:bg-amber-300 transition">Next best move</button>
+          <button id="copyBtn" class="lift px-4 py-2 rounded-xl border border-line text-dim hover:text-ink transition" title="copy the next post to the ledger">Copy next post</button>
+          <button id="resetBtn" class="lift px-4 py-2 rounded-xl border border-line text-dim hover:text-ink transition">Let the fog take it</button>
+          <a href="https://open.spotify.com/artist/1HRZ5DqpUe3QL6QtqSp0Dx" target="_blank" rel="noreferrer" class="lift px-4 py-2 rounded-xl border border-line text-dim hover:text-ink transition">Spotify</a>
         </div>
       </div>
-      <div class="card bg-zinc-900/70 border border-zinc-800 rounded-3xl p-6 sm:p-8">
+      <div class="card bg-raised/80 border border-line rounded-3xl p-6 sm:p-8">
         <div class="grid grid-cols-2 gap-3 text-sm">
-          <div class="rounded-2xl bg-zinc-950/70 border border-zinc-800 p-4">
-            <div class="text-zinc-500 text-xs uppercase tracking-[0.2em]">Launch mode</div>
+          <div class="lift rounded-2xl bg-sunk/80 border border-line p-4">
+            <div class="text-dim font-mono text-[0.6rem] uppercase tracking-[0.22em]">Launch mode</div>
             <div class="mt-2 text-white font-bold" id="launchMode">Day 1</div>
-            <div class="text-zinc-500 text-xs mt-1">Announcement → thesis → hook</div>
+            <div class="text-dim text-xs mt-1">Announcement → thesis → hook</div>
           </div>
-          <div class="rounded-2xl bg-zinc-950/70 border border-zinc-800 p-4">
-            <div class="text-zinc-500 text-xs uppercase tracking-[0.2em]">Completed</div>
+          <div class="lift rounded-2xl bg-sunk/80 border border-line p-4">
+            <div class="text-dim font-mono text-[0.6rem] uppercase tracking-[0.22em]">Fossilized</div>
             <div class="mt-2 text-white font-bold" id="doneCount">0 / 12</div>
-            <div class="text-zinc-500 text-xs mt-1">Tracks shipped to the world</div>
+            <div class="text-dim text-xs mt-1">Tracks loosed on the world</div>
           </div>
-          <div class="rounded-2xl bg-zinc-950/70 border border-zinc-800 p-4 col-span-2">
-            <div class="text-zinc-500 text-xs uppercase tracking-[0.2em]">Suggested next post</div>
-            <div class="mt-2 text-white font-semibold" id="nextText">Pick a track to begin.</div>
+          <div class="rounded-2xl bg-sunk/80 border border-line p-4 col-span-2 result-glow" id="nextPanel">
+            <div class="text-dim font-mono text-[0.6rem] uppercase tracking-[0.22em]">Suggested next post</div>
+            <div class="mt-2 text-white font-semibold breathe" id="nextText">Pin a track. The board is listening.</div>
           </div>
         </div>
       </div>
     </header>
 
     <main class="grid lg:grid-cols-[1.1fr_.9fr] gap-5">
-      <section class="card bg-zinc-900/70 border border-zinc-800 rounded-3xl p-6 sm:p-8">
+      <section class="card bg-raised/80 border border-line rounded-3xl p-6 sm:p-8">
         <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
           <h2 class="text-lg font-bold text-white">Tracks</h2>
-          <div class="text-xs text-zinc-500">click a track to pin it</div>
+          <div class="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-dim">click a track to pin it</div>
         </div>
         <div class="space-y-3" id="trackList"></div>
       </section>
 
       <section class="space-y-5">
-        <div class="card bg-zinc-900/70 border border-zinc-800 rounded-3xl p-6 sm:p-8">
+        <div class="card bg-raised/80 border border-line rounded-3xl p-6 sm:p-8">
           <h2 class="text-lg font-bold text-white mb-4">Post plan</h2>
           <div class="space-y-3" id="planList"></div>
         </div>
-        <div class="card bg-zinc-900/70 border border-zinc-800 rounded-3xl p-6 sm:p-8">
+        <div class="card bg-raised/80 border border-line rounded-3xl p-6 sm:p-8">
           <h2 class="text-lg font-bold text-white mb-4">Caption spine</h2>
-          <div class="space-y-2 text-sm text-zinc-400 leading-relaxed">
+          <div class="space-y-2 text-sm text-dim leading-relaxed">
             <p>• I wrote the founder post I couldn’t bring myself to write.</p>
             <p>• This album is a memoir, not a victory lap.</p>
             <p>• Specificity earns the sentiment.</p>
-            <p>• No fake closure. Just the right track at the right time.</p>
+            <p>• No fake closure. Just the right track at the right hour.</p>
           </div>
         </div>
       </section>
     </main>
+
+    <footer class="mt-10 flex items-center justify-between gap-4 border-t border-line-soft pt-5 font-mono text-[0.62rem] uppercase tracking-[0.24em] text-ghost">
+      <span>prízrak · the release board</span>
+      <span id="footerWhisper" class="flicker">the ghost keeps the ledger</span>
+    </footer>
   </div>
 
   <script>
@@ -111,32 +219,33 @@
     function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
     function doneCount() { return TRACKS.filter(t => state[t.title]?.done).length; }
     function formatLabel(f) { return f === 'all' ? 'all' : f; }
+    function nextTrack() { return TRACKS.find(t => !state[t.title]?.done) || null; }
 
     function renderFilters() {
       document.getElementById('formatFilters').innerHTML = formats.map(f => `
-        <button class="pill px-3 py-1.5 rounded-full border border-zinc-700 text-xs ${activeFormat===f ? 'active' : 'text-zinc-500 hover:text-zinc-300 hover:border-zinc-500'}" data-f="${f}">${formatLabel(f)}</button>
+        <button class="pill lift px-3 py-1.5 rounded-full border border-line font-mono text-[0.65rem] uppercase tracking-[0.12em] ${activeFormat===f ? 'active' : 'text-dim hover:text-ink'}" data-f="${f}">${formatLabel(f)}</button>
       `).join('');
     }
 
     function renderTracks() {
       const list = TRACKS.filter(t => activeFormat === 'all' || t.format === activeFormat);
-      document.getElementById('trackList').innerHTML = list.map((t, i) => {
+      document.getElementById('trackList').innerHTML = list.map((t) => {
         const entry = state[t.title] || {};
-        const done = entry.done ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-zinc-800 bg-zinc-950/60';
-        const pin = pinned === t.title ? 'track active' : '';
+        const done = entry.done ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-line bg-sunk/70';
+        const pin = pinned === t.title ? 'track active' : 'track';
         return `
-          <div class="track ${done} ${pin} border rounded-2xl p-4 transition cursor-pointer" data-title="${t.title}">
+          <div class="${pin} lift ${done} border rounded-2xl p-4 cursor-pointer reveal" data-title="${t.title}">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <div class="text-xs text-zinc-500 uppercase tracking-[0.2em] mb-1">${t.day} · ${t.format}</div>
+                <div class="font-mono text-[0.6rem] text-dim uppercase tracking-[0.22em] mb-1">${t.day} · ${t.format}</div>
                 <div class="font-bold text-white">${t.title}</div>
-                <div class="text-zinc-400 text-sm mt-1 leading-relaxed">${t.hook}</div>
+                <div class="text-dim text-sm mt-1 leading-relaxed">${t.hook}</div>
               </div>
-              <div class="shrink-0 text-xs text-zinc-500">${doneCount() > 0 ? (entry.done ? '✓' : '') : ''}</div>
+              <div class="shrink-0 text-xs text-amber-300">${entry.done ? '✓' : ''}</div>
             </div>
             <div class="mt-3 flex gap-2 flex-wrap">
-              <button class="toggle-done px-3 py-1.5 rounded-lg border border-zinc-700 text-xs hover:border-emerald-500 hover:text-emerald-300 transition" data-title="${t.title}">${entry.done ? 'undo' : 'done'}</button>
-              <button class="toggle-pin px-3 py-1.5 rounded-lg border border-zinc-700 text-xs hover:border-amber-500 hover:text-amber-300 transition" data-title="${t.title}">${pinned === t.title ? 'unpin' : 'pin'}</button>
+              <button class="toggle-done lift px-3 py-1.5 rounded-lg border border-line font-mono text-[0.62rem] uppercase tracking-[0.12em] hover:border-emerald-500 hover:text-emerald-300 transition" data-title="${t.title}">${entry.done ? 'undo' : 'ship it'}</button>
+              <button class="toggle-pin lift px-3 py-1.5 rounded-lg border border-line font-mono text-[0.62rem] uppercase tracking-[0.12em] hover:border-amber-500 hover:text-amber-300 transition" data-title="${t.title}">${pinned === t.title ? 'unpin' : 'pin'}</button>
             </div>
           </div>
         `;
@@ -149,16 +258,19 @@
 
     function renderPlan() {
       document.getElementById('planList').innerHTML = PLANS.map(p => `
-        <div class="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4">
-          <div class="text-xs uppercase tracking-[0.2em] text-amber-300 mb-1">${p.title}</div>
-          <div class="text-zinc-300 text-sm leading-relaxed">${p.text}</div>
+        <div class="lift rounded-2xl border border-line bg-sunk/70 p-4">
+          <div class="font-mono text-[0.6rem] uppercase tracking-[0.22em] text-amber-300 mb-1">${p.title}</div>
+          <div class="text-ink text-sm leading-relaxed">${p.text}</div>
         </div>
       `).join('');
     }
 
     function suggestNext() {
-      const next = TRACKS.find(t => !state[t.title]?.done) || TRACKS[0];
-      if (!next) return 'All tracks are marked done. Go drink water, founder.';
+      if (doneCount() === TRACKS.length) return 'Every track is loosed. The cave is empty. Go drink water, founder.';
+      const next = pinned && !state[pinned]?.done
+        ? TRACKS.find(t => t.title === pinned)
+        : nextTrack();
+      if (!next) return 'Every track is loosed. The cave is empty.';
       return `${next.title} → ${next.hook}`;
     }
 
@@ -185,17 +297,100 @@
     });
 
     document.getElementById('resetBtn').addEventListener('click', () => {
+      if (!confirm('let the fog take it? the ledger forgets everything. this cannot be recovered.')) return;
       localStorage.removeItem(STORAGE_KEY);
+      for (const k in state) delete state[k];
       pinned = null;
       refresh();
     });
 
     document.getElementById('nextBtn').addEventListener('click', () => {
-      const next = TRACKS.find(t => !state[t.title]?.done);
-      if (next) pinned = next.title;
-      refresh();
-      alert(next ? `Next best move: ${next.title}` : 'Everything is done. Rare event.');
+      const next = nextTrack();
+      if (next) {
+        pinned = next.title;
+        refresh();
+        const panel = document.getElementById('nextPanel');
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        refresh();
+        flashWhisper('all twelve are loosed. rare event. the mountain noticed.');
+      }
     });
+
+    // copy-to-clipboard — every verdict ships a copy button
+    const copyBtn = document.getElementById('copyBtn');
+    copyBtn.addEventListener('click', async () => {
+      const text = document.getElementById('nextText').textContent.trim();
+      try {
+        await navigator.clipboard.writeText(text);
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = 'copied to the ledger';
+        copyBtn.classList.add('copied-flash');
+        setTimeout(() => { copyBtn.textContent = orig; copyBtn.classList.remove('copied-flash'); }, 1200);
+      } catch (_) {
+        flashWhisper('the clipboard refused. the ghost shrugs.');
+      }
+    });
+
+    // ── footer whisper helper (non-blocking, never touches saved state) ──
+    const footerWhisper = document.getElementById('footerWhisper');
+    const defaultWhisper = footerWhisper.textContent;
+    let whisperTimer = null;
+    function flashWhisper(msg) {
+      footerWhisper.textContent = msg;
+      footerWhisper.classList.remove('flicker');
+      clearTimeout(whisperTimer);
+      whisperTimer = setTimeout(() => {
+        footerWhisper.textContent = defaultWhisper;
+        footerWhisper.classList.add('flicker');
+      }, 3200);
+    }
+
+    // ── embers: spawn a few, staggered (capped, reduced-motion-safe) ──
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const host = document.getElementById('embers');
+      const N = 8;
+      for (let i = 0; i < N; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random() * 88) + '%';
+        e.style.animationDelay = (-Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ── easter egg A: type "prizrak" to light the watcher ──
+    (function watcher(){
+      const want = 'prizrak';
+      let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+          buf = (buf + ev.key.toLowerCase()).slice(-want.length);
+          if (buf === want) flashWhisper('you found the watcher. still here. still watching.');
+        }
+      });
+    })();
+
+    // ── easter egg B: triple-click the title → one extra ember ──
+    document.getElementById('boardTitle').addEventListener('click', (ev) => {
+      if (ev.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+        const host = document.getElementById('embers');
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (40 + Math.random() * 20) + '%';
+        e.style.animationDuration = (10 + Math.random() * 6) + 's';
+        host.appendChild(e);
+        setTimeout(() => e.remove(), 18000);
+      }
+    });
+
+    // ── deep-night whisper: 00:00–03:00 the mountain does not sleep ──
+    (function nightWatch(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) footerWhisper.textContent = 'the mountain does not sleep';
+    })();
 
     refresh();
   </script>
