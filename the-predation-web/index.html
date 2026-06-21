@@ -6,26 +6,97 @@
     <title>The Predation Web | Offerings</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #18181b; overflow: hidden; }
-        canvas { display: block; }
-        .glow { text-shadow: 0 0 10px currentColor; }
-        .panel { backdrop-filter: blur(12px); background: rgba(24,24,27,0.85); }
-        input, select { background: #27272a; border: 1px solid #3f3f46; color: #d4d4d8; }
-        input:focus, select:focus { outline: none; border-color: #a78bfa; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a78bfa;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body { background: var(--bg); overflow: hidden; }
+        canvas#web { display: block; }
+        body{ color:var(--ink); }
+
+        .glow { text-shadow: 0 0 10px var(--glow); }
+        .panel {
+            backdrop-filter: blur(12px);
+            background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+            border:1px solid var(--line);
+        }
+        .panel-active{ box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+        input, select {
+            background: var(--bg-sunk);
+            border: 1px solid var(--line);
+            color: var(--ink);
+            transition:border-color .15s, box-shadow .15s;
+        }
+        input::placeholder{ color:var(--ink-dim); }
+        input:focus-visible, select:focus-visible {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+
+        .label{ text-transform:uppercase; letter-spacing:.14em; color:var(--ink-dim); font-size:9px; }
+
+        button{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s; }
+        button:hover{ transform:translateY(-1px); }
+        button:active{ transform:translateY(1px); }
+
+        /* === Prízrak motion vocabulary === */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 7s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            button:hover,button:active{transform:none!important}
+        }
+
+        .panel, .fixed{ z-index:20; }
+        #ghostLine{ color:var(--ink-ghost); }
     </style>
 </head>
-<body class="text-zinc-300 font-mono">
-    <canvas id="web"></canvas>
+<body class="font-mono grain">
+    <div class="fog"></div>
+    <canvas id="web" style="position:relative;z-index:2;"></canvas>
 
-    <div class="fixed top-4 left-4 z-20 panel rounded-xl p-4 border border-zinc-700 max-w-xs">
-        <h1 class="text-lg font-bold text-violet-400 glow mb-1">The Predation Web</h1>
-        <p class="text-xs text-zinc-500 mb-3">Who eats whom. Drag nodes. Click canvas to deselect.</p>
+    <div class="fixed top-4 left-4 panel rounded-xl p-4 max-w-xs" style="z-index:20;">
+        <h1 id="title" class="text-lg font-bold breathe mb-1 select-none cursor-default" style="color:var(--accent)">The Predation Web</h1>
+        <p class="text-xs mb-3" style="color:var(--ink-dim)">a ledger of who eats whom. drag the living. click the dark to deselect.</p>
         <div class="space-y-2">
-            <input id="nodeName" type="text" placeholder="New entity name..." class="w-full px-2 py-1 rounded text-sm">
-            <button id="addNode" class="w-full px-2 py-1 bg-violet-900/60 hover:bg-violet-800/60 border border-violet-700/50 rounded text-sm text-violet-300">+ Add Entity</button>
+            <div class="label">name the next creature</div>
+            <input id="nodeName" type="text" placeholder="something that hungers..." class="w-full px-2 py-1 rounded text-sm">
+            <button id="addNode" class="w-full px-2 py-1 rounded text-sm" style="background:color-mix(in srgb,var(--accent) 18%,transparent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);color:var(--accent)">+ release it into the web</button>
         </div>
-        <div class="mt-3 pt-3 border-t border-zinc-700 space-y-2">
-            <p class="text-xs text-zinc-500">Draw connection:</p>
+        <div class="mt-3 pt-3 space-y-2" style="border-top:1px solid var(--line)">
+            <div class="label">draw the appetite</div>
             <select id="fromNode" class="w-full px-2 py-1 rounded text-sm"></select>
             <div class="flex gap-1">
                 <select id="edgeType" class="flex-1 px-2 py-1 rounded text-sm">
@@ -36,16 +107,26 @@
                 </select>
             </div>
             <select id="toNode" class="w-full px-2 py-1 rounded text-sm"></select>
-            <button id="addEdge" class="w-full px-2 py-1 bg-emerald-900/60 hover:bg-emerald-800/60 border border-emerald-700/50 rounded text-sm text-emerald-300">+ Connect</button>
+            <button id="addEdge" class="w-full px-2 py-1 rounded text-sm" style="background:color-mix(in srgb,#34d399 16%,transparent);border:1px solid color-mix(in srgb,#34d399 40%,transparent);color:#6ee7b7">+ bind them</button>
         </div>
-        <div class="mt-3 pt-3 border-t border-zinc-700">
-            <button id="resetBtn" class="w-full px-2 py-1 bg-red-900/40 hover:bg-red-900/60 border border-red-800/40 rounded text-xs text-red-400">Reset to defaults</button>
+        <div class="mt-3 pt-3" style="border-top:1px solid var(--line)">
+            <button id="resetBtn" class="w-full px-2 py-1 rounded text-xs" style="background:color-mix(in srgb,#ef4444 12%,transparent);border:1px solid color-mix(in srgb,#ef4444 30%,transparent);color:#f87171">let the fog take it all</button>
         </div>
     </div>
 
-    <div class="fixed bottom-4 left-4 z-20 panel rounded-lg px-3 py-2 border border-zinc-700">
-        <p class="text-xs text-zinc-500" id="status">Drag nodes to rearrange. Right-click node to remove.</p>
+    <!-- Verdict / readout panel -->
+    <div id="verdict" class="fixed top-4 right-4 panel panel-active rounded-xl p-4 max-w-[15rem]" style="z-index:20;">
+        <div class="label mb-2">the web reads</div>
+        <p id="verdictApex" class="text-sm leading-snug mb-2"></p>
+        <p id="verdictStat" class="text-xs" style="color:var(--ink-dim)"></p>
+        <button id="copyBtn" class="mt-3 w-full px-2 py-1 rounded text-xs" style="background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink-dim)">copy to the ledger</button>
     </div>
+
+    <div class="fixed bottom-4 left-4 panel rounded-lg px-3 py-2" style="z-index:20;">
+        <p class="text-xs flicker" style="color:var(--ink-dim)" id="status">drag the living to rearrange. right-click a creature to let it die.</p>
+    </div>
+
+    <p id="ghostLine" class="fixed bottom-4 right-4 text-xs select-none pointer-events-none" style="z-index:20;opacity:0;transition:opacity 1.2s ease"></p>
 
     <script>
     const STORAGE_KEY = "predation_web_v1";
@@ -54,6 +135,8 @@
 
     const COLORS = ["#a78bfa","#f472b6","#34d399","#fbbf24","#60a5fa","#fb923c","#e879f9","#22d3ee","#a3e635","#f87171"];
     const EDGE_COLORS = { consumes: "#ef4444", mutual: "#f59e0b", feeds: "#22c55e", competes: "#8b5cf6" };
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let nodes = [];
     let edges = [];
@@ -99,6 +182,7 @@
     function save() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
         updateSelects();
+        updateVerdict();
     }
 
     function resize() {
@@ -109,9 +193,70 @@
     function updateSelects() {
         const fromSel = document.getElementById("fromNode");
         const toSel = document.getElementById("toNode");
+        const prevFrom = fromSel.value, prevTo = toSel.value;
         const opts = nodes.map(n => `<option value="${n.id}">${n.name}</option>`).join("");
         fromSel.innerHTML = opts;
         toSel.innerHTML = opts;
+        if (nodes.find(n=>n.id===prevFrom)) fromSel.value = prevFrom;
+        if (nodes.find(n=>n.id===prevTo)) toSel.value = prevTo;
+    }
+
+    // === Verdict: who eats, who is eaten ===
+    function updateVerdict() {
+        const apexEl = document.getElementById("verdictApex");
+        const statEl = document.getElementById("verdictStat");
+        if (!apexEl) return;
+
+        if (nodes.length === 0) {
+            apexEl.textContent = "the cave is empty. nothing has fossilized yet.";
+            statEl.textContent = "0 creatures · 0 appetites";
+            return;
+        }
+
+        // Out-degree (predation pressure) vs in-degree (being eaten/fed-upon)
+        const out = {}, inc = {};
+        nodes.forEach(n => { out[n.id] = 0; inc[n.id] = 0; });
+        edges.forEach(e => {
+            if (out[e.from] !== undefined) out[e.from]++;
+            if (inc[e.to] !== undefined) inc[e.to]++;
+            // mutual & competes feed both ways
+            if ((e.type === "mutual" || e.type === "competes")) {
+                if (out[e.to] !== undefined) out[e.to]++;
+                if (inc[e.from] !== undefined) inc[e.from]++;
+            }
+        });
+
+        const byName = id => (nodes.find(n => n.id === id) || {}).name || "?";
+        let apex = nodes[0].id, prey = nodes[0].id;
+        nodes.forEach(n => {
+            if (out[n.id] > out[apex]) apex = n.id;
+            if (inc[n.id] > inc[prey]) prey = n.id;
+        });
+
+        const apexHungry = out[apex] > 0;
+        const preyEaten = inc[prey] > 0;
+
+        if (!apexHungry && !preyEaten) {
+            apexEl.innerHTML = 'the web is drawn but no one hungers. <span style="color:var(--ink-dim)">a still life.</span>';
+        } else {
+            apexEl.innerHTML =
+                '<span style="color:var(--accent)" class="glow">' + byName(apex) + '</span> sits at the top of the food chain' +
+                (preyEaten && prey !== apex
+                    ? '. <span style="color:#f87171">' + byName(prey) + '</span> is consumed most.'
+                    : '.');
+        }
+
+        const orphans = nodes.filter(n => out[n.id] === 0 && inc[n.id] === 0).length;
+        statEl.textContent =
+            nodes.length + " creature" + (nodes.length===1?"":"s") + " · " +
+            edges.length + " appetite" + (edges.length===1?"":"s") +
+            (orphans ? " · " + orphans + " starving alone" : "");
+    }
+
+    function verdictText() {
+        const apex = document.getElementById("verdictApex").textContent;
+        const stat = document.getElementById("verdictStat").textContent;
+        return "THE PREDATION WEB\n" + apex + "\n" + stat + "\n— filed in the ledger by the watcher.";
     }
 
     function nodeAt(x, y) {
@@ -131,10 +276,10 @@
         const sx = x1 + nx*30, sy = y1 + ny*30;
         const ex = x2 - nx*30, ey = y2 - ny*30;
 
-        // Animated dash
+        // Animated dash — the flow of appetite
         ctx.beginPath();
         ctx.setLineDash([8, 6]);
-        ctx.lineDashOffset = -t * 30;
+        ctx.lineDashOffset = reduceMotion ? 0 : -t * 30;
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.7;
@@ -177,11 +322,11 @@
     }
 
     function draw() {
-        animT += 0.016;
+        if (!reduceMotion) animT += 0.016;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Grid
-        ctx.strokeStyle = "#27272a";
+        // Grid — the cave floor
+        ctx.strokeStyle = "#1a1a1d";
         ctx.lineWidth = 1;
         for (let x = 0; x < canvas.width; x += 40) {
             ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
@@ -206,7 +351,7 @@
 
             // Glow
             const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2);
-            grad.addColorStop(0, n.color + "40");
+            grad.addColorStop(0, n.color + (isHovered ? "55" : "40"));
             grad.addColorStop(1, "transparent");
             ctx.fillStyle = grad;
             ctx.beginPath();
@@ -216,14 +361,14 @@
             // Circle
             ctx.beginPath();
             ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-            ctx.fillStyle = "#18181b";
+            ctx.fillStyle = "#0d0d0f";
             ctx.fill();
             ctx.strokeStyle = n.color;
             ctx.lineWidth = isHovered ? 3 : 2;
             ctx.stroke();
 
-            // Pulse
-            const pulse = Math.sin(animT * 2 + nodes.indexOf(n)) * 0.15 + 0.85;
+            // Pulse — the heartbeat
+            const pulse = reduceMotion ? 0.85 : (Math.sin(animT * 2 + nodes.indexOf(n)) * 0.15 + 0.85);
             ctx.beginPath();
             ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2);
             ctx.strokeStyle = n.color;
@@ -242,10 +387,14 @@
         requestAnimationFrame(draw);
     }
 
-    // Events
+    // === Events ===
     canvas.addEventListener("mousedown", e => {
         const n = nodeAt(e.clientX, e.clientY);
-        if (n) { dragging = n; dragOff = { x: e.clientX - n.x, y: e.clientY - n.y }; }
+        if (n) {
+            dragging = n;
+            dragOff = { x: e.clientX - n.x, y: e.clientY - n.y };
+            canvas.style.cursor = "grabbing";
+        }
     });
     canvas.addEventListener("mousemove", e => {
         if (dragging) {
@@ -254,47 +403,140 @@
             save();
         }
         hoveredNode = nodeAt(e.clientX, e.clientY);
-        canvas.style.cursor = hoveredNode ? "grab" : "default";
+        if (!dragging) canvas.style.cursor = hoveredNode ? "grab" : "default";
     });
-    canvas.addEventListener("mouseup", () => { dragging = null; });
+    canvas.addEventListener("mouseup", () => { dragging = null; canvas.style.cursor = hoveredNode ? "grab" : "default"; });
     canvas.addEventListener("contextmenu", e => {
         e.preventDefault();
         const n = nodeAt(e.clientX, e.clientY);
-        if (n && confirm(`Remove "${n.name}" from the web?`)) {
+        if (n && confirm(`let "${n.name}" die? it leaves the web for good. this cannot be undone.`)) {
             nodes = nodes.filter(x => x !== n);
             edges = edges.filter(x => x.from !== n.id && x.to !== n.id);
             save();
+            setStatus(`${n.name} was eaten by the dark.`);
         }
     });
 
+    function setStatus(msg){
+        const s = document.getElementById("status");
+        s.textContent = msg;
+        s.classList.remove("reveal"); void s.offsetWidth; s.classList.add("reveal");
+    }
+
     document.getElementById("addNode").addEventListener("click", () => {
         const name = document.getElementById("nodeName").value.trim();
-        if (!name) return;
+        if (!name) { setStatus("a nameless thing cannot be fed. give it a name."); return; }
         const id = name.toLowerCase().replace(/[^a-z0-9]/g, "-");
-        if (nodes.find(n => n.id === id)) return;
+        if (nodes.find(n => n.id === id)) { setStatus(`"${name}" already hunts here.`); return; }
         nodes.push({ id, name, x: 300 + Math.random()*200, y: 200 + Math.random()*200, color: COLORS[nodes.length % COLORS.length] });
         document.getElementById("nodeName").value = "";
         save();
+        setStatus(`${name} enters the web. the mountain is watching.`);
+    });
+    document.getElementById("nodeName").addEventListener("keydown", e => {
+        if (e.key === "Enter") document.getElementById("addNode").click();
     });
 
     document.getElementById("addEdge").addEventListener("click", () => {
         const from = document.getElementById("fromNode").value;
         const to = document.getElementById("toNode").value;
         const type = document.getElementById("edgeType").value;
-        if (from === to) return;
-        if (edges.find(e => e.from === from && e.to === to)) return;
+        if (!from || !to) { setStatus("there is no one to bind."); return; }
+        if (from === to) { setStatus("a thing cannot eat itself. though many try."); return; }
+        if (edges.find(e => e.from === from && e.to === to)) { setStatus("that appetite is already drawn."); return; }
         edges.push({ from, to, type });
         save();
+        const fn = nodes.find(n=>n.id===from), tn = nodes.find(n=>n.id===to);
+        setStatus(`bound. ${fn?fn.name:from} ${type} ${tn?tn.name:to}.`);
     });
 
     document.getElementById("resetBtn").addEventListener("click", () => {
-        if (confirm("Reset to default predation web?")) { resetDefaults(); }
+        if (confirm("let the fog take it all? the web returns to its first hunger. this cannot be recovered.")) {
+            resetDefaults();
+            setStatus("the web is remade. old appetites, forgotten.");
+        }
     });
+
+    // === Copy verdict to the ledger ===
+    document.getElementById("copyBtn").addEventListener("click", () => {
+        const btn = document.getElementById("copyBtn");
+        navigator.clipboard.writeText(verdictText()).then(() => {
+            const prev = btn.textContent;
+            btn.textContent = "copied to the ledger";
+            btn.style.color = "var(--accent)";
+            btn.style.borderColor = "var(--accent)";
+            setTimeout(() => {
+                btn.textContent = prev;
+                btn.style.color = "var(--ink-dim)";
+                btn.style.borderColor = "var(--line)";
+            }, 1200);
+        }).catch(() => setStatus("the ledger would not take it."));
+    });
+
+    // === Ambient embers (capped, reduced-motion safe) ===
+    function spawnEmbers(count){
+        if (reduceMotion) return;
+        for (let i = 0; i < count; i++) {
+            const el = document.createElement("div");
+            el.className = "ember";
+            el.style.left = Math.random()*100 + "vw";
+            el.style.animationDelay = (Math.random()*14) + "s";
+            el.style.animationDuration = (11 + Math.random()*6) + "s";
+            document.body.appendChild(el);
+        }
+    }
+    spawnEmbers(7);
+
+    // === Easter egg 1: type "prizrak" → the watcher reveals itself ===
+    let buf = "";
+    window.addEventListener("keydown", e => {
+        if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "SELECT")) return;
+        if (e.key && e.key.length === 1) {
+            buf = (buf + e.key.toLowerCase()).slice(-7);
+            if (buf === "prizrak") {
+                const g = document.getElementById("ghostLine");
+                g.textContent = "you found the watcher. it has been here the whole time.";
+                g.style.opacity = "0.9";
+                setTimeout(() => { g.style.opacity = "0"; }, 6000);
+            }
+        }
+    });
+
+    // === Easter egg 2: triple-click the title → one extra ember ===
+    document.getElementById("title").addEventListener("click", e => {
+        if (e.detail === 3) spawnEmbers(1);
+    });
+
+    // === Easter egg 3: the small hours ===
+    (function nightWhisper(){
+        const h = new Date().getHours();
+        if (h >= 0 && h < 3) {
+            const g = document.getElementById("ghostLine");
+            g.textContent = "the mountain does not sleep.";
+            g.style.opacity = "0.7";
+        }
+    })();
+
+    // === Easter egg 4: idle 60s → still watching ===
+    let idleTimer;
+    function resetIdle(){
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            const g = document.getElementById("ghostLine");
+            if (g.textContent === "the mountain does not sleep.") return;
+            g.textContent = "still here. still watching.";
+            g.style.opacity = "0.75";
+            setTimeout(() => { if (g.textContent === "still here. still watching.") g.style.opacity = "0"; }, 5000);
+        }, 60000);
+    }
+    ["mousemove","keydown","mousedown"].forEach(ev => window.addEventListener(ev, resetIdle, { passive:true }));
+    resetIdle();
 
     window.addEventListener("resize", resize);
     resize();
     load();
     updateSelects();
+    updateVerdict();
     draw();
     </script>
 </body>

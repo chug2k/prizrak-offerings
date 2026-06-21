@@ -88,10 +88,34 @@
     .label{color:var(--ink-dim);}
     .ghost-line{color:var(--ink-ghost);}
 
+    /* ---- the moving target: a gauge whose needle actually swings ---- */
+    .gauge-wrap{position:relative;}
+    .gauge svg{display:block;width:100%;height:auto;overflow:visible;}
+    .gauge-track{fill:none;stroke:var(--line);stroke-width:6;stroke-linecap:round;}
+    .gauge-fill{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;
+      filter:drop-shadow(0 0 6px var(--glow));
+      transition:stroke-dasharray .9s cubic-bezier(.16,1,.3,1),stroke .6s ease;}
+    .gauge-needle{stroke:var(--ink);stroke-width:2.5;stroke-linecap:round;transform-origin:60px 56px;
+      transition:transform 1.1s cubic-bezier(.34,1.56,.64,1);}
+    .gauge-hub{fill:var(--accent);filter:drop-shadow(0 0 5px var(--glow));}
+    .gauge-tick{stroke:var(--line);stroke-width:1.5;}
+    .gauge-pct{fill:#fff;font-weight:700;}
+    .gauge-cap{fill:var(--ink-dim);}
+    /* needle idle drift, so the target never quite holds still */
+    @keyframes needleHunt{0%,100%{transform:rotate(var(--needle,0deg))}
+      50%{transform:rotate(calc(var(--needle,0deg) + 1.4deg))}}
+    .gauge-needle.hunting{animation:needleHunt 5.5s ease-in-out infinite;}
+
+    /* verdict reads in like a stamp pressed into the ledger */
+    @keyframes stamp{0%{transform:scale(1.18);opacity:0;filter:blur(2px)}
+      60%{transform:scale(.97);opacity:1;filter:blur(0)}100%{transform:scale(1)}}
+    .stamp{animation:stamp .4s cubic-bezier(.2,.9,.3,1.2) both;}
+
     @media (prefers-reduced-motion:reduce){
-      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .fog,.ember,.breathe,.reveal,.flicker,.stamp,.gauge-needle.hunting{animation:none!important}
       .ember{display:none}
       .breathe,.flicker{opacity:1!important}
+      .gauge-fill,.gauge-needle{transition:none!important}
     }
   </style>
 </head>
@@ -132,8 +156,26 @@
             <p class="mono text-[11px] uppercase tracking-[0.25em] label">VERDICT</p>
             <button id="copyBtn" class="copy-btn mono text-[10px] uppercase tracking-[0.15em] rounded px-2 py-1 hidden" type="button">copy to ledger</button>
           </div>
-          <p id="verdict" class="mt-2 text-2xl font-semibold" style="color:#fff;">The mountain is waiting.</p>
-          <p id="summary" class="mt-2" style="color:var(--ink-dim);">Name a metric and the mountain will tell you whether it is a compass or a shrine.</p>
+          <div class="mt-2 flex items-center gap-4">
+            <!-- the moving target, made literal: a swinging shrine-risk needle -->
+            <div class="gauge-wrap shrink-0" style="width:120px;">
+              <div class="gauge" aria-hidden="true">
+                <svg viewBox="0 0 120 74">
+                  <path class="gauge-track" d="M12 60 A48 48 0 0 1 108 60" />
+                  <path id="gaugeFill" class="gauge-fill" d="M12 60 A48 48 0 0 1 108 60" stroke-dasharray="0 999" />
+                  <line class="gauge-tick" x1="60" y1="12" x2="60" y2="18" />
+                  <line id="gaugeNeedle" class="gauge-needle" x1="60" y1="56" x2="60" y2="20" style="--needle:-90deg;transform:rotate(-90deg);" />
+                  <circle class="gauge-hub" cx="60" cy="56" r="4.5" />
+                  <text id="gaugePct" class="gauge-pct mono" x="60" y="50" text-anchor="middle" font-size="15">—</text>
+                  <text class="gauge-cap mono" x="60" y="70" text-anchor="middle" font-size="6" letter-spacing="1.5">SHRINE RISK</text>
+                </svg>
+              </div>
+            </div>
+            <div class="min-w-0">
+              <p id="verdict" class="text-2xl font-semibold" style="color:#fff;">The mountain is waiting.</p>
+              <p id="summary" class="mt-2" style="color:var(--ink-dim);">Name a metric and the mountain will tell you whether it is a compass or a shrine.</p>
+            </div>
+          </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="stat rounded-xl p-3">
@@ -178,7 +220,12 @@
       risk: document.getElementById('risk'),
       use: document.getElementById('use'),
       history: document.getElementById('history'),
+      gaugeFill: document.getElementById('gaugeFill'),
+      gaugeNeedle: document.getElementById('gaugeNeedle'),
+      gaugePct: document.getElementById('gaugePct'),
     };
+
+    const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // verdict accent helpers — keep stored class strings intact for backward compat
     const VERDICT_COLORS = {
@@ -218,6 +265,41 @@
       return String(s).replace(/[&<>"]+/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
     }
 
+    // ---- gauge geometry: semicircle arc r=48 from (12,60) to (108,60) ----
+    const ARC_LEN = Math.PI * 48; // ~150.8
+    function setGauge(pct, hex) {
+      const p = Math.max(0, Math.min(100, pct));
+      // fill arc proportional to risk
+      els.gaugeFill.setAttribute('stroke-dasharray', `${(p / 100) * ARC_LEN} 999`);
+      els.gaugeFill.style.stroke = hex;
+      // needle sweeps -90deg (left, 0%) → +90deg (right, 100%)
+      const deg = -90 + (p / 100) * 180;
+      els.gaugeNeedle.style.setProperty('--needle', deg + 'deg');
+      els.gaugeNeedle.style.transform = `rotate(${deg}deg)`;
+      els.gaugeNeedle.classList.add('hunting'); // the target never quite holds still
+    }
+    function resetGauge() {
+      els.gaugeFill.setAttribute('stroke-dasharray', '0 999');
+      els.gaugeFill.style.stroke = 'var(--accent)';
+      els.gaugeNeedle.style.setProperty('--needle', '-90deg');
+      els.gaugeNeedle.style.transform = 'rotate(-90deg)';
+      els.gaugeNeedle.classList.remove('hunting');
+      els.gaugePct.textContent = '—';
+    }
+
+    // count a number up; honors reduced-motion (snaps instantly)
+    function countTo(el, target, suffix) {
+      if (reduce()) { el.textContent = target + (suffix || ''); return; }
+      const from = 0, dur = 850, t0 = performance.now();
+      function step(now) {
+        const k = Math.min(1, (now - t0) / dur);
+        const eased = 1 - Math.pow(1 - k, 3);
+        el.textContent = Math.round(from + (target - from) * eased) + (suffix || '');
+        if (k < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
     // last computed verdict, for copy-to-ledger
     let lastAudit = null;
 
@@ -244,27 +326,34 @@
       if (shrineRisk >= 70) {
         verdict = 'Shrine';
         verdictColor = 'text-rose-400';
-        summary = 'The ground moved and the number stayed. It now mostly preserves itself. Let the fog take it.';
+        summary = 'The ground moved and the number stayed. It now mostly guards itself. Let the fog take it — this candle warms no one.';
         use = 'Retire';
       } else if (shrineRisk >= 45) {
         verdict = 'Suspicious';
         verdictColor = 'text-amber-400';
-        summary = 'Still warm, but cooling. It earns its keep only while it still changes what you do.';
+        summary = 'Still warm, but cooling toward ceremony. It earns its keep only while it still changes what you do — not merely how you feel.';
         use = 'Reframe';
       }
 
       const hex = VERDICT_COLORS[verdictColor];
       els.verdict.textContent = verdict;
-      els.verdict.className = 'mt-2 text-2xl font-semibold breathe';
+      els.verdict.className = 'text-2xl font-semibold breathe stamp';
       els.verdict.style.color = hex;
+      // re-trigger stamp animation on repeat audits
+      void els.verdict.offsetWidth;
+      els.verdict.classList.add('stamp');
       document.documentElement.style.setProperty('--accent', hex);
       document.documentElement.style.setProperty('--glow', `color-mix(in srgb, ${hex} 55%, transparent)`);
 
       els.summary.textContent = summary;
       els.summary.style.color = 'var(--ink-dim)';
-      els.fit.textContent = `${fit}%`;
-      els.risk.textContent = `${shrineRisk}%`;
+
+      // animated numerics + swinging needle: the target, moving
+      countTo(els.fit, fit, '%');
+      countTo(els.risk, shrineRisk, '%');
+      countTo(els.gaugePct, shrineRisk, '');
       els.use.textContent = use;
+      setGauge(shrineRisk, hex);
 
       // result panel breathes + reveals
       const panel = document.getElementById('resultPanel');
@@ -280,7 +369,7 @@
       saveHistory(history);
       renderHistory();
 
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (reduce()) return;
       panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
@@ -292,13 +381,14 @@
       els.context.value = '';
       els.metric.placeholder = 'weekly approval score, reply speed, battery';
       els.verdict.textContent = 'The mountain is waiting.';
-      els.verdict.className = 'mt-2 text-2xl font-semibold breathe';
+      els.verdict.className = 'text-2xl font-semibold breathe';
       els.verdict.style.color = '#fff';
       els.summary.textContent = 'Name a metric and the mountain will tell you whether it is a compass or a shrine.';
       els.summary.style.color = 'var(--ink-dim)';
       els.fit.textContent = '—';
       els.risk.textContent = '—';
       els.use.textContent = '—';
+      resetGauge();
       document.documentElement.style.setProperty('--accent', '#a78bfa');
       document.documentElement.style.setProperty('--glow', 'color-mix(in srgb, #a78bfa 55%, transparent)');
       document.getElementById('resultPanel').classList.remove('result-live');
@@ -344,7 +434,7 @@ ruling:      ${a.summary}
 
     // ---- ambient embers (capped, reduced-motion-safe) ----
     (function spawnEmbers(){
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (reduce()) return;
       const field = document.getElementById('emberField');
       const n = 7;
       for (let i = 0; i < n; i++) {
@@ -383,7 +473,7 @@ ruling:      ${a.summary}
     // ---- easter egg 2: triple-click the title → spawn one extra ember ----
     document.getElementById('title').addEventListener('click', (ev) => {
       if (ev.detail !== 3) return;
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (reduce()) return;
       const e = document.createElement('div');
       e.className = 'ember';
       e.style.left = (10 + Math.random() * 80) + '%';
@@ -391,6 +481,29 @@ ruling:      ${a.summary}
       document.getElementById('emberField').appendChild(e);
       setTimeout(() => e.remove(), 18000);
     });
+
+    // ---- easter egg 3: idle 60s → the watcher murmurs (non-blocking, never touches state) ----
+    (function idleWatch(){
+      let t;
+      const f = document.getElementById('footerWhisper');
+      const base = () => {
+        f.textContent = "the watcher keeps a ledger of every shrine you wouldn't bury";
+        f.style.color = 'var(--ink-ghost)';
+        f.style.textShadow = 'none';
+      };
+      const wake = () => {
+        if (reduce()) return;
+        f.textContent = 'still here. still watching. the needle keeps hunting.';
+        f.style.color = 'var(--ink-ghost)';
+        f.style.textShadow = 'none';
+        f.classList.add('flicker');
+        setTimeout(() => { f.classList.remove('flicker'); base(); }, 6000);
+      };
+      const arm = () => { clearTimeout(t); t = setTimeout(wake, 60000); };
+      ['mousemove','keydown','click','scroll','touchstart'].forEach(ev =>
+        window.addEventListener(ev, arm, { passive: true }));
+      arm();
+    })();
 
     // ---- nocturnal whisper: 00:00–03:00 local ----
     (function nightfall(){

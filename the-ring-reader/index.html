@@ -7,12 +7,21 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0d0d0f;
-      --surface: #15151a;
-      --border: #252530;
-      --text: #ddd8d0;
-      --muted: #60606c;
+      --bg: #0a0a0a;
+      --bg-raised: #111113;
+      --bg-sunk: #0d0d0f;
+      --line: #26262b;
+      --line-soft: #1a1a1d;
+      --ink: #d4cfc8;
+      --ink-dim: #7a7570;
+      --ink-ghost: #3a3530;
+      /* legacy aliases kept so existing rules still read */
+      --surface: var(--bg-raised);
+      --border: var(--line);
+      --text: var(--ink);
+      --muted: var(--ink-dim);
       --accent: #a07858;
+      --glow: color-mix(in srgb, var(--accent) 55%, transparent);
       --ring-thick: #8fba78;
       --ring-thin: #7898ba;
       --ring-false: #ba9a58;
@@ -28,13 +37,50 @@
       flex-direction: column;
       align-items: center;
       padding: 2rem 1rem 5rem;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* ---- atmosphere layers ---- */
+    .fog {
+      position: fixed; inset: -10% -10% auto; height: 60vh; pointer-events: none; z-index: 0;
+      background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+      animation: fogDrift 32s ease-in-out infinite alternate;
+    }
+    @keyframes fogDrift { 0%{transform:translateX(-5%);opacity:.04} 50%{opacity:.07} 100%{transform:translateX(5%);opacity:.04} }
+    .ember {
+      position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 6px var(--glow); pointer-events: none; z-index: 1;
+      animation: ember 14s linear infinite;
+    }
+    @keyframes ember { 0%{transform:translateY(0);opacity:0} 10%{opacity:.5} 100%{transform:translateY(-90vh);opacity:0} }
+    .grain::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .035;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    @keyframes breathe { 0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)} 50%{opacity:1;text-shadow:0 0 16px var(--glow)} }
+    .breathe { animation: breathe 4.5s ease-in-out infinite; }
+    @keyframes reveal { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .reveal { animation: reveal .35s ease-out both; }
+    @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 94%{opacity:1} 97%{opacity:.7} 98%{opacity:1} }
+    .flicker { animation: flicker 6s steps(1) infinite; }
+
+    .header, .ring-legend, .card, .btn, .result, .footnote { position: relative; z-index: 2; }
+
     .header {
       text-align: center;
       max-width: 540px;
       margin-bottom: 2.5rem;
     }
-    .header h1 { font-size: 1.5rem; font-weight: normal; color: var(--accent); margin-bottom: 0.4rem; letter-spacing: 0.04em; }
+    .header h1 {
+      font-size: 1.5rem; font-weight: normal; color: var(--accent);
+      margin-bottom: 0.4rem; letter-spacing: 0.04em;
+      text-shadow: 0 0 10px var(--glow); cursor: default; user-select: none;
+    }
+    .header .kicker {
+      font-size: 0.62rem; letter-spacing: 0.32em; text-transform: uppercase;
+      color: var(--ink-dim); margin-bottom: 0.7rem;
+    }
     .header p { font-size: 0.8rem; color: var(--muted); line-height: 1.7; font-style: italic; }
     .ring-legend {
       display: flex;
@@ -50,8 +96,11 @@
       gap: 0.4rem;
       font-size: 0.72rem;
       color: var(--muted);
+      transition: color .15s;
     }
-    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-item:hover { color: var(--text); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; transition: box-shadow .15s; }
+    .legend-item:hover .legend-dot { box-shadow: 0 0 8px currentColor; }
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -60,8 +109,10 @@
       width: 100%;
       max-width: 540px;
       margin-bottom: 1rem;
+      transition: transform .15s, box-shadow .15s, border-color .15s;
     }
-    .card label {
+    .card:focus-within { border-color: var(--line); box-shadow: 0 0 24px -10px var(--glow); }
+    .card label.field-label {
       display: block;
       font-size: 0.72rem;
       letter-spacing: 0.1em;
@@ -71,7 +122,7 @@
     }
     .card input[type="text"], .card textarea {
       width: 100%;
-      background: var(--bg);
+      background: var(--bg-sunk);
       border: 1px solid var(--border);
       border-radius: 3px;
       color: var(--text);
@@ -79,9 +130,12 @@
       font-size: 0.92rem;
       padding: 0.6rem 0.75rem;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .card input[type="text"]:focus, .card textarea:focus { border-color: var(--accent); }
+    .card input[type="text"]:focus, .card textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--glow);
+    }
     .card textarea { resize: vertical; min-height: 100px; }
     .checks {
       display: grid;
@@ -97,11 +151,14 @@
       border: 1px solid var(--border);
       border-radius: 3px;
       cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
+      transition: border-color 0.15s, background 0.15s, transform 0.15s;
       font-size: 0.8rem;
       line-height: 1.4;
     }
-    .check-item:hover { border-color: var(--accent); }
+    .check-item:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .check-item:active { transform: translateY(0); }
+    .check-item:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .check-item:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
     .check-item input[type="checkbox"] { margin-top: 2px; accent-color: var(--accent); }
     .btn {
       display: block;
@@ -116,10 +173,12 @@
       padding: 0.75rem;
       border-radius: 3px;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      transition: background 0.2s, color 0.2s, transform 0.12s, box-shadow 0.2s;
       margin-bottom: 1.5rem;
     }
-    .btn:hover { background: var(--accent); color: var(--bg); }
+    .btn:hover { background: var(--accent); color: var(--bg); box-shadow: 0 0 24px -6px var(--glow); }
+    .btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--glow); }
+    .btn:active { transform: translateY(1px); }
     .result { display: none; width: 100%; max-width: 540px; }
     .result.visible { display: block; }
     .ring-display {
@@ -129,6 +188,7 @@
       padding: 2rem;
       margin-bottom: 1rem;
       text-align: center;
+      box-shadow: 0 0 0 1px var(--line), 0 0 28px -8px var(--glow);
     }
     .ring-visual {
       width: 140px;
@@ -140,6 +200,11 @@
       align-items: center;
       justify-content: center;
     }
+    .ring-visual .core-dot {
+      position: absolute; width: 6px; height: 6px; border-radius: 50%;
+      animation: corePulse 3.6s ease-in-out infinite;
+    }
+    @keyframes corePulse { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.5);opacity:1} }
     .ring-type-label {
       font-size: 1.1rem;
       letter-spacing: 0.06em;
@@ -171,6 +236,17 @@
       margin-top: 1rem;
       text-align: left;
     }
+    .copy-row { text-align: left; margin-top: 1rem; }
+    .copy-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--ink-dim);
+      font-family: 'Georgia', serif; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 0.4rem 0.7rem; border-radius: 3px; cursor: pointer;
+      transition: border-color .15s, color .15s, box-shadow .15s, transform .12s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .copy-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+    .copy-btn:active { transform: translateY(1px); }
+    .copy-btn.copied { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 18px -6px var(--glow); }
     .history-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -201,7 +277,9 @@
     .h-ring-bar {
       border-radius: 2px 2px 0 0;
       width: 100%;
+      transition: opacity .15s, box-shadow .15s, transform .15s;
     }
+    .h-ring:hover .h-ring-bar { opacity: 1 !important; box-shadow: 0 0 12px -2px currentColor; transform: translateY(-2px); }
     .h-ring-label {
       font-size: 0.6rem;
       color: var(--muted);
@@ -220,11 +298,27 @@
       font-style: italic;
       line-height: 1.6;
     }
+    .watcher {
+      font-size: 0.7rem; color: var(--ink-ghost); text-align: center; max-width: 540px;
+      margin-top: 1.4rem; letter-spacing: 0.06em; font-style: italic;
+      min-height: 1em; opacity: 0; transition: opacity 1.2s ease; position: relative; z-index: 2;
+    }
+    .watcher.show { opacity: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fog, .ember, .breathe, .reveal, .flicker, .core-dot { animation: none !important; }
+      .ember { display: none; }
+      .breathe, .flicker { opacity: 1 !important; }
+      .watcher { transition: none; }
+    }
   </style>
 </head>
-<body>
+<body class="grain">
+  <div class="fog" aria-hidden="true"></div>
+
   <div class="header">
-    <h1>The Ring Reader</h1>
+    <div class="kicker flicker">Dendro Archive / Prízrak</div>
+    <h1 id="title" class="breathe" title="the ghost keeps a ledger of seasons">The Ring Reader</h1>
     <p>Every tree is its own archive. Each ring records a year — the conditions that shaped it. Drought leaves a thin ring. Good water and light leaves a thick one. Some years are pointer years: so extreme the ring becomes a reference point. What kind of ring did you just grow?</p>
   </div>
 
@@ -237,17 +331,17 @@
   </div>
 
   <div class="card">
-    <label>Name this period</label>
+    <label class="field-label" for="period">Name this period</label>
     <input type="text" id="period" placeholder="e.g. 2025, Q1 2026, The VC Year..." />
   </div>
 
   <div class="card">
-    <label>What actually happened?</label>
+    <label class="field-label" for="description">What actually happened?</label>
     <textarea id="description" placeholder="Describe it plainly. What did you do, where did you go, what broke, what held..."></textarea>
   </div>
 
   <div class="card">
-    <label>What was present this period? (check all that apply)</label>
+    <label class="field-label">What was present this period? (check all that apply)</label>
     <div class="checks">
       <label class="check-item"><input type="checkbox" id="c_growth"> Growth, forward momentum</label>
       <label class="check-item"><input type="checkbox" id="c_stress"> High stress, survival mode</label>
@@ -262,7 +356,7 @@
     </div>
   </div>
 
-  <button class="btn" onclick="readRing()">Read the ring →</button>
+  <button class="btn" onclick="readRing()">Core the sample →</button>
 
   <div class="result" id="result">
     <div class="ring-display">
@@ -271,6 +365,9 @@
       <div class="ring-year-label" id="ring-year"></div>
       <div class="ring-description" id="ring-desc"></div>
       <div class="prizrak-verdict" id="prizrak-verdict"></div>
+      <div class="copy-row">
+        <button class="copy-btn" id="copy-btn" onclick="copyVerdict()">file to the ledger</button>
+      </div>
     </div>
 
     <div class="history-card" id="history-card" style="display:none">
@@ -280,6 +377,8 @@
 
     <div class="footnote">The bristlecone pine grows so slowly its wood becomes too dense to rot. The tree that struggles most produces the ring that endures longest.</div>
   </div>
+
+  <div class="watcher" id="watcher" aria-hidden="true"></div>
 
   <script>
     const STORAGE_KEY = 'prizrak_rings_v1';
@@ -342,6 +441,13 @@
       },
     };
 
+    // ---- color resolver so copy + core-dot get real hex from CSS vars ----
+    function resolveColor(c) {
+      if (!c || !c.startsWith('var(')) return c;
+      const name = c.slice(4, -1).trim();
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || c;
+    }
+
     function classifyRing() {
       const g = document.getElementById('c_growth').checked;
       const s = document.getElementById('c_stress').checked;
@@ -362,11 +468,14 @@
       return 'thin';
     }
 
+    let lastVerdictText = '';
+
     function readRing() {
       const period = document.getElementById('period').value.trim() || 'This period';
       const rtype = classifyRing();
       const info = ringTypes[rtype];
       const verdict = info.verdicts[Math.floor(Math.random() * info.verdicts.length)];
+      const solidColor = resolveColor(info.color);
 
       // Build ring visual
       const viz = document.getElementById('ring-visual');
@@ -385,12 +494,25 @@
         `;
         viz.appendChild(ring);
       }
+      // pulsing pith at the heart of the sample
+      const core = document.createElement('div');
+      core.className = 'core-dot';
+      core.style.background = solidColor;
+      core.style.boxShadow = '0 0 8px ' + solidColor;
+      viz.appendChild(core);
 
-      document.getElementById('ring-type').style.color = info.color;
-      document.getElementById('ring-type').textContent = info.label;
+      const typeEl = document.getElementById('ring-type');
+      typeEl.style.color = info.color;
+      typeEl.style.textShadow = '0 0 12px ' + solidColor + '66';
+      typeEl.textContent = info.label;
       document.getElementById('ring-year').textContent = period;
       document.getElementById('ring-desc').textContent = info.desc;
       document.getElementById('prizrak-verdict').textContent = verdict;
+
+      lastVerdictText = `${info.label.toUpperCase()} — ${period}\n\n${info.desc}\n\n${verdict}\n\n— read from the ring. the mountain is watching.`;
+      const cb = document.getElementById('copy-btn');
+      cb.classList.remove('copied');
+      cb.textContent = 'file to the ledger';
 
       // Save to history
       const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -409,17 +531,142 @@
           const barH = rt.height;
           const el = document.createElement('div');
           el.className = 'h-ring';
+          el.style.color = resolveColor(rt.color);
           el.innerHTML = `
             <div class="h-ring-bar" style="height:${barH}px;background:${rt.color};opacity:0.7;"></div>
-            <div class="h-ring-label" title="${h.period}">${h.period}</div>
+            <div class="h-ring-label" title="${h.period} · ${rt.label}">${h.period}</div>
           `;
           hRings.appendChild(el);
         });
       }
 
-      document.getElementById('result').classList.add('visible');
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+      const result = document.getElementById('result');
+      result.classList.add('visible');
+      // re-trigger the reveal animation on every read
+      const display = result.querySelector('.ring-display');
+      display.classList.remove('reveal'); void display.offsetWidth; display.classList.add('reveal', 'breathe');
+      result.scrollIntoView({ behavior: 'smooth' });
     }
+
+    function copyVerdict() {
+      if (!lastVerdictText) return;
+      const cb = document.getElementById('copy-btn');
+      navigator.clipboard.writeText(lastVerdictText).then(() => {
+        cb.classList.add('copied');
+        cb.textContent = 'copied to the ledger';
+        setTimeout(() => { cb.classList.remove('copied'); cb.textContent = 'file to the ledger'; }, 1200);
+      }).catch(() => {
+        cb.textContent = 'the fog refused it';
+        setTimeout(() => { cb.textContent = 'file to the ledger'; }, 1200);
+      });
+    }
+
+    // ---------- atmosphere: drifting embers ----------
+    (function embers() {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 7) + 's';
+        document.body.appendChild(e);
+      }
+    })();
+
+    // ---------- easter egg 1: type "prizrak" -> the watcher answers ----------
+    (function typedEgg() {
+      let buf = '';
+      const w = document.getElementById('watcher');
+      window.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+          buf = (buf + ev.key.toLowerCase()).slice(-12);
+          if (buf.includes('prizrak')) {
+            w.textContent = 'you found the watcher. it has been reading your rings all along.';
+            w.classList.add('show');
+            buf = '';
+            clearTimeout(w._t);
+            w._t = setTimeout(() => w.classList.remove('show'), 7000);
+          }
+        }
+      });
+    })();
+
+    // ---------- easter egg 2: triple-click the title -> one extra ember ----------
+    (function tripleClickEgg() {
+      const t = document.getElementById('title');
+      if (!t) return;
+      t.addEventListener('click', (ev) => {
+        if (ev.detail === 3) {
+          if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (Math.random() * 100) + 'vw';
+          e.style.animationDuration = (10 + Math.random() * 6) + 's';
+          document.body.appendChild(e);
+          setTimeout(() => e.remove(), 18000);
+        }
+      });
+    })();
+
+    // ---------- easter egg 3: idle 60s -> the ghost murmurs ----------
+    (function idleEgg() {
+      const w = document.getElementById('watcher');
+      let timer;
+      const arm = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (!w.classList.contains('show')) {
+            w.textContent = 'still here. still reading the rings.';
+            w.classList.add('show');
+            setTimeout(() => w.classList.remove('show'), 6000);
+          }
+        }, 60000);
+      };
+      ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'].forEach(ev =>
+        window.addEventListener(ev, arm, { passive: true }));
+      arm();
+    })();
+
+    // ---------- small hour whisper: 00:00–03:00 local ----------
+    (function nightWhisper() {
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        const f = document.querySelector('.footnote');
+        if (f) {
+          const line = document.createElement('div');
+          line.style.cssText = 'margin-top:0.9rem;color:var(--ink-ghost);font-style:italic;';
+          line.className = 'flicker';
+          line.textContent = 'the mountain does not sleep. neither, it seems, do you.';
+          f.appendChild(line);
+        }
+      }
+    })();
+
+    // ---------- restore history view on load (read-only, never mutates) ----------
+    (function restoreHistory() {
+      const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (history.length > 1) {
+        const histCard = document.getElementById('history-card');
+        const hRings = document.getElementById('history-rings');
+        history.forEach(h => {
+          const rt = ringTypes[h.rtype];
+          if (!rt) return;
+          const el = document.createElement('div');
+          el.className = 'h-ring';
+          el.style.color = resolveColor(rt.color);
+          el.innerHTML = `
+            <div class="h-ring-bar" style="height:${rt.height}px;background:${rt.color};opacity:0.7;"></div>
+            <div class="h-ring-label" title="${h.period} · ${rt.label}">${h.period}</div>
+          `;
+          hRings.appendChild(el);
+        });
+        histCard.style.display = 'block';
+        document.getElementById('result').classList.add('visible');
+      }
+    })();
   </script>
 </body>
 </html>

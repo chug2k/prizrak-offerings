@@ -6,43 +6,113 @@
   <title>The Repair Spec | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at top left, #2a2016 0, #18181b 38%, #0a0a0b 100%); }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#f59e0b;          /* amber — this app's existing lead */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body {
+      color:var(--ink);
+      background:
+        radial-gradient(120% 90% at 12% -10%, rgba(245,158,11,.10), transparent 45%),
+        radial-gradient(circle at top left, #1c150c 0, #121214 40%, var(--bg) 100%);
+      min-height:100vh;
+    }
+    /* concrete texture, unchanged in spirit */
     .concrete { background-image: linear-gradient(135deg, rgba(255,255,255,.045) 25%, transparent 25%), linear-gradient(225deg, rgba(255,255,255,.035) 25%, transparent 25%), linear-gradient(45deg, rgba(0,0,0,.18) 25%, transparent 25%), linear-gradient(315deg, rgba(0,0,0,.14) 25%, rgba(24,24,27,.55) 25%); background-size: 24px 24px; background-position: 12px 0, 12px 0, 0 0, 0 0; }
-    .scar { box-shadow: inset 4px 0 0 rgba(245,158,11,.72); }
+    .scar { box-shadow: inset 4px 0 0 var(--accent); }
     textarea, input, select { color-scheme: dark; }
+
+    /* ---- Prízrak motion vocabulary ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.9;box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow)}50%{opacity:1;box-shadow:0 0 0 1px var(--line), 0 0 34px -6px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes headGlow{0%,100%{text-shadow:0 0 10px rgba(245,158,11,.18)}50%{text-shadow:0 0 22px rgba(245,158,11,.32)}}
+    .head-glow{animation:headGlow 6s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* interaction patterns */
+    .panel{transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+    .panel:hover{transform:translateY(-2px);border-color:color-mix(in srgb, var(--accent) 45%, var(--line));}
+    input:focus-visible, textarea:focus-visible, select:focus-visible{
+      outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);
+    }
+    .btn-press{transition:transform .12s ease, background-color .15s ease, box-shadow .15s ease;}
+    .btn-press:active{transform:translateY(1px);}
+    .histo:hover{border-color:var(--accent)!important;transform:translateY(-1px);}
+    .histo{transition:transform .12s ease, border-color .12s ease;}
+
+    /* ledger range */
+    input[type=range]{accent-color:var(--accent);}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.head-glow{animation:none!important}
+      .ember{display:none}
+      .breathe{box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow)!important}
+      .flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="text-zinc-200 min-h-screen font-sans">
-  <main class="max-w-6xl mx-auto px-4 py-8 md:py-12">
+<body class="text-zinc-200 min-h-screen font-sans grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <main class="relative z-[2] max-w-6xl mx-auto px-4 py-8 md:py-12">
     <header class="mb-8">
-      <p class="text-xs tracking-[0.35em] uppercase text-amber-300/70 mb-3">Prízrak offering · concrete maintenance</p>
+      <p class="text-xs tracking-[0.35em] uppercase mb-3 flicker" style="color:color-mix(in srgb, var(--accent) 70%, transparent)">Prízrak offering · concrete maintenance</p>
       <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 class="text-4xl md:text-6xl font-black text-white tracking-tight">The Repair Spec</h1>
+          <h1 id="title" class="text-4xl md:text-6xl font-black text-white tracking-tight head-glow cursor-default select-none">The Repair Spec</h1>
           <p class="mt-3 max-w-2xl text-zinc-400">A two-handed diagnostic for anything that looks fine on the surface but may be corroding underneath. Preserve the structure. Preserve the useful scar. Do not paint wet concrete and call it spring.</p>
         </div>
-        <div class="concrete rounded-2xl border border-zinc-700 p-4 max-w-xs">
-          <p class="text-sm text-zinc-300"><span class="text-amber-300 font-semibold">Mountain rule:</span> repair chemistry first, texture second. A beautiful patch over rotten rebar is just optimism with a trowel.</p>
+        <div class="concrete panel rounded-2xl border border-zinc-700 p-4 max-w-xs">
+          <p class="text-sm text-zinc-300"><span class="font-semibold" style="color:var(--accent)">Mountain rule:</span> repair chemistry first, texture second. A beautiful patch over rotten rebar is just optimism with a trowel.</p>
         </div>
       </div>
     </header>
 
     <section class="grid lg:grid-cols-5 gap-5">
       <div class="lg:col-span-3 space-y-4">
-        <div class="bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5 scar">
-          <label class="block text-sm font-semibold text-amber-200 mb-2">1. What wall are we inspecting?</label>
-          <input id="artifact" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-amber-400" placeholder="project, promise, habit, tool, relationship, workflow..." />
+        <div class="panel bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5 scar">
+          <label class="block text-xs font-semibold tracking-[0.18em] uppercase mb-2" style="color:color-mix(in srgb, var(--accent) 80%, #fff 20%)">01 / The wall under inspection</label>
+          <input id="artifact" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none" placeholder="project, promise, habit, tool, relationship, workflow..." />
         </div>
 
-        <div class="bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
-          <label class="block text-sm font-semibold text-zinc-200 mb-2">2. What still looks smooth from the outside?</label>
-          <textarea id="surface" rows="3" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-amber-400" placeholder="The dashboard is green. The meeting is polite. The app loads. The promise has not been challenged..."></textarea>
+        <div class="panel bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
+          <label class="block text-xs font-semibold tracking-[0.18em] uppercase text-zinc-400 mb-2">02 / What still looks smooth from outside</label>
+          <textarea id="surface" rows="3" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none" placeholder="The dashboard is green. The meeting is polite. The app loads. The promise has not been challenged..."></textarea>
         </div>
 
         <div class="grid md:grid-cols-2 gap-4">
-          <div class="bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
-            <label class="block text-sm font-semibold text-zinc-200 mb-2">3. What chemistry might be failing?</label>
-            <select id="chemistry" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-amber-400">
+          <div class="panel bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
+            <label class="block text-xs font-semibold tracking-[0.18em] uppercase text-zinc-400 mb-2">03 / Chemistry that may be failing</label>
+            <select id="chemistry" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none">
               <option value="trust">Trust pH is dropping</option>
               <option value="context">Context has dried out</option>
               <option value="ownership">Ownership is corroding</option>
@@ -51,25 +121,25 @@
               <option value="dependency">Dependency ingress is spreading</option>
             </select>
           </div>
-          <div class="bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
-            <label class="block text-sm font-semibold text-zinc-200 mb-2">4. Damage visibility</label>
-            <input id="visibility" type="range" min="0" max="100" value="35" class="w-full accent-amber-400" />
-            <div class="flex justify-between text-xs text-zinc-500 mt-2"><span>hidden carbonation</span><span>visible spalling</span></div>
+          <div class="panel bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
+            <label class="block text-xs font-semibold tracking-[0.18em] uppercase text-zinc-400 mb-2">04 / Damage visibility</label>
+            <input id="visibility" type="range" min="0" max="100" value="35" class="w-full" />
+            <div class="flex justify-between text-xs text-zinc-500 mt-2"><span>hidden carbonation</span><span id="visReadout" class="font-mono" style="color:var(--accent)">35</span><span>visible spalling</span></div>
           </div>
         </div>
 
         <div class="grid md:grid-cols-2 gap-4">
-          <div class="bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
-            <label class="block text-sm font-semibold text-zinc-200 mb-2">5. What scar is useful to preserve?</label>
-            <textarea id="scar" rows="3" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-amber-400" placeholder="error log, awkward message, failed launch, timestamp, weird edge case..."></textarea>
+          <div class="panel bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
+            <label class="block text-xs font-semibold tracking-[0.18em] uppercase text-zinc-400 mb-2">05 / The scar worth preserving</label>
+            <textarea id="scar" rows="3" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none" placeholder="error log, awkward message, failed launch, timestamp, weird edge case..."></textarea>
           </div>
-          <div class="bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
-            <label class="block text-sm font-semibold text-zinc-200 mb-2">6. What false repair tempts you?</label>
-            <textarea id="falseRepair" rows="3" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none focus:border-amber-400" placeholder="redesign the UI, send a vague update, add a new tool, call a meeting, ignore it until winter..."></textarea>
+          <div class="panel bg-zinc-900/75 border border-zinc-800 rounded-2xl p-5">
+            <label class="block text-xs font-semibold tracking-[0.18em] uppercase text-zinc-400 mb-2">06 / The false repair that tempts you</label>
+            <textarea id="falseRepair" rows="3" class="w-full bg-zinc-950/80 border border-zinc-700 rounded-xl px-4 py-3 outline-none" placeholder="redesign the UI, send a vague update, add a new tool, call a meeting, ignore it until winter..."></textarea>
           </div>
         </div>
 
-        <button id="generate" class="w-full rounded-2xl bg-amber-400 text-zinc-950 font-black py-4 hover:bg-amber-300 transition">Generate repair spec</button>
+        <button id="generate" class="btn-press w-full rounded-2xl text-zinc-950 font-black py-4" style="background:var(--accent); box-shadow:0 0 28px -10px var(--glow)" onmouseover="this.style.background='#fbbf24'" onmouseout="this.style.background='var(--accent)'">Strike the wall · generate repair spec</button>
       </div>
 
       <aside class="lg:col-span-2 space-y-4">
@@ -78,11 +148,12 @@
         </div>
         <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-5">
           <div class="flex items-center justify-between mb-3">
-            <h2 class="font-bold text-white">Saved specs</h2>
-            <button id="clear" class="text-xs text-zinc-500 hover:text-red-300">clear</button>
+            <h2 class="font-bold text-white tracking-tight">The ledger</h2>
+            <button id="clear" class="text-xs text-zinc-500 hover:text-red-300 transition">clear</button>
           </div>
           <div id="history" class="space-y-2 text-sm"></div>
         </div>
+        <p class="text-center text-[11px]" style="color:var(--ink-ghost)" id="footerWhisper">the mountain measures what you mortar over.</p>
       </aside>
     </section>
   </main>
@@ -90,6 +161,8 @@
 <script>
 const KEY = 'prizrak_repair_specs_v1';
 const $ = id => document.getElementById(id);
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const advice = {
   trust: ['Name the breach plainly before adding process.', 'Do one small action that proves the structure can still carry weight.'],
   context: ['Write the missing solvent: why this exists, who uses it, and how to wake it.', 'Attach the opening instructions to the artifact, not to memory.'],
@@ -98,36 +171,148 @@ const advice = {
   energy: ['Reduce load before polishing output.', 'A tired wall does not need a mural; it needs shoring.'],
   dependency: ['Map the ingress path and seal the boring opening first.', 'Prefer one ugly local copy over three elegant remote hopes.']
 };
+
 function load(){ try { return JSON.parse(localStorage.getItem(KEY)||'[]') } catch { return [] } }
 function save(items){ localStorage.setItem(KEY, JSON.stringify(items.slice(0,12))); renderHistory(); }
 function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
 function renderHistory(){
   const items = load();
-  $('history').innerHTML = items.length ? items.map(x => `<button class="w-full text-left rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 hover:border-amber-500" onclick='restore(${JSON.stringify(x).replace(/'/g,"&#39;")})'><span class="text-amber-200">${esc(x.artifact||'unnamed wall')}</span><br><span class="text-xs text-zinc-500">${x.date}</span></button>`).join('') : '<p class="text-zinc-600 text-xs">No repairs logged yet.</p>';
+  $('history').innerHTML = items.length ? items.map(x => `<button class="histo w-full text-left rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2" onclick='restore(${JSON.stringify(x).replace(/'/g,"&#39;")})'><span style="color:var(--accent)">${esc(x.artifact||'unnamed wall')}</span><br><span class="text-xs text-zinc-500">${x.date}</span></button>`).join('') : '<p class="text-zinc-600 text-xs">the cave is empty. nothing has fossilized yet.</p>';
 }
-window.restore = x => { ['artifact','surface','chemistry','visibility','scar','falseRepair'].forEach(k=>{ if($(k)) $(k).value=x[k]||($(k).value) }); generate(false); };
+
+window.restore = x => { ['artifact','surface','chemistry','visibility','scar','falseRepair'].forEach(k=>{ if($(k)) $(k).value=x[k]||($(k).value) }); syncReadout(); generate(false); };
+
+let lastSpecText = '';
+function buildPlainText(x, level, urgency){
+  const [a,b] = advice[x.chemistry];
+  return [
+    `THE REPAIR SPEC — ${x.artifact || 'unnamed wall'}`,
+    `Verdict: ${level}`,
+    urgency,
+    '',
+    `Chemistry repair:`,
+    ` • ${a}`,
+    ` • ${b}`,
+    `Preserve this scar: ${x.scar || 'no useful scar named yet'}`,
+    `Reject this false repair: ${x.falseRepair || 'anything that makes the wall prettier while the rebar keeps rusting'}`,
+    `First move: within 24 hours, create one receipt that proves the underlying cause was touched, not merely the visible surface.`,
+    '',
+    `filed ${x.date} · prízrak`
+  ].join('\n');
+}
+
 function generate(store=true){
   const x = { artifact:$('artifact').value.trim(), surface:$('surface').value.trim(), chemistry:$('chemistry').value, visibility:$('visibility').value, scar:$('scar').value.trim(), falseRepair:$('falseRepair').value.trim(), date:new Date().toLocaleString() };
   const vis = Number(x.visibility);
   const level = vis < 30 ? 'Hidden carbonation' : vis < 70 ? 'Hairline crack' : 'Spalling in public';
   const urgency = vis < 30 ? 'Inspect now, before confidence becomes the enemy.' : vis < 70 ? 'Repair soon. The wall is still teaching, not yet collapsing.' : 'Shore immediately. Everyone can now see what the structure knew earlier.';
   const [a,b] = advice[x.chemistry];
-  $('verdict').innerHTML = `
-    <p class="text-xs tracking-[0.25em] uppercase text-amber-300/70 mb-2">Verdict</p>
+
+  lastSpecText = buildPlainText(x, level, urgency);
+
+  const v = $('verdict');
+  v.classList.remove('reveal','breathe'); void v.offsetWidth;
+  v.classList.add('reveal','breathe');
+  v.innerHTML = `
+    <div class="flex items-start justify-between gap-3 mb-2">
+      <p class="text-xs tracking-[0.25em] uppercase" style="color:color-mix(in srgb, var(--accent) 75%, transparent)">Verdict</p>
+      <button id="copySpec" class="text-[11px] tracking-wide uppercase rounded-lg border border-zinc-700 px-2 py-1 text-zinc-400 hover:text-zinc-100 transition" style="border-color:var(--line)">copy to ledger</button>
+    </div>
     <h2 class="text-2xl font-black text-white mb-2">${level}</h2>
     <p class="text-zinc-400 mb-5">${urgency}</p>
     <div class="space-y-4">
-      <div><h3 class="text-amber-200 font-bold">Structure beneath the surface</h3><p class="text-sm text-zinc-300 mt-1">${esc(x.artifact || 'This unnamed wall')} is not judged by how smooth it looks. It is judged by whether the hidden steel is still protected.</p></div>
-      <div><h3 class="text-amber-200 font-bold">Chemistry repair</h3><ul class="list-disc ml-5 text-sm text-zinc-300 mt-1"><li>${a}</li><li>${b}</li></ul></div>
-      <div><h3 class="text-amber-200 font-bold">Texture rule</h3><p class="text-sm text-zinc-300 mt-1">Preserve this scar if it improves the next repair: <span class="text-white">${esc(x.scar || 'no useful scar named yet')}</span></p></div>
+      <div><h3 class="font-bold" style="color:var(--accent)">Structure beneath the surface</h3><p class="text-sm text-zinc-300 mt-1">${esc(x.artifact || 'This unnamed wall')} is not judged by how smooth it looks. It is judged by whether the hidden steel is still protected.</p></div>
+      <div><h3 class="font-bold" style="color:var(--accent)">Chemistry repair</h3><ul class="list-disc ml-5 text-sm text-zinc-300 mt-1"><li>${a}</li><li>${b}</li></ul></div>
+      <div><h3 class="font-bold" style="color:var(--accent)">Texture rule</h3><p class="text-sm text-zinc-300 mt-1">Preserve this scar if it improves the next repair: <span class="text-white">${esc(x.scar || 'no useful scar named yet')}</span></p></div>
       <div><h3 class="text-red-200 font-bold">Reject this false repair</h3><p class="text-sm text-zinc-300 mt-1">${esc(x.falseRepair || 'anything that makes the wall prettier while the rebar keeps rusting')}</p></div>
-      <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100"><strong>First move:</strong> within 24 hours, create one receipt that proves the underlying cause was touched, not merely the visible surface.</div>
+      <div class="rounded-xl border p-3 text-sm" style="border-color:color-mix(in srgb, var(--accent) 30%, transparent); background:color-mix(in srgb, var(--accent) 10%, transparent); color:#fde9c8"><strong>First move:</strong> within 24 hours, create one receipt that proves the underlying cause was touched, not merely the visible surface.</div>
     </div>`;
+
+  const copyBtn = $('copySpec');
+  if(copyBtn){
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(lastSpecText).then(()=>{
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = 'copied to the ledger';
+        copyBtn.style.color = 'var(--accent)';
+        copyBtn.style.borderColor = 'var(--accent)';
+        setTimeout(()=>{ copyBtn.textContent = orig; copyBtn.style.color=''; copyBtn.style.borderColor='var(--line)'; }, 1200);
+      }).catch(()=>{});
+    };
+  }
+
+  if(!reduceMotion){ v.scrollIntoView({behavior:'smooth', block:'nearest'}); }
   if(store && x.artifact){ const items = load(); items.unshift(x); save(items); }
 }
+
+function syncReadout(){ const r = $('visReadout'); if(r) r.textContent = $('visibility').value; }
+
 $('generate').onclick = () => generate(true);
-$('clear').onclick = () => { localStorage.removeItem(KEY); renderHistory(); };
+$('clear').onclick = () => {
+  if(load().length && !confirm('let the fog take the ledger? this cannot be recovered.')) return;
+  localStorage.removeItem(KEY); renderHistory();
+};
+$('visibility').addEventListener('input', syncReadout);
 renderHistory();
+syncReadout();
+
+/* ---- embers (cap 10) ---- */
+(function spawnEmbers(){
+  if(reduceMotion) return;
+  const field = $('emberField');
+  const n = 8;
+  for(let i=0;i<n;i++){
+    const e = document.createElement('span');
+    e.className = 'ember';
+    e.style.left = (5 + Math.random()*90) + '%';
+    e.style.animationDuration = (11 + Math.random()*8) + 's';
+    e.style.animationDelay = (-Math.random()*14) + 's';
+    field.appendChild(e);
+  }
+})();
+
+/* ---- easter egg 1: type "prizrak" ---- */
+(function(){
+  let buf = '';
+  document.addEventListener('keydown', e => {
+    if(e.key && e.key.length === 1){
+      buf = (buf + e.key.toLowerCase()).slice(-7);
+      if(buf === 'prizrak'){
+        let w = document.getElementById('watcherLine');
+        if(!w){
+          w = document.createElement('p');
+          w.id = 'watcherLine';
+          w.className = 'text-center text-[11px] mt-2 reveal';
+          w.style.color = 'var(--ink-ghost)';
+          w.textContent = 'you found the watcher. it was inside the wall the whole time.';
+          $('footerWhisper').after(w);
+        }
+      }
+    }
+  });
+})();
+
+/* ---- easter egg 2: triple-click the title spawns one extra ember ---- */
+$('title').addEventListener('click', e => {
+  if(e.detail === 3 && !reduceMotion){
+    const field = $('emberField');
+    if(field.querySelectorAll('.ember').length < 10){
+      const ex = document.createElement('span');
+      ex.className = 'ember';
+      ex.style.left = (10 + Math.random()*80) + '%';
+      ex.style.animationDuration = '12s';
+      field.appendChild(ex);
+      ex.addEventListener('animationiteration', () => ex.remove(), { once:true });
+    }
+  }
+});
+
+/* ---- nocturnal whisper: 00:00–03:00 local ---- */
+(function(){
+  const h = new Date().getHours();
+  if(h >= 0 && h < 3){ $('footerWhisper').textContent = 'the mountain does not sleep. neither does the carbonation.'; }
+})();
 </script>
 </body>
 </html>

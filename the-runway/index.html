@@ -6,40 +6,123 @@
     <title>The Runway — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        input[type="range"] { accent-color: #a78bfa; width: 100%; cursor: pointer; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#a78bfa;
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        body { background: var(--bg); }
+
+        input[type="range"] { accent-color: var(--accent); width: 100%; cursor: pointer; }
         input[type="number"] {
-            background: #18181b;
-            border: 1px solid #3f3f46;
+            background: var(--bg-sunk);
+            border: 1px solid var(--line);
             border-radius: 6px;
             padding: 8px 12px;
-            color: #e4e4e7;
+            color: var(--ink);
             width: 100%;
             outline: none;
             font-size: 14px;
+            transition: border-color .15s, box-shadow .15s;
         }
-        input[type="number"]:focus { border-color: #7c3aed; }
-        .verdict-enter { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .glow { text-shadow: 0 0 10px currentColor; }
+        input[type="number"]:focus-visible,
+        input[type="number"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--glow);
+        }
+
+        /* Panels: thin border, lift on hover */
+        .panel{
+            background: var(--bg-raised);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            transition: transform .15s, box-shadow .15s, border-color .15s;
+        }
+        .panel:hover{ border-color: var(--line); box-shadow: 0 0 30px -18px var(--glow); }
+
+        .sig-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        /* The summon button */
+        .summon{
+            transition: transform .12s, box-shadow .2s, border-color .2s, background-color .2s;
+        }
+        .summon:hover{ transform: translateY(-2px); box-shadow: 0 0 28px -8px var(--glow); }
+        .summon:active{ transform: translateY(1px); }
+
+        /* Result panel breathing glow */
+        .result-live{
+            box-shadow: 0 0 0 1px var(--line), 0 0 34px -10px var(--glow);
+        }
+
+        /* --- Motion vocabulary (reduced-motion-safe) --- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+        .verdict-enter{ animation: reveal .4s ease-out both; }
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .glow { text-shadow: 0 0 12px var(--glow); }
+
+        /* copy button flash */
+        @keyframes copyFlash{0%{color:var(--accent)}100%{color:var(--ink-dim)}}
+        .copy-flash{ animation: copyFlash 1.2s ease-out; }
+
+        #idle-whisper{ opacity:0; transition:opacity 1.4s ease; }
+        #idle-whisper.show{ opacity:1; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.verdict-enter,.copy-flash{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+            #idle-whisper{transition:none}
+        }
     </style>
 </head>
-<body class="text-zinc-300 min-h-screen antialiased font-sans">
-    <div class="max-w-2xl mx-auto px-4 py-10">
+<body class="text-zinc-300 min-h-screen antialiased font-sans grain">
+
+    <!-- Atmosphere layers (decorative, behind content) -->
+    <div class="fog" aria-hidden="true"></div>
+    <div id="emberField" aria-hidden="true"></div>
+
+    <div class="max-w-2xl mx-auto px-4 py-10" style="position:relative;z-index:2">
 
         <!-- Nav -->
-        <a href="/index.html" class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">← The Offerings</a>
+        <a href="/index.html" class="text-xs text-zinc-600 hover:text-violet-400 transition-colors">← The Offerings</a>
 
         <!-- Header -->
         <div class="mt-4 mb-8">
-            <h1 class="text-3xl font-bold text-white">The Runway</h1>
+            <h1 id="title" class="text-3xl font-bold text-white glow breathe select-none" title="the watcher keeps the ledger">The Runway</h1>
             <p class="text-zinc-500 text-sm mt-1">The molecule knows when to move. The math must agree.</p>
             <p class="text-zinc-600 text-xs mt-2 leading-relaxed">Based on Principle 41 — The Residence Time Doctrine. In oceanography, residence time is how long a molecule stays in a reservoir before moving on. The molecule is not stuck. It is waiting for the gradient to become sufficient.</p>
         </div>
 
         <!-- Section 1: Financial -->
-        <div class="bg-zinc-900/80 border border-zinc-800 rounded-lg p-5 mb-4">
-            <h2 class="text-xs font-semibold text-violet-400 uppercase tracking-wider mb-4">Financial Position</h2>
+        <div class="panel p-5 mb-4">
+            <h2 class="text-[11px] font-semibold text-violet-400 uppercase tracking-[0.18em] mb-4">DOMAIN 01 / FINANCIAL POSITION</h2>
             <div class="space-y-4">
                 <div>
                     <label class="text-xs text-zinc-500 block mb-1.5">Liquid assets available for exit (USD — or your currency, same math)</label>
@@ -64,8 +147,8 @@
         </div>
 
         <!-- Section 2: Gradient Readiness -->
-        <div class="bg-zinc-900/80 border border-zinc-800 rounded-lg p-5 mb-4">
-            <h2 class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Gradient Readiness</h2>
+        <div class="panel p-5 mb-4">
+            <h2 class="text-[11px] font-semibold text-violet-400 uppercase tracking-[0.18em] mb-2">DOMAIN 02 / GRADIENT READINESS</h2>
             <p class="text-xs text-zinc-600 mb-4">Rate how assembled each dimension is. The gradient must be sufficient for the molecule to move. Financial conditions alone are not the gradient — they are one dimension of it.</p>
             <div class="space-y-4">
                 <div>
@@ -107,8 +190,8 @@
         </div>
 
         <!-- Section 3: Pickleball Signal -->
-        <div class="bg-zinc-900/80 border border-zinc-800 rounded-lg p-5 mb-4">
-            <h2 class="text-xs font-semibold text-lime-400 uppercase tracking-wider mb-2">The Pickleball Signal</h2>
+        <div class="panel p-5 mb-4">
+            <h2 class="text-[11px] font-semibold text-violet-400 uppercase tracking-[0.18em] mb-2">DOMAIN 03 / THE PICKLEBALL SIGNAL</h2>
             <p class="text-xs text-zinc-600 mb-3">783 minutes per week is not a hobby. It is a pressure gauge. How has this number moved in the last four weeks?</p>
             <div class="flex gap-2">
                 <button onclick="setSignal('up')" id="sig_up" class="sig-btn flex-1 py-2 rounded border border-zinc-700 text-xs text-zinc-400 hover:border-lime-600 hover:text-lime-400 transition-colors">↑ Going up</button>
@@ -118,21 +201,40 @@
         </div>
 
         <!-- Calculate -->
-        <button onclick="calculate()" class="w-full py-3 bg-violet-900/50 hover:bg-violet-800/60 border border-violet-700 hover:border-violet-500 text-violet-200 rounded-lg font-semibold text-sm transition-all mb-4">
-            Calculate Runway
+        <button onclick="calculate()" class="summon w-full py-3 bg-violet-900/40 hover:bg-violet-800/55 border border-violet-700 hover:border-violet-400 text-violet-200 rounded-lg font-semibold text-sm mb-4">
+            Read the Gradient
         </button>
 
         <!-- Result -->
-        <div id="result" class="hidden bg-zinc-900 border border-violet-800/30 rounded-lg p-6"></div>
+        <div id="result" class="hidden panel p-6 border-violet-800/30"></div>
 
         <!-- Footer -->
         <div class="mt-12 text-center">
             <p class="text-xs text-zinc-700">Residence time is not paralysis. It is the physics of the situation.</p>
             <p class="text-xs text-zinc-700 mt-1">The molecule moves when the gradient is sufficient. Not before. Not after.</p>
+            <p id="night-whisper" class="text-xs mt-3 hidden" style="color:var(--ink-ghost)">the mountain does not sleep.</p>
+            <p id="ghost-line" class="text-xs mt-2 hidden flicker" style="color:var(--ink-ghost)">you found the watcher.</p>
+            <p id="idle-whisper" class="text-xs mt-2" style="color:var(--ink-ghost)">still here. still watching.</p>
         </div>
     </div>
 
     <script>
+        // ---- Atmosphere: spawn a few drifting embers (cap <=10) ----
+        (function spawnEmbers(){
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            const field = document.getElementById('emberField');
+            if (!field) return;
+            const COUNT = 7;
+            for (let i = 0; i < COUNT; i++){
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (Math.random() * 100) + '%';
+                e.style.animationDelay = (Math.random() * 14) + 's';
+                e.style.animationDuration = (12 + Math.random() * 8) + 's';
+                field.appendChild(e);
+            }
+        })();
+
         // Slider sync
         const sliders = [
             ['buffer', 'bufferVal', v => v + ' mo'],
@@ -232,6 +334,9 @@
             };
         }
 
+        // Plain-text rendering of the verdict for the ledger (copy button)
+        let lastLedger = "";
+
         function calculate() {
             const savings = parseFloat(document.getElementById('savings').value) || 0;
             const burn = parseFloat(document.getElementById('burn').value) || 1000;
@@ -284,11 +389,25 @@
                     </span>
                 </div>` : '';
 
+            // Build the plain-text ledger entry for copy-to-clipboard
+            const sigText = pickleSignal === 'up' ? 'rising' : pickleSignal === 'down' ? 'declining' : pickleSignal === 'flat' ? 'stable' : 'unrecorded';
+            lastLedger =
+                `THE RUNWAY — PRÍZRAK LEDGER\n` +
+                `verdict: ${status}\n` +
+                `runway: ${runwayDisplay} mo  /  needed: ${bufferNeeded} mo  /  gradient: ${gradientPct}%\n` +
+                `net monthly burn: $${netBurn.toLocaleString()}\n` +
+                `dimensions — financial ${gf}, social ${gs}, psychological ${gp}, logistical ${gl}, conviction ${gc}\n` +
+                `pickleball signal: ${sigText}\n\n` +
+                `${verdict}` + (sub ? `\n\n${sub}` : '');
+
             document.getElementById('result').innerHTML = `
                 <div class="space-y-5 verdict-enter">
-                    <div>
-                        <div class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Prízrak Verdict</div>
-                        <div class="text-lg font-bold ${color} glow">${status}</div>
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <div class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Prízrak Verdict</div>
+                            <div class="text-lg font-bold ${color} glow breathe">${status}</div>
+                        </div>
+                        <button id="copyBtn" onclick="copyLedger()" class="shrink-0 text-[10px] uppercase tracking-widest border border-zinc-700 hover:border-violet-500 text-zinc-500 hover:text-violet-300 rounded px-2.5 py-1.5 transition-colors">file to ledger</button>
                     </div>
 
                     <div class="grid grid-cols-3 gap-3">
@@ -330,7 +449,7 @@
                         <div class="space-y-2">${dimBars}</div>
                     </div>
 
-                    <div class="border-l-2 border-zinc-700 pl-4">
+                    <div class="border-l-2 border-violet-800/60 pl-4">
                         <p class="text-sm text-zinc-300 leading-relaxed">${verdict}</p>
                         ${sub ? `<p class="text-xs text-zinc-500 mt-2 italic">${sub}</p>` : ''}
                     </div>
@@ -341,16 +460,90 @@
 
             const resultEl = document.getElementById('result');
             resultEl.classList.remove('hidden');
+            resultEl.classList.add('result-live');
             resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-            // Persist state
+            // Persist state — SAME KEY, SAME SHAPE
             localStorage.setItem('prizrak_runway_v1', JSON.stringify({
                 savings, burn, bridge, bufferNeeded, gf, gs, gp, gl, gc,
                 signal: pickleSignal, timestamp: Date.now()
             }));
         }
 
-        // Restore persisted state
+        // Copy-to-clipboard — files the verdict to the ledger
+        function copyLedger() {
+            const btn = document.getElementById('copyBtn');
+            if (!lastLedger || !navigator.clipboard) {
+                if (btn) { btn.textContent = 'no ledger'; setTimeout(() => { btn.textContent = 'file to ledger'; }, 1200); }
+                return;
+            }
+            navigator.clipboard.writeText(lastLedger).then(() => {
+                if (!btn) return;
+                btn.textContent = 'copied to the ledger';
+                btn.classList.add('copy-flash');
+                setTimeout(() => { btn.textContent = 'file to ledger'; btn.classList.remove('copy-flash'); }, 1200);
+            }).catch(() => {
+                if (btn) { btn.textContent = 'the fog refused'; setTimeout(() => { btn.textContent = 'file to ledger'; }, 1200); }
+            });
+        }
+
+        // ---- Easter egg: type "prizrak" to wake the watcher ----
+        (function watcherEgg(){
+            const target = 'prizrak';
+            let buf = '';
+            window.addEventListener('keydown', (e) => {
+                if (!e.key || e.key.length !== 1) return;
+                buf = (buf + e.key.toLowerCase()).slice(-target.length);
+                if (buf === target) {
+                    const line = document.getElementById('ghost-line');
+                    if (line) line.classList.remove('hidden');
+                }
+            });
+        })();
+
+        // ---- Easter egg: triple-click the title spawns one extra ember ----
+        (function tripleClickEgg(){
+            const title = document.getElementById('title');
+            if (!title) return;
+            title.addEventListener('click', (e) => {
+                if (e.detail !== 3) return;
+                if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                const field = document.getElementById('emberField');
+                if (!field || field.children.length >= 10) return;
+                const em = document.createElement('div');
+                em.className = 'ember';
+                em.style.left = (Math.random() * 100) + '%';
+                em.style.animationDuration = (12 + Math.random() * 8) + 's';
+                field.appendChild(em);
+            });
+        })();
+
+        // ---- Night whisper: 00:00–03:00 local ----
+        (function nightWhisper(){
+            const h = new Date().getHours();
+            if (h >= 0 && h < 3) {
+                const w = document.getElementById('night-whisper');
+                if (w) w.classList.remove('hidden');
+            }
+        })();
+
+        // ---- Idle 60s: the watcher murmurs ----
+        (function idleWatcher(){
+            const el = document.getElementById('idle-whisper');
+            if (!el) return;
+            let t;
+            const reset = () => {
+                el.classList.remove('show');
+                clearTimeout(t);
+                t = setTimeout(() => { el.classList.add('show'); }, 60000);
+            };
+            ['mousemove','keydown','touchstart','scroll','click'].forEach(ev =>
+                window.addEventListener(ev, reset, { passive: true })
+            );
+            reset();
+        })();
+
+        // Restore persisted state — reads the SAME KEY/SHAPE as before
         try {
             const saved = JSON.parse(localStorage.getItem('prizrak_runway_v1') || 'null');
             if (saved) {

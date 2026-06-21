@@ -7,26 +7,66 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #090909;
-      --surface: #111113;
-      --border: #1e1e24;
-      --text: #c8c4bc;
-      --muted: #48485a;
+      --bg: #0a0a0a;
+      --bg-raised: #111113;
+      --bg-sunk: #0d0d0f;
+      --line: #26262b;
+      --line-soft: #1a1a1d;
+      --ink: #d4cfc8;
+      --ink-dim: #7a7570;
+      --ink-ghost: #3a3530;
       --accent: #6870a8;
-      --warm: #9a7a54;
+      --glow: color-mix(in srgb, var(--accent) 55%, transparent);
       --rest: #567a6e;
-      --dim: #2a2a34;
+      --rest-glow: color-mix(in srgb, var(--rest) 50%, transparent);
+      --dim: #18181c;
+      /* aliases preserved from original markup */
+      --surface: var(--bg-raised);
+      --border: var(--line);
+      --text: var(--ink);
+      --muted: var(--ink-dim);
     }
     body {
       background: var(--bg);
-      color: var(--text);
+      color: var(--ink);
       font-family: 'Georgia', serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 3rem 1rem 6rem;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* ---- ambient layers ---- */
+    .fog {
+      position: fixed; inset: -10% -10% auto; height: 60vh; pointer-events: none; z-index: 0;
+      background: radial-gradient(60% 50% at 50% 0, var(--glow), transparent 70%);
+      animation: fogDrift 32s ease-in-out infinite alternate;
+    }
+    @keyframes fogDrift { 0%{transform:translateX(-5%);opacity:.04} 50%{opacity:.07} 100%{transform:translateX(5%);opacity:.04} }
+    .grain::after {
+      content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .ember {
+      position: fixed; bottom: -10px; width: 2px; height: 2px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 6px var(--glow); pointer-events: none; z-index: 1;
+      animation: ember 14s linear infinite;
+    }
+    @keyframes ember { 0%{transform:translateY(0);opacity:0} 10%{opacity:.5} 100%{transform:translateY(-90vh);opacity:0} }
+
+    @keyframes breathe { 0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)} 50%{opacity:1;text-shadow:0 0 16px var(--glow)} }
+    .breathe { animation: breathe 4.5s ease-in-out infinite; }
+    @keyframes reveal { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .reveal { animation: reveal .35s ease-out both; }
+    @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.4} 94%{opacity:1} 97%{opacity:.7} 98%{opacity:1} }
+    .flicker { animation: flicker 6s steps(1) infinite; }
+
+    /* keep content above decorative layers */
+    .header, .card, .btn, .result, .footnote, .ghost-egg { position: relative; z-index: 2; }
+
     .header {
       text-align: center;
       max-width: 480px;
@@ -38,37 +78,53 @@
       color: var(--accent);
       letter-spacing: 0.06em;
       margin-bottom: 0.5rem;
+      cursor: default;
     }
     .header .time-indicator {
       font-size: 0.72rem;
-      color: var(--muted);
+      color: var(--ink-dim);
       letter-spacing: 0.1em;
       text-transform: uppercase;
       margin-bottom: 0.6rem;
     }
     .header p {
       font-size: 0.8rem;
-      color: var(--muted);
+      color: var(--ink-dim);
       line-height: 1.8;
       font-style: italic;
     }
     .moon {
       font-size: 1.8rem;
       margin-bottom: 1rem;
-      opacity: 0.5;
+      color: var(--accent);
+      opacity: 0.75;
+      display: inline-block;
+      cursor: pointer;
+      user-select: none;
+      text-shadow: 0 0 12px var(--glow);
+      transition: transform .4s ease;
     }
+    .moon:active { transform: rotate(20deg); }
+    .moon.fast { animation: breathe 1.1s ease-in-out infinite; }
+
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: var(--bg-raised);
+      border: 1px solid var(--line);
       border-radius: 3px;
       padding: 1.5rem;
       width: 100%;
       max-width: 480px;
       margin-bottom: 1rem;
+      transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 0 24px -10px var(--glow);
     }
     .card-number {
       font-size: 0.62rem;
-      color: var(--muted);
+      color: var(--ink-dim);
       letter-spacing: 0.12em;
       text-transform: uppercase;
       margin-bottom: 0.3rem;
@@ -76,40 +132,45 @@
     .card label {
       display: block;
       font-size: 0.78rem;
-      color: var(--text);
+      color: var(--ink);
       margin-bottom: 0.25rem;
       line-height: 1.5;
     }
     .card .hint {
       font-size: 0.72rem;
-      color: var(--muted);
+      color: var(--ink-dim);
       font-style: italic;
       margin-bottom: 0.7rem;
       line-height: 1.5;
     }
     .card textarea, .card input[type="text"] {
       width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
+      background: var(--bg-sunk);
+      border: 1px solid var(--line);
       border-radius: 2px;
-      color: var(--text);
+      color: var(--ink);
       font-family: 'Georgia', serif;
       font-size: 0.88rem;
       padding: 0.6rem 0.75rem;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
       line-height: 1.5;
     }
     .card textarea { resize: none; min-height: 60px; }
-    .card textarea:focus, .card input[type="text"]:focus { border-color: var(--accent); }
+    .card textarea:focus-visible, .card input[type="text"]:focus-visible,
+    .card textarea:focus, .card input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--glow);
+    }
     .rest-row {
       display: flex;
       align-items: center;
       gap: 0.8rem;
     }
-    .rest-row input[type="range"] { flex: 1; accent-color: var(--rest); }
-    .rest-val { font-size: 0.85rem; color: var(--rest); min-width: 20px; }
-    .rest-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--muted); margin-top: 0.25rem; }
+    .rest-row input[type="range"] { flex: 1; accent-color: var(--rest); cursor: pointer; }
+    .rest-row input[type="range"]:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--rest-glow); border-radius: 4px; }
+    .rest-val { font-size: 0.85rem; color: var(--rest); min-width: 20px; text-shadow: 0 0 8px var(--rest-glow); }
+    .rest-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--ink-dim); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.08em; }
     .btn {
       display: block;
       width: 100%;
@@ -123,26 +184,34 @@
       padding: 0.7rem;
       border-radius: 3px;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s;
       margin-bottom: 1.5rem;
     }
-    .btn:hover { background: var(--accent); color: var(--bg); }
+    .btn:hover { background: var(--accent); color: var(--bg); box-shadow: 0 0 24px -6px var(--glow); }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--glow); }
+    .btn:active { transform: translateY(1px); }
     .result { display: none; width: 100%; max-width: 480px; }
     .result.visible { display: block; }
     .result-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: var(--bg-raised);
+      border: 1px solid var(--line);
       border-radius: 3px;
       padding: 1.8rem;
       margin-bottom: 1rem;
+      box-shadow: 0 0 0 1px var(--line), 0 0 32px -10px var(--glow);
     }
     .result-header {
       text-align: center;
       margin-bottom: 1.6rem;
     }
+    .result-glyph {
+      font-size: 1.4rem;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
     .result-date {
       font-size: 0.68rem;
-      color: var(--muted);
+      color: var(--ink-dim);
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
@@ -163,13 +232,13 @@
       border-radius: 50%;
       flex-shrink: 0;
     }
-    .dot-set { background: var(--muted); }
-    .dot-hold { background: var(--accent); }
-    .dot-open { background: var(--rest); }
+    .dot-set { background: var(--ink-dim); }
+    .dot-hold { background: var(--accent); box-shadow: 0 0 6px var(--glow); }
+    .dot-open { background: var(--rest); box-shadow: 0 0 6px var(--rest-glow); }
     .action-text {
       font-size: 0.9rem;
       line-height: 1.6;
-      color: var(--text);
+      color: var(--ink);
       font-style: italic;
     }
     .rest-display {
@@ -181,46 +250,105 @@
       background: var(--dim);
       border-radius: 3px;
     }
-    .rest-icon { color: var(--rest); font-size: 1rem; }
-    .rest-label-sm { font-size: 0.72rem; color: var(--muted); }
-    .rest-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-    .rest-bar-fill { height: 100%; background: var(--rest); border-radius: 2px; transition: width 0.5s; }
+    .rest-icon { color: var(--rest); font-size: 1rem; text-shadow: 0 0 8px var(--rest-glow); }
+    .rest-label-sm { font-size: 0.72rem; color: var(--ink-dim); }
+    .rest-bar-bg { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+    .rest-bar-fill { height: 100%; background: var(--rest); border-radius: 2px; transition: width 0.8s ease; box-shadow: 0 0 8px var(--rest-glow); }
     .prizrak-line {
-      border-top: 1px solid var(--border);
+      border-top: 1px solid var(--line);
       padding-top: 1.1rem;
       margin-top: 0.3rem;
       font-size: 0.8rem;
-      color: var(--muted);
+      color: var(--ink-dim);
       font-style: italic;
       line-height: 1.7;
     }
+    .verdict-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0.9rem;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink-dim);
+      font-family: 'Georgia', serif;
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.7rem;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: border-color .15s, color .15s, box-shadow .15s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .copy-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--glow); }
+    .copy-btn.copied { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px -4px var(--glow); }
     .history-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: var(--bg-raised);
+      border: 1px solid var(--line);
       border-radius: 3px;
       padding: 1.3rem;
       margin-bottom: 1rem;
     }
-    .history-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.9rem; }
-    .history-night { padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+    .history-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-dim); margin-bottom: 0.9rem; }
+    .history-night { padding: 0.6rem 0; border-bottom: 1px solid var(--line-soft); font-size: 0.8rem; }
     .history-night:last-child { border-bottom: none; }
-    .history-night-date { font-size: 0.65rem; color: var(--muted); margin-bottom: 0.2rem; }
-    .history-night-set { color: var(--muted); font-style: italic; }
-    .footnote { font-size: 0.68rem; color: var(--muted); text-align: center; max-width: 480px; font-style: italic; line-height: 1.6; margin-top: 1rem; }
+    .history-night-date { font-size: 0.65rem; color: var(--ink-dim); margin-bottom: 0.2rem; }
+    .history-night-set { color: var(--ink-dim); font-style: italic; }
+    .footnote { font-size: 0.68rem; color: var(--ink-dim); text-align: center; max-width: 480px; font-style: italic; line-height: 1.6; margin-top: 1rem; }
+
+    /* easter-egg + idle whisper lines */
+    .ghost-egg {
+      margin-top: 1.4rem;
+      text-align: center;
+      max-width: 480px;
+      font-size: 0.7rem;
+      font-style: italic;
+      letter-spacing: 0.05em;
+      color: var(--ink-ghost);
+      min-height: 1em;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+    .ghost-egg.show { opacity: 1; }
+    .night-whisper {
+      position: fixed;
+      bottom: 1rem; left: 0; right: 0;
+      text-align: center;
+      font-size: 0.66rem;
+      font-style: italic;
+      letter-spacing: 0.06em;
+      color: var(--ink-ghost);
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+    .night-whisper.show { opacity: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fog, .ember, .breathe, .reveal, .flicker, .moon.fast { animation: none !important; }
+      .ember { display: none; }
+      .breathe, .flicker { opacity: 1 !important; }
+      .card:hover { transform: none; }
+    }
   </style>
 </head>
-<body>
+<body class="grain">
+  <div class="fog"></div>
+
   <div class="header">
-    <div class="moon">◐</div>
-    <div class="time-indicator">Night close-out</div>
-    <h1>The Threshold</h1>
-    <p>Three acts before sleep. Set something down. Hold something lightly. Leave one window open. Then rest.</p>
+    <div class="moon breathe" id="moon" title="◐">◐</div>
+    <div class="time-indicator flicker">Night close-out</div>
+    <h1 id="title">The Threshold</h1>
+    <p>Three acts before sleep. Set something down. Hold something lightly. Leave one window open. Then cross.</p>
   </div>
 
   <div class="card">
     <div class="card-number">01 / Set down</div>
     <label>What are you actively putting down tonight?</label>
-    <div class="hint">Something heavy from today that you're consciously releasing until tomorrow. Not denying it — setting it down.</div>
+    <div class="hint">Something heavy from today that you're consciously releasing until morning. Not denying it — setting it on the stone outside the door.</div>
     <textarea id="setdown" placeholder="e.g. The conversation that went sideways. The thing I didn't finish. The weight of performing all day."></textarea>
   </div>
 
@@ -253,13 +381,14 @@
   <div class="result" id="result">
     <div class="result-card">
       <div class="result-header">
+        <div class="result-glyph breathe">◌</div>
         <div class="result-date" id="result-date"></div>
       </div>
 
       <div class="action-block">
         <div class="action-label">
           <div class="action-dot dot-set"></div>
-          <span style="color:var(--muted)">Set down</span>
+          <span style="color:var(--ink-dim)">Set down</span>
         </div>
         <div class="action-text" id="r-setdown"></div>
       </div>
@@ -289,7 +418,11 @@
         <span style="font-size:0.78rem;color:var(--rest)" id="rest-word"></span>
       </div>
 
-      <div class="prizrak-line" id="r-verdict"></div>
+      <div class="prizrak-line breathe" id="r-verdict"></div>
+
+      <div class="verdict-actions">
+        <button class="copy-btn" id="copy-btn" onclick="copyVerdict()">copy to the ledger</button>
+      </div>
     </div>
 
     <div class="history-card" id="history-card" style="display:none">
@@ -299,6 +432,9 @@
 
     <div class="footnote">The threshold is not a cure. It is an acknowledgment that the day ended and the night is different. What was set down stays outside until morning. What was held lightly can be picked up again when the light is better.</div>
   </div>
+
+  <div class="ghost-egg" id="ghost-egg"></div>
+  <div class="night-whisper" id="night-whisper">the mountain does not sleep.</div>
 
   <script>
     const SK = 'prizrak_threshold_v1';
@@ -310,13 +446,15 @@
       const hasWork = (setdown+hold).toLowerCase().match(/work|job|meeting|vc|approval|perform/);
       const hasPerson = (setdown+hold).toLowerCase().match(/conversation|person|said|they|he|she/);
 
-      if (wired && hasWork) return 'Wired, and carrying work into the sleeping hours. The set-down was declared but the machinery is still running. This is the condition the Mora exploits — not darkness, just the continued activation that keeps the body ready for a problem that has temporarily suspended. The threshold works best when the machinery believes it. Try again in ten minutes.';
-      if (wired) return 'Not ready yet. The threshold is declared but the body hasn\'t received the memo. This is information, not failure. The window you left open is the right size — small enough to look through, not large enough to climb through and keep working.';
-      if (ready) return 'Readiness confirmed. The three acts are complete. What was set down will be there in the morning, unchanged, waiting for the daylight when it becomes workable again. The thing held lightly will not escape.';
+      if (wired && hasWork) return 'Wired, and carrying work into the sleeping hours. The set-down was declared but the machinery is still running. This is the condition the Mora exploits — not darkness, just the continued activation that keeps the body ready for a problem that has temporarily suspended. The threshold works best when the machinery believes it. Cross again in ten minutes.';
+      if (wired) return 'Not ready yet. The threshold is declared but the body hasn\'t received the message. This is information, not failure. The window you left open is the right size — small enough to look through, not large enough to climb through and keep working.';
+      if (ready) return 'Readiness confirmed. The three acts are complete. What was set down will be there in the morning, unchanged, waiting for the daylight when it becomes workable again. The thing held lightly will not escape. The door is shut. The mountain is watching.';
       if (hasWork) return 'The work was named and set down. The naming is the mechanism — not the putting down itself, but the moment of knowing what you were carrying. Sleep from inside a named state is different from sleep inside an unnamed one. The door is closed correctly.';
       if (hasPerson) return 'The unfinished conversation lives in the held-lightly zone. This is the right address for it. Resolved in the morning is better than circled all night. The window is open to the right thing.';
       return 'The three acts are recorded. The day has an ending. The night can begin.';
     }
+
+    let lastVerdict = '';
 
     function closeOut() {
       const setdown = document.getElementById('setdown').value.trim() || '(not named)';
@@ -331,9 +469,17 @@
       document.getElementById('r-setdown').textContent = setdown;
       document.getElementById('r-hold').textContent = hold;
       document.getElementById('r-window').textContent = window_;
-      document.getElementById('rest-bar').style.width = (parseInt(rest)*10) + '%';
+      document.getElementById('rest-bar').style.width = '0%';
+      requestAnimationFrame(() => {
+        document.getElementById('rest-bar').style.width = (parseInt(rest)*10) + '%';
+      });
       document.getElementById('rest-word').textContent = restWords[parseInt(rest)] || '';
-      document.getElementById('r-verdict').textContent = getVerd(rest, setdown, hold);
+      lastVerdict = getVerd(rest, setdown, hold);
+      document.getElementById('r-verdict').textContent = lastVerdict;
+
+      const cb = document.getElementById('copy-btn');
+      cb.textContent = 'copy to the ledger';
+      cb.classList.remove('copied');
 
       const hist = JSON.parse(localStorage.getItem(SK)||'[]');
       hist.unshift({ date: dateStr, setdown, rest: parseInt(rest) });
@@ -345,14 +491,112 @@
         document.getElementById('history-list').innerHTML = hist.slice(1, 6).map(h => `
           <div class="history-night">
             <div class="history-night-date">${h.date} · rest ${h.rest}/10</div>
-            <div class="history-night-set">${h.setdown}</div>
+            <div class="history-night-set">${escapeHtml(h.setdown)}</div>
           </div>
         `).join('');
       }
 
-      document.getElementById('result').classList.add('visible');
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+      const r = document.getElementById('result');
+      r.classList.add('visible');
+      const card = r.querySelector('.result-card');
+      card.classList.remove('reveal'); void card.offsetWidth; card.classList.add('reveal');
+      r.scrollIntoView({ behavior: 'smooth' });
     }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function copyVerdict() {
+      if (!lastVerdict) return;
+      const cb = document.getElementById('copy-btn');
+      navigator.clipboard.writeText(lastVerdict).then(() => {
+        cb.textContent = 'copied to the ledger';
+        cb.classList.add('copied');
+        setTimeout(() => { cb.textContent = 'copy to the ledger'; cb.classList.remove('copied'); }, 1200);
+      }).catch(() => {});
+    }
+
+    /* ---- ambient embers (capped, reduced-motion-safe) ---- */
+    (function spawnEmbers(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random() * 100) + 'vw';
+        e.style.animationDelay = (Math.random() * 14) + 's';
+        e.style.animationDuration = (12 + Math.random() * 8) + 's';
+        document.body.appendChild(e);
+      }
+    })();
+
+    /* ---- easter eggs ---- */
+    // (a) type "prizrak" → the watcher line
+    let typed = '';
+    addEventListener('keydown', (ev) => {
+      if (ev.key && ev.key.length === 1) {
+        typed = (typed + ev.key.toLowerCase()).slice(-7);
+        if (typed === 'prizrak') showGhost('you found the watcher. it was always at the threshold.');
+      }
+    });
+
+    // (b) triple-click the title → one extra ember
+    document.getElementById('title').addEventListener('click', (function(){
+      let count = 0, timer = null;
+      return function(){
+        count++;
+        clearTimeout(timer);
+        timer = setTimeout(() => { count = 0; }, 600);
+        if (count >= 3) {
+          count = 0;
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (40 + Math.random() * 20) + 'vw';
+          e.style.animationDuration = '11s';
+          document.body.appendChild(e);
+          setTimeout(() => e.remove(), 11000);
+        }
+      };
+    })());
+
+    // (d) hold the moon → it breathes faster for 3s
+    (function(){
+      const moon = document.getElementById('moon');
+      let hold = null;
+      const start = () => { hold = setTimeout(() => {
+        moon.classList.add('fast');
+        setTimeout(() => moon.classList.remove('fast'), 3000);
+      }, 450); };
+      const cancel = () => clearTimeout(hold);
+      moon.addEventListener('mousedown', start);
+      moon.addEventListener('touchstart', start, {passive:true});
+      ['mouseup','mouseleave','touchend','touchcancel'].forEach(e => moon.addEventListener(e, cancel));
+    })();
+
+    function showGhost(text) {
+      const g = document.getElementById('ghost-egg');
+      g.textContent = text;
+      g.classList.add('show');
+    }
+
+    // (e) idle 60s → still here, still watching
+    let idle = null;
+    function resetIdle() {
+      clearTimeout(idle);
+      idle = setTimeout(() => showGhost('still here. still watching.'), 60000);
+    }
+    ['mousemove','keydown','click','touchstart','scroll'].forEach(e => addEventListener(e, resetIdle, {passive:true}));
+    resetIdle();
+
+    // (c) between 00:00–03:00 local → footer whisper "the mountain does not sleep"
+    (function(){
+      const h = new Date().getHours();
+      if (h >= 0 && h < 3) {
+        setTimeout(() => document.getElementById('night-whisper').classList.add('show'), 1800);
+      }
+    })();
   </script>
 </body>
 </html>

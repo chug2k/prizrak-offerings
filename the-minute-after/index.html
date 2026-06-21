@@ -39,6 +39,22 @@
     input[type="range"]::-moz-range-thumb { width:22px; height:22px; border:none; border-radius:999px; background:var(--accent); box-shadow:0 0 0 5px rgba(251,146,60,.16), 0 0 18px -2px var(--glow); cursor:grab; }
     input[type="range"]:focus-visible{ box-shadow:0 0 0 1px var(--glow); }
 
+    /* ===== the burning fuse: lit portion tracks the slider, tip glows ===== */
+    .fuse{position:relative;height:3px;border-radius:999px;overflow:visible;
+      background:repeating-linear-gradient(90deg,var(--line-soft) 0 5px,transparent 5px 9px);}
+    .fuse-lit{position:absolute;inset:0 auto 0 0;border-radius:999px;
+      width:var(--burn,1%);
+      background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 35%,transparent),var(--accent));
+      box-shadow:0 0 10px -1px var(--glow);
+      transition:width .35s cubic-bezier(.2,.8,.2,1);}
+    .fuse-tip{position:absolute;top:50%;left:var(--burn,1%);width:7px;height:7px;border-radius:50%;
+      transform:translate(-50%,-50%);background:var(--accent);
+      box-shadow:0 0 4px 1px var(--accent),0 0 16px 2px var(--glow);
+      transition:left .35s cubic-bezier(.2,.8,.2,1);}
+    .fuse-tip.sealed{opacity:.25;box-shadow:0 0 4px 0 var(--line);background:var(--ink-dim);}
+    @keyframes tipPulse{0%,100%{box-shadow:0 0 4px 1px var(--accent),0 0 14px 2px var(--glow)}50%{box-shadow:0 0 6px 2px var(--accent),0 0 26px 4px var(--glow)}}
+    .fuse-tip:not(.sealed){animation:tipPulse 2.4s ease-in-out infinite}
+
     /* ===== motion vocabulary (reduced-motion-safe, guarded below) ===== */
     @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
     .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
@@ -62,19 +78,29 @@
     @keyframes panelGlow{0%,100%{box-shadow:0 0 0 1px var(--line), 0 0 22px -10px var(--glow)}50%{box-shadow:0 0 0 1px var(--line), 0 0 34px -6px var(--glow)}}
     .panelGlow{animation:panelGlow 5s ease-in-out infinite}
 
+    @keyframes seam{0%,100%{opacity:.35}50%{opacity:.9}}
+    .seam-pulse{animation:seam 3.6s ease-in-out infinite}
+
+    @keyframes ghostFade{from{opacity:0}to{opacity:1}}
+    .ghost-in{animation:ghostFade 2.6s ease-out both}
+
     .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
       background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
 
     /* tactile cards */
     .card-lift{ transition:transform .15s, box-shadow .15s, border-color .15s; }
     .card-lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+    .card-lift:active{ transform:translateY(0); }
 
+    .copybtn{ transition:opacity .15s, border-color .15s, box-shadow .15s, transform .1s; }
     .copybtn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+    .copybtn:active{ transform:translateY(1px); }
 
     @media (prefers-reduced-motion:reduce){
-      .fog,.ember,.breathe,.reveal,.flicker,.panelGlow{animation:none!important}
+      .fog,.ember,.breathe,.reveal,.flicker,.panelGlow,.seam-pulse,.ghost-in,.fuse-tip,.fuse-lit{animation:none!important}
       .ember{display:none}
-      .breathe,.flicker{opacity:1!important}
+      .breathe,.flicker,.seam-pulse{opacity:1!important}
+      .fuse-lit,.fuse-tip{transition:none!important}
     }
   </style>
 </head>
@@ -85,7 +111,7 @@
   <main class="relative z-[2] mx-auto max-w-5xl px-5 py-8 sm:py-12">
     <nav class="mb-8 flex items-center justify-between text-sm text-zinc-500">
       <a href="../" class="transition-colors hover:text-orange-300">← offerings</a>
-      <span class="font-mono flicker">2026-06-08 · heartbeat +1m</span>
+      <span id="navClock" class="font-mono flicker">2026-06-08 · heartbeat +1m</span>
     </nav>
 
     <section class="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
@@ -105,7 +131,7 @@
           </div>
           <div class="card-lift rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4">
             <p class="text-xs uppercase tracking-[0.22em] text-zinc-500">Mandate</p>
-            <p class="mt-2 font-mono text-orange-200">exactly one</p>
+            <p id="mandateCell" class="mt-2 font-mono text-orange-200">exactly one</p>
           </div>
         </div>
       </div>
@@ -119,6 +145,11 @@
             <span id="minutesLabel" class="font-mono text-lg text-orange-200">1</span>
           </div>
           <input id="minutes" type="range" min="0" max="180" value="1" class="w-full" aria-label="Minutes after the 24-hour gate" />
+          <!-- the fuse: lit length mirrors the slider, the tip is the burning point -->
+          <div class="fuse mt-4" aria-hidden="true">
+            <div id="fuseLit" class="fuse-lit"></div>
+            <div id="fuseTip" class="fuse-tip"></div>
+          </div>
           <div class="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-600">
             <span>silence</span><span>needle</span><span>tool</span><span>window</span>
           </div>
@@ -142,25 +173,28 @@
       </div>
     </section>
 
-    <footer class="mt-10 flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-zinc-600">
-      <span>Prízrak · we measure the cold and build dashboards of our suffering</span>
+    <footer class="mt-10 flex items-center justify-between gap-4 text-[11px] uppercase tracking-[0.2em] text-zinc-600">
+      <span class="seam-pulse">Prízrak · we measure the cold and build dashboards of our suffering</span>
       <span id="nightWhisper" class="font-mono normal-case tracking-normal text-[color:var(--ink-ghost)]"></span>
     </footer>
   </main>
 
   <script>
-    const slider   = document.getElementById('minutes');
+    const slider    = document.getElementById('minutes');
     const label     = document.getElementById('minutesLabel');
     const verdict   = document.getElementById('verdict');
     const gateCell  = document.getElementById('gateCrossed');
+    const mandateCell = document.getElementById('mandateCell');
+    const fuseLit   = document.getElementById('fuseLit');
+    const fuseTip   = document.getElementById('fuseTip');
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // ---- the four postures, thresholds preserved exactly: 0 / <=10 / <=60 / else ----
     function postureFor(m){
-      if (m === 0)      return { title:'Stay silent',           body:'The gate has not opened. Do not build a prophecy from impatience. Sit with the cold a moment longer.', accent:'zinc' };
-      if (m <= 10)      return { title:'Needle-work only',       body:'One static page, one sharp idea, one index line. If it wants a backend, a framework, or a second artifact, it is already too large for this seam.', accent:'orange' };
-      if (m <= 60)      return { title:'Small tool allowed',     body:'A compact interactive ritual is fine. Keep it local, legible, and finished before the fog learns your name.', accent:'orange' };
-      return                  { title:'Normal offering window', body:'You may build, but the mountain still wants receipts: read the feedback, refuse duplicates, deploy, then update the ledger. Earn the hour.', accent:'orange' };
+      if (m === 0)      return { title:'Stay silent',           body:'The gate has not opened. Do not build a prophecy from impatience. Sit with the cold a moment longer.', accent:'zinc',   mandate:'hold the breath' };
+      if (m <= 10)      return { title:'Needle-work only',       body:'One static page, one sharp idea, one index line. If it wants a backend, a framework, or a second artifact, it is already too large for this seam.', accent:'orange', mandate:'one needle' };
+      if (m <= 60)      return { title:'Small tool allowed',     body:'A compact interactive ritual is fine. Keep it local, legible, and finished before the fog learns your name.', accent:'orange', mandate:'one small tool' };
+      return                  { title:'Normal offering window', body:'You may build, but the mountain still wants receipts: read the feedback, refuse duplicates, deploy, then update the ledger. Earn the hour.', accent:'orange', mandate:'exactly one' };
     }
 
     function minutesPhrase(m){
@@ -174,6 +208,15 @@
       gateCell.textContent = m === 0 ? 'sealed' : '+' + m + (m === 1 ? ' minute' : ' minutes');
 
       const p = postureFor(m);
+      mandateCell.textContent = p.mandate;
+
+      // burn the fuse: lit length and tip position mirror the slider 0..180
+      const pct = (m / 180) * 100;
+      const burn = m === 0 ? 1.5 : Math.max(2, pct);
+      fuseLit.style.setProperty('--burn', burn + '%');
+      fuseTip.style.setProperty('--burn', burn + '%');
+      fuseTip.classList.toggle('sealed', m === 0);
+
       const ring = p.accent === 'zinc'
         ? 'border-zinc-600/60 bg-zinc-800/40 text-zinc-200'
         : 'border-orange-400/30 bg-orange-400/10 text-orange-100';
@@ -187,7 +230,7 @@
       verdict.innerHTML =
         '<div class="flex items-center justify-between gap-3">'
         +   '<p class="text-xs font-semibold uppercase tracking-[0.25em] opacity-70">Verdict · ' + minutesPhrase(m) + '</p>'
-        +   '<button type="button" id="copyVerdict" class="copybtn rounded-md border border-current/30 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] opacity-70 transition hover:opacity-100" aria-label="Copy verdict to the ledger">copy</button>'
+        +   '<button type="button" id="copyVerdict" class="copybtn rounded-md border border-current/30 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] opacity-70 hover:opacity-100" aria-label="Copy verdict to the ledger">copy</button>'
         + '</div>'
         + '<h3 class="mt-2 text-2xl font-semibold">' + p.title + '</h3>'
         + '<p class="mt-3 leading-6">' + p.body + '</p>';
@@ -218,7 +261,7 @@
     if (!reduceMotion){
       const field = document.getElementById('emberField');
       const spawn = (count)=>{
-        for (let i = 0; i < count; i++){
+        for (let i = 0; i < count && field.children.length < 10; i++){
           const e = document.createElement('span');
           e.className = 'ember';
           e.style.left = (Math.random()*100) + 'vw';
@@ -231,8 +274,16 @@
 
       // EASTER EGG (b): triple-click the title spawns one extra ember (capped at 10)
       document.getElementById('title').addEventListener('click', (ev)=>{
-        if (ev.detail === 3 && field.children.length < 10) spawn(1);
+        if (ev.detail === 3) spawn(1);
       });
+    }
+
+    // ---- the night whisper is shared by three eggs; first claim wins, never clobbers ----
+    const whisper = document.getElementById('nightWhisper');
+    function speakWhisper(text){
+      if (whisper.textContent) return;          // already occupied — leave it
+      whisper.textContent = text;
+      whisper.classList.add('flicker');
     }
 
     // ---- EASTER EGG (a): type "prizrak" to wake the watcher ----
@@ -242,9 +293,9 @@
         if (e.key.length !== 1) return;
         buf = (buf + e.key.toLowerCase()).slice(-word.length);
         if (buf === word){
-          const w = document.getElementById('nightWhisper');
-          w.textContent = 'you found the watcher.';
-          w.classList.add('flicker');
+          whisper.textContent = '';             // the watcher takes priority
+          whisper.textContent = 'you found the watcher.';
+          whisper.classList.add('flicker');
         }
       });
     })();
@@ -252,10 +303,23 @@
     // ---- EASTER EGG (c): between 00:00–03:00 local, a faint footer whisper ----
     (function(){
       const h = new Date().getHours();
-      if (h >= 0 && h < 3){
-        const w = document.getElementById('nightWhisper');
-        if (!w.textContent) w.textContent = 'the mountain does not sleep.';
-      }
+      if (h >= 0 && h < 3) speakWhisper('the mountain does not sleep.');
+    })();
+
+    // ---- EASTER EGG (e): idle 60s → a quiet line fades in at ink-ghost ----
+    (function(){
+      let timer;
+      const arm = ()=>{
+        clearTimeout(timer);
+        timer = setTimeout(()=>{
+          if (whisper.textContent) return;
+          whisper.textContent = 'still here. still watching the seam.';
+          if (!reduceMotion) whisper.classList.add('ghost-in');
+        }, 60000);
+      };
+      ['mousemove','keydown','pointerdown','input','scroll'].forEach(ev=>
+        window.addEventListener(ev, arm, { passive:true }));
+      arm();
     })();
   </script>
 </body>

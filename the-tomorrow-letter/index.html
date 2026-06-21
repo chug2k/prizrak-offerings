@@ -5,119 +5,229 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Tomorrow Letter — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
-        #letter-body { font-family: 'Georgia', serif; font-size: 0.95rem; line-height: 1.8; }
-        .letter-paper { background: linear-gradient(180deg, #101014 0%, #0e0e12 100%); }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#f0c674;            /* the warm lamp the letter is written by */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        html,body{ background:var(--bg); }
+        body{ color:var(--ink); }
+
+        .mono{ font-family:'JetBrains Mono','Courier New',monospace; }
+        #letter-body, .serif{ font-family:'Georgia','Times New Roman',serif; }
+        #letter-body{ font-size:0.95rem; line-height:1.85; }
+
+        .letter-paper{
+            background:
+                linear-gradient(180deg, var(--bg-raised) 0%, var(--bg-sunk) 100%);
+            position:relative;
+        }
+        /* faint ruled-paper whisper */
+        .letter-paper::before{
+            content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+            background:repeating-linear-gradient(180deg, transparent 0 30px, color-mix(in srgb,var(--accent) 7%,transparent) 30px 31px);
+            opacity:.25; mask:linear-gradient(180deg,transparent,#000 12%,#000 88%,transparent);
+        }
+        .result-panel{
+            box-shadow:0 0 0 1px var(--line), 0 0 28px -10px var(--glow);
+        }
+
+        /* ===== labels ===== */
+        .label{
+            font-family:'JetBrains Mono',monospace; text-transform:uppercase;
+            letter-spacing:.16em; font-size:10px; color:var(--ink-dim);
+        }
+
+        /* ===== motion vocabulary ===== */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .38s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        /* a slow candle wax-seal pulse on the sealed glyph */
+        @keyframes sealPulse{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+        .seal-glyph{animation:sealPulse 5s ease-in-out infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .stage{position:relative;z-index:2}
+
+        /* ===== interactions ===== */
+        .lift{ transition:transform .15s, box-shadow .15s, border-color .15s, background-color .15s; }
+        .lift:hover{ transform:translateY(-2px); border-color:var(--accent); }
+        .lift:active{ transform:translateY(1px); }
+
+        textarea{ caret-color:var(--accent); }
+        textarea:focus-visible, button:focus-visible, .focusable:focus-visible{
+            outline:none; border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow);
+        }
+
+        .ghost-line{ color:var(--ink-ghost); }
+
+        ::selection{ background:color-mix(in srgb,var(--accent) 30%,transparent); color:var(--ink); }
+
         @media print {
-            body { background: #fff; color: #111; }
-            .no-print { display: none; }
-            #letter-body { color: #111; }
+            .fog,.ember,.grain::after{ display:none !important; }
+            body { background:#fff; color:#111; }
+            .no-print { display:none; }
+            #letter-body { color:#111; }
+            .letter-paper::before{ display:none; }
+        }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.seal-glyph{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
         }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
-<div class="max-w-xl mx-auto">
+<body class="mono antialiased min-h-screen px-4 py-10 grain">
+
+<!-- atmosphere -->
+<div class="fog"></div>
+<div id="embers" aria-hidden="true"></div>
+
+<div class="max-w-xl mx-auto stage">
 
     <!-- Header -->
     <div class="text-center mb-8">
-        <div class="text-4xl mb-3">✉️</div>
-        <h1 class="text-2xl font-bold text-white mb-2">The Tomorrow Letter</h1>
-        <p class="text-sm text-zinc-500 leading-relaxed">Write tonight. Read in the morning.<br>The night before is the only honest time.</p>
+        <div id="title-glyph" class="text-4xl mb-3 seal-glyph select-none" title="sealed by candlelight">✉</div>
+        <h1 id="app-title" class="text-2xl font-bold text-white mb-2 breathe cursor-default">The Tomorrow Letter</h1>
+        <p class="text-sm leading-relaxed" style="color:var(--ink-dim)">write tonight. read at first light.<br>the night before is the only honest hour.</p>
     </div>
 
     <!-- Write view -->
     <div id="write-view">
-        <div class="letter-paper rounded-xl border border-zinc-800 p-6 mb-4">
-            <div class="mb-4 pb-4 border-b border-zinc-800">
-                <p id="write-date" class="text-xs text-zinc-600"></p>
-                <p class="text-xs text-zinc-700 mt-1">To: tomorrow</p>
+        <div class="letter-paper rounded-xl border p-6 mb-4" style="border-color:var(--line)">
+            <div class="mb-4 pb-4 border-b" style="border-color:var(--line-soft)">
+                <p id="write-date" class="text-xs" style="color:var(--ink-dim)"></p>
+                <p class="text-xs mt-1" style="color:var(--ink-ghost)">to: tomorrow, who does not yet exist</p>
             </div>
 
             <div class="space-y-4 mb-6">
                 <div>
-                    <label class="text-xs text-zinc-600 mb-2 block">What today actually produced (honestly):</label>
-                    <textarea id="q-produced" rows="2" placeholder="Not what was scheduled. What actually happened that matters."
-                        class="w-full bg-transparent border-b border-zinc-800 focus:border-zinc-600 py-1 text-sm text-zinc-300 focus:outline-none placeholder-zinc-800 transition-colors"></textarea>
+                    <label class="label mb-2 block">01 / what today actually produced</label>
+                    <textarea id="q-produced" rows="2" placeholder="not what was scheduled. what actually happened that matters."
+                        class="w-full bg-transparent border-b py-1 text-sm transition-colors placeholder:opacity-40" style="border-color:var(--line);color:var(--ink)"></textarea>
                 </div>
                 <div>
-                    <label class="text-xs text-zinc-600 mb-2 block">What was left unresolved:</label>
-                    <textarea id="q-unresolved" rows="2" placeholder="The thing that followed you through the day without getting addressed."
-                        class="w-full bg-transparent border-b border-zinc-800 focus:border-zinc-600 py-1 text-sm text-zinc-300 focus:outline-none placeholder-zinc-800 transition-colors"></textarea>
+                    <label class="label mb-2 block">02 / what was left unresolved</label>
+                    <textarea id="q-unresolved" rows="2" placeholder="the thing that followed you through the day without being addressed."
+                        class="w-full bg-transparent border-b py-1 text-sm transition-colors placeholder:opacity-40" style="border-color:var(--line);color:var(--ink)"></textarea>
                 </div>
                 <div>
-                    <label class="text-xs text-zinc-600 mb-2 block">What tomorrow actually needs (not the calendar version):</label>
-                    <textarea id="q-needs" rows="2" placeholder="What does tomorrow need from you that only you can give it?"
-                        class="w-full bg-transparent border-b border-zinc-800 focus:border-zinc-600 py-1 text-sm text-zinc-300 focus:outline-none placeholder-zinc-800 transition-colors"></textarea>
+                    <label class="label mb-2 block">03 / what tomorrow actually needs</label>
+                    <textarea id="q-needs" rows="2" placeholder="not the calendar version. what does tomorrow need that only you can give it?"
+                        class="w-full bg-transparent border-b py-1 text-sm transition-colors placeholder:opacity-40" style="border-color:var(--line);color:var(--ink)"></textarea>
                 </div>
                 <div>
-                    <label class="text-xs text-zinc-600 mb-2 block">What you want to tell morning-you:</label>
-                    <textarea id="q-tell" rows="3" placeholder="No audience. What would you actually say?"
-                        class="w-full bg-transparent border-b border-zinc-800 focus:border-zinc-600 py-1 text-sm text-zinc-300 focus:outline-none placeholder-zinc-800 transition-colors"></textarea>
+                    <label class="label mb-2 block">04 / what you'd tell morning-you</label>
+                    <textarea id="q-tell" rows="3" placeholder="no audience. no one is watching but the ghost. what would you actually say?"
+                        class="w-full bg-transparent border-b py-1 text-sm transition-colors placeholder:opacity-40" style="border-color:var(--line);color:var(--ink)"></textarea>
                 </div>
             </div>
 
             <div class="text-right">
-                <p class="text-xs text-zinc-700 italic">— tonight-you</p>
+                <p class="text-xs italic" style="color:var(--ink-ghost)">— tonight-you, who will not remember writing this</p>
             </div>
         </div>
 
-        <button id="seal-btn" class="w-full py-3 rounded-lg border border-zinc-600 bg-zinc-900/60 hover:bg-zinc-800 text-sm text-zinc-300 font-bold transition-all mb-2">
-            Seal and save →
+        <button id="seal-btn" class="lift w-full py-3 rounded-lg border bg-[#111113] text-sm font-bold mb-2"
+            style="border-color:var(--accent);color:var(--ink)">
+            seal it. let the wax cool →
         </button>
-        <p class="text-xs text-zinc-700 text-center">Saved locally. Open tomorrow to read it.</p>
+        <p class="text-xs text-center" style="color:var(--ink-ghost)">kept in the cave. the ghost does not read it. you will, at dawn.</p>
 
         <div id="prev-letters" class="hidden mt-10 no-print">
-            <div class="border-t border-zinc-900 pt-6">
-                <p class="text-xs text-zinc-700 uppercase tracking-widest mb-3">Previous letters</p>
+            <div class="border-t pt-6" style="border-color:var(--line-soft)">
+                <p class="label mb-3">letters that have fossilized</p>
                 <div id="prev-list" class="space-y-2"></div>
             </div>
         </div>
     </div>
 
     <!-- Sealed view (for reading next day) -->
-    <div id="sealed-view" class="hidden fade-in">
+    <div id="sealed-view" class="hidden">
         <div class="text-center mb-6">
-            <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">A letter from last night</p>
-            <p id="sealed-from-date" class="text-xs text-zinc-700"></p>
+            <p class="label mb-2">a letter from the dark hours</p>
+            <p id="sealed-from-date" class="text-xs" style="color:var(--ink-ghost)"></p>
         </div>
 
-        <div class="letter-paper rounded-xl border border-zinc-700 p-6 mb-5">
-            <div class="mb-5 pb-4 border-b border-zinc-800">
-                <p class="text-xs text-zinc-600">To: you, this morning</p>
-                <p class="text-xs text-zinc-700 mt-0.5">From: last night</p>
+        <div class="letter-paper result-panel rounded-xl border p-6 mb-5" style="border-color:var(--line)">
+            <div class="mb-5 pb-4 border-b flex items-center justify-between gap-3" style="border-color:var(--line-soft)">
+                <div>
+                    <p class="text-xs" style="color:var(--ink-dim)">to: you, this morning</p>
+                    <p class="text-xs mt-0.5" style="color:var(--ink-ghost)">from: the version of you that survived last night</p>
+                </div>
+                <span class="text-lg seal-glyph select-none" style="color:var(--accent)" title="seal intact">❧</span>
             </div>
             <div class="space-y-5" id="letter-body">
                 <div id="r-produced" class="hidden">
-                    <p class="text-xs text-zinc-600 mb-1">What yesterday actually produced:</p>
-                    <p class="text-sm text-zinc-300 leading-relaxed italic" id="r-produced-text"></p>
+                    <p class="label mb-1">what yesterday actually produced</p>
+                    <p class="text-sm leading-relaxed italic" style="color:var(--ink)" id="r-produced-text"></p>
                 </div>
                 <div id="r-unresolved" class="hidden">
-                    <p class="text-xs text-zinc-600 mb-1">Left unresolved:</p>
-                    <p class="text-sm text-amber-300/70 leading-relaxed italic" id="r-unresolved-text"></p>
+                    <p class="label mb-1">left unresolved</p>
+                    <p class="text-sm leading-relaxed italic" style="color:var(--accent)" id="r-unresolved-text"></p>
                 </div>
                 <div id="r-needs" class="hidden">
-                    <p class="text-xs text-zinc-600 mb-1">What today actually needs:</p>
-                    <p class="text-sm text-zinc-300 leading-relaxed italic" id="r-needs-text"></p>
+                    <p class="label mb-1">what today actually needs</p>
+                    <p class="text-sm leading-relaxed italic" style="color:var(--ink)" id="r-needs-text"></p>
                 </div>
                 <div id="r-tell" class="hidden">
-                    <p class="text-xs text-zinc-600 mb-1">What tonight-you wanted to say:</p>
-                    <p class="text-sm text-zinc-200 leading-relaxed font-medium" id="r-tell-text"></p>
+                    <p class="label mb-1">what tonight-you wanted to say</p>
+                    <p class="text-sm leading-relaxed font-medium" style="color:var(--ink);text-shadow:0 0 10px var(--glow)" id="r-tell-text"></p>
                 </div>
             </div>
-            <div class="mt-5 pt-4 border-t border-zinc-800 text-right">
-                <p class="text-xs text-zinc-700 italic">— written at <span id="r-time"></span></p>
+            <div class="mt-5 pt-4 border-t text-right" style="border-color:var(--line-soft)">
+                <p class="text-xs italic" style="color:var(--ink-ghost)">— written at <span id="r-time"></span>, by lamplight</p>
             </div>
         </div>
 
         <div class="flex gap-2 no-print">
-            <button id="archive-btn" class="flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-all">
-                Archive &amp; write tonight's
+            <button id="copy-btn" class="lift focusable flex-1 py-2 rounded border text-xs"
+                style="border-color:var(--line);color:var(--ink-dim)">
+                copy to the ledger
+            </button>
+            <button id="archive-btn" class="lift focusable flex-1 py-2 rounded border text-xs"
+                style="border-color:var(--line);color:var(--ink-dim)">
+                let it fossilize &amp; write tonight's
             </button>
         </div>
     </div>
+
+    <footer class="mt-12 text-center">
+        <p id="footer-line" class="text-xs flicker" style="color:var(--ink-ghost)">prízrak keeps the lamp lit. it does not read your mail.</p>
+        <p id="idle-line" class="text-xs mt-2 opacity-0 transition-opacity duration-1000" style="color:var(--ink-ghost)"></p>
+    </footer>
 
 </div>
 
@@ -148,12 +258,19 @@ function renderPrevLetters() {
     const sec = document.getElementById('prev-letters');
     sec.classList.remove('hidden');
     document.getElementById('prev-list').innerHTML = arch.slice(0, 6).map(l => `
-        <div class="flex items-start gap-3 py-1.5 border-b border-zinc-900 text-xs cursor-pointer hover:bg-zinc-900/30 rounded px-1" 
-             onclick="readArchived('${l.saved_at}')">
-            <span class="text-zinc-700 shrink-0">${l.date}</span>
-            <span class="text-zinc-600 flex-1 italic truncate">${l.tell || l.needs || l.produced || '(no content)'}</span>
+        <div class="lift focusable flex items-start gap-3 py-1.5 border-b text-xs cursor-pointer rounded px-1"
+             style="border-color:var(--line-soft)" tabindex="0" role="button"
+             data-saved="${l.saved_at}"
+             onclick="readArchived('${l.saved_at}')"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();readArchived('${l.saved_at}')}">
+            <span class="shrink-0" style="color:var(--ink-dim)">${l.date}</span>
+            <span class="flex-1 italic truncate" style="color:var(--ink-ghost)">${escapeText(l.tell || l.needs || l.produced || '(silence — nothing fossilized)')}</span>
         </div>
     `).join('');
+}
+
+function escapeText(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function readArchived(saved_at) {
@@ -165,8 +282,10 @@ function readArchived(saved_at) {
 
 function showSealedView(letter) {
     document.getElementById('write-view').classList.add('hidden');
-    document.getElementById('sealed-view').classList.remove('hidden');
-    
+    const sealed = document.getElementById('sealed-view');
+    sealed.classList.remove('hidden');
+    sealed.classList.remove('reveal'); void sealed.offsetWidth; sealed.classList.add('reveal');
+
     document.getElementById('sealed-from-date').textContent = letter.date;
     document.getElementById('r-time').textContent = getTimeStr(letter.saved_at);
 
@@ -186,12 +305,27 @@ function showSealedView(letter) {
             el.classList.add('hidden');
         }
     });
+    try { sealed.scrollIntoView({behavior:'smooth', block:'start'}); } catch(e){}
 }
+
+// ===== embers (atmosphere, capped) =====
+(function spawnEmbers(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const wrap = document.getElementById('embers');
+    const count = 7;
+    for (let i=0;i<count;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (5 + Math.random()*90) + '%';
+        e.style.animationDelay = (Math.random()*14) + 's';
+        e.style.animationDuration = (12 + Math.random()*8) + 's';
+        wrap.appendChild(e);
+    }
+})();
 
 // Init
 const data = getData();
 if (data.current) {
-    // Show the sealed letter for reading
     showSealedView(data.current);
 } else {
     document.getElementById('write-view').classList.remove('hidden');
@@ -205,10 +339,14 @@ document.getElementById('seal-btn').addEventListener('click', () => {
     const unresolved = document.getElementById('q-unresolved').value.trim();
     const needs = document.getElementById('q-needs').value.trim();
     const tell = document.getElementById('q-tell').value.trim();
-    
+
     if (!produced && !unresolved && !needs && !tell) {
-        document.getElementById('q-tell').style.borderColor = '#7f1d1d';
-        setTimeout(() => document.getElementById('q-tell').style.borderColor = '', 1500);
+        const tellEl = document.getElementById('q-tell');
+        tellEl.style.borderColor = '#7f1d1d';
+        const btn = document.getElementById('seal-btn');
+        const orig = btn.textContent;
+        btn.textContent = 'an empty letter is just the cold. say one true thing.';
+        setTimeout(() => { tellEl.style.borderColor = ''; btn.textContent = orig; }, 1800);
         return;
     }
 
@@ -240,7 +378,9 @@ document.getElementById('archive-btn').addEventListener('click', () => {
         saveData(d);
     }
     document.getElementById('sealed-view').classList.add('hidden');
-    document.getElementById('write-view').classList.remove('hidden');
+    const wv = document.getElementById('write-view');
+    wv.classList.remove('hidden');
+    wv.classList.remove('reveal'); void wv.offsetWidth; wv.classList.add('reveal');
     document.getElementById('write-date').textContent = getLetterDate();
     document.getElementById('q-produced').value = '';
     document.getElementById('q-unresolved').value = '';
@@ -249,7 +389,100 @@ document.getElementById('archive-btn').addEventListener('click', () => {
     renderPrevLetters();
 });
 
+// Copy to the ledger
+document.getElementById('copy-btn').addEventListener('click', () => {
+    const date = document.getElementById('sealed-from-date').textContent;
+    const parts = [];
+    const map = [
+        ['what yesterday actually produced', 'r-produced'],
+        ['left unresolved', 'r-unresolved'],
+        ['what today actually needs', 'r-needs'],
+        ['what tonight-you wanted to say', 'r-tell'],
+    ];
+    map.forEach(([label, wrapId]) => {
+        const wrap = document.getElementById(wrapId);
+        const el = document.getElementById(wrapId + '-text');
+        if (!wrap.classList.contains('hidden') && el.textContent.trim()) {
+            parts.push(`${label}:\n${el.textContent.trim()}`);
+        }
+    });
+    const text = `THE TOMORROW LETTER — ${date}\n\n` + parts.join('\n\n') + `\n\n— sealed by lamplight, kept by the ghost`;
+    const btn = document.getElementById('copy-btn');
+    const orig = btn.textContent;
+    const flash = () => {
+        btn.textContent = 'copied to the ledger';
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(flash).catch(() => { fallbackCopy(text); flash(); });
+    } else { fallbackCopy(text); flash(); }
+});
+
+function fallbackCopy(text){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+}
+
 window.readArchived = readArchived;
+
+// ===== easter eggs (quiet, non-blocking, never touch saved state) =====
+
+// (a) type "prizrak" -> the watcher lights up
+let typed = '';
+window.addEventListener('keydown', (e) => {
+    if (e.key && e.key.length === 1) {
+        typed = (typed + e.key.toLowerCase()).slice(-7);
+        if (typed === 'prizrak') {
+            const f = document.getElementById('footer-line');
+            f.textContent = 'you found the watcher. it has been reading the lamp, not the letter.';
+            f.style.color = 'var(--accent)';
+            f.style.textShadow = '0 0 12px var(--glow)';
+        }
+    }
+});
+
+// (b) triple-click the title -> one extra ember
+document.getElementById('app-title').addEventListener('click', (e) => {
+    if (e.detail === 3 && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+        const wrap = document.getElementById('embers');
+        if (wrap.children.length < 10) {
+            const em = document.createElement('div');
+            em.className = 'ember';
+            em.style.left = (10 + Math.random()*80) + '%';
+            em.style.animationDuration = (10 + Math.random()*6) + 's';
+            wrap.appendChild(em);
+        }
+    }
+});
+
+// (c) between 00:00–03:00 local time, a footer whisper
+(function nightWhisper(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) {
+        const f = document.getElementById('footer-line');
+        f.textContent = 'the mountain does not sleep. neither, apparently, do you.';
+    }
+})();
+
+// (e) idle 60s -> a single line fades in
+let idleTimer;
+function resetIdle(){
+    clearTimeout(idleTimer);
+    const line = document.getElementById('idle-line');
+    line.style.opacity = '0';
+    idleTimer = setTimeout(() => {
+        line.textContent = 'still here. still watching. the ink is still wet.';
+        line.style.opacity = '1';
+    }, 60000);
+}
+['mousemove','keydown','touchstart','scroll','click'].forEach(ev =>
+    window.addEventListener(ev, resetIdle, {passive:true}));
+resetIdle();
 </script>
 </body>
 </html>

@@ -5,70 +5,247 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>The Realm Shift | Prízrak</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  body{background:radial-gradient(circle at top,#1e293b 0,#0b1120 42%,#020617 100%);}
-  .rune{letter-spacing:.18em}.card{background:rgba(15,23,42,.78);backdrop-filter:blur(16px)}
+  :root{
+    --bg:#0a0a0a;
+    --bg-raised:#111113;
+    --bg-sunk:#0d0d0f;
+    --line:#26262b;
+    --line-soft:#1a1a1d;
+    --ink:#d4cfc8;
+    --ink-dim:#7a7570;
+    --ink-ghost:#3a3530;
+    --accent:#67e8f9;            /* the realm's lead: cyan, kept */
+    --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  body{
+    background:
+      radial-gradient(70% 50% at 50% -10%, color-mix(in srgb,var(--accent) 8%,transparent), transparent 60%),
+      radial-gradient(circle at top,#0f1518 0,#0a0d0f 42%,#060708 100%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'JetBrains Mono',ui-monospace,monospace;
+  }
+  .rune{letter-spacing:.34em}
+  .label{font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-dim)}
+  .card{background:linear-gradient(180deg,var(--bg-raised),var(--bg-sunk));backdrop-filter:blur(12px);border:1px solid var(--line)}
+
+  /* fields */
+  .field{background:var(--bg-sunk);border:1px solid var(--line);color:var(--ink);transition:border-color .15s,box-shadow .15s}
+  .field::placeholder{color:var(--ink-ghost)}
+  .field:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+  select.field option{background:#0d0d0f}
+
+  /* the forge button — brutalist with hard shadow */
+  .forge-btn{
+    background:var(--accent);color:#04181c;font-weight:700;letter-spacing:.04em;
+    box-shadow:2px 2px 0 #000, 0 0 22px -6px var(--glow);
+    transition:transform .12s ease,box-shadow .12s ease,filter .12s ease;
+  }
+  .forge-btn:hover{filter:brightness(1.08)}
+  .forge-btn:active{transform:translate(2px,2px);box-shadow:0 0 0 #000,0 0 18px -8px var(--glow)}
+  .forge-btn:focus-visible{outline:none;box-shadow:2px 2px 0 #000,0 0 0 2px var(--glow)}
+
+  /* result panel breathing edge once forged */
+  .lit{box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow);border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+
+  .lineitem{border-left:2px solid var(--accent);transition:transform .15s,border-color .15s,background .15s}
+  .lineitem:hover{transform:translateX(2px);background:color-mix(in srgb,var(--accent) 5%,transparent)}
+
+  .logcard{background:var(--bg-sunk);border:1px solid var(--line-soft);transition:transform .15s,border-color .15s,box-shadow .15s}
+  .logcard:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 0 22px -10px var(--glow)}
+
+  .copybtn{color:var(--ink-dim);border:1px solid var(--line);transition:color .15s,border-color .15s,background .15s}
+  .copybtn:hover{color:var(--accent);border-color:var(--accent)}
+  .copybtn.flash{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+
+  /* ===== motion vocabulary (reduced-motion-safe) ===== */
+  @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+  .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+    animation:fogDrift 32s ease-in-out infinite alternate}
+
+  @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+  .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+    animation:ember 14s linear infinite}
+
+  @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+  .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+  @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{animation:reveal .35s ease-out both}
+
+  @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+  .flicker{animation:flicker 6s steps(1) infinite}
+
+  .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  @media (prefers-reduced-motion:reduce){
+    .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+    .ember{display:none}
+    .breathe,.flicker{opacity:1!important}
+  }
 </style>
 </head>
-<body class="min-h-screen text-slate-200 font-sans">
-<main class="max-w-5xl mx-auto px-5 py-8">
-  <header class="mb-7 border-b border-cyan-900/60 pb-5">
-    <p class="rune text-xs text-cyan-300/80 mb-2">ᚱ ᛖ ᚨ ᛚ ᛗ · ᛋ ᚺ ᛁ ᚠ ᛏ</p>
-    <h1 class="text-4xl md:text-5xl font-black text-white">The Realm Shift</h1>
-    <p class="text-slate-400 mt-3 max-w-2xl">A small God of War-flavored mode-change board. Use it before leaving one realm for another: work to friendship, battle to rest, fog to human presence.</p>
+<body class="min-h-screen grain">
+<div class="fog" aria-hidden="true"></div>
+<div id="emberField" aria-hidden="true"></div>
+
+<main class="max-w-5xl mx-auto px-5 py-10 relative" style="z-index:2">
+  <header class="mb-8 border-b border-[var(--line)] pb-6">
+    <p class="rune text-[0.7rem] mb-3 flicker" style="color:var(--accent)">ᚱ ᛖ ᚨ ᛚ ᛗ · ᛋ ᚺ ᛁ ᚠ ᛏ</p>
+    <h1 id="title" class="text-4xl md:text-5xl font-black text-white tracking-tight cursor-default select-none breathe">The Realm Shift</h1>
+    <p class="mt-4 max-w-2xl leading-relaxed" style="color:var(--ink-dim)">A threshold between worlds. Use it before you leave one realm for another — work to friendship, battle to rest, fog to human presence. Cross deliberately, or the old realm follows you in and charges rent.</p>
   </header>
 
   <section class="grid md:grid-cols-2 gap-5">
-    <div class="card rounded-2xl border border-slate-700 p-5 shadow-2xl">
-      <h2 class="text-xl font-bold text-cyan-200 mb-4">Name the crossing</h2>
-      <label class="block text-sm text-slate-400 mb-1">Realm leaving</label>
-      <input id="leaving" class="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-lg px-3 py-2" placeholder="e.g. VC work, inbox, task fog">
-      <label class="block text-sm text-slate-400 mb-1">Realm entering</label>
-      <input id="entering" class="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-lg px-3 py-2" placeholder="e.g. spa bros night, family, deep build">
-      <label class="block text-sm text-slate-400 mb-1">What weapon must be put down?</label>
-      <input id="weapon" class="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-lg px-3 py-2" placeholder="e.g. proving, optimizing, defending">
-      <label class="block text-sm text-slate-400 mb-1">What must be carried across?</label>
-      <input id="carry" class="w-full mb-3 bg-slate-950/80 border border-slate-700 rounded-lg px-3 py-2" placeholder="e.g. warmth, one question, patience">
-      <label class="block text-sm text-slate-400 mb-1">Body battery / readiness</label>
-      <select id="battery" class="w-full mb-4 bg-slate-950/80 border border-slate-700 rounded-lg px-3 py-2">
+    <div class="card rounded-2xl p-6 shadow-2xl">
+      <h2 class="text-sm font-bold mb-5" style="color:var(--accent)">NAME THE CROSSING</h2>
+
+      <label class="label block mb-1">Realm 01 / leaving</label>
+      <input id="leaving" class="field w-full mb-4 rounded-lg px-3 py-2 text-sm" placeholder="VC work, inbox, task fog">
+
+      <label class="label block mb-1">Realm 02 / entering</label>
+      <input id="entering" class="field w-full mb-4 rounded-lg px-3 py-2 text-sm" placeholder="spa bros night, family, deep build">
+
+      <label class="label block mb-1">Weapon to put down</label>
+      <input id="weapon" class="field w-full mb-4 rounded-lg px-3 py-2 text-sm" placeholder="proving, optimizing, defending">
+
+      <label class="label block mb-1">What must be carried across</label>
+      <input id="carry" class="field w-full mb-4 rounded-lg px-3 py-2 text-sm" placeholder="warmth, one question, patience">
+
+      <label class="label block mb-1">Body battery / readiness</label>
+      <select id="battery" class="field w-full mb-5 rounded-lg px-3 py-2 text-sm">
         <option>Low — shield first</option><option selected>Medium — choose the loadout</option><option>High — do not over-swing</option>
       </select>
-      <button onclick="forge()" class="w-full bg-cyan-300 text-slate-950 font-black rounded-lg py-3 hover:bg-cyan-200">Forge the crossing</button>
+
+      <button id="forgeBtn" onclick="forge()" class="forge-btn w-full rounded-lg py-3 text-sm uppercase tracking-wider">Forge the crossing</button>
     </div>
 
-    <div class="card rounded-2xl border border-cyan-800/70 p-5 shadow-2xl">
-      <h2 class="text-xl font-bold text-white mb-4">The shift card</h2>
-      <div id="out" class="space-y-4 text-slate-300">
-        <p class="text-slate-500">Fill the board. The dwarves are waiting by the forge. They are impatient because they are correct.</p>
+    <div id="cardPanel" class="card rounded-2xl p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-sm font-bold text-white tracking-wide">THE SHIFT CARD</h2>
+        <button id="copyBtn" onclick="copyCard()" class="copybtn hidden text-[0.62rem] uppercase tracking-widest rounded px-2 py-1">copy to ledger</button>
+      </div>
+      <div id="out" class="space-y-4 text-sm" style="color:var(--ink)">
+        <p style="color:var(--ink-dim)">The board is bare. The dwarves wait by the forge — impatient, because they are correct. Name the crossing and strike.</p>
       </div>
     </div>
   </section>
 
-  <section class="mt-6 card rounded-2xl border border-slate-800 p-5">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="font-bold text-slate-200">Recent crossings</h2>
-      <button onclick="clearLog()" class="text-xs text-slate-500 hover:text-red-300">clear</button>
+  <section class="mt-6 card rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-bold tracking-wide" style="color:var(--ink)">RECENT CROSSINGS</h2>
+      <button onclick="clearLog()" class="text-[0.62rem] uppercase tracking-widest transition-colors" style="color:var(--ink-dim)" onmouseover="this.style.color='#fca5a5'" onmouseout="this.style.color='var(--ink-dim)'">let the fog take it</button>
     </div>
     <div id="log" class="grid md:grid-cols-2 gap-3 text-sm"></div>
   </section>
+
+  <footer class="mt-10 pt-5 border-t border-[var(--line-soft)] flex items-center justify-between">
+    <span class="label">PRÍZRAK · THRESHOLD ENGINE</span>
+    <span id="whisper" class="text-[0.62rem]" style="color:var(--ink-ghost)"></span>
+  </footer>
 </main>
+
 <script>
 const KEY='realm_shift_log_v1';
 function val(id){return document.getElementById(id).value.trim()}
-function line(title,body){return `<div class="border-l-2 border-cyan-400 pl-3"><div class="text-xs uppercase tracking-widest text-cyan-300">${title}</div><div>${body}</div></div>`}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function line(title,body){return `<div class="lineitem pl-3 py-1 reveal"><div class="text-[0.6rem] uppercase tracking-[0.18em]" style="color:var(--accent)">${title}</div><div class="mt-1 leading-relaxed">${esc(body)}</div></div>`}
+
+let lastCard='';
+
 function forge(){
  const leaving=val('leaving')||'the old realm'; const entering=val('entering')||'the next realm';
  const weapon=val('weapon')||'the weapon that solved the last fight'; const carry=val('carry')||'one honest signal'; const battery=val('battery');
- const shield=battery.startsWith('Low')?'small exits, water, and no heroic performance':battery.startsWith('High')?'restraint; strength is not permission to swing at everything':'one clean intention and one protected boundary';
- const verdict=`Leave ${leaving} deliberately. Enter ${entering} with ${carry}. Put down ${weapon}; it was useful in the previous realm and may be poison in this one.`;
- const atreus=`What would you notice here if you were not trying to win the previous fight?`;
- const mimir=`The trick, brother, is not changing masks. It is changing rules before the old realm keeps charging rent.`;
- document.getElementById('out').innerHTML=line('Kratos verdict',verdict)+line('Shield protocol',shield)+line('Atreus question',atreus)+line('Mimir',mimir);
+ const shield=battery.startsWith('Low')?'small exits, water, and no heroic performance. you do not owe this realm a spectacle.':battery.startsWith('High')?'restraint. strength is not permission to swing at everything — the mountain is watching what you spare.':'one clean intention and one protected boundary. carry both across the threshold.';
+ const verdict=`Leave ${leaving} deliberately. Enter ${entering} with ${carry}. Put down ${weapon} — it was a tool in the old realm and it is poison in this one.`;
+ const atreus=`What would you notice here if you were not still trying to win the last fight?`;
+ const mimir=`The trick, brother, is not swapping masks. It is changing the rules before the old realm follows you across and starts charging rent.`;
+ document.getElementById('out').innerHTML=line('Kratos · verdict',verdict)+line('Shield protocol',shield)+line('Atreus · question',atreus)+line('Mimir',mimir);
+
+ // breathing glow on the panel + reveal copy button
+ const panel=document.getElementById('cardPanel'); panel.classList.add('lit');
+ const cb=document.getElementById('copyBtn'); cb.classList.remove('hidden');
+ lastCard=`THE REALM SHIFT — ${leaving} → ${entering}\n\nKratos · verdict: ${verdict}\nShield protocol: ${shield}\nAtreus · question: ${atreus}\nMimir: ${mimir}`;
+
  const item={t:new Date().toLocaleString(),leaving,entering,weapon,carry,battery};
  const arr=JSON.parse(localStorage.getItem(KEY)||'[]'); arr.unshift(item); localStorage.setItem(KEY,JSON.stringify(arr.slice(0,8))); renderLog();
+ spawnEmber(); // one extra ember marks each crossing
+ if(window.matchMedia&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){ panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 }
-function renderLog(){const arr=JSON.parse(localStorage.getItem(KEY)||'[]'); document.getElementById('log').innerHTML=arr.length?arr.map(x=>`<div class="rounded-lg bg-slate-950/60 border border-slate-800 p-3"><div class="text-xs text-slate-500">${x.t}</div><div><b>${x.leaving}</b> → <b>${x.entering}</b></div><div class="text-slate-400">carry: ${x.carry}</div></div>`).join(''):'<p class="text-slate-600">No crossings logged yet.</p>'}
-function clearLog(){localStorage.removeItem(KEY);renderLog()} renderLog();
+
+function copyCard(){
+ if(!lastCard) return;
+ navigator.clipboard.writeText(lastCard).then(()=>{
+   const cb=document.getElementById('copyBtn'); const prev=cb.textContent;
+   cb.textContent='filed. the ledger remembers'; cb.classList.add('flash');
+   setTimeout(()=>{cb.textContent=prev;cb.classList.remove('flash')},1200);
+ }).catch(()=>{});
+}
+
+function renderLog(){
+ const arr=JSON.parse(localStorage.getItem(KEY)||'[]');
+ document.getElementById('log').innerHTML=arr.length
+   ? arr.map(x=>`<div class="logcard rounded-lg p-3 reveal"><div class="text-[0.6rem] uppercase tracking-widest" style="color:var(--ink-dim)">${esc(x.t)}</div><div class="mt-1"><b class="text-white">${esc(x.leaving)}</b> <span style="color:var(--accent)">→</span> <b class="text-white">${esc(x.entering)}</b></div><div class="mt-0.5" style="color:var(--ink-dim)">carried: ${esc(x.carry)}</div></div>`).join('')
+   : '<p style="color:var(--ink-ghost)">the cave is empty. no crossing has fossilized yet.</p>';
+}
+
+function clearLog(){localStorage.removeItem(KEY);renderLog()}
+renderLog();
+
+// ===== ambient embers (capped) =====
+const field=document.getElementById('emberField');
+const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function spawnEmber(){
+ if(reduced) return;
+ if(field.childElementCount>=10) return;
+ const e=document.createElement('div'); e.className='ember';
+ e.style.left=Math.random()*100+'vw';
+ e.style.animationDuration=(11+Math.random()*7)+'s';
+ e.style.animationDelay=(Math.random()*2)+'s';
+ field.appendChild(e);
+ e.addEventListener('animationend',()=>e.remove());
+}
+if(!reduced){ for(let i=0;i<6;i++){ setTimeout(spawnEmber,i*1800); } setInterval(spawnEmber,5200); }
+
+// ===== easter eggs (quiet, non-blocking, never touch saved state) =====
+// 1. triple-click the title -> one extra ember
+document.getElementById('title').addEventListener('click',function(e){
+ if(e.detail===3) spawnEmber();
+});
+
+// 2. type "prizrak" -> a watcher line surfaces in the footer
+let buf='';
+window.addEventListener('keydown',e=>{
+ if(e.target&&/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+ buf=(buf+e.key.toLowerCase()).slice(-7);
+ if(buf==='prizrak'){ document.getElementById('whisper').textContent='you found the watcher.'; }
+});
+
+// 3. the witching hours (00:00–03:00) -> a footer whisper
+(function(){
+ const h=new Date().getHours();
+ if(h>=0&&h<3){ const w=document.getElementById('whisper'); if(!w.textContent) w.textContent='the mountain does not sleep.'; }
+})();
+
+// 4. idle 60s -> a single ghost line fades in
+let idle;
+function resetIdle(){
+ clearTimeout(idle);
+ idle=setTimeout(()=>{
+   const w=document.getElementById('whisper');
+   if(!w.textContent){ w.textContent='still here. still watching.'; w.classList.add('reveal'); }
+ },60000);
+}
+['mousemove','keydown','scroll','click','touchstart'].forEach(ev=>window.addEventListener(ev,resetIdle,{passive:true}));
+resetIdle();
 </script>
 </body>
 </html>

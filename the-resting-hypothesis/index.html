@@ -6,108 +6,174 @@
     <title>The Resting Hypothesis — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
-        textarea { resize: none; }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#d2a24a;            /* the app's existing amber, made the lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{background:var(--bg);}
+        body{color:var(--ink);}
+
+        /* ---- house motion vocabulary (reduced-motion-safe below) ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .45s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 7s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* ---- panels ---- */
+        .panel{transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+        .panel-hover:hover{transform:translateY(-2px);border-color:var(--accent)}
+        .result-glow{box-shadow:0 0 0 1px var(--line),0 0 30px -8px var(--glow)}
+
+        /* ---- inputs ---- */
+        textarea{resize:none}
+        textarea:focus-visible, button:focus-visible{
+            outline:none;border-color:var(--accent);
+            box-shadow:0 0 0 1px var(--glow)}
+
+        /* ---- buttons ---- */
+        .btn{transition:transform .12s ease,box-shadow .15s ease,border-color .15s ease,color .15s ease,background-color .15s ease}
+        .btn:active{transform:translateY(1px)}
+
+        .accent-text{color:var(--accent)}
+        .ghost-line{color:var(--ink-ghost)}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
-<div class="max-w-xl mx-auto">
+<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10 grain">
+
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
+<div class="max-w-xl mx-auto relative" style="z-index:2">
 
     <div class="text-center mb-10">
-        <div class="text-4xl mb-3">🔭</div>
-        <h1 class="text-2xl font-bold text-white mb-2">The Resting Hypothesis</h1>
-        <p class="text-sm text-zinc-500 leading-relaxed max-w-md mx-auto">Not your plan. Your prediction.<br>What do you actually believe will be true in 12 months?</p>
+        <div id="glyph" class="text-4xl mb-3 select-none cursor-default breathe accent-text" title="">🔭</div>
+        <h1 id="title" class="text-2xl font-bold text-white mb-2 select-none">The Resting Hypothesis</h1>
+        <p class="text-sm text-zinc-500 leading-relaxed max-w-md mx-auto">Not your plan. Your prediction.<br>What do you actually believe will be true in twelve months?</p>
         <p class="text-xs text-zinc-700 mt-2">State it before it states itself through your decisions.</p>
     </div>
 
     <div id="form-section" class="space-y-5">
 
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-3">The setup</p>
-            <p class="text-xs text-zinc-400 leading-relaxed mb-4">If you continue doing roughly what you are doing now — no dramatic changes, no heroic interventions — where will you be in 12 months? Answer as a prediction, not a goal. Not what you want. What you actually believe will happen.</p>
+        <div class="panel rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
+            <p class="text-xs text-zinc-500 uppercase tracking-widest mb-3">THE SETUP</p>
+            <p class="text-xs text-zinc-400 leading-relaxed mb-1">If you keep doing roughly what you do now — no dramatic changes, no heroic interventions — where do you land in twelve months? Answer as a forecast, not a vow. Not what you want. What you privately believe will happen.</p>
         </div>
 
         <div class="space-y-4">
 
-            <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">Work / career</label>
-                <p class="text-xs text-zinc-700 mb-2">Where will you be working, and what will you be doing? Be honest — not where you want to be, where you predict you'll be.</p>
-                <textarea id="q-work" rows="2" placeholder="Still at the same place, doing roughly the same things. Or: I'll have moved on, but to what I don't know yet..."
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+            <div class="panel panel-hover rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
+                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">DOMAIN 01 / WORK &amp; CAREER</label>
+                <p class="text-xs text-zinc-700 mb-2">Where will you be working, and what will you be doing? Honest, not aspirational — where you predict you'll be, not where you'd like to stand.</p>
+                <textarea id="q-work" rows="2" placeholder="Still at the same place, doing roughly the same things. Or: moved on, but to what I can't yet name…"
+                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
             </div>
 
-            <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">Building / creating</label>
-                <p class="text-xs text-zinc-700 mb-2">What will you have built or created? If you are being honest about your current trajectory, not aspirational.</p>
-                <textarea id="q-build" rows="2" placeholder="Nothing new. The same project, still in progress. Or: one thing, smaller than I planned..."
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+            <div class="panel panel-hover rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
+                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">DOMAIN 02 / BUILDING &amp; CREATING</label>
+                <p class="text-xs text-zinc-700 mb-2">What will you have built? Read your current trajectory, not your intentions.</p>
+                <textarea id="q-build" rows="2" placeholder="Nothing new. The same project, still in progress. Or: one thing, smaller than I planned…"
+                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
             </div>
 
-            <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">The thing you keep not doing</label>
-                <p class="text-xs text-zinc-700 mb-2">There is something you say you want to do that you keep not doing. What is your prediction about whether you will have done it in 12 months?</p>
-                <textarea id="q-notdoing" rows="2" placeholder="Probably still not started. I keep saying Q2 but I don't believe it..."
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+            <div class="panel panel-hover rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
+                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">DOMAIN 03 / THE THING YOU KEEP NOT DOING</label>
+                <p class="text-xs text-zinc-700 mb-2">There is something you say you want, and keep not starting. Your honest forecast: done, or still pending, in twelve months?</p>
+                <textarea id="q-notdoing" rows="2" placeholder="Probably still not started. I keep saying Q2 and I don't believe myself…"
+                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
             </div>
 
-            <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">What will have changed</label>
-                <p class="text-xs text-zinc-700 mb-2">What is actually likely to be different in 12 months, based on current trajectory?</p>
-                <textarea id="q-changed" rows="2" placeholder="My relationship to the job will have clarified one way or another. My body will be in better shape..."
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+            <div class="panel panel-hover rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
+                <label class="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">DOMAIN 04 / WHAT WILL HAVE SHIFTED</label>
+                <p class="text-xs text-zinc-700 mb-2">What is genuinely likely to be different in twelve months, on present trajectory?</p>
+                <textarea id="q-changed" rows="2" placeholder="My relationship to the job will have clarified, one way or the other. My body, in better shape…"
+                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
             </div>
 
-            <div class="rounded-lg border border-amber-950/40 bg-amber-950/10 p-4">
-                <label class="text-xs text-amber-800 uppercase tracking-widest mb-2 block">The gap</label>
-                <p class="text-xs text-zinc-700 mb-2">Looking at the above: what is the biggest difference between what you want to be true in 12 months and what you predict will be true?</p>
-                <textarea id="q-gap" rows="3" placeholder="I want to have built something. I predict I'll be further into a job I'm not sure about..."
-                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+            <div class="panel panel-hover rounded-lg border p-4" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent);background:color-mix(in srgb,var(--accent) 7%,transparent)">
+                <label class="text-xs uppercase tracking-widest mb-2 block accent-text" style="opacity:.85">THE GAP / WANT MINUS FORECAST</label>
+                <p class="text-xs text-zinc-700 mb-2">Now the cold measurement: the biggest distance between what you <em>want</em> true in twelve months and what you <em>predict</em> will be true.</p>
+                <textarea id="q-gap" rows="3" placeholder="I want to have built something. I predict I'll be deeper into a job I'm unsure of…"
+                    class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
             </div>
         </div>
 
-        <button id="generate-btn" class="w-full py-3 rounded-lg border border-zinc-600 bg-zinc-900/60 hover:bg-zinc-800 text-sm text-zinc-300 font-bold transition-all">
+        <button id="generate-btn" class="btn w-full py-3 rounded-lg border text-sm font-bold accent-text"
+            style="border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent)">
             Surface the hypothesis →
         </button>
     </div>
 
     <!-- Output -->
-    <div id="output-section" class="hidden fade-in mt-2">
-        <div class="rounded-xl border border-zinc-700 bg-zinc-900/50 p-6">
+    <div id="output-section" class="hidden mt-2">
+        <div class="panel rounded-xl border border-zinc-700 bg-zinc-900/50 p-6 result-glow">
             <div class="flex justify-between items-center mb-5">
-                <p class="text-xs text-zinc-500 uppercase tracking-widest">Your resting hypothesis</p>
+                <p class="text-xs text-zinc-500 uppercase tracking-widest breathe accent-text">YOUR RESTING HYPOTHESIS</p>
                 <p id="out-date" class="text-xs text-zinc-700"></p>
             </div>
 
             <div class="space-y-4" id="out-fields"></div>
 
             <div id="gap-section" class="mt-5 pt-4 border-t border-zinc-800 hidden">
-                <p class="text-xs text-amber-800 uppercase tracking-widest mb-2">The gap</p>
-                <p id="out-gap" class="text-sm text-amber-300/80 leading-relaxed italic"></p>
+                <p class="text-xs uppercase tracking-widest mb-2 accent-text" style="opacity:.85">THE GAP</p>
+                <p id="out-gap" class="text-sm leading-relaxed italic" style="color:color-mix(in srgb,var(--accent) 80%,var(--ink))"></p>
             </div>
 
             <div class="mt-5 pt-4 border-t border-zinc-800">
-                <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">What this means</p>
+                <p class="text-xs text-zinc-600 uppercase tracking-widest mb-2">WHAT THE MOUNTAIN READS IN THIS</p>
                 <p id="prizrak-note" class="text-xs text-zinc-500 italic leading-relaxed"></p>
             </div>
         </div>
 
         <div class="mt-4 flex gap-2">
-            <button id="edit-btn" class="flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-all">Revise</button>
-            <button id="save-btn" class="flex-1 py-2 rounded border border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-all">Save snapshot</button>
+            <button id="edit-btn" class="btn flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700">Revise</button>
+            <button id="copy-btn" class="btn flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-600">Copy to ledger</button>
+            <button id="save-btn" class="btn flex-1 py-2 rounded border border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500">Fossilize snapshot</button>
         </div>
 
         <div id="history-section" class="hidden mt-8">
             <div class="border-t border-zinc-900 pt-5">
-                <p class="text-xs text-zinc-700 uppercase tracking-widest mb-3">Previous hypotheses</p>
+                <p class="text-xs text-zinc-700 uppercase tracking-widest mb-3">STRATA / EARLIER HYPOTHESES</p>
                 <div id="history-list" class="space-y-2"></div>
             </div>
         </div>
     </div>
 
     <div class="mt-12 text-center">
-        <p class="text-xs text-zinc-700 italic">The prediction is steering. Make it explicit so it can be examined.</p>
+        <p class="text-xs text-zinc-700 italic">The prediction is already steering. Make it explicit so it can be examined.</p>
+        <p id="night-whisper" class="text-xs ghost-line italic mt-2 hidden flicker">the mountain does not sleep.</p>
+        <p id="idle-whisper" class="text-xs ghost-line italic mt-2 opacity-0 transition-opacity duration-1000">still here. still watching.</p>
+        <p id="egg-line" class="text-xs ghost-line italic mt-2 hidden">you found the watcher.</p>
     </div>
 </div>
 
@@ -115,14 +181,15 @@
 const KEY = 'prizrak_hypothesis';
 
 const NOTES_WITH_GAP = [
-    "The gap between what you want and what you predict is not a problem to be solved tonight. It is information. The prediction is already steering — you are making decisions consistent with it, whether you acknowledge it or not. Making it explicit means you can at least examine whether the steering is deliberate.",
-    "A large gap between want and prediction is not evidence of failure. It is evidence that the plan and the prediction have not been reconciled. One of them will win. Usually it is the prediction, because it operates below deliberate decision-making. The question is whether the prediction is correct.",
-    "If you want the prediction to change, the plan is usually not the lever. The prediction changes when the underlying beliefs change — when new evidence arrives, when the context shifts, when something breaks the assumption that made the prediction seem inevitable. Rewriting the plan does not update the prediction. It just changes what is written down.",
+    "The gap between want and forecast is not a problem to solve tonight. It is information. The prediction is already steering — you are making decisions consistent with it whether you admit it or not. Naming it lets you at least check whether the steering is deliberate.",
+    "A wide gap between want and forecast is not failure. It is a sign the plan and the prediction were never reconciled. One of them wins. Usually the prediction, because it operates below deliberate decision. The only question is whether it is correct.",
+    "If you want the forecast to change, the plan is rarely the lever. Predictions shift when the underlying belief shifts — new evidence, a moved context, something that breaks the assumption that made the outcome feel inevitable. Rewriting the plan does not update the prediction. It just changes what is written down.",
+    "Measure the cold and you can dress for it. The gap you just stated is the temperature on the threshold. It will not warm because you looked away. It will warm — or not — based on what you carry across it.",
 ];
 
 const NOTES_NO_GAP = [
-    "No significant gap detected between want and prediction. Either the trajectory is aligned, or the question did not reach the real conflict. Check again in 90 days.",
-    "When want and prediction align, the question becomes whether the prediction itself is the right target. A prediction that matches your want is not necessarily a good prediction — it may just be well-defended.",
+    "No significant gap detected between want and forecast. Either the trajectory is genuinely aligned, or the questions did not reach the real fault line. Return in ninety days and read the strata again.",
+    "When want and forecast agree, the question becomes whether the forecast is the right target at all. A prediction that flatters your want is not necessarily a good one — it may only be well-defended.",
 ];
 
 function getDate() {
@@ -141,12 +208,14 @@ function renderHistory() {
     const sec = document.getElementById('history-section');
     sec.classList.remove('hidden');
     document.getElementById('history-list').innerHTML = history.slice(0,5).map(h => `
-        <div class="py-1.5 border-b border-zinc-900 text-xs">
+        <div class="panel py-1.5 px-2 -mx-2 rounded border-b border-zinc-900 text-xs hover:bg-zinc-900/40 transition-colors">
             <span class="text-zinc-700">${h.date}</span>
-            <span class="text-zinc-600 ml-3 italic">${(h.gap || h.work || '—').slice(0,60)}…</span>
+            <span class="text-zinc-600 ml-3 italic">${esc((h.gap || h.work || '—').slice(0,60))}…</span>
         </div>
     `).join('');
 }
+
+function esc(s){ const t=document.createElement('div'); t.textContent=String(s); return t.innerHTML; }
 
 document.getElementById('generate-btn').addEventListener('click', () => {
     const work = document.getElementById('q-work').value.trim();
@@ -156,25 +225,28 @@ document.getElementById('generate-btn').addEventListener('click', () => {
     const gap = document.getElementById('q-gap').value.trim();
 
     const fields = [
-        { label: 'Work / career', val: work },
-        { label: 'Building / creating', val: build },
-        { label: 'The thing not done', val: notdoing },
-        { label: 'What will change', val: changed },
+        { label: 'WORK / CAREER', val: work },
+        { label: 'BUILDING / CREATING', val: build },
+        { label: 'THE THING NOT DONE', val: notdoing },
+        { label: 'WHAT WILL SHIFT', val: changed },
     ].filter(f => f.val);
 
     if (!fields.length && !gap) {
-        document.getElementById('q-work').style.borderColor = '#7f1d1d';
-        setTimeout(() => document.getElementById('q-work').style.borderColor = '', 1500);
+        const w = document.getElementById('q-work');
+        w.style.borderColor = '#7f1d1d';
+        w.style.boxShadow = '0 0 0 1px rgba(127,29,29,.5)';
+        w.setAttribute('placeholder','the cave is empty. nothing has fossilized yet. speak first.');
+        setTimeout(() => { w.style.borderColor = ''; w.style.boxShadow=''; }, 1600);
         return;
     }
 
     document.getElementById('out-date').textContent = getDate() + ' · 12-month view';
-    
+
     const outFields = document.getElementById('out-fields');
-    outFields.innerHTML = fields.map(f => `
-        <div>
+    outFields.innerHTML = fields.map((f,i) => `
+        <div class="reveal" style="animation-delay:${i*0.07}s">
             <p class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">${f.label}</p>
-            <p class="text-sm text-zinc-300 leading-relaxed">${f.val}</p>
+            <p class="text-sm text-zinc-300 leading-relaxed">${esc(f.val)}</p>
         </div>
     `).join('');
 
@@ -188,14 +260,52 @@ document.getElementById('generate-btn').addEventListener('click', () => {
         document.getElementById('prizrak-note').textContent = NOTES_NO_GAP[Math.floor(Math.random() * NOTES_NO_GAP.length)];
     }
 
+    // reset the fossilize button each time a hypothesis is surfaced
+    const sb = document.getElementById('save-btn');
+    sb.textContent = 'Fossilize snapshot'; sb.disabled = false;
+
     document.getElementById('form-section').classList.add('hidden');
-    document.getElementById('output-section').classList.remove('hidden');
+    const out = document.getElementById('output-section');
+    out.classList.remove('hidden');
+    out.querySelector('.result-glow').classList.add('reveal');
     renderHistory();
+    out.scrollIntoView({behavior:'smooth', block:'start'});
 });
 
 document.getElementById('edit-btn').addEventListener('click', () => {
     document.getElementById('output-section').classList.add('hidden');
     document.getElementById('form-section').classList.remove('hidden');
+    window.scrollTo({top:0, behavior:'smooth'});
+});
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+    const work = document.getElementById('q-work').value.trim();
+    const build = document.getElementById('q-build').value.trim();
+    const notdoing = document.getElementById('q-notdoing').value.trim();
+    const changed = document.getElementById('q-changed').value.trim();
+    const gap = document.getElementById('q-gap').value.trim();
+    const lines = [
+        'RESTING HYPOTHESIS · ' + getDate() + ' · 12-month view',
+        '',
+        work ? 'WORK / CAREER\n' + work : '',
+        build ? '\nBUILDING / CREATING\n' + build : '',
+        notdoing ? '\nTHE THING NOT DONE\n' + notdoing : '',
+        changed ? '\nWHAT WILL SHIFT\n' + changed : '',
+        gap ? '\nTHE GAP\n' + gap : '',
+    ].filter(Boolean).join('\n');
+    const btn = document.getElementById('copy-btn');
+    const done = () => {
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        setTimeout(() => { btn.textContent = prev; btn.style.color=''; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lines).then(done).catch(done);
+    } else {
+        const ta = document.createElement('textarea'); ta.value = lines; document.body.appendChild(ta);
+        ta.select(); try { document.execCommand('copy'); } catch(e){} document.body.removeChild(ta); done();
+    }
 });
 
 document.getElementById('save-btn').addEventListener('click', () => {
@@ -212,10 +322,85 @@ document.getElementById('save-btn').addEventListener('click', () => {
     });
     d.history = history.slice(0, 20);
     saveData(d);
-    document.getElementById('save-btn').textContent = 'Saved ✓';
-    document.getElementById('save-btn').disabled = true;
+    const sb = document.getElementById('save-btn');
+    sb.textContent = 'filed. the ledger remembers.';
+    sb.style.color = 'var(--accent)';
+    sb.disabled = true;
     renderHistory();
 });
+
+/* ---- ambient embers (capped) ---- */
+(function(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const field = document.getElementById('ember-field');
+    const COUNT = 7;
+    for (let i=0;i<COUNT;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100) + 'vw';
+        e.style.animationDelay = (Math.random()*14) + 's';
+        e.style.animationDuration = (12 + Math.random()*8) + 's';
+        field.appendChild(e);
+    }
+    window.__spawnEmber = function(){
+        if (field.querySelectorAll('.ember').length >= 10) return;
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100) + 'vw';
+        e.style.animationDuration = (12 + Math.random()*8) + 's';
+        field.appendChild(e);
+        setTimeout(() => e.remove(), 20000);
+    };
+})();
+
+/* ---- night whisper: 00:00–03:00 local ---- */
+(function(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) document.getElementById('night-whisper').classList.remove('hidden');
+})();
+
+/* ---- easter egg: type "prizrak" ---- */
+(function(){
+    let buf = '';
+    const target = 'prizrak';
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key && ev.key.length === 1) {
+            buf = (buf + ev.key.toLowerCase()).slice(-target.length);
+            if (buf === target) {
+                document.getElementById('egg-line').classList.remove('hidden');
+                if (window.__spawnEmber) window.__spawnEmber();
+            }
+        }
+    });
+})();
+
+/* ---- easter egg: triple-click the title spawns an ember ---- */
+document.getElementById('title').addEventListener('click', (ev) => {
+    if (ev.detail === 3 && window.__spawnEmber) window.__spawnEmber();
+});
+
+/* ---- easter egg: hold the glyph → it breathes faster for 3s ---- */
+(function(){
+    const g = document.getElementById('glyph');
+    let t;
+    const start = () => { g.style.animationDuration = '1.1s'; clearTimeout(t); t = setTimeout(stop, 3000); };
+    const stop = () => { g.style.animationDuration = ''; };
+    g.addEventListener('mousedown', start);
+    g.addEventListener('touchstart', start, {passive:true});
+    g.addEventListener('mouseup', () => { clearTimeout(t); t = setTimeout(stop, 600); });
+})();
+
+/* ---- idle 60s → a single line fades in ---- */
+(function(){
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const line = document.getElementById('idle-whisper');
+    let t;
+    const reset = () => { line.classList.add('opacity-0'); clearTimeout(t); t = setTimeout(() => line.classList.remove('opacity-0'), 60000); };
+    ['mousemove','keydown','scroll','touchstart','click'].forEach(e => document.addEventListener(e, reset, {passive:true}));
+    reset();
+})();
+
+renderHistory();
 </script>
 </body>
 </html>

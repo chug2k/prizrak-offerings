@@ -46,6 +46,12 @@
   .reveal { animation: reveal .4s ease-out both; }
   @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
+  /* The page exhales when a frame names itself. */
+  @keyframes frameSettle{0%{box-shadow:inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 0%, transparent)}
+    18%{box-shadow:inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 22%, transparent)}
+    100%{box-shadow:inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 0%, transparent)}}
+  .settle-wash{position:fixed;inset:0;pointer-events:none;z-index:49;animation:frameSettle 1.6s ease-out both}
+
   /* ---- chosen / frame tints (preserved) ---- */
   .chosen { border-color: #52525b !important; background: rgba(39,39,42,0.8); }
   .chosen.frame-approval { border-color: #f43f5e !important; background: rgba(244,63,94,0.10); box-shadow:0 0 18px -8px rgba(244,63,94,.6); }
@@ -66,13 +72,18 @@
 
   .result-panel{box-shadow:0 0 0 1px var(--line), 0 0 32px -10px var(--glow);}
 
+  /* divergence meter — how contested the reading was */
+  .meter-track{height:3px;background:var(--line-soft);overflow:hidden}
+  .meter-fill{height:100%;background:var(--accent);box-shadow:0 0 8px var(--glow);width:0;transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
+
   #ghost-egg{transition:opacity 1.2s ease;}
   #idle-whisper{transition:opacity 2s ease;}
 
   @media (prefers-reduced-motion:reduce){
-    .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
-    .ember{display:none}
+    .fog,.ember,.breathe,.reveal,.flicker,.settle-wash{animation:none!important}
+    .ember,.settle-wash{display:none}
     .breathe,.flicker{opacity:1!important}
+    .meter-fill{transition:none!important}
   }
 </style>
 </head>
@@ -85,7 +96,7 @@
 
   <!-- Header -->
   <div class="mb-10 border-b border-zinc-800 pb-6">
-    <div class="text-xs text-zinc-600 mb-2 flicker">PRÍZRAK / FRAME AUDIT v1.1 / <span id="clock">22:00</span></div>
+    <div class="text-xs text-zinc-600 mb-2 flicker">PRÍZRAK / FRAME AUDIT v1.2 / <span id="clock">22:00</span></div>
     <h1 id="title" class="text-2xl font-bold text-white tracking-tight breathe select-none cursor-default">THE FRAME AUDIT</h1>
     <p class="text-xs text-zinc-500 mt-2 leading-relaxed">The reference frame is set before the system can audit itself.<br>You cannot see it from inside. These questions go around it.</p>
   </div>
@@ -114,6 +125,17 @@
       <div class="text-xs text-zinc-500 mb-1">THE FRAME SAYS:</div>
       <div id="res-frame" class="text-lg font-bold mb-2 breathe"></div>
       <div id="res-verdict" class="text-xs text-zinc-400 leading-relaxed mb-5"></div>
+
+      <!-- Divergence: how unanimous the underground river ran -->
+      <div class="border-t border-zinc-800 pt-4 mb-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs text-zinc-600 uppercase tracking-widest">RIVER DEPTH</div>
+          <div id="res-depth-num" class="text-xs text-zinc-500"></div>
+        </div>
+        <div class="meter-track"><div id="depth-fill" class="meter-fill"></div></div>
+        <div id="res-depth" class="text-xs text-zinc-600 leading-relaxed mt-2"></div>
+      </div>
+
       <div class="border-t border-zinc-800 pt-4">
         <div class="text-xs text-zinc-600 mb-2">THE GAP:</div>
         <div id="res-gap" class="text-xs text-zinc-500 leading-relaxed"></div>
@@ -130,8 +152,15 @@
       <button onclick="reset()" class="lift border border-zinc-700 text-zinc-600 text-xs px-4 py-2 hover:text-zinc-400 transition-colors uppercase tracking-widest">RESET</button>
     </div>
     <div id="log-display" class="mt-8 hidden">
-      <div class="text-xs text-zinc-700 mb-3 uppercase tracking-widest">// What has fossilized</div>
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-xs text-zinc-700 uppercase tracking-widest">// What has fossilized</div>
+        <button id="drift-btn" onclick="readDrift()" class="text-xs text-zinc-700 hover:text-zinc-400 uppercase tracking-widest transition-colors hidden">READ THE DRIFT</button>
+      </div>
+      <div id="drift-line" class="text-xs text-zinc-600 leading-relaxed mb-3 hidden"></div>
       <div id="log-entries" class="space-y-3"></div>
+      <div id="purge-row" class="mt-4 hidden">
+        <button id="purge-btn" onclick="purgeLog()" class="text-xs text-zinc-800 hover:text-rose-400 uppercase tracking-widest transition-colors">LET THE FOG TAKE IT</button>
+      </div>
     </div>
   </div>
 
@@ -237,14 +266,21 @@ const FRAMES = {
   }
 };
 
+// Frame display names for the drift reader (terse, no prefix).
+const FRAME_NAME = { approval:"APPROVAL", safety:"SAFETY", status:"STATUS", control:"AGENCY", escape:"EXIT" };
+
 let answers = [];
 let declared = "";
 let lastReading = null;
+let pickTimes = [];          // ms between consecutive picks — the frame hears hesitation
+let lastPickAt = 0;
 
 function beginAudit() {
   declared = document.getElementById("declared").value.trim();
   if (!declared) { document.getElementById("declared").focus(); return; }
   document.getElementById("step-0").classList.add("hidden");
+  pickTimes = [];
+  lastPickAt = performance.now();
   renderQuestions();
   const sq = document.getElementById("steps-questions");
   sq.classList.remove("hidden");
@@ -275,6 +311,11 @@ function renderQuestions() {
 }
 
 function pick(qi, oi, frame) {
+  // Time the hesitation between this answer and the previous one.
+  const now = performance.now();
+  if (lastPickAt) pickTimes[qi] = now - lastPickAt;
+  lastPickAt = now;
+
   // Mark chosen
   document.querySelectorAll(`.opt-${qi}-${frame}`).forEach(el => el.classList.remove("chosen"));
   for (let i = 0; i < QUESTIONS[qi].opts.length; i++) {
@@ -298,12 +339,23 @@ function pick(qi, oi, frame) {
   }
 }
 
+// Wash the whole page in the named frame's hue, once.
+function frameWash() {
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) return;
+  const w = document.createElement("div");
+  w.className = "settle-wash";
+  document.body.appendChild(w);
+  setTimeout(() => w.remove(), 1700);
+}
+
 function showResult() {
   document.getElementById("steps-questions").classList.add("hidden");
   // Tally
   const counts = {};
   answers.forEach(f => { counts[f] = (counts[f] || 0) + 1; });
-  const dominant = Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+  const ranked = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const dominant = ranked[0][0];
   const frame = FRAMES[dominant];
 
   document.getElementById("res-declared").textContent = `"${declared}"`;
@@ -313,18 +365,56 @@ function showResult() {
   document.getElementById("res-verdict").textContent = frame.verdict;
   document.getElementById("res-gap").textContent = frame.gap(declared);
 
+  // ---- River depth: how unanimous the underground channel ran ----
+  // 5/5 = the river runs deep and single. 2-2-1 = it forks in the dark.
+  const topCount = ranked[0][1];
+  const distinct = ranked.length;
+  const depthPct = Math.round((topCount / QUESTIONS.length) * 100);
+  const second = ranked[1];
+  let depthLine;
+  if (topCount >= 5) {
+    depthLine = "The river runs deep and single. No fork, no hesitation in the channel. Whatever this frame is, it owns you cleanly.";
+  } else if (topCount === 4) {
+    depthLine = "One channel dominates. A single stray current, but the bed is clear.";
+  } else if (topCount === 3 && distinct === 2) {
+    depthLine = `A near-even split with ${FRAME_NAME[second[0]]}. You answer from two frames depending on where you're standing. The reading names the louder one.`;
+  } else if (topCount === 3) {
+    depthLine = `Three readings agree, the rest scatter. ${FRAME_NAME[second[0]]} runs beneath as an undercurrent — watch for it when the surface frame goes quiet.`;
+  } else {
+    depthLine = `The river forks badly — ${FRAME_NAME[dominant]} barely leads ${FRAME_NAME[second[0]]}. You are not one frame. You are a delta in the fog. Run the audit again on a different night and it may name someone else.`;
+  }
+  document.getElementById("res-depth").textContent = depthLine;
+  document.getElementById("res-depth-num").textContent = `${topCount} / ${QUESTIONS.length} READINGS`;
+
+  // ---- Hesitation: did the frame hear you stall? ----
+  const valid = pickTimes.filter(t => typeof t === "number" && t > 0);
+  let hesitationNote = "";
+  if (valid.length) {
+    const slowest = Math.max(...valid);
+    const slowIdx = pickTimes.indexOf(slowest);
+    if (slowest > 9000 && slowIdx >= 0) {
+      hesitationNote = ` Reading 0${slowIdx+1} took you the longest. The frame heard it. The place you hesitate is the place the frame is load-bearing.`;
+    }
+  }
+  document.getElementById("res-depth").textContent = depthLine + hesitationNote;
+
   // Let the named frame take over the ambient accent — the watcher changes color.
   document.documentElement.style.setProperty("--accent", frame.accent);
   document.documentElement.style.setProperty("--glow",
     `color-mix(in srgb, ${frame.accent} 55%, transparent)`);
+  frameWash();
 
-  lastReading = `THE FRAME AUDIT\nDeclared: "${declared}"\n${frame.label}\n\n${frame.verdict}\n\nTHE GAP:\n${frame.gap(declared)}`;
+  lastReading = `THE FRAME AUDIT\nDeclared: "${declared}"\n${frame.label}\nRiver depth: ${topCount}/${QUESTIONS.length}\n\n${frame.verdict}\n\nTHE GAP:\n${frame.gap(declared)}`;
   document.getElementById("copy-flash").textContent = "";
   document.getElementById("copy-btn").textContent = "COPY THE VERDICT";
 
   const r = document.getElementById("result");
   r.classList.remove("hidden");
   loadLog();
+  // Animate the depth meter after the panel is on screen.
+  const fill = document.getElementById("depth-fill");
+  fill.style.width = "0";
+  setTimeout(() => { fill.style.width = depthPct + "%"; }, 250);
   setTimeout(() => r.scrollIntoView({ behavior: "smooth" }), 100);
 }
 
@@ -363,21 +453,33 @@ function saveLog() {
   loadLog();
 }
 
+// Dominant frame for an entry's answer array.
+function entryDominant(e) {
+  const counts = {};
+  (e.answers||[]).forEach(f => { counts[f] = (counts[f]||0)+1; });
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "—";
+}
+
 function loadLog() {
   const log = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+  const ld = document.getElementById("log-display");
+  const driftBtn = document.getElementById("drift-btn");
+  const purgeRow = document.getElementById("purge-row");
   if (!log.length) {
-    const ld = document.getElementById("log-display");
     if (ld) ld.classList.remove("hidden");
     const c = document.getElementById("log-entries");
     if (c) c.innerHTML = `<div class="text-xs text-zinc-700 italic">the cave is empty. nothing has fossilized yet.</div>`;
+    if (driftBtn) driftBtn.classList.add("hidden");
+    if (purgeRow) purgeRow.classList.add("hidden");
     return;
   }
-  document.getElementById("log-display").classList.remove("hidden");
+  ld.classList.remove("hidden");
+  if (purgeRow) purgeRow.classList.remove("hidden");
+  // The drift reader only makes sense with at least two strata.
+  if (driftBtn) driftBtn.classList.toggle("hidden", log.length < 2);
   const container = document.getElementById("log-entries");
   container.innerHTML = log.map(e => {
-    const counts = {};
-    (e.answers||[]).forEach(f => { counts[f] = (counts[f]||0)+1; });
-    const dom = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || "—";
+    const dom = entryDominant(e);
     const accent = (FRAMES[dom] && FRAMES[dom].accent) || "#52525b";
     return `<div class="border border-zinc-800 px-3 py-2 lift" style="border-left:2px solid ${accent}">
       <div class="text-xs text-zinc-600 flex justify-between"><span>${e.date}</span><span class="uppercase tracking-widest">${dom}</span></div>
@@ -387,11 +489,59 @@ function loadLog() {
   }).join("");
 }
 
+// The drift: how the frame has shifted across fossilized readings.
+function readDrift() {
+  const log = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+  const line = document.getElementById("drift-line");
+  if (log.length < 2) { line.classList.add("hidden"); return; }
+  // log[0] is newest. Compare oldest → newest in chronological order.
+  const chrono = log.slice().reverse();
+  const seq = chrono.map(entryDominant);
+  const newest = seq[seq.length - 1];
+  const oldest = seq[0];
+  const uniq = [...new Set(seq)];
+  let msg;
+  if (uniq.length === 1) {
+    msg = `Across ${seq.length} readings the frame never moved: ${FRAME_NAME[newest]||newest}. The bedrock does not drift. This is not a phase. This is the channel.`;
+  } else if (newest === oldest) {
+    msg = `You wandered through ${FRAME_NAME[uniq.filter(f=>f!==newest)[0]]||"other terrain"} and came back to ${FRAME_NAME[newest]||newest}. The river always returns to its lowest bed.`;
+  } else {
+    msg = `The frame has drifted: ${FRAME_NAME[oldest]||oldest} → ${FRAME_NAME[newest]||newest}. Either you changed, or the season did. The ghost noted both and judges neither.`;
+  }
+  line.textContent = msg;
+  line.classList.remove("hidden");
+}
+
+function purgeLog() {
+  const btn = document.getElementById("purge-btn");
+  if (btn.dataset.armed !== "1") {
+    btn.dataset.armed = "1";
+    btn.textContent = "LET THE FOG TAKE IT — THIS CANNOT BE RECOVERED";
+    btn.classList.add("text-rose-400");
+    setTimeout(() => {
+      if (btn.dataset.armed === "1") {
+        btn.dataset.armed = "0";
+        btn.textContent = "LET THE FOG TAKE IT";
+        btn.classList.remove("text-rose-400");
+      }
+    }, 4000);
+    return;
+  }
+  // Confirmed.
+  localStorage.removeItem(LOG_KEY);
+  btn.dataset.armed = "0";
+  btn.textContent = "LET THE FOG TAKE IT";
+  btn.classList.remove("text-rose-400");
+  document.getElementById("drift-line").classList.add("hidden");
+  loadLog();
+}
+
 function reset() {
-  answers = []; declared = ""; lastReading = null;
+  answers = []; declared = ""; lastReading = null; pickTimes = []; lastPickAt = 0;
   document.getElementById("result").classList.add("hidden");
   document.getElementById("steps-questions").classList.add("hidden");
   document.getElementById("declared").value = "";
+  const dl = document.getElementById("drift-line"); if (dl) dl.classList.add("hidden");
   // The watcher returns to its neutral hue.
   document.documentElement.style.setProperty("--accent", "#8b5cf6");
   document.documentElement.style.setProperty("--glow", "color-mix(in srgb, #8b5cf6 55%, transparent)");
@@ -468,6 +618,23 @@ function reset() {
       setTimeout(() => ember.remove(), 11000);
     }
   });
+})();
+
+// Long-press the title → it breathes faster for 3s (the watcher leans in).
+(function holdEgg(){
+  const t = document.getElementById("title");
+  let hold;
+  function start(){
+    hold = setTimeout(() => {
+      const prev = t.style.animationDuration;
+      t.style.animationDuration = "1.1s";
+      setTimeout(() => { t.style.animationDuration = prev || ""; }, 3000);
+    }, 600);
+  }
+  function cancel(){ clearTimeout(hold); }
+  t.addEventListener("mousedown", start);
+  t.addEventListener("touchstart", start, { passive: true });
+  ["mouseup","mouseleave","touchend","touchcancel"].forEach(ev => t.addEventListener(ev, cancel));
 })();
 
 // Idle 60s → a single line fades in.

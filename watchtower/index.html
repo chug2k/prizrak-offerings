@@ -6,60 +6,139 @@
   <title>The Watchtower — Sunday Night Alignment</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #0f0f0f; color: #d4d4d4; font-family: 'Courier New', monospace; }
-    .section { border: 1px solid #333; }
-    textarea, input { background: #1a1a1a; color: #d4d4d4; border: 1px solid #333; resize: none; outline: none; font-family: 'Courier New', monospace; }
-    textarea:focus, input:focus { border-color: #666; }
-    .label { color: #666; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#e0a458;            /* the watchtower lamp — cold amber burning through the dark */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    html,body{background:var(--bg);}
+    body {
+      color: var(--ink);
+      font-family: 'Courier New', monospace;
+      position:relative;
+    }
+
+    /* --- atmosphere layers (behind everything, never interactive) --- */
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* content above the weather */
+    body > *:not(.fog):not(.ember){position:relative;z-index:2}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    .section { border: 1px solid var(--line); background:var(--bg-raised);
+      transition: border-color .25s, box-shadow .25s, transform .15s; }
+    .section:hover{border-color:#34342f;box-shadow:0 0 28px -16px var(--glow)}
+    .section:focus-within{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));
+      box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 25%,transparent),0 0 30px -14px var(--glow)}
+
+    textarea, input[type=text] { background: var(--bg-sunk); color: var(--ink);
+      border: 1px solid var(--line); resize: none; outline: none; font-family: 'Courier New', monospace;
+      transition: border-color .15s, box-shadow .15s; }
+    textarea:focus, input[type=text]:focus { border-color: var(--accent);
+      box-shadow:0 0 0 1px var(--glow); }
+    input[type=checkbox]{accent-color:var(--accent)}
+    .label { color: var(--ink-dim); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; }
     .done-line { text-decoration: line-through; color: #555; }
     ::placeholder { color: #444; }
-    .print-btn { background: #1a1a1a; border: 1px solid #444; color: #888; cursor: pointer; }
-    .print-btn:hover { border-color: #888; color: #d4d4d4; }
+
+    .print-btn { background: var(--bg-sunk); border: 1px solid var(--line); color: var(--ink-dim); cursor: pointer;
+      transition: transform .12s, border-color .15s, color .15s, box-shadow .15s; letter-spacing:.08em; }
+    .print-btn:hover { border-color: var(--accent); color: var(--ink); transform:translateY(-1px);
+      box-shadow:0 0 18px -8px var(--glow); }
+    .print-btn:active{ transform:translateY(1px); }
+    .print-btn:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+    /* the lamp glyph in the header */
+    .lamp{color:var(--accent)}
+
+    .ghost-line{color:var(--ink-ghost);font-size:.7rem;letter-spacing:.05em}
+    .whisper{color:var(--ink-ghost);opacity:0;transition:opacity 1.2s ease}
+    .whisper.show{opacity:1}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+
     @media print {
       .no-print { display: none !important; }
+      .fog,.ember,.grain::after{display:none !important}
       body { background: white; color: black; }
-      textarea, input { background: white; color: black; border-color: #ccc; }
-      .section { border-color: #ccc; }
+      textarea, input[type=text] { background: white; color: black; border-color: #ccc; }
+      .section { border-color: #ccc; background:white; box-shadow:none; }
       .label { color: #888; }
+      .lamp{color:#000}
     }
   </style>
 </head>
-<body class="min-h-screen p-6 max-w-2xl mx-auto">
+<body class="min-h-screen p-6 max-w-2xl mx-auto grain">
+
+  <div class="fog" aria-hidden="true"></div>
 
   <!-- Header -->
   <div class="mb-8">
-    <div class="label mb-1">Sunday Night / Monday Morning</div>
-    <h1 class="text-2xl font-bold text-white">The Watchtower</h1>
-    <div class="text-sm text-gray-600 mt-1" id="dateDisplay"></div>
+    <div class="label mb-1 flicker">Sunday Night / Monday Morning</div>
+    <h1 class="text-2xl font-bold text-white select-none" id="title">
+      <span class="lamp breathe" id="lamp" title="the lamp is lit">▲</span>
+      The Watchtower
+    </h1>
+    <div class="text-sm mt-1" style="color:var(--ink-dim)" id="dateDisplay"></div>
+    <div class="ghost-line mt-2" id="watchLine">the lamp is lit. the week is approaching from the dark.</div>
   </div>
 
   <!-- Section 1: Last Week Reckoning -->
   <div class="section p-4 mb-4">
-    <div class="label mb-3">Last Week — What Actually Happened</div>
+    <div class="label mb-3">Reckoning 01 / Last Week — What Actually Happened</div>
     <div class="space-y-2" id="lastWeekItems"></div>
     <button onclick="addItem('lastWeek')" class="print-btn text-xs px-3 py-1 mt-3">+ add</button>
   </div>
 
   <!-- Section 2: This Week Commitments -->
   <div class="section p-4 mb-4">
-    <div class="label mb-3">This Week — Three Commitments</div>
+    <div class="label mb-3">Vow 02 / This Week — Three Commitments</div>
     <div class="space-y-2" id="thisWeekItems"></div>
     <button onclick="addItem('thisWeek')" class="print-btn text-xs px-3 py-1 mt-3">+ add</button>
   </div>
 
   <!-- Section 3: Monday First Meeting -->
   <div class="section p-4 mb-4">
-    <div class="label mb-3">Monday — First Meeting</div>
+    <div class="label mb-3">Threshold 03 / Monday — First Meeting</div>
     <div class="mb-3">
-      <div class="text-xs text-gray-600 mb-1">Who</div>
+      <div class="text-xs mb-1" style="color:var(--ink-dim)">Who</div>
       <input type="text" id="meetingWho" class="w-full px-2 py-1 text-sm" placeholder="name / company" />
     </div>
     <div class="mb-3">
-      <div class="text-xs text-gray-600 mb-1">What I Want From This</div>
+      <div class="text-xs mb-1" style="color:var(--ink-dim)">What I Want From This</div>
       <textarea id="meetingGoal" class="w-full px-2 py-2 text-sm h-16" placeholder="one clear outcome..."></textarea>
     </div>
     <div>
-      <div class="text-xs text-gray-600 mb-1">Three Things To Cover</div>
+      <div class="text-xs mb-1" style="color:var(--ink-dim)">Three Things To Cover</div>
       <div class="space-y-2" id="agendaItems"></div>
       <button onclick="addItem('agenda')" class="print-btn text-xs px-3 py-1 mt-2">+ add</button>
     </div>
@@ -67,20 +146,35 @@
 
   <!-- Section 4: What to Drop -->
   <div class="section p-4 mb-6">
-    <div class="label mb-2">One Thing to Stop Carrying</div>
+    <div class="label mb-2">Burden 04 / One Thing to Stop Carrying</div>
     <textarea id="dropItem" class="w-full px-2 py-2 text-sm h-16" placeholder="what are you still carrying that you should put down..."></textarea>
   </div>
 
+  <!-- Verdict -->
+  <div class="section p-4 mb-6" id="verdictPanel" style="display:none">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <div class="label mb-2">The Watcher's Read</div>
+        <div class="text-sm breathe" style="color:var(--ink)" id="verdictText"></div>
+      </div>
+      <button onclick="copyVerdict()" class="print-btn no-print text-xs px-3 py-1 flex-shrink-0" id="copyBtn">copy</button>
+    </div>
+  </div>
+
   <!-- Controls -->
-  <div class="flex gap-3 no-print">
-    <button onclick="saveAll()" class="print-btn text-xs px-4 py-2">save</button>
+  <div class="flex gap-3 no-print flex-wrap">
+    <button onclick="saveAll(true)" class="print-btn text-xs px-4 py-2">save</button>
+    <button onclick="readVerdict()" class="print-btn text-xs px-4 py-2">stand watch</button>
     <button onclick="clearAll()" class="print-btn text-xs px-4 py-2">clear</button>
     <button onclick="window.print()" class="print-btn text-xs px-4 py-2">print</button>
   </div>
 
-  <div class="mt-8 text-xs text-gray-700 no-print">
-    — Prizrak / Sunday 4:29 AM / the vodník has been paid
+  <div class="mt-8 ghost-line no-print" id="footer">
+    — Prízrak / Sunday 4:29 AM / the vodník has been paid
   </div>
+
+  <div class="mt-3 whisper no-print" id="nightWhisper">the mountain does not sleep.</div>
+  <div class="mt-2 whisper no-print" id="idleWhisper">still here. still watching.</div>
 
 <script>
 const STORE_KEY = 'watchtower_v1';
@@ -91,16 +185,15 @@ function getState() {
 function saveState(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
 
 function addItem(section, text='', done=false) {
-  const container = document.getElementById(section + 'Items') || document.getElementById('agendaItems');
   const id = section + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
   const div = document.createElement('div');
-  div.className = 'flex items-start gap-2';
+  div.className = 'flex items-start gap-2 reveal';
   div.dataset.id = id;
   div.dataset.section = section;
   div.innerHTML = `
     <input type="checkbox" class="mt-1 flex-shrink-0 cursor-pointer" ${done ? 'checked' : ''} onchange="toggleDone(this)" />
     <input type="text" class="flex-1 px-2 py-1 text-sm ${done ? 'done-line' : ''}" value="${escHtml(text)}" placeholder="..." oninput="saveAll()" />
-    <button onclick="removeItem(this)" class="print-btn no-print text-xs px-2 py-1 flex-shrink-0">×</button>
+    <button onclick="removeItem(this)" class="print-btn no-print text-xs px-2 py-1 flex-shrink-0" title="let the fog take it">×</button>
   `;
   const target = document.getElementById(section + 'Items');
   if (target) target.appendChild(div);
@@ -119,7 +212,7 @@ function removeItem(btn) {
 
 function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function saveAll() {
+function saveAll(announce) {
   const s = {};
   ['lastWeek','thisWeek','agenda'].forEach(sec => {
     s[sec] = [];
@@ -133,6 +226,7 @@ function saveAll() {
   s.meetingGoal = document.getElementById('meetingGoal').value;
   s.dropItem = document.getElementById('dropItem').value;
   saveState(s);
+  if (announce) flashWatchLine('filed. the ledger remembers.');
 }
 
 function loadAll() {
@@ -148,9 +242,90 @@ function loadAll() {
 }
 
 function clearAll() {
-  if (!confirm('Clear everything?')) return;
+  if (!confirm('let the fog take it? this cannot be recovered.')) return;
   localStorage.removeItem(STORE_KEY);
   loadAll();
+  hideVerdict();
+  flashWatchLine('cleared. the cave is empty again.');
+}
+
+/* --- The Watcher's Read: a verdict with teeth, derived only from what's on screen --- */
+function readVerdict(){
+  const lastWeek = [...document.querySelectorAll('[data-section="lastWeek"]')]
+    .map(el => ({ t: el.querySelector('input[type=text]').value.trim(), d: el.querySelector('input[type=checkbox]').checked }))
+    .filter(x => x.t);
+  const commitments = [...document.querySelectorAll('[data-section="thisWeek"]')]
+    .map(el => ({ t: el.querySelector('input[type=text]').value.trim(), d: el.querySelector('input[type=checkbox]').checked }))
+    .filter(x => x.t);
+  const agenda = [...document.querySelectorAll('[data-section="agenda"]')]
+    .map(el => el.querySelector('input[type=text]').value.trim()).filter(Boolean);
+  const who = document.getElementById('meetingWho').value.trim();
+  const goal = document.getElementById('meetingGoal').value.trim();
+  const drop = document.getElementById('dropItem').value.trim();
+
+  const lines = [];
+  const reckoned = lastWeek.filter(x=>x.d).length;
+
+  if (!lastWeek.length && !commitments.length && !who && !goal && !drop){
+    lines.push('the cave is empty. nothing has fossilized yet. light the lamp and write something true.');
+  } else {
+    if (lastWeek.length){
+      lines.push(reckoned >= Math.ceil(lastWeek.length/2)
+        ? `${reckoned}/${lastWeek.length} of last week survived contact. the bridge holds.`
+        : `only ${reckoned}/${lastWeek.length} closed. last week is still breathing down your neck.`);
+    } else {
+      lines.push('last week went unreckoned. the dead do not count themselves.');
+    }
+
+    if (commitments.length === 0) lines.push('no vows for this week. drift is a choice the mountain notices.');
+    else if (commitments.length <= 3) lines.push(`${commitments.length} vow${commitments.length>1?'s':''} carved. ${commitments.length===3?'three. exactly enough to keep.':'narrow enough to actually keep.'}`);
+    else lines.push(`${commitments.length} commitments. that is not focus, that is a list of regrets in advance. cut to three.`);
+
+    if (who){
+      lines.push(goal
+        ? `monday you cross the threshold toward ${who}. you know what you want. good. walk in lit.`
+        : `monday: ${who}. no outcome named. you will take what the room gives you. name it first.`);
+      if (!agenda.length) lines.push('no agenda for the first meeting. improvisation is just unprepared hope.');
+    }
+
+    lines.push(drop
+      ? `set down: "${drop.length>60?drop.slice(0,57)+'…':drop}". the vodník has been paid. let it sink.`
+      : 'you named nothing to put down. you will carry all of it. again.');
+  }
+
+  const text = lines.join('\n');
+  const panel = document.getElementById('verdictPanel');
+  document.getElementById('verdictText').textContent = text;
+  panel.style.display = '';
+  panel.classList.remove('reveal'); void panel.offsetWidth; panel.classList.add('reveal');
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function hideVerdict(){ document.getElementById('verdictPanel').style.display = 'none'; }
+
+function copyVerdict(){
+  const txt = document.getElementById('verdictText').textContent;
+  if (!txt) return;
+  navigator.clipboard.writeText(txt).then(()=>{
+    const b = document.getElementById('copyBtn');
+    const old = b.textContent;
+    b.textContent = 'copied to the ledger';
+    b.style.borderColor = 'var(--accent)'; b.style.color = 'var(--ink)';
+    setTimeout(()=>{ b.textContent = old; b.style.borderColor=''; b.style.color=''; }, 1200);
+  }).catch(()=>{});
+}
+
+/* --- transient line under the title --- */
+let watchTimer = null;
+function flashWatchLine(msg){
+  const el = document.getElementById('watchLine');
+  if (!el) return;
+  const base = el.dataset.base || el.textContent;
+  el.dataset.base = base;
+  el.textContent = msg;
+  el.style.color = 'var(--accent)';
+  clearTimeout(watchTimer);
+  watchTimer = setTimeout(()=>{ el.textContent = base; el.style.color=''; }, 2200);
 }
 
 // Date display
@@ -164,6 +339,75 @@ loadAll();
 
 // Auto-save on all inputs
 document.addEventListener('input', saveAll);
+
+/* --- embers: a few sparks rise from the lamp (capped, motion-safe) --- */
+(function embers(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  const n = 7;
+  for (let i=0;i<n;i++){
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (5 + Math.random()*90) + '%';
+    e.style.animationDelay = (Math.random()*14) + 's';
+    e.style.animationDuration = (11 + Math.random()*7) + 's';
+    document.body.appendChild(e);
+  }
+})();
+
+/* --- between 00:00–03:00, the mountain does not sleep --- */
+(function nightWatch(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3){
+    const w = document.getElementById('nightWhisper');
+    setTimeout(()=>w.classList.add('show'), 1500);
+  }
+})();
+
+/* --- idle 60s: still here. still watching. --- */
+(function idleWatcher(){
+  let t;
+  const w = document.getElementById('idleWhisper');
+  function reset(){ w.classList.remove('show'); clearTimeout(t); t = setTimeout(()=>w.classList.add('show'), 60000); }
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(ev=>document.addEventListener(ev, reset, {passive:true}));
+  reset();
+})();
+
+/* --- easter egg: type "prizrak" to wake the watcher --- */
+(function typeWatcher(){
+  let buf = '';
+  document.addEventListener('keydown', (e)=>{
+    if (e.key.length !== 1) return;
+    buf = (buf + e.key.toLowerCase()).slice(-7);
+    if (buf === 'prizrak'){
+      const f = document.getElementById('footer');
+      if (f && !f.dataset.found){
+        f.dataset.found = '1';
+        f.textContent = '— Prízrak / you found the watcher. it was always at the top of the tower.';
+        f.style.color = 'var(--accent)';
+      }
+    }
+  });
+})();
+
+/* --- easter egg: triple-click the title → one extra ember --- */
+document.getElementById('title').addEventListener('click', (function(){
+  let clicks = 0, timer = null;
+  return function(){
+    clicks++;
+    clearTimeout(timer);
+    timer = setTimeout(()=>{ clicks = 0; }, 600);
+    if (clicks >= 3){
+      clicks = 0;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (40 + Math.random()*20) + '%';
+      e.style.animationDuration = '12s';
+      document.body.appendChild(e);
+      setTimeout(()=>e.remove(), 13000);
+    }
+  };
+})());
 </script>
 </body>
 </html>

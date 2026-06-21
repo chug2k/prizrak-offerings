@@ -77,10 +77,37 @@
     @keyframes copyFlash{0%{color:var(--accent)}100%{color:var(--ink-dim)}}
     .copyflash{animation:copyFlash 1.2s ease-out}
 
+    /* the title glow can be coaxed to breathe faster (hold-press easter egg) */
+    .breathe.fast{animation-duration:1.1s}
+
+    /* live "carving" tick — flashes when a field fossilizes as you type */
+    @keyframes carveIn{0%{color:var(--ink-dim);text-shadow:none}30%{color:var(--accent);text-shadow:0 0 10px var(--glow)}100%{color:#6ee7b7;text-shadow:none}}
+    .carve-in{animation:carveIn .7s ease-out}
+
+    /* a faint scanline sweeps the receipt as it is struck */
+    @keyframes strike{0%{transform:translateY(-100%);opacity:0}10%{opacity:.6}100%{transform:translateY(220%);opacity:0}}
+    .receipt-wrap{position:relative;overflow:hidden}
+    .receipt-wrap::before{content:"";position:absolute;left:0;right:0;top:0;height:18%;pointer-events:none;z-index:3;
+      background:linear-gradient(180deg,transparent,var(--glow),transparent);opacity:0}
+    .receipt-wrap.striking::before{animation:strike 1.1s ease-out}
+
+    /* the idle watcher line */
+    @keyframes watchFade{from{opacity:0}to{opacity:1}}
+    #idleWatch{opacity:0;transition:opacity .8s ease}
+    #idleWatch.show{opacity:1}
+
+    /* live mirror dot pulses when the field-mirror updates */
+    @keyframes mirrorPulse{0%{box-shadow:0 0 0 0 var(--glow)}100%{box-shadow:0 0 0 7px transparent}}
+    .mirror-pulse{animation:mirrorPulse .8s ease-out}
+
     @media (prefers-reduced-motion:reduce){
-      .fog,.ember,.breathe,.reveal,.flicker,.copyflash{animation:none!important}
+      .fog,.ember,.breathe,.flicker,.copyflash,.carve-in,.mirror-pulse{animation:none!important}
+      .reveal{animation:none!important}
+      .receipt-wrap.striking::before{animation:none!important;opacity:0}
+      .breathe.fast{animation:none!important}
       .ember{display:none}
       .breathe,.flicker{opacity:1!important}
+      #idleWatch{transition:none}
     }
   </style>
 </head>
@@ -93,6 +120,7 @@
       <p class="label flicker">Prízrak Offering · No. 47 / the ledger of arrivals</p>
       <h1 id="title" class="text-4xl font-bold mt-3 breathe" style="color:var(--accent);cursor:default">The Invite Receipt</h1>
       <p class="mt-4 max-w-3xl" style="color:var(--ink-dim)">A meeting is not scheduled because a tool whispered <span style="color:var(--ink)">200</span>. It is scheduled when the artifact exists, cold and dated, like a name carved above a cave mouth. Lock the details. Then demand the proof.</p>
+      <p id="ledgerWeight" class="label mt-4"></p>
     </header>
 
     <div class="grid lg:grid-cols-2 gap-6">
@@ -132,6 +160,13 @@
             <span class="label">What this meeting must produce</span>
             <textarea id="objective" rows="3" class="field mt-1.5 w-full rounded-xl px-3 py-2" style="color:var(--ink)" placeholder="Clear next step, investor context, founder fit, etc."></textarea>
           </label>
+          <div class="flex items-center justify-between rounded-xl px-3 py-2" style="background:var(--bg-sunk);border:1px solid var(--line-soft)">
+            <span class="label">the ghost is counting</span>
+            <span class="flex items-center gap-2">
+              <span id="liveDots" class="flex items-center gap-1" aria-hidden="true"></span>
+              <span id="liveScore" class="text-xs" style="color:var(--ink-dim)">0 / 5 carved</span>
+            </span>
+          </div>
           <button id="save" class="btn-accent w-full rounded-xl font-semibold py-3">Generate receipt</button>
         </div>
       </section>
@@ -144,7 +179,9 @@
             <span id="status" class="text-xs px-2 py-1 rounded-full" style="border:1px solid var(--line);color:var(--ink-dim)">waiting</span>
           </div>
         </div>
-        <div id="receipt" class="mt-4 space-y-4 text-sm" style="color:var(--ink)"></div>
+        <div id="receiptWrap" class="receipt-wrap mt-4 rounded-xl">
+          <div id="receipt" class="space-y-4 text-sm" style="color:var(--ink)"></div>
+        </div>
       </section>
     </div>
 
@@ -158,6 +195,7 @@
 
     <footer class="mt-10 text-center">
       <p id="whisper" class="text-xs ghostline">we do not trust the response code. we trust the carving.</p>
+      <p id="idleWatch" class="text-xs ghostline mt-2" aria-hidden="true"></p>
     </footer>
   </div>
 
@@ -175,6 +213,35 @@
     }
     function escapeHtml(str='') {
       return String(str).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+    const prefersReduce = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // the ledger of arrivals — how far off, in plain Tatra-cold language
+    function whenAway(when) {
+      if (!when) return '';
+      const t = new Date(when).getTime();
+      if (isNaN(t)) return '';
+      const diff = t - Date.now();
+      const past = diff < 0;
+      const mins = Math.round(Math.abs(diff) / 60000);
+      let phrase;
+      if (mins < 1) phrase = 'now';
+      else if (mins < 60) phrase = `${mins} min`;
+      else if (mins < 1440) phrase = `${Math.round(mins/60)} h`;
+      else phrase = `${Math.round(mins/1440)} d`;
+      if (phrase === 'now') return 'the threshold is here';
+      return past ? `crossed the threshold ${phrase} ago` : `${phrase} until the threshold`;
+    }
+
+    // spawn a single short-lived ember at a given horizontal % (used on a defensible verdict)
+    function spawnEmber(leftPct, dur) {
+      if (prefersReduce()) return;
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = leftPct + '%';
+      e.style.animationDuration = (dur || 12) + 's';
+      el('embers').appendChild(e);
+      setTimeout(() => e.remove(), (dur || 12) * 1000);
     }
 
     function renderReceipt(item) {
@@ -206,10 +273,12 @@
 
       el('copy').style.display = '';
 
+      const away = whenAway(item.when);
       el('receipt').innerHTML = `
         <div class="reveal rounded-xl p-4" style="background:var(--bg-sunk);border:1px solid var(--line)">
           <div class="text-xl font-semibold" style="color:var(--ink)">${escapeHtml(item.person || 'Unnamed meeting')}</div>
           <div class="mt-1" style="color:var(--ink-dim)">${item.when ? escapeHtml(new Date(item.when).toLocaleString()) : 'No time locked'} · ${escapeHtml(item.duration || '')} min</div>
+          ${away ? `<div class="text-xs mt-1 ghostline">${escapeHtml(away)}</div>` : ''}
           <div class="mt-3 grid gap-2">
             <div><span class="label">Account</span> <span style="color:var(--ink)">${escapeHtml(item.account || '—')}</span></div>
             <div><span class="label">Attendee</span> <span style="color:var(--ink)">${escapeHtml(item.email || '—')}</span></div>
@@ -228,7 +297,21 @@
           <p class="mt-4 text-xs ghostline">${escapeHtml(verdict)}</p>
         </div>`;
 
-      if (window.matchMedia && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      // the receipt is struck: a faint scanline sweeps the artifact
+      const wrap = el('receiptWrap');
+      if (wrap && !prefersReduce()) {
+        wrap.classList.remove('striking');
+        void wrap.offsetWidth; // restart the animation
+        wrap.classList.add('striking');
+      }
+
+      // a defensible artifact earns a quiet pair of rising embers — the carving caught light
+      if (ready) {
+        spawnEmber(44 + Math.random() * 4, 10);
+        spawnEmber(52 + Math.random() * 4, 11);
+      }
+
+      if (!prefersReduce()) {
         el('proofPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
@@ -247,12 +330,63 @@
       [...el('history').querySelectorAll('[data-idx]')].forEach(btn => btn.onclick = () => renderReceipt(load()[Number(btn.dataset.idx)]));
     }
 
+    // ---- live carving: the ghost counts the proof as you type ----
+    const dotsHost = el('liveDots');
+    // five small marks, one per check; they fill (and briefly flare) as fields fossilize
+    if (dotsHost) {
+      dotsHost.innerHTML = Array.from({length:5}, () =>
+        '<span class="lvdot inline-block rounded-full" style="width:6px;height:6px;background:var(--line);transition:background .3s"></span>'
+      ).join('');
+    }
+    let lastLiveScore = -1;
+    function liveChecks() {
+      const v = id => el(id).value.trim();
+      return [
+        !!v('account'),
+        !!v('email'),
+        !!(v('when') && v('duration')),
+        !!v('where'),
+        !!v('objective'),
+      ];
+    }
+    function updateLive() {
+      const checks = liveChecks();
+      const score = checks.filter(Boolean).length;
+      const dots = dotsHost ? [...dotsHost.querySelectorAll('.lvdot')] : [];
+      dots.forEach((d, i) => {
+        const on = checks[i];
+        d.style.background = on ? 'var(--accent)' : 'var(--line)';
+        d.style.boxShadow = on ? '0 0 6px var(--glow)' : 'none';
+      });
+      const ls = el('liveScore');
+      if (ls) {
+        ls.textContent = score === 5 ? 'defensible — strike it' : `${score} / 5 carved`;
+        ls.style.color = score === 5 ? '#6ee7b7' : 'var(--ink-dim)';
+        if (score !== lastLiveScore && score > lastLiveScore && !prefersReduce()) {
+          ls.classList.remove('carve-in'); void ls.offsetWidth; ls.classList.add('carve-in');
+        }
+      }
+      lastLiveScore = score;
+    }
+    fields.forEach(id => { const node = el(id); if (node) node.addEventListener('input', updateLive); });
+
+    // ---- ledger weight: how heavy the cave has grown ----
+    function renderWeight() {
+      const n = load().length;
+      const lw = el('ledgerWeight');
+      if (!lw) return;
+      lw.textContent = n === 0
+        ? 'the cave is empty · 0 receipts carved'
+        : `${n} receipt${n === 1 ? '' : 's'} carved · oldest ${n >= 12 ? 'falling off the wall' : 'still holding'}`;
+    }
+
     el('save').onclick = () => {
       const item = Object.fromEntries(fields.map(id => [id, el(id).value.trim()]));
       const items = [item, ...load()];
       save(items);
       renderReceipt(item);
       renderHistory();
+      renderWeight();
     };
 
     el('clear').onclick = () => {
@@ -268,6 +402,7 @@
       el('proofPanel').classList.remove('panel-glow');
       el('copy').style.display = 'none';
       renderHistory();
+      renderWeight();
     };
 
     // ---- copy the receipt to the ledger ----
@@ -377,6 +512,40 @@
       }
     })();
 
+    // ---- easter egg 4: hold the title → the glow breathes faster for 3s ----
+    (function holdGlow(){
+      const t = el('title');
+      let timer = null;
+      const start = () => {
+        if (prefersReduce()) return;
+        t.classList.add('fast');
+        clearTimeout(timer);
+        timer = setTimeout(() => t.classList.remove('fast'), 3000);
+      };
+      t.addEventListener('pointerdown', start);
+      t.addEventListener('pointerup', () => {/* let it finish its 3s */});
+    })();
+
+    // ---- easter egg 5: idle 60s → a single ghost-line fades in. moves on the next breath. ----
+    (function idleWatch(){
+      const line = el('idleWatch');
+      if (!line) return;
+      let timer = null;
+      const sleep = () => {
+        line.textContent = 'still here. still watching.';
+        line.classList.add('show');
+        if (!prefersReduce()) line.classList.add('flicker');
+      };
+      const wake = () => {
+        line.classList.remove('show','flicker');
+        clearTimeout(timer);
+        timer = setTimeout(sleep, 60000);
+      };
+      ['pointermove','keydown','pointerdown','scroll','input'].forEach(ev =>
+        addEventListener(ev, wake, { passive: true }));
+      wake();
+    })();
+
     // ---- seed (only fills blank inputs; never touches saved state) ----
     const seed = {
       person: 'Willis',
@@ -389,6 +558,8 @@
     };
     for (const [k,v] of Object.entries(seed)) if (!el(k).value) el(k).value = v;
     renderHistory();
+    renderWeight();
+    updateLive();
     renderReceipt(seed);
   </script>
 </body>

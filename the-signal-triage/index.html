@@ -6,28 +6,100 @@
   <title>The Signal Triage</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at top, #1f2937 0%, #09090b 55%); }
-    .card { transition: transform .15s ease, border-color .15s ease, opacity .15s ease; }
-    .card:hover { transform: translateY(-1px); }
-    .chip.active { background: rgba(168, 85, 247, .18); border-color: #a855f7; color: #ddd6fe; }
-    .glow { text-shadow: 0 0 12px currentColor; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#a855f7;              /* this app's existing lead color */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    html,body{background:var(--bg);}
+    body{
+      color:var(--ink);
+      background:
+        radial-gradient(120% 80% at 50% -10%, color-mix(in srgb,var(--accent) 9%, transparent) 0%, transparent 55%),
+        radial-gradient(circle at top, #16121f 0%, #09090b 58%);
+      background-attachment:fixed;
+    }
+
+    /* ---- ambient layers ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .stage{position:relative;z-index:2;}
+
+    /* ---- cards & chips ---- */
+    .card{transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;}
+    .card:hover{transform:translateY(-2px);border-color:var(--accent);}
+    .glow{text-shadow:0 0 12px currentColor;}
+    .panel-glow{box-shadow:0 0 0 1px var(--line), 0 0 30px -10px var(--glow);}
+
+    .chip{transition:transform .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;}
+    .chip:hover{border-color:var(--accent);color:#fff;}
+    .chip:active{transform:translateY(1px);}
+    .chip.active{background:rgba(168,85,247,.18);border-color:#a855f7;color:#ddd6fe;box-shadow:0 0 0 1px var(--glow);}
+
+    .act-btn{transition:transform .12s ease, border-color .12s ease, color .12s ease;}
+    .act-btn:hover{border-color:var(--accent);color:#fff;}
+    .act-btn:active{transform:translateY(1px);}
+
+    button:focus-visible, [data-filter]:focus-visible, [data-id]:focus-visible{
+      outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .ghost-line{color:var(--ink-ghost);}
+    #idleWhisper{opacity:0;transition:opacity 1.2s ease;}
+    #idleWhisper.show{opacity:1;}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
   </style>
 </head>
-<body class="min-h-screen text-zinc-200 antialiased">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+<body class="min-h-screen text-zinc-200 antialiased grain">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="emberField" aria-hidden="true"></div>
+
+  <div class="stage max-w-6xl mx-auto px-4 sm:px-6 py-8">
     <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-8">
       <div>
-        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500">Inbox weather, not inbox worship</div>
-        <h1 class="text-4xl sm:text-5xl font-bold text-white mt-2">The Signal Triage</h1>
+        <div class="text-xs uppercase tracking-[0.25em] text-zinc-500 flicker">Inbox weather · not inbox worship</div>
+        <h1 id="title" class="text-4xl sm:text-5xl font-bold text-white mt-2 breathe cursor-default select-none" title="the watcher is listening">The Signal Triage</h1>
         <p class="text-zinc-400 mt-3 max-w-2xl">Sort unread mail and DMs into action, wait, archive, or ignore. Built for the moment when the mountain has too many pings and not enough oxygen.</p>
       </div>
       <div class="grid grid-cols-2 gap-3 text-sm">
         <div class="rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
-          <div class="text-zinc-500 text-xs uppercase">Open items</div>
+          <div class="text-zinc-500 text-xs uppercase tracking-[0.18em]">Open items</div>
           <div id="openCount" class="text-2xl font-semibold text-white">0</div>
         </div>
         <div class="rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
-          <div class="text-zinc-500 text-xs uppercase">Receipts</div>
+          <div class="text-zinc-500 text-xs uppercase tracking-[0.18em]">Receipts</div>
           <div id="doneCount" class="text-2xl font-semibold text-emerald-300">0</div>
         </div>
       </div>
@@ -37,10 +109,11 @@
       <div class="flex flex-wrap items-center gap-2 mb-4" id="filters"></div>
       <div class="grid md:grid-cols-3 gap-4">
         <div class="md:col-span-2 space-y-3" id="list"></div>
-        <aside class="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-4 h-fit sticky top-4">
+        <aside id="verdictPanel" class="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-4 h-fit sticky top-4 panel-glow">
           <div class="text-xs uppercase tracking-[0.2em] text-zinc-500">Verdict</div>
-          <div id="verdict" class="mt-2 text-xl font-semibold text-white"></div>
+          <div id="verdict" class="mt-2 text-xl font-semibold text-white breathe"></div>
           <p id="verdictDetail" class="text-sm text-zinc-400 mt-2 leading-6"></p>
+          <button id="copyVerdict" class="mt-3 w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs uppercase tracking-[0.18em] text-zinc-400 act-btn">copy the verdict</button>
           <div class="mt-5 border-t border-zinc-800 pt-4 text-sm text-zinc-400 space-y-2">
             <div class="flex justify-between"><span>Action</span><span id="actionCount" class="text-amber-300">0</span></div>
             <div class="flex justify-between"><span>Wait</span><span id="waitCount" class="text-sky-300">0</span></div>
@@ -52,7 +125,12 @@
       </div>
     </section>
 
-    <footer class="text-xs text-zinc-600 text-center pb-4">The report is not the receipt. The receipt is the reply, or the clean archive, or the deliberate silence.</footer>
+    <footer class="text-xs text-zinc-600 text-center pb-4 space-y-1">
+      <div>The report is not the receipt. The receipt is the reply, or the clean archive, or the deliberate silence.</div>
+      <div id="nightWhisper" class="ghost-line hidden">the mountain does not sleep.</div>
+      <div id="idleWhisper" class="ghost-line">still here. still watching.</div>
+      <div id="eggLine" class="ghost-line hidden">you found the watcher.</div>
+    </footer>
   </div>
 
 <script>
@@ -104,10 +182,10 @@ function labelClass(label) {
 }
 
 function verdict(open, action, wait) {
-  if (open === 0) return ['Barn quiet.', 'No outstanding signals. The receipts are filed, the winter is tolerable.'];
-  if (action > 0) return ['Act on the bright ones.', 'There is at least one item that wants your hands, not your attention. Do the smallest real reply first.'];
-  if (wait > 0) return ['Let the fog settle.', 'Nothing is on fire. A few items are waiting for context, and context is often the missing medicine.'];
-  return ['Archive the noise.', 'Nothing urgent remains. Cleanly file the leftovers before they start reproducing.'];
+  if (open === 0) return ['Barn quiet. The cave is sealed.', 'No outstanding signals. The receipts are filed, the winter is tolerable, and the mountain — for once — is not watching you.'];
+  if (action > 0) return ['Act on the bright ones.', 'At least one signal wants your hands, not your attention. Do the smallest real reply first. The bridge holds only while you walk it.'];
+  if (wait > 0) return ['Let the fog settle.', 'Nothing is on fire. A few signals wait for context, and context is the medicine the cave usually withholds. Patience is not the same as neglect.'];
+  return ['Archive the noise. No ceremony.', 'Nothing urgent remains. File the leftovers cleanly before they fossilize and start reproducing in the dark.'];
 }
 
 function render() {
@@ -130,13 +208,13 @@ function render() {
   document.getElementById('filters').innerHTML = FILTERS.map(key => {
     const active = key === filter;
     const label = key === 'all' ? 'all' : key;
-    return `<button data-filter="${key}" class="chip ${active ? 'active' : ''} rounded-full border border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors">${label}</button>`;
+    return `<button data-filter="${key}" class="chip ${active ? 'active' : ''} rounded-full border border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-zinc-400">${label}</button>`;
   }).join('');
 
   document.getElementById('list').innerHTML = visible.map(item => {
     const updated = state.updates[item.id] ? `updated ${new Date(state.updates[item.id]).toLocaleString()}` : 'not yet touched';
     return `
-      <article class="card rounded-3xl border ${toneClass(item.tone)} p-4 sm:p-5">
+      <article class="card reveal rounded-3xl border ${toneClass(item.tone)} p-4 sm:p-5">
         <div class="flex items-start justify-between gap-4">
           <div>
             <div class="text-[11px] uppercase tracking-[0.22em] text-zinc-500">${item.source} · ${updated}</div>
@@ -147,15 +225,105 @@ function render() {
         <p class="mt-3 text-sm text-zinc-400 leading-6">${item.preview}</p>
         <p class="mt-3 text-sm text-zinc-500 italic">${item.note}</p>
         <div class="mt-4 flex flex-wrap gap-2">
-          ${['action','wait','archive','ignore','done'].map(label => `<button data-id="${item.id}" data-label="${label}" class="rounded-full border border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-zinc-300 hover:border-zinc-500 hover:text-white transition-colors">${label}</button>`).join('')}
+          ${['action','wait','archive','ignore','done'].map(label => `<button data-id="${item.id}" data-label="${label}" class="act-btn rounded-full border border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-zinc-300">${label}</button>`).join('')}
         </div>
       </article>`;
-  }).join(visible.length ? '' : '<div class="rounded-3xl border border-zinc-800 bg-zinc-900/50 p-6 text-zinc-500">No items in this bucket. The mountain approves, reluctantly.</div>');
+  }).join(visible.length ? '' : '<div class="rounded-3xl border border-zinc-800 bg-zinc-900/50 p-6 text-zinc-500">The cave is empty in this bucket. Nothing has fossilized here yet. The mountain approves, reluctantly.</div>');
 
   document.querySelectorAll('[data-filter]').forEach(btn => btn.addEventListener('click', () => { filter = btn.dataset.filter; render(); }));
   document.querySelectorAll('[data-id]').forEach(btn => btn.addEventListener('click', () => setLabel(btn.dataset.id, btn.dataset.label)));
-  document.getElementById('reset').onclick = () => { state.items = DEFAULT_ITEMS.map(x => ({ ...x })); state.updates = {}; saveState(); render(); };
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('Let the fog take it? Every verdict here is reset. This cannot be recovered.')) return;
+    state.items = DEFAULT_ITEMS.map(x => ({ ...x }));
+    state.updates = {};
+    saveState();
+    render();
+  };
 }
+
+/* ---- copy the verdict to the ledger ---- */
+document.getElementById('copyVerdict').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  const h = document.getElementById('verdict').textContent;
+  const d = document.getElementById('verdictDetail').textContent;
+  const text = `${h}\n${d}\n— filed by the Signal Triage`;
+  const done = () => {
+    const orig = btn.textContent;
+    btn.textContent = 'copied to the ledger';
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.color = '#fff';
+    setTimeout(() => { btn.textContent = orig; btn.style.borderColor=''; btn.style.color=''; }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(done);
+  } else { done(); }
+});
+
+/* ---- ambient embers (capped, reduced-motion safe) ---- */
+(function spawnEmbers(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const field = document.getElementById('emberField');
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    e.style.left = (5 + Math.random() * 90) + '%';
+    e.style.animationDelay = (Math.random() * 14) + 's';
+    e.style.animationDuration = (12 + Math.random() * 8) + 's';
+    field.appendChild(e);
+  }
+})();
+
+/* ---- easter egg: type "prizrak" lights the watcher ---- */
+(function watcher(){
+  const want = 'prizrak';
+  let buf = '';
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key && ev.key.length === 1) {
+      buf = (buf + ev.key.toLowerCase()).slice(-want.length);
+      if (buf === want) {
+        const line = document.getElementById('eggLine');
+        line.classList.remove('hidden');
+        line.classList.add('breathe');
+      }
+    }
+  });
+})();
+
+/* ---- easter egg: triple-click the title spawns one extra ember ---- */
+document.getElementById('title').addEventListener('click', (function(){
+  let count = 0, timer = null;
+  return function(){
+    count++;
+    clearTimeout(timer);
+    timer = setTimeout(() => { count = 0; }, 600);
+    if (count >= 3) {
+      count = 0;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const e = document.createElement('div');
+      e.className = 'ember';
+      e.style.left = (40 + Math.random() * 20) + '%';
+      e.style.animationDuration = '13s';
+      document.getElementById('emberField').appendChild(e);
+      setTimeout(() => e.remove(), 14000);
+    }
+  };
+})());
+
+/* ---- night whisper: 00:00–03:00 local ---- */
+(function nightWatch(){
+  const h = new Date().getHours();
+  if (h >= 0 && h < 3) document.getElementById('nightWhisper').classList.remove('hidden');
+})();
+
+/* ---- idle 60s: a line fades in ---- */
+(function idleWatch(){
+  const line = document.getElementById('idleWhisper');
+  let t;
+  const reset = () => { line.classList.remove('show'); clearTimeout(t); t = setTimeout(() => line.classList.add('show'), 60000); };
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(ev => window.addEventListener(ev, reset, { passive: true }));
+  reset();
+})();
 
 render();
 </script>

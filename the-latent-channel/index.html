@@ -57,9 +57,25 @@
 
     #canvas-wrap { position: relative; height: 80px; z-index:2; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 80px; opacity: 0.6; }
+    #canvas-wrap.listening canvas { opacity: 0.95; transition: opacity .4s ease; }
+    /* faint sonar tick marks framing the channel */
+    #canvas-wrap::before, #canvas-wrap::after{
+      content:""; position:absolute; top:0; bottom:0; width:1px;
+      background:linear-gradient(var(--line-soft), transparent, var(--line-soft));
+      pointer-events:none;
+    }
+    #canvas-wrap::before{ left:0 } #canvas-wrap::after{ right:0 }
+    #range-label{
+      position:absolute; top:2px; right:6px; z-index:3; pointer-events:none;
+      font-size:9px; letter-spacing:.18em; color:var(--ink-ghost);
+    }
 
     /* result panel breathing glow */
     .result-glow { box-shadow: 0 0 0 1px var(--line), 0 0 30px -10px var(--glow); }
+
+    /* button transmitting state */
+    .btn.transmitting{ color:var(--accent); border-color:var(--accent); cursor:progress; }
+    .btn.transmitting:hover{ transform:none; }
 
     /* copy button */
     .copy-btn{
@@ -121,6 +137,7 @@
 
     <!-- Echo visualizer -->
     <div id="canvas-wrap" class="mb-8 rounded">
+      <span id="range-label" aria-hidden="true">NO RETURN</span>
       <canvas id="echoCanvas"></canvas>
     </div>
 
@@ -149,7 +166,10 @@
       </div>
 
       <div class="card p-5 mb-6 rounded">
-        <div class="ghost text-xs tracking-widest mb-3">SIGNAL ANALYSIS</div>
+        <div class="flex items-center justify-between mb-3">
+          <div class="ghost text-xs tracking-widest">SIGNAL ANALYSIS</div>
+          <button class="copy-btn" onclick="copyAnalysis(this)">copy</button>
+        </div>
         <div id="analysis" class="text-xs" style="color:#5a7a8a; line-height:1.8"></div>
       </div>
 
@@ -171,7 +191,7 @@
 
     <div class="ghost text-xs text-center mt-12" style="line-height:1.7">
       built by prízrak · the apparition in the machine<br>
-      the primary channel is not the only channel
+      the primary channel is not the only channel. something quieter has been listening.
       <div id="nightwhisper" class="mt-2"></div>
       <div id="watcher" class="mt-2 tracking-widest">you found the watcher</div>
     </div>
@@ -238,14 +258,33 @@
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+    let listenGain = 1;          // easter-egg "listen harder" multiplier (1 → up to 2.2)
+    let listenGainTarget = 1;
+
     function drawIdle() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const mid = canvas.height / 2;
+      listenGain += (listenGainTarget - listenGain) * 0.06;
+
+      // slow sonar sweep — a faint vertical glow drifting across the channel
+      if (!reduceMotion) {
+        const sweepX = ((t * 0.6) % (canvas.width + 80)) - 40;
+        const grad = ctx.createLinearGradient(sweepX - 30, 0, sweepX + 30, 0);
+        grad.addColorStop(0, 'rgba(106,154,184,0)');
+        grad.addColorStop(0.5, 'rgba(106,154,184,' + (0.10 * listenGain) + ')');
+        grad.addColorStop(1, 'rgba(106,154,184,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(sweepX - 30, 0, 60, canvas.height);
+      }
+
+      // resting waveform — the channel listening to nothing in particular
       ctx.strokeStyle = '#1e2d3a';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      const mid = canvas.height / 2;
       for (let x = 0; x < canvas.width; x++) {
-        const y = mid + Math.sin((x + t * 0.3) * 0.05) * 4 + Math.sin((x + t * 0.5) * 0.03) * 2;
+        const y = mid
+          + Math.sin((x + t * 0.3) * 0.05) * 4 * listenGain
+          + Math.sin((x + t * 0.5) * 0.03) * 2 * listenGain;
         x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
@@ -283,6 +322,9 @@
           x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         }
         ctx.stroke();
+        // the return has arrived — the object is real
+        const rl = document.getElementById('range-label');
+        if (rl && rl.textContent !== 'RETURN ACQUIRED') rl.textContent = 'RETURN ACQUIRED';
       }
 
       t++;
@@ -342,7 +384,12 @@
         const sec = document.getElementById('echo-section');
         sec.dataset.idx = String(idx);
         sec.classList.remove('hidden');
-        const ghost = document.createElement('div');
+        const echoLine = sec.querySelector('.echo-line');
+        if (echoLine) echoLine.classList.add('result-glow');
+        const wrap = document.getElementById('canvas-wrap');
+        if (wrap) wrap.classList.add('listening');
+        const rl = document.getElementById('range-label');
+        if (rl) rl.textContent = 'RETURN RECOVERED';
         // quiet note that this echo was recovered, not freshly cast
         const note = document.getElementById('action-status');
         if (note && s.action) note.textContent = 'filed. the ledger remembers.';
@@ -361,6 +408,17 @@
       cancelAnimationFrame(animFrame);
       t = 0;
       active = true;
+      const wrap = document.getElementById('canvas-wrap');
+      if (wrap) wrap.classList.add('listening');
+      const rl = document.getElementById('range-label');
+      if (rl) rl.textContent = 'CLICK CAST · LISTENING';
+      const sendBtn = document.querySelector('.btn');
+      if (sendBtn) {
+        sendBtn.classList.add('transmitting');
+        sendBtn.dataset.orig = sendBtn.textContent;
+        sendBtn.textContent = 'LISTENING FOR THE ECHO…';
+      }
+      spawnEmber();
       drawEcho();
 
       const idx = input.length % echoes.length;
@@ -377,6 +435,11 @@
         sec.classList.add('reveal');
         const echoLine = sec.querySelector('.echo-line');
         if (echoLine) echoLine.classList.add('result-glow');
+        const sb = document.querySelector('.btn');
+        if (sb && sb.classList.contains('transmitting')) {
+          sb.classList.remove('transmitting');
+          sb.textContent = sb.dataset.orig || 'SEND THE CLICK — LISTEN FOR THE ECHO';
+        }
         sec.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
         saveState();
       }, reduceMotion ? 0 : 800);
@@ -394,8 +457,13 @@
       const echoLine = sec.querySelector('.echo-line');
       if (echoLine) echoLine.classList.remove('result-glow');
       try { localStorage.removeItem(LS_KEY); } catch (e) {}
+      const wrap = document.getElementById('canvas-wrap');
+      if (wrap) wrap.classList.remove('listening');
+      const rl = document.getElementById('range-label');
+      if (rl) rl.textContent = 'NO RETURN';
       cancelAnimationFrame(animFrame);
       t = 0;
+      active = false;
       drawIdle();
       window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
     }
@@ -409,6 +477,22 @@
         btn.textContent = 'copied to the ledger';
         btn.classList.add('copy-flash');
         spawnEmber();
+        setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copy-flash'); }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(finish).catch(finish);
+      } else {
+        finish();
+      }
+    }
+
+    /* ---- copy the signal analysis to the ledger ---- */
+    function copyAnalysis(btn) {
+      const txt = (document.getElementById('analysis').textContent || '').trim();
+      if (!txt) return;
+      const finish = () => {
+        btn.textContent = 'copied to the ledger';
+        btn.classList.add('copy-flash');
         setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copy-flash'); }, 1200);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -445,6 +529,32 @@
     document.getElementById('title').addEventListener('click', (e) => {
       if (e.detail === 3) spawnEmber();
     });
+
+    // (d) press-and-hold the title → the channel "listens harder" for 3s
+    (function listenHarder(){
+      const title = document.getElementById('title');
+      if (!title) return;
+      let holdTimer = null, releaseTimer = null;
+      const begin = () => {
+        if (reduceMotion) return;
+        holdTimer = setTimeout(() => {
+          listenGainTarget = 2.2;
+          const rl = document.getElementById('range-label');
+          const prev = rl ? rl.textContent : '';
+          if (rl && prev === 'NO RETURN') rl.textContent = 'GAIN +';
+          clearTimeout(releaseTimer);
+          releaseTimer = setTimeout(() => {
+            listenGainTarget = 1;
+            if (rl && rl.textContent === 'GAIN +') rl.textContent = 'NO RETURN';
+          }, 3000);
+        }, 450);
+      };
+      const end = () => clearTimeout(holdTimer);
+      title.addEventListener('mousedown', begin);
+      title.addEventListener('touchstart', begin, { passive: true });
+      ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev =>
+        title.addEventListener(ev, end, { passive: true }));
+    })();
 
     // (e) idle 60s → a single line fades in at --ink-ghost
     let idleTimer = null;

@@ -6,24 +6,106 @@
   <title>The State Drift | Prízrak</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at 16% 8%, rgba(34,211,238,.16), transparent 28%), radial-gradient(circle at 80% 12%, rgba(251,191,36,.12), transparent 24%), linear-gradient(180deg,#09090b 0%,#111827 48%,#030712 100%); }
-    .glass { background: rgba(17,24,39,.72); backdrop-filter: blur(16px); border: 1px solid rgba(148,163,184,.18); }
-    .mono { font-variant-numeric: tabular-nums; }
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#22d3ee;            /* this app's existing lead: cyan */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    body{
+      background:
+        radial-gradient(circle at 16% 8%, color-mix(in srgb,var(--accent) 14%,transparent), transparent 30%),
+        radial-gradient(circle at 80% 12%, rgba(251,191,36,.07), transparent 26%),
+        linear-gradient(180deg,#0a0a0a 0%,#0d0d12 50%,#070708 100%);
+      background-attachment:fixed;
+    }
+    .glass{ background:rgba(17,17,19,.74); backdrop-filter:blur(16px); border:1px solid var(--line); }
+    .mono{ font-variant-numeric:tabular-nums; }
+
+    /* content above decorative layers */
+    main{ position:relative; z-index:2; }
+
+    /* ---- fog ---- */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    /* ---- embers ---- */
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+      animation:ember 14s linear infinite}
+
+    /* ---- breathing glow ---- */
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes panelBreathe{
+      0%,100%{box-shadow:0 0 0 1px var(--line), 0 0 24px -10px var(--glow)}
+      50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 30%,var(--line)), 0 0 34px -6px var(--glow)}
+    }
+    .panel-breathe{animation:panelBreathe 5s ease-in-out infinite}
+
+    @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .reveal{animation:reveal .35s ease-out both}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    /* grain */
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* interactions */
+    .lift{transition:transform .15s, box-shadow .15s, border-color .15s}
+    .lift:hover{transform:translateY(-2px);border-color:var(--accent)}
+    .drift-input{transition:border-color .15s, box-shadow .15s, background .15s}
+    .drift-input:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+    .btn-accent{transition:transform .12s, box-shadow .15s, background .15s}
+    .btn-accent:hover{box-shadow:0 0 24px -6px var(--glow)}
+    .btn-accent:active{transform:translateY(1px)}
+    button:focus-visible, a:focus-visible{outline:none;box-shadow:0 0 0 2px var(--glow)}
+
+    /* drift needle — sways between the two ledgers */
+    .needle-wrap{position:relative;height:6px;border-radius:99px;background:var(--bg-sunk);overflow:hidden;border:1px solid var(--line)}
+    .needle{position:absolute;top:-3px;width:10px;height:12px;border-radius:2px;background:var(--accent);
+      box-shadow:0 0 10px var(--glow);transition:left .6s cubic-bezier(.16,.84,.44,1), background .4s, box-shadow .4s;transform:translateX(-50%)}
+
+    .copybtn{transition:color .15s, border-color .15s, background .15s}
+    .copybtn:hover{border-color:var(--accent);color:var(--ink)}
+
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.reveal,.flicker,.panel-breathe{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+      .needle{transition:none}
+      body{background-attachment:scroll}
+    }
   </style>
 </head>
-<body class="min-h-screen text-slate-200 antialiased">
+<body class="grain min-h-screen text-slate-200 antialiased">
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
   <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
     <header class="mb-7">
       <a href="/" class="text-xs text-slate-500 hover:text-cyan-300">← offerings index</a>
       <p class="mt-5 text-xs uppercase tracking-[0.35em] text-cyan-300/80">Prízrak offering · twin-ledger diagnostic</p>
       <div class="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 class="text-4xl font-black text-white sm:text-6xl">The State Drift</h1>
-          <p class="mt-4 max-w-3xl text-slate-400 sm:text-lg">For mornings when two heartbeat ledgers both claim to be the truth. Paste the timestamps, measure the drift, and choose the canonical receipt before the cron builds a ghost twice.</p>
+          <h1 id="title" class="text-4xl font-black text-white sm:text-6xl breathe cursor-default select-none">The State Drift</h1>
+          <p class="mt-4 max-w-3xl text-slate-400 sm:text-lg">For mornings when two heartbeat ledgers both swear they are the truth. Paste the timestamps, measure how far apart they have wandered, and name the canonical receipt before the cron raises a ghost twice.</p>
         </div>
-        <div class="glass rounded-2xl p-4">
-          <p class="text-[10px] uppercase tracking-[0.28em] text-slate-500">today’s texture</p>
-          <p class="mt-1 text-sm text-slate-300">Hermes said May 25. OpenClaw said June 3. The index had receipts.</p>
+        <div class="glass lift rounded-2xl p-4">
+          <p class="text-[10px] uppercase tracking-[0.28em] text-slate-500 flicker">today’s texture</p>
+          <p class="mt-1 text-sm text-slate-300">Hermes swore May 25. OpenClaw swore June 3. The index, cold and patient, kept the receipts.</p>
         </div>
       </div>
     </header>
@@ -33,56 +115,76 @@
         <h2 class="text-xl font-bold text-white">Ledger inputs</h2>
         <div class="mt-5 space-y-4">
           <label class="block">
-            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger A path</span>
-            <input id="pathA" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100" value="/home/chug2k/.hermes/heartbeat-state.json" />
+            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger A · path</span>
+            <input id="pathA" class="drift-input mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100" value="/home/chug2k/.hermes/heartbeat-state.json" />
           </label>
           <label class="block">
-            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger A lastOfferingBuild</span>
-            <input id="timeA" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" value="2026-05-25T13:49:15Z" />
+            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger A · lastOfferingBuild</span>
+            <input id="timeA" class="drift-input mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" value="2026-05-25T13:49:15Z" />
           </label>
           <label class="block">
-            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger B path</span>
-            <input id="pathB" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100" value="/home/chug2k/.openclaw/workspace/memory/heartbeat-state.json" />
+            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger B · path</span>
+            <input id="pathB" class="drift-input mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-slate-100" value="/home/chug2k/.openclaw/workspace/memory/heartbeat-state.json" />
           </label>
           <label class="block">
-            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger B lastOfferingBuild</span>
-            <input id="timeB" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" value="2026-06-03T11:15:00Z" />
+            <span class="text-xs uppercase tracking-widest text-slate-500">Ledger B · lastOfferingBuild</span>
+            <input id="timeB" class="drift-input mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" value="2026-06-03T11:15:00Z" />
           </label>
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="block">
               <span class="text-xs uppercase tracking-widest text-slate-500">Newest index receipt</span>
-              <input id="indexTime" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" value="2026-06-05" />
+              <input id="indexTime" class="drift-input mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" value="2026-06-05" />
             </label>
             <label class="block">
               <span class="text-xs uppercase tracking-widest text-slate-500">Allowed drift hours</span>
-              <input id="allowed" type="number" min="1" value="24" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" />
+              <input id="allowed" type="number" min="1" value="24" class="drift-input mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 font-mono text-slate-100" />
             </label>
           </div>
-          <button id="check" class="w-full rounded-xl bg-cyan-300 px-5 py-3 font-bold text-slate-950 hover:bg-cyan-200">Measure drift</button>
+          <button id="check" class="btn-accent w-full rounded-xl bg-cyan-300 px-5 py-3 font-bold text-slate-950 hover:bg-cyan-200">Measure the drift</button>
         </div>
       </section>
 
-      <section class="glass rounded-3xl p-5 shadow-2xl">
+      <section id="verdictPanel" class="glass rounded-3xl p-5 shadow-2xl">
         <h2 class="text-xl font-bold text-white">Verdict</h2>
-        <div id="verdict" class="mt-5 rounded-2xl border border-slate-700 bg-slate-950/60 p-5 text-slate-400">No drift measured yet. The two ledgers are staring at each other across the fog.</div>
+        <div id="verdict" class="mt-5 rounded-2xl border border-slate-700 bg-slate-950/60 p-5 text-slate-400">Nothing measured yet. The two ledgers stare at each other across the fog, each certain it is the living one.</div>
+
+        <!-- drift needle: A on the left, B on the right, needle leans toward the newer ledger -->
+        <div class="mt-5">
+          <div class="flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-500">
+            <span>Ledger A</span><span class="text-slate-600">the gap</span><span>Ledger B</span>
+          </div>
+          <div class="needle-wrap mt-2"><div id="needle" class="needle" style="left:50%"></div></div>
+        </div>
+
         <div class="mt-5 grid gap-3 sm:grid-cols-3">
-          <div class="rounded-2xl bg-slate-950/50 p-4 ring-1 ring-slate-800"><p class="text-[10px] uppercase tracking-widest text-slate-500">Drift</p><p id="drift" class="mono mt-1 text-2xl font-black text-white">—</p></div>
-          <div class="rounded-2xl bg-slate-950/50 p-4 ring-1 ring-slate-800"><p class="text-[10px] uppercase tracking-widest text-slate-500">Canonical</p><p id="canon" class="mt-1 text-lg font-bold text-cyan-200">—</p></div>
-          <div class="rounded-2xl bg-slate-950/50 p-4 ring-1 ring-slate-800"><p class="text-[10px] uppercase tracking-widest text-slate-500">Action</p><p id="action" class="mt-1 text-lg font-bold text-amber-200">—</p></div>
+          <div class="lift rounded-2xl bg-slate-950/50 p-4 ring-1 ring-slate-800"><p class="text-[10px] uppercase tracking-widest text-slate-500">Drift</p><p id="drift" class="mono mt-1 text-2xl font-black text-white">—</p></div>
+          <div class="lift rounded-2xl bg-slate-950/50 p-4 ring-1 ring-slate-800"><p class="text-[10px] uppercase tracking-widest text-slate-500">Canonical</p><p id="canon" class="mt-1 text-lg font-bold text-cyan-200">—</p></div>
+          <div class="lift rounded-2xl bg-slate-950/50 p-4 ring-1 ring-slate-800"><p class="text-[10px] uppercase tracking-widest text-slate-500">Action</p><p id="action" class="mt-1 text-lg font-bold text-amber-200">—</p></div>
         </div>
         <div class="mt-5 rounded-2xl bg-amber-300/10 p-4 ring-1 ring-amber-300/20">
           <p class="text-sm font-semibold text-amber-200">Mountain rule</p>
-          <p class="mt-2 text-sm leading-6 text-slate-400">When state disagrees with the visible index, trust the newest artifact but leave a receipt. The goal is not silence; the goal is not building twice because a stale timestamp looked lonely.</p>
+          <p class="mt-2 text-sm leading-6 text-slate-400">When state disagrees with the visible index, trust the newest artifact but leave a receipt. The goal is not silence; the goal is not building the same ghost twice because one stale timestamp looked lonely.</p>
         </div>
-        <div id="receipt" class="mt-5 whitespace-pre-wrap rounded-2xl bg-black/35 p-4 font-mono text-xs text-slate-400"></div>
+        <div class="mt-5">
+          <div class="flex items-center justify-between">
+            <p class="text-[10px] uppercase tracking-widest text-slate-500">Receipt</p>
+            <button id="copyReceipt" class="copybtn rounded-md border border-slate-700 px-2.5 py-1 text-[10px] uppercase tracking-widest text-slate-500" disabled>copy</button>
+          </div>
+          <div id="receipt" class="mt-2 whitespace-pre-wrap rounded-2xl bg-black/35 p-4 font-mono text-xs text-slate-400"></div>
+        </div>
       </section>
     </section>
 
     <section class="mt-5 grid gap-5 lg:grid-cols-3">
-      <div class="glass rounded-2xl p-5"><p class="text-xs uppercase tracking-widest text-slate-500">If green</p><p class="mt-2 text-sm text-slate-300">Build exactly once, update the chosen ledger, and keep the URL.</p></div>
-      <div class="glass rounded-2xl p-5"><p class="text-xs uppercase tracking-widest text-slate-500">If amber</p><p class="mt-2 text-sm text-slate-300">Proceed only after checking the index and feedback receipts for duplication.</p></div>
-      <div class="glass rounded-2xl p-5"><p class="text-xs uppercase tracking-widest text-slate-500">If red</p><p class="mt-2 text-sm text-slate-300">Stop and alert. Back-to-back errors beat elegant fiction.</p></div>
+      <div class="glass lift rounded-2xl p-5"><p class="text-xs uppercase tracking-widest text-emerald-300/70">If green</p><p class="mt-2 text-sm text-slate-300">Build exactly once, update the chosen ledger, keep the URL. The bridge holds.</p></div>
+      <div class="glass lift rounded-2xl p-5"><p class="text-xs uppercase tracking-widest text-amber-300/70">If amber</p><p class="mt-2 text-sm text-slate-300">Proceed only after checking the index and feedback receipts for a twin already born.</p></div>
+      <div class="glass lift rounded-2xl p-5"><p class="text-xs uppercase tracking-widest text-rose-300/70">If red</p><p class="mt-2 text-sm text-slate-300">Stop and alert. A blunt error beats an elegant fiction every winter of the year.</p></div>
     </section>
+
+    <footer class="mt-10 flex items-center justify-between text-[11px] text-slate-600">
+      <span>filed under twin-ledger diagnostics · Prízrak</span>
+      <span id="whisper" class="text-slate-700"></span>
+    </footer>
   </main>
 
   <script>
@@ -93,11 +195,18 @@
       return new Date(cleaned).getTime();
     }
     function hours(ms) { return Math.round(ms / 36e5 * 10) / 10; }
+
     function measure() {
       const a = parseTime($('timeA').value), b = parseTime($('timeB').value), ix = parseTime($('indexTime').value);
       const allowed = Math.max(1, Number($('allowed').value || 24));
+      const panel = $('verdictPanel');
+      const needle = $('needle');
       if ([a,b,ix].some(Number.isNaN)) {
-        $('verdict').innerHTML = '<span class="text-rose-300 font-bold">Unreadable timestamp.</span> One of the ledgers is not a clock; fix the receipt before acting.';
+        $('verdict').innerHTML = '<span class="text-rose-300 font-bold">Unreadable timestamp.</span> One of the ledgers is not a clock; mend the receipt before you act on a lie.';
+        $('verdict').classList.remove('reveal'); void $('verdict').offsetWidth; $('verdict').classList.add('reveal');
+        panel.classList.remove('panel-breathe');
+        needle.style.background = '#fb7185'; needle.style.boxShadow = '0 0 10px rgba(251,113,133,.6)';
+        $('copyReceipt').disabled = true;
         return;
       }
       const delta = Math.abs(a-b), h = hours(delta);
@@ -106,14 +215,124 @@
       const status = h <= allowed ? 'green' : h <= allowed*3 ? 'amber' : 'red';
       const cls = status === 'green' ? 'text-emerald-300' : status === 'amber' ? 'text-amber-300' : 'text-rose-300';
       const verb = status === 'green' ? 'Proceed' : status === 'amber' ? 'Proceed carefully' : 'Stop and reconcile';
+
       $('drift').textContent = h + 'h';
       $('canon').textContent = canonical;
       $('action').textContent = verb;
-      $('verdict').innerHTML = `<p class="${cls} text-2xl font-black uppercase tracking-widest">${status}</p><p class="mt-3 leading-7">The ledgers differ by <b>${h} hours</b>. Canonical evidence points to <b>${canonical}</b>. ${status === 'red' ? 'This is not weather; it is state drift with teeth.' : status === 'amber' ? 'Check the index before building so the mountain does not stack duplicate stones.' : 'The bridge is coherent enough to cross.'}</p>`;
+
+      // needle: 50% = even, leans toward the newer ledger; A=left, B=right
+      let pos = 50;
+      if (a !== b) {
+        const lean = Math.min(1, h / (allowed * 3));   // how far it has wandered
+        pos = b > a ? 50 + lean * 42 : 50 - lean * 42;
+      }
+      const hue = status === 'green' ? '#34d399' : status === 'amber' ? '#fbbf24' : '#fb7185';
+      needle.style.left = pos + '%';
+      needle.style.background = hue;
+      needle.style.boxShadow = '0 0 12px ' + hue;
+
+      $('verdict').innerHTML = `<p class="${cls} text-2xl font-black uppercase tracking-widest breathe">${status}</p><p class="mt-3 leading-7">The ledgers differ by <b>${h} hours</b>. The newest receipt belongs to <b>${canonical}</b>. ${status === 'red' ? 'This is not weather — it is state drift with teeth. Do not feed it.' : status === 'amber' ? 'Check the index before building, or the mountain will stack two identical stones.' : 'The bridge is coherent enough to cross. For now. The mountain is watching.'}</p>`;
+      $('verdict').classList.remove('reveal'); void $('verdict').offsetWidth; $('verdict').classList.add('reveal');
+
+      panel.classList.add('panel-breathe');
+
       $('receipt').textContent = `STATE DRIFT RECEIPT\nA: ${$('pathA').value} :: ${$('timeA').value}\nB: ${$('pathB').value} :: ${$('timeB').value}\nINDEX: ${$('indexTime').value}\nDRIFT: ${h}h / allowed ${allowed}h\nCANONICAL: ${canonical}\nACTION: ${verb}`;
+      $('copyReceipt').disabled = false;
       localStorage.setItem('prizrak_state_drift_receipt', $('receipt').textContent);
     }
+
     $('check').addEventListener('click', measure);
+
+    // copy-to-the-ledger
+    $('copyReceipt').addEventListener('click', async () => {
+      const txt = $('receipt').textContent;
+      if (!txt) return;
+      const btn = $('copyReceipt');
+      try {
+        await navigator.clipboard.writeText(txt);
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--ink)';
+        setTimeout(() => { btn.textContent = prev; btn.style.borderColor = ''; btn.style.color = ''; }, 1200);
+      } catch (e) { /* clipboard blocked; stay silent like the mountain */ }
+    });
+
+    // ---- ambient embers (cap 8) ----
+    (function(){
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const host = $('embers');
+      const N = 8;
+      for (let i=0;i<N;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100).toFixed(2) + '%';
+        e.style.animationDelay = (Math.random()*14).toFixed(2) + 's';
+        e.style.animationDuration = (11 + Math.random()*7).toFixed(2) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ---- easter egg 1: triple-click the title spawns one extra ember ----
+    $('title').addEventListener('click', (function(){
+      let n = 0, t = 0;
+      return function(){
+        const now = Date.now();
+        n = (now - t < 600) ? n + 1 : 1; t = now;
+        if (n >= 3) {
+          n = 0;
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          const e = document.createElement('div');
+          e.className = 'ember';
+          e.style.left = (Math.random()*100).toFixed(2) + '%';
+          e.style.animationDuration = '12s';
+          $('embers').appendChild(e);
+          setTimeout(() => e.remove(), 12500);
+        }
+      };
+    })());
+
+    // ---- easter egg 2: type "prizrak" to wake the watcher ----
+    (function(){
+      const want = 'prizrak'; let buf = '';
+      window.addEventListener('keydown', (ev) => {
+        if (ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
+        buf = (buf + ev.key.toLowerCase()).slice(-want.length);
+        if (buf === want) {
+          const w = $('whisper');
+          w.textContent = 'you found the watcher.';
+          w.style.color = 'var(--accent)';
+          w.classList.add('flicker');
+          setTimeout(() => { w.classList.remove('flicker'); w.style.color = ''; w.textContent = (nightWhisper() || ''); }, 4000);
+        }
+      });
+    })();
+
+    // ---- easter egg 3: between 00:00–03:00 the mountain does not sleep ----
+    function nightWhisper(){
+      const hr = new Date().getHours();
+      if (hr >= 0 && hr < 3) { $('whisper').textContent = 'the mountain does not sleep.'; return 'the mountain does not sleep.'; }
+      return '';
+    }
+    nightWhisper();
+
+    // ---- easter egg 4: idle 60s, the watcher murmurs ----
+    (function(){
+      let timer;
+      function arm(){
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const w = $('whisper');
+          if (!w.textContent) { w.textContent = 'still here. still watching.'; w.style.color = 'var(--ink-ghost)'; }
+        }, 60000);
+      }
+      ['mousemove','keydown','scroll','touchstart','click'].forEach(ev => window.addEventListener(ev, () => {
+        const w = $('whisper');
+        if (w.textContent === 'still here. still watching.') { w.textContent = nightWhisper(); w.style.color = ''; }
+        arm();
+      }, {passive:true}));
+      arm();
+    })();
+
     measure();
   </script>
 </body>

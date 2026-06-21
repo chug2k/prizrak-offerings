@@ -6,23 +6,138 @@
     <title>The Serendipity Box</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            background-color: #000;
-            color: #fff;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#7cc4e8;            /* cool aurora-blue: whispers from the past */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        *{box-sizing:border-box}
+        body{
+            background-color:var(--bg);
+            color:var(--ink);
+            font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            margin:0;
+        }
+
+        /* ---- atmosphere ---- */
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate}
+
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .4s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        /* ---- structure ---- */
+        .panel{
+            background:var(--bg-raised);
+            border:1px solid var(--line);
+            box-shadow:0 0 0 1px var(--line), 0 0 60px -30px var(--glow);
+            transition:box-shadow .4s ease;
+        }
+        .panel.lit{ box-shadow:0 0 0 1px var(--line), 0 0 34px -8px var(--glow); }
+
+        .label{ color:var(--ink-dim); letter-spacing:.28em; }
+
+        .well{
+            background:var(--bg-sunk);
+            border:1px solid var(--line-soft);
+        }
+
+        #action-btn{
+            background:transparent;
+            color:var(--ink);
+            border:1px solid var(--line);
+            transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease, background-color .15s ease;
+        }
+        #action-btn:hover{
+            transform:translateY(-2px);
+            border-color:var(--accent);
+            color:#06121a;
+            background:var(--accent);
+            box-shadow:0 0 24px -6px var(--glow);
+        }
+        #action-btn:active{ transform:translateY(1px); box-shadow:none; }
+        #action-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+        #copy-btn{
+            color:var(--ink-dim);
+            border:1px solid var(--line-soft);
+            transition:color .15s ease, border-color .15s ease, transform .12s ease;
+        }
+        #copy-btn:hover{ color:var(--accent); border-color:var(--accent); transform:translateY(-1px); }
+        #copy-btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+        #copy-btn.flash{ color:var(--accent); border-color:var(--accent); }
+
+        h1{ color:var(--ink); cursor:default; }
+
+        .ghost-line{ color:var(--ink-ghost); }
+        #watcher{ opacity:0; transition:opacity 1.2s ease; }
+        #watcher.show{ opacity:1; }
+        #idle-line{ opacity:0; transition:opacity 2s ease; }
+        #idle-line.show{ opacity:1; }
+        #nocturne{ opacity:0; transition:opacity 2s ease; }
+        #nocturne.show{ opacity:.7; }
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker{opacity:1!important}
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen overflow-hidden p-4">
-    <div class="max-w-md w-full text-center border-2 border-white p-8">
-        <h1 class="text-2xl font-bold mb-6 uppercase tracking-widest">The Serendipity Box</h1>
-        <div id="content" class="min-h-[120px] flex items-center justify-center mb-8 text-lg italic">
-            Click the button to find a small truth.
+<body class="grain flex items-center justify-center min-h-screen overflow-hidden p-4">
+    <div class="fog" aria-hidden="true"></div>
+    <div id="embers" aria-hidden="true"></div>
+
+    <main class="relative max-w-md w-full" style="z-index:2">
+        <div class="panel p-8 text-center">
+            <div class="label text-[10px] mb-3 flicker">THE LEDGER OF SMALL TRUTHS</div>
+            <h1 id="title" class="breathe text-2xl font-bold mb-2 uppercase tracking-[0.2em]">The Serendipity Box</h1>
+            <p class="label text-[10px] mb-6">DRAW 00 / AWAITING</p>
+
+            <div id="content" class="well min-h-[128px] flex items-center justify-center mb-5 px-5 py-6 text-lg italic text-[var(--ink-dim)]">
+                the box is shut. something small waits inside.
+            </div>
+
+            <button id="action-btn" class="w-full py-3 px-6 text-lg font-bold uppercase tracking-[0.15em]">
+                Open the Box
+            </button>
+
+            <button id="copy-btn" class="hidden mt-3 w-full py-2 px-4 text-[11px] uppercase tracking-[0.2em]">
+                copy to the ledger
+            </button>
+
+            <p id="watcher" class="ghost-line mt-6 text-[10px] tracking-[0.2em] lowercase">you found the watcher.</p>
+            <p id="idle-line" class="ghost-line mt-2 text-[10px] tracking-[0.2em] lowercase">still here. still watching.</p>
         </div>
-        <button id="action-btn" class="w-full border-2 border-white py-3 px-6 text-xl font-bold hover:bg-white hover:text-black transition-colors duration-200 uppercase">
-            Seek Serendipity
-        </button>
-    </div>
+
+        <footer class="mt-4 text-center text-[10px] label">
+            <span>prízrak keeps the count.</span>
+            <span id="nocturne" class="ghost-line block mt-1 lowercase">the mountain does not sleep.</span>
+        </footer>
+    </main>
 
     <script>
         const serendipities = [
@@ -45,20 +160,167 @@
             "The universe is expanding, yet we find connection in the small spaces.",
             "In the stillness of the mountain, everything is heard.",
             "The simplest truths are often the most profound.",
-            "Complexity arises from simple rules, just like life."
+            "Complexity arises from simple rules, just like life.",
+            "Karst caves keep one temperature all year; the mountain refuses to be rushed.",
+            "Bears do not truly sleep through winter. They wake, listen, and decide to stay.",
+            "Snow is not silent. It is a thousand crystals agreeing to be still.",
+            "The High Tatras hold ice older than every name you have ever forgotten.",
+            "A threshold is the only door that remembers which way you went."
         ];
+
+        const STORE_KEY = "serendipity-box-state";  // new, additive — never present before
 
         const contentDiv = document.getElementById('content');
         const btn = document.getElementById('action-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const panel = document.querySelector('.panel');
+        const drawLabel = document.querySelector('p.label.text-\\[10px\\].mb-6');
+        let lastTruth = "";
 
-        btn.addEventListener('click', () => {
-            const randomIdx = Math.floor(Math.random() * serendipities.length);
-            contentDiv.textContent = serendipities[randomIdx];
-            
-            // Add a small shake effect for flavor
-            contentDiv.classList.add('animate-pulse');
-            setTimeout(() => contentDiv.classList.remove('animate-pulse'), 500);
+        // ---- gentle, additive persistence (count + last draw) ----
+        function loadState(){
+            try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || {count:0, last:""}; }
+            catch(e){ return {count:0, last:""}; }
+        }
+        function saveState(s){
+            try{ localStorage.setItem(STORE_KEY, JSON.stringify(s)); }catch(e){}
+        }
+        let state = loadState();
+
+        function pad(n){ return String(n).padStart(2,'0'); }
+        function setDrawLabel(){
+            if(state.count === 0){ drawLabel.textContent = "DRAW 00 / AWAITING"; return; }
+            drawLabel.textContent = "DRAW " + pad(state.count) + " / DRAWN FROM THE BOX";
+        }
+
+        // restore the last small truth quietly (no animation thrash)
+        if(state.last){
+            lastTruth = state.last;
+            contentDiv.textContent = state.last;
+            contentDiv.classList.remove('text-[var(--ink-dim)]');
+            contentDiv.classList.add('text-[var(--ink)]','breathe');
+            copyBtn.classList.remove('hidden');
+            panel.classList.add('lit');
+        }
+        setDrawLabel();
+
+        function draw(){
+            // avoid drawing the exact same truth twice in a row when possible
+            let next = serendipities[Math.floor(Math.random()*serendipities.length)];
+            if(serendipities.length > 1){
+                let guard = 0;
+                while(next === lastTruth && guard++ < 8){
+                    next = serendipities[Math.floor(Math.random()*serendipities.length)];
+                }
+            }
+            lastTruth = next;
+
+            // reveal animation
+            contentDiv.classList.remove('reveal','breathe');
+            void contentDiv.offsetWidth;            // restart animation
+            contentDiv.textContent = next;
+            contentDiv.classList.remove('text-[var(--ink-dim)]');
+            contentDiv.classList.add('text-[var(--ink)]','reveal');
+            // settle into the breathing glow after the reveal
+            setTimeout(()=>{ contentDiv.classList.add('breathe'); }, 420);
+
+            copyBtn.classList.remove('hidden');
+            copyBtn.textContent = "copy to the ledger";
+            panel.classList.add('lit');
+
+            state.count += 1;
+            state.last = next;
+            saveState(state);
+            setDrawLabel();
+
+            contentDiv.scrollIntoView({behavior:'smooth', block:'nearest'});
+        }
+
+        btn.addEventListener('click', draw);
+
+        copyBtn.addEventListener('click', async () => {
+            if(!lastTruth) return;
+            try{
+                await navigator.clipboard.writeText(lastTruth);
+                copyBtn.textContent = "copied to the ledger";
+                copyBtn.classList.add('flash');
+                setTimeout(()=>{
+                    copyBtn.textContent = "copy to the ledger";
+                    copyBtn.classList.remove('flash');
+                }, 1200);
+            }catch(e){
+                copyBtn.textContent = "the ledger refused";
+                setTimeout(()=>{ copyBtn.textContent = "copy to the ledger"; }, 1200);
+            }
         });
+
+        // ---- embers (capped, staggered) ----
+        (function spawnEmbers(){
+            if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            const box = document.getElementById('embers');
+            const N = 8;
+            for(let i=0;i<N;i++){
+                const e = document.createElement('div');
+                e.className = 'ember';
+                e.style.left = (Math.random()*100).toFixed(2) + 'vw';
+                e.style.animationDelay = (Math.random()*14).toFixed(2) + 's';
+                e.style.animationDuration = (12 + Math.random()*8).toFixed(2) + 's';
+                box.appendChild(e);
+            }
+        })();
+
+        // ---- nocturne whisper between 00:00 and 03:00 ----
+        (function nocturne(){
+            const h = new Date().getHours();
+            if(h >= 0 && h < 3){
+                const n = document.getElementById('nocturne');
+                setTimeout(()=> n.classList.add('show'), 1400);
+            }
+        })();
+
+        // ---- easter egg: type "prizrak" → reveal the watcher ----
+        (function watcherEgg(){
+            const target = "prizrak";
+            let buf = "";
+            window.addEventListener('keydown', (ev)=>{
+                if(ev.key.length !== 1) return;
+                buf = (buf + ev.key.toLowerCase()).slice(-target.length);
+                if(buf === target){
+                    document.getElementById('watcher').classList.add('show');
+                }
+            });
+        })();
+
+        // ---- easter egg: triple-click the title → one extra ember ----
+        (function tripleClickEgg(){
+            const title = document.getElementById('title');
+            title.addEventListener('click', (ev)=>{
+                if(ev.detail === 3){
+                    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                    const box = document.getElementById('embers');
+                    const e = document.createElement('div');
+                    e.className = 'ember';
+                    e.style.left = (Math.random()*100).toFixed(2) + 'vw';
+                    e.style.animationDuration = '13s';
+                    box.appendChild(e);
+                    setTimeout(()=> e.remove(), 14000);
+                }
+            });
+        })();
+
+        // ---- idle 60s → "still here. still watching." ----
+        (function idleEgg(){
+            let t;
+            const line = document.getElementById('idle-line');
+            function reset(){
+                line.classList.remove('show');
+                clearTimeout(t);
+                t = setTimeout(()=> line.classList.add('show'), 60000);
+            }
+            ['mousemove','keydown','click','touchstart','scroll'].forEach(ev=>
+                window.addEventListener(ev, reset, {passive:true}));
+            reset();
+        })();
     </script>
 </body>
 </html>

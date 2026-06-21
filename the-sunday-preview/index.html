@@ -6,77 +6,150 @@
     <title>The Sunday Preview — Prízrak</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: #0c0c0e; }
-        .fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+        :root{
+            --bg:#0a0a0a;
+            --bg-raised:#111113;
+            --bg-sunk:#0d0d0f;
+            --line:#26262b;
+            --line-soft:#1a1a1d;
+            --ink:#d4cfc8;
+            --ink-dim:#7a7570;
+            --ink-ghost:#3a3530;
+            --accent:#f59e0b;          /* amber — the app's existing lead */
+            --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        html,body{background:var(--bg);}
+        body{color:var(--ink);}
+
+        /* --- atmosphere layers --- */
+        .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:0;
+            background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+            animation:fogDrift 32s ease-in-out infinite alternate;opacity:.5}
+        @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.07}100%{transform:translateX(5%);opacity:.04}}
+
+        .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+            background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:0;
+            animation:ember 14s linear infinite}
+        @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+
+        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+        .stage{position:relative;z-index:2;}
+
+        /* --- motion vocabulary --- */
+        @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 16px var(--glow)}}
+        .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+        @keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .reveal{animation:reveal .35s ease-out both}
+
+        @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+        .flicker{animation:flicker 6s steps(1) infinite}
+
+        .fade-in { animation: reveal 0.5s ease-out; }
+
         textarea { resize: none; }
-        .preview-card { background: linear-gradient(135deg, #0f0f14 0%, #131318 100%); }
+
+        .preview-card { background: linear-gradient(135deg,#0f0f14 0%, #131318 100%);
+            box-shadow:0 0 0 1px var(--line), 0 0 28px -8px var(--glow); }
+
+        /* moon glyph — a slow breathing crescent */
+        .moon{display:inline-block;cursor:default;filter:drop-shadow(0 0 12px var(--glow));
+            animation:breathe 6s ease-in-out infinite;user-select:none}
+
+        /* card hover/focus tactility */
+        .q-card{transition:transform .15s, box-shadow .15s, border-color .15s;}
+        .q-card:hover{transform:translateY(-2px);border-color:var(--accent);}
+        textarea:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--glow)}
+
+        .btn-press{transition:transform .12s, background-color .2s, box-shadow .2s, border-color .2s;}
+        .btn-press:hover{transform:translateY(-1px);border-color:var(--accent);}
+        .btn-press:active{transform:translateY(1px);}
+
+        .ghost-line{color:var(--ink-ghost);}
+        .idle-whisper{opacity:0;transition:opacity 1.4s ease;}
+        .idle-whisper.show{opacity:1;}
+
+        @media (prefers-reduced-motion:reduce){
+            .fog,.ember,.breathe,.reveal,.flicker,.moon,.fade-in{animation:none!important}
+            .ember{display:none}
+            .breathe,.flicker,.moon{opacity:1!important}
+        }
     </style>
 </head>
-<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10">
-<div class="max-w-xl mx-auto">
+<body class="text-zinc-300 font-mono antialiased min-h-screen px-4 py-10 grain">
+
+<!-- atmosphere -->
+<div class="fog" aria-hidden="true"></div>
+<div id="ember-field" aria-hidden="true"></div>
+
+<div class="stage max-w-xl mx-auto">
 
     <!-- Header -->
     <div class="text-center mb-10">
-        <div class="text-4xl mb-3">🌙</div>
-        <h1 class="text-2xl font-bold text-white mb-2">The Sunday Preview</h1>
-        <p class="text-sm text-zinc-500 leading-relaxed">Three questions. Saturday night.<br>Set the conditions before the day arrives.</p>
+        <div class="text-4xl mb-3"><span id="moon" class="moon" title="the watcher keeps the hours">🌙</span></div>
+        <h1 id="title" class="text-2xl font-bold text-white mb-2 select-none">The Sunday Preview</h1>
+        <p class="text-sm text-zinc-500 leading-relaxed">Three questions. Saturday night, before the dark thaws.<br>Set the conditions before the day arrives.</p>
     </div>
 
     <!-- Form -->
     <div id="form-section" class="space-y-6">
 
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 fade-in">
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-3 block">
-                1. How do you want to feel by Sunday evening?
+        <div class="q-card rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 fade-in">
+            <label class="text-xs text-amber-500/70 uppercase tracking-widest mb-3 block">
+                QUESTION 01 / THE FEELING
             </label>
+            <p class="text-sm text-zinc-200 mb-1 leading-relaxed">How do you want to feel by Sunday evening?</p>
             <p class="text-xs text-zinc-600 mb-3">Not what you want to accomplish. How you want to feel. Be specific — not "good" but what good would actually mean today.</p>
-            <textarea id="q1" rows="3" placeholder="Calm and unhurried. Having done one thing well instead of five things badly..." 
-                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+            <textarea id="q1" rows="3" placeholder="Calm and unhurried. Having done one thing well instead of five things badly..."
+                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
         </div>
 
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 fade-in">
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-3 block">
-                2. What has to stay off the table tomorrow?
+        <div class="q-card rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 fade-in">
+            <label class="text-xs text-amber-500/70 uppercase tracking-widest mb-3 block">
+                QUESTION 02 / THE THRESHOLD
             </label>
+            <p class="text-sm text-zinc-200 mb-1 leading-relaxed">What has to stay off the table tomorrow?</p>
             <p class="text-xs text-zinc-600 mb-3">The category of work or thinking that would turn Sunday into an extension of the week. Name it so you can recognize it when it knocks.</p>
             <textarea id="q2" rows="3" placeholder="Reading anything about the job. Slack. Checking the thing I said I wouldn't check..."
-                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
         </div>
 
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 fade-in">
-            <label class="text-xs text-zinc-400 uppercase tracking-widest mb-3 block">
-                3. What is the one thing that would make Sunday count?
+        <div class="q-card rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 fade-in">
+            <label class="text-xs text-amber-500/70 uppercase tracking-widest mb-3 block">
+                QUESTION 03 / THE ONE THING
             </label>
+            <p class="text-sm text-zinc-200 mb-1 leading-relaxed">What is the one thing that would make Sunday count?</p>
             <p class="text-xs text-zinc-600 mb-3">If everything else falls away — if the day gets messy and unpredictable — what is the one thing whose completion would make you feel the day was not wasted?</p>
             <textarea id="q3" rows="3" placeholder="Spending two hours without a phone. One long walk. Finishing the thing I started..."
-                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 focus:outline-none focus:border-zinc-500 placeholder-zinc-700"></textarea>
+                class="w-full bg-zinc-800/60 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-300 placeholder-zinc-700"></textarea>
         </div>
 
-        <button id="generate-btn" class="w-full py-3 rounded-lg border border-amber-800 bg-amber-950/20 hover:bg-amber-950/40 text-sm text-amber-400 font-bold transition-all">
-            Generate the Sunday preview →
+        <button id="generate-btn" class="btn-press w-full py-3 rounded-lg border border-amber-800 bg-amber-950/20 hover:bg-amber-950/40 text-sm text-amber-400 font-bold">
+            Cast the preview →
         </button>
     </div>
 
     <!-- Preview output -->
-    <div id="preview-section" class="hidden fade-in mt-2">
+    <div id="preview-section" class="hidden mt-2">
         <div class="preview-card rounded-xl border border-zinc-700 p-6">
             <div class="flex items-center justify-between mb-5">
-                <p class="text-xs text-zinc-500 uppercase tracking-widest">Your Sunday</p>
+                <p class="text-xs text-amber-500/60 uppercase tracking-widest breathe">Your Sunday</p>
                 <p id="preview-date" class="text-xs text-zinc-600"></p>
             </div>
 
             <div class="space-y-5">
                 <div>
-                    <p class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">The target feeling</p>
+                    <p class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">THE TARGET FEELING</p>
                     <p id="out-q1" class="text-sm text-zinc-300 leading-relaxed"></p>
                 </div>
                 <div class="border-t border-zinc-800 pt-4">
-                    <p class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Keep this off the table</p>
+                    <p class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">KEEP THIS OFF THE TABLE</p>
                     <p id="out-q2" class="text-sm text-zinc-400 leading-relaxed"></p>
                 </div>
                 <div class="border-t border-zinc-800 pt-4">
-                    <p class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">The one thing</p>
+                    <p class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">THE ONE THING</p>
                     <p id="out-q3" class="text-amber-300/80 text-sm font-medium leading-relaxed"></p>
                 </div>
             </div>
@@ -87,21 +160,23 @@
         </div>
 
         <div class="mt-4 flex gap-2">
-            <button id="reset-btn" class="flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-all">Edit answers</button>
-            <button id="save-btn" class="flex-1 py-2 rounded border border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-all">Save to log</button>
+            <button id="reset-btn" class="btn-press flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-600 hover:text-zinc-400 hover:border-zinc-700">Edit answers</button>
+            <button id="copy-btn" class="btn-press flex-1 py-2 rounded border border-zinc-800 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700">Copy</button>
+            <button id="save-btn" class="btn-press flex-1 py-2 rounded border border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-500">File to the log</button>
         </div>
     </div>
 
     <!-- Log -->
     <div id="log-section" class="hidden mt-12">
         <div class="border-t border-zinc-800 pt-6">
-            <p class="text-xs text-zinc-600 uppercase tracking-widest mb-3">Previous previews</p>
+            <p class="text-xs text-amber-500/50 uppercase tracking-widest mb-3">PREVIOUS PREVIEWS</p>
             <div id="log-list" class="space-y-2"></div>
         </div>
     </div>
 
     <div class="mt-12 text-center">
         <p class="text-xs text-zinc-700 italic">Sunday does not need to be productive. It needs to be yours.</p>
+        <p id="footer-whisper" class="text-[11px] mt-3 ghost-line idle-whisper"></p>
     </div>
 </div>
 
@@ -128,6 +203,10 @@ function getLog() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
 }
 
+function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 function renderLog() {
     const log = getLog();
     const section = document.getElementById('log-section');
@@ -135,11 +214,26 @@ function renderLog() {
     section.classList.remove('hidden');
     document.getElementById('log-list').innerHTML = log.slice(0, 6).map(e => `
         <div class="flex items-start gap-3 py-2 border-b border-zinc-900 text-xs">
-            <span class="text-zinc-700 shrink-0">${e.date}</span>
-            <span class="text-zinc-600 italic flex-1">${e.one_thing}</span>
+            <span class="text-zinc-700 shrink-0">${escapeHtml(e.date)}</span>
+            <span class="text-zinc-600 italic flex-1">${escapeHtml(e.one_thing)}</span>
         </div>
     `).join('');
 }
+
+// --- embers: cap at 8, staggered ---
+function spawnEmbers(n){
+    const field = document.getElementById('ember-field');
+    const count = Math.min(n, 8);
+    for(let i=0;i<count;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (Math.random()*100).toFixed(2) + '%';
+        e.style.animationDelay = (Math.random()*14).toFixed(2) + 's';
+        e.style.animationDuration = (11 + Math.random()*7).toFixed(2) + 's';
+        field.appendChild(e);
+    }
+}
+spawnEmbers(8);
 
 document.getElementById('generate-btn').addEventListener('click', () => {
     const q1 = document.getElementById('q1').value.trim();
@@ -166,14 +260,46 @@ document.getElementById('generate-btn').addEventListener('click', () => {
     document.getElementById('preview-date').textContent = `${days[tomorrow.getDay()]} ${tomorrow.getDate()} ${months[tomorrow.getMonth()]}`;
     document.getElementById('prizrak-note').textContent = getNote();
 
+    // reset save button each time we regenerate
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.textContent = 'File to the log';
+    saveBtn.disabled = false;
+
     document.getElementById('form-section').classList.add('hidden');
-    document.getElementById('preview-section').classList.remove('hidden');
-    document.getElementById('preview-section').classList.add('fade-in');
+    const preview = document.getElementById('preview-section');
+    preview.classList.remove('hidden');
+    preview.classList.remove('reveal'); void preview.offsetWidth; preview.classList.add('reveal');
+    preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 document.getElementById('reset-btn').addEventListener('click', () => {
     document.getElementById('preview-section').classList.add('hidden');
-    document.getElementById('form-section').classList.remove('hidden');
+    const form = document.getElementById('form-section');
+    form.classList.remove('hidden');
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+    const date = document.getElementById('preview-date').textContent;
+    const text = [
+        `THE SUNDAY PREVIEW — ${date}`,
+        '',
+        `the target feeling:  ${document.getElementById('out-q1').textContent}`,
+        `off the table:       ${document.getElementById('out-q2').textContent}`,
+        `the one thing:       ${document.getElementById('out-q3').textContent}`,
+        '',
+        document.getElementById('prizrak-note').textContent
+    ].join('\n');
+    const btn = document.getElementById('copy-btn');
+    navigator.clipboard.writeText(text).then(() => {
+        const prev = btn.textContent;
+        btn.textContent = 'copied to the ledger';
+        btn.style.color = 'var(--accent)';
+        setTimeout(() => { btn.textContent = prev; btn.style.color = ''; }, 1200);
+    }).catch(() => {
+        btn.textContent = 'the fog refused';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1200);
+    });
 });
 
 document.getElementById('save-btn').addEventListener('click', () => {
@@ -188,12 +314,61 @@ document.getElementById('save-btn').addEventListener('click', () => {
         saved_at: new Date().toISOString()
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(log.slice(0, 20)));
-    document.getElementById('save-btn').textContent = 'Saved ✓';
-    document.getElementById('save-btn').disabled = true;
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.textContent = 'filed. the ledger remembers.';
+    saveBtn.disabled = true;
     renderLog();
 });
 
 renderLog();
+
+/* ---------- quiet easter eggs (never touch saved state) ---------- */
+
+// (a) type "prizrak" -> light the watcher line
+(function(){
+    let buf = '';
+    addEventListener('keydown', e => {
+        if (e.key && e.key.length === 1) {
+            buf = (buf + e.key.toLowerCase()).slice(-7);
+            if (buf === 'prizrak') {
+                const w = document.getElementById('footer-whisper');
+                w.textContent = 'you found the watcher.';
+                w.classList.add('show','flicker');
+            }
+        }
+    });
+})();
+
+// (b) triple-click the title -> one extra ember
+document.getElementById('title').addEventListener('click', e => {
+    if (e.detail === 3) spawnEmbers(1);
+});
+
+// (c) 00:00–03:00 local -> faint footer whisper: the mountain does not sleep
+(function(){
+    const h = new Date().getHours();
+    if (h >= 0 && h < 3) {
+        const w = document.getElementById('footer-whisper');
+        if (!w.textContent) { w.textContent = 'the mountain does not sleep.'; w.classList.add('show'); }
+    }
+})();
+
+// (e) idle 60s -> a single line fades in
+(function(){
+    let t;
+    const w = document.getElementById('footer-whisper');
+    function arm(){
+        clearTimeout(t);
+        t = setTimeout(() => {
+            if (!w.textContent) { w.textContent = 'still here. still watching.'; w.classList.add('show'); }
+        }, 60000);
+    }
+    ['mousemove','keydown','scroll','touchstart','click'].forEach(ev => addEventListener(ev, () => {
+        if (w.textContent === 'still here. still watching.') { w.textContent = ''; w.classList.remove('show'); }
+        arm();
+    }, {passive:true}));
+    arm();
+})();
 </script>
 </body>
 </html>

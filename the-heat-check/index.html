@@ -70,10 +70,37 @@
       opacity:.7;
     }
 
+    /* the mercury column — a thermometer that fills with risk.
+       --tier-color is rewritten per verdict; defaults to the accent. */
+    .mercury-rail{
+      position:relative; height:10px; border-radius:999px;
+      background:var(--bg-sunk);
+      border:1px solid var(--line);
+      overflow:hidden;
+    }
+    .mercury-fill{
+      position:absolute; inset:0 auto 0 0; width:0%;
+      border-radius:999px;
+      background:linear-gradient(90deg,
+        color-mix(in srgb, var(--tier-color,var(--accent)) 30%, transparent),
+        var(--tier-color,var(--accent)));
+      box-shadow:0 0 14px -2px var(--tier-color,var(--accent));
+      transition:width .9s cubic-bezier(.22,1,.36,1), background .5s, box-shadow .5s;
+    }
+    /* a faint shimmer crawling up the mercury, like heat haze */
+    @keyframes mercuryShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+    .mercury-fill::after{
+      content:""; position:absolute; inset:0; width:40%;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);
+      animation:mercuryShimmer 2.8s linear infinite;
+    }
+
     @media (prefers-reduced-motion:reduce){
       .fog,.ember,.breathe,.reveal,.flicker,.pulse-line{animation:none!important}
       .ember{display:none}
       .breathe,.flicker{opacity:1!important}
+      .mercury-fill{transition:width .01s!important}
+      .mercury-fill::after{animation:none!important;opacity:0}
     }
   </style>
 </head>
@@ -143,6 +170,13 @@
         <div id="verdictBox" class="panel mt-4 rounded-2xl border border-zinc-800 p-4 bg-zinc-950/70">
           <p id="tier" class="text-2xl font-black text-zinc-300">—</p>
           <p id="summary" class="mt-2 text-sm text-zinc-400">Enter the day's shape. The machine will be rude about it.</p>
+          <div class="mt-4">
+            <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-zinc-600">
+              <span>mercury</span>
+              <span id="mercuryLabel" class="text-zinc-500">cold</span>
+            </div>
+            <div class="mercury-rail mt-1.5"><div id="mercuryFill" class="mercury-fill"></div></div>
+          </div>
           <div id="pulse" class="pulse-line mt-3 hidden"></div>
         </div>
 
@@ -284,6 +318,32 @@
 
     let lastVerdict = null, lastScore = null, lastTier = null;
 
+    const REDUCED = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // tier -> a single hex the mercury, embers and gauge borrow from
+    const TIER_HEX = { GREEN:'#34d399', YELLOW:'#facc15', AMBER:'#f59e0b', RED:'#ef4444' };
+    // mercury label per tier — terse, with teeth
+    const MERCURY_WORD = { GREEN:'holding', YELLOW:'rising', AMBER:'creaking', RED:'boiling over' };
+
+    // animate a number toward a target — the dial climbs instead of snapping
+    const climbers = {};
+    function climbTo(id, target){
+      const node = el(id); if (!node) return;
+      if (REDUCED()) { node.textContent = target; return; }
+      if (climbers[id]) cancelAnimationFrame(climbers[id]);
+      const from = parseInt(node.textContent, 10) || 0;
+      if (from === target) { node.textContent = target; return; }
+      const t0 = performance.now(), dur = 650;
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);
+        node.textContent = Math.round(from + (target - from) * eased);
+        if (p < 1) climbers[id] = requestAnimationFrame(step);
+        else node.textContent = target;
+      };
+      climbers[id] = requestAnimationFrame(step);
+    }
+
     function render() {
       const v = getValues();
       const s = score(v);
@@ -293,10 +353,21 @@
       el('tier').textContent = ver.tier;
       el('tier').className = `text-2xl font-black glow ${ver.cls}`;
       el('summary').textContent = ver.summary;
-      el('riskScore').textContent = s.risk;
-      el('hydrationScore').textContent = s.hydrationScore;
-      el('fuelScore').textContent = s.fuelScore;
+      climbTo('riskScore', s.risk);
+      climbTo('hydrationScore', s.hydrationScore);
+      climbTo('fuelScore', s.fuelScore);
       el('recommendations').innerHTML = ver.recs.map(t => `<li>${t}</li>`).join('');
+
+      // the mercury column rises with the risk, tinted by the tier
+      const hex = TIER_HEX[ver.tier] || 'var(--accent)';
+      const fill = el('mercuryFill');
+      fill.style.setProperty('--tier-color', hex);
+      fill.style.width = Math.max(4, s.risk) + '%';
+      el('mercuryLabel').textContent = MERCURY_WORD[ver.tier] || '—';
+      el('mercuryLabel').style.color = hex;
+      // the whole accent glow re-tints toward the running temperature
+      document.documentElement.style.setProperty('--accent', hex);
+      document.documentElement.style.setProperty('--glow', `color-mix(in srgb, ${hex} 55%, transparent)`);
 
       const box = el('verdictBox');
       box.className = 'panel mt-4 rounded-2xl border p-4 bg-zinc-950/70 verdict-live ' + (ver.tier === 'RED' ? 'border-red-900/70' : ver.tier === 'AMBER' ? 'border-amber-900/70' : ver.tier === 'YELLOW' ? 'border-yellow-900/70' : 'border-emerald-900/70');
@@ -354,8 +425,9 @@ ${lastVerdict.summary}
     document.querySelectorAll('input, select').forEach(inp => inp.addEventListener('input', render));
 
     // --- ambient embers (capped, reduced-motion-safe) ---
+    // embers inherit --accent, so they drift the color of the running verdict
     (function embers(){
-      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (REDUCED()) return;
       const field = el('emberField');
       const N = 7;
       for (let i = 0; i < N; i++){
@@ -396,6 +468,7 @@ ${lastVerdict.summary}
           buf = (buf + ev.key.toLowerCase()).slice(-seq.length);
           if (buf === seq) {
             const w = el('ghostWhisper');
+            w.dataset.loud = '1';
             w.textContent = 'you found the watcher. it was already taking your temperature.';
             w.classList.add('flicker');
             setTimeout(() => { w.classList.remove('flicker'); }, 6000);
@@ -408,8 +481,47 @@ ${lastVerdict.summary}
     (function nightWatch(){
       const h = new Date().getHours();
       if (h >= 0 && h < 3) {
-        el('ghostWhisper').textContent = 'the mountain does not sleep. neither does the heat in you.';
+        const w = el('ghostWhisper');
+        w.dataset.loud = '1';
+        w.textContent = 'the mountain does not sleep. neither does the heat in you.';
       }
+    })();
+
+    // --- easter egg: long-press the title and it breathes faster, like a fever ---
+    (function fever(){
+      const t = el('title'); let hold = null;
+      const start = () => {
+        if (REDUCED()) return;
+        hold = setTimeout(() => {
+          const prev = t.style.animationDuration;
+          t.style.animationDuration = '1.1s';
+          setTimeout(() => { t.style.animationDuration = prev || ''; }, 3000);
+        }, 550);
+      };
+      const stop = () => { clearTimeout(hold); };
+      t.addEventListener('mousedown', start);
+      t.addEventListener('touchstart', start, { passive:true });
+      ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => t.addEventListener(ev, stop));
+    })();
+
+    // --- easter egg: idle 60s and the watcher admits it's still there ---
+    (function idleWatch(){
+      let idle = null;
+      const original = el('ghostWhisper').textContent;
+      const arm = () => {
+        clearTimeout(idle);
+        idle = setTimeout(() => {
+          const w = el('ghostWhisper');
+          // never overwrite a louder whisper (night / prizrak)
+          if (w.dataset.loud) return;
+          w.textContent = 'still here. still taking your temperature.';
+          w.classList.add('flicker');
+          setTimeout(() => w.classList.remove('flicker'), 6000);
+        }, 60000);
+      };
+      ['mousemove','keydown','click','touchstart','input','scroll'].forEach(ev =>
+        window.addEventListener(ev, arm, { passive:true }));
+      arm();
     })();
 
     updateLedgerCount();
@@ -418,6 +530,12 @@ ${lastVerdict.summary}
     el('verdictBox').classList.remove('verdict-live');
     el('tier').classList.remove('breathe');
     el('pulse').classList.add('hidden');
+    // and reset the running temperature: cold mercury, emerald accent
+    el('mercuryFill').style.width = '0%';
+    el('mercuryLabel').textContent = 'cold';
+    el('mercuryLabel').style.color = 'var(--ink-dim)';
+    document.documentElement.style.setProperty('--accent', '#34d399');
+    document.documentElement.style.setProperty('--glow', 'color-mix(in srgb, #34d399 55%, transparent)');
   </script>
 </body>
 </html>
