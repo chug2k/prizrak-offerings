@@ -54,7 +54,7 @@
   .hint{font-family:"Caveat",cursive;font-size:22px;color:var(--ink-soft);margin:14px 0 0;height:26px;transition:opacity .3s}
 
   /* note card */
-  .stage{margin:26px auto 0;min-height:200px;display:flex;align-items:center;justify-content:center}
+  .stage{margin:26px auto 0;min-height:210px;display:flex;align-items:center;justify-content:center}
   .note{background:var(--card);border-radius:22px;padding:30px 26px;max-width:420px;width:100%;
     box-shadow:0 18px 40px -18px rgba(239,111,147,.45),0 2px 0 #fff inset;border:1px solid #ffe4ec;
     position:relative;opacity:0;transform:translateY(14px) scale(.96);transition:all .5s cubic-bezier(.34,1.4,.5,1)}
@@ -64,19 +64,24 @@
     display:flex;align-items:center;justify-content:center;font-size:16px}
   .note p{font-family:"Caveat",cursive;font-size:clamp(24px,6vw,30px);line-height:1.32;margin:6px 0 0;color:#7a5b5b}
   .note small{display:block;margin-top:14px;font-family:"Quicksand";font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#d59bab;font-weight:600}
+  .note .views{margin-top:8px;font-family:"Quicksand";font-size:11px;letter-spacing:.04em;color:#d3bdb6;font-weight:600;min-height:13px}
   .note.keeping{animation:keptPulse .5s ease}
   @keyframes keptPulse{0%{transform:translateY(0) scale(1)}40%{transform:translateY(-5px) scale(1.045)}100%{transform:translateY(0) scale(1)}}
   .note.tossing{animation:toss .5s cubic-bezier(.5,0,.85,.5) forwards}
   @keyframes toss{to{opacity:0;transform:translate(40vw,-44vh) scale(.16) rotate(20deg)}}
+  .note.snoozing{animation:snz .45s ease forwards}
+  @keyframes snz{to{opacity:0;transform:translateY(26px) scale(.96)}}
 
-  /* keep / toss decide row */
-  .decide{display:none;gap:10px;justify-content:center;margin-top:20px}
+  /* keep / snooze / toss decide row */
+  .decide{display:none;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:20px}
   .decide.on{display:flex}
   .decide button{font-family:"Quicksand";font-weight:700;font-size:14px;cursor:pointer;border:none;
-    padding:10px 17px;border-radius:999px;transition:transform .14s, box-shadow .14s}
+    padding:10px 16px;border-radius:999px;transition:transform .14s, box-shadow .14s}
   .decide button:active{transform:scale(.95)}
   .keepbtn{background:linear-gradient(180deg,#ffd9e2,#ffb3c6);color:#9a3d59;box-shadow:0 8px 16px -8px rgba(239,111,147,.6)}
   .keepbtn:hover{transform:translateY(-2px)}
+  .snoozebtn{background:#fff8e8;color:#bd8f3f;border:1px solid #f1e2c2 !important}
+  .snoozebtn:hover{transform:translateY(-2px);color:#a2772f}
   .tossbtn{background:#fff;color:#b9a39e;border:1px solid #ecdcd7 !important}
   .tossbtn:hover{transform:translateY(-2px);color:#9a8b86}
 
@@ -123,7 +128,7 @@
 
   /* collection list */
   .colllist{max-height:50vh;overflow-y:auto;text-align:left;margin:4px -4px 0;padding:0 4px;-webkit-overflow-scrolling:touch}
-  .collempty{font-size:16px;color:var(--ink-soft);text-align:center;padding:26px 10px;font-family:"Caveat",cursive;font-size:22px}
+  .collempty{color:var(--ink-soft);text-align:center;padding:26px 10px;font-family:"Caveat",cursive;font-size:22px}
   .collitem{background:#fff;border:1px solid #ffe4ec;border-radius:14px;padding:14px 16px;margin:10px 0}
   .collitem p{font-family:"Caveat",cursive;font-size:21px;line-height:1.28;margin:0;color:#7a5b5b}
   .collitem small{display:block;margin-top:5px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#d59bab;font-weight:600}
@@ -180,9 +185,11 @@
       <div class="seal">💛</div>
       <p id="noteText">when you're ready, pull a note from the jar…</p>
       <small id="noteFrom">a little jar of good things</small>
+      <div class="views" id="views"></div>
       <div class="decide" id="decide">
         <button class="keepbtn" id="keepBtn">keep it 💛</button>
-        <button class="tossbtn" id="tossBtn">into the basket 🗑️</button>
+        <button class="snoozebtn" id="snoozeBtn">later 😴</button>
+        <button class="tossbtn" id="tossBtn">basket 🗑️</button>
       </div>
     </div></div>
 
@@ -221,8 +228,9 @@
 <script>
 (function(){
   var API = "https://chloe-notes.vercel.app";
+  var SNOOZE_MS = 8 * 60 * 60 * 1000;   // "a while" ≈ 8 hours, then it returns to the jar
 
-  // built-in notes — stable ids so keep/toss decisions persist server-side
+  // built-in notes — stable ids so keep/toss/snooze + view counts persist server-side
   var BUILTINS = [
     {id:"seed-01", body:"Whatever today felt like — you made it here. That counts.", type:"today counts"},
     {id:"seed-02", body:"You are not behind. You're exactly where you are, and that's allowed.", type:"permission slip"},
@@ -244,33 +252,36 @@
   var PURRS = ["prrrrr 💗","that's the spot 🐾","happy cat noises ✨","mrrrp! 💛","*tiny purr*","🐾 *content* 🐾"];
 
   var note=document.getElementById('note'), noteText=document.getElementById('noteText'),
-      noteFrom=document.getElementById('noteFrom'), hint=document.getElementById('hint'),
-      cat=document.getElementById('cat'), count=document.getElementById('count'),
+      noteFrom=document.getElementById('noteFrom'), viewsEl=document.getElementById('views'),
+      hint=document.getElementById('hint'), cat=document.getElementById('cat'),
       big=document.getElementById('big'), decide=document.getElementById('decide'),
       freshpill=document.getElementById('freshpill'), collOverlay=document.getElementById('collOverlay'),
       collList=document.getElementById('collList');
 
-  var live=[], decisions={}, keptArr=[], basketArr=[], queue=[], current=null, pets=0, bigShown=false, currentColl='kept';
+  var live=[], decisions={}, views={}, keptArr=[], basketArr=[], queue=[], current=null, pets=0, bigShown=false, currentColl='kept', petTimer;
 
   function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
   function shuffleArr(a){ for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;} return a; }
   function findNote(id){ var i; for(i=0;i<live.length;i++) if(live[i].id===id) return live[i]; for(i=0;i<BUILTINS.length;i++) if(BUILTINS[i].id===id) return BUILTINS[i]; return null; }
 
-  function newPool(){ var all=live.concat(BUILTINS); return all.filter(function(n){ var d=decisions[n.id]; return !d || d.status==='new'; }); }
-  function buildQueue(){ var pool=newPool(); var l=pool.filter(function(n){return n.live;}), s=pool.filter(function(n){return !n.live;}); shuffleArr(l); shuffleArr(s); queue=l.concat(s); }
+  function eligible(n){ var d=decisions[n.id]; if(!d || d.status==='new') return true; if(d.status==='snoozed') return !d.until || d.until<=Date.now(); return false; }
+  function newPool(){ return live.concat(BUILTINS).filter(eligible); }
+  function buildQueue(){ queue = shuffleArr(newPool().slice()); }   // fully random order
   function recompute(){ var vals=Object.keys(decisions).map(function(k){return decisions[k];});
     keptArr=vals.filter(function(d){return d.status==='kept';}).sort(function(a,b){return b.ts-a.ts;});
     basketArr=vals.filter(function(d){return d.status==='discarded';}).sort(function(a,b){return b.ts-a.ts;});
     updateCounts(); }
   function updateCounts(){ document.getElementById('keptCount').textContent=keptArr.length; document.getElementById('basketCount').textContent=basketArr.length; }
 
-  // ---- load notes + decisions from the datastore ----
+  // ---- load notes + decisions + view counts from the datastore ----
   Promise.all([
     fetch(API+"/api/notes").then(function(r){return r.json();}).catch(function(){return {notes:[]};}),
-    fetch(API+"/api/decisions").then(function(r){return r.json();}).catch(function(){return {decisions:[]};})
+    fetch(API+"/api/decisions").then(function(r){return r.json();}).catch(function(){return {decisions:[]};}),
+    fetch(API+"/api/views").then(function(r){return r.json();}).catch(function(){return {counts:{}};})
   ]).then(function(arr){
     live = (arr[0].notes||[]).map(function(n){ return {id:n.id, body:n.body, type:n.type||"for you", live:true}; });
     decisions = {}; (arr[1].decisions||[]).forEach(function(d){ decisions[d.id]=d; });
+    views = (arr[2] && arr[2].counts) || {};
     recompute(); buildQueue();
     if(newPool().some(function(n){return n.live;})) freshpill.style.display='inline-block';
   }).catch(function(){ recompute(); buildQueue(); });
@@ -278,57 +289,70 @@
   // ---- the jar ----
   function showNote(text, from){ note.classList.remove('show'); void note.offsetWidth; noteText.textContent=text; noteFrom.textContent=from; note.classList.add('show'); }
 
+  function registerView(id){
+    views[id]=(views[id]||0)+1;
+    var c=views[id];
+    viewsEl.textContent = c===1 ? "✨ first time seeing this one" : ("👁 seen " + c + " times");
+    fetch(API+"/api/views", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:id})}).catch(function(){});
+  }
+
   function pull(){
-    var pool=newPool();
-    if(!pool.length){ endState(); return; }
-    if(!queue.length || queue.every(function(n){return !pool.indexOf||pool.indexOf(n)===-1;})) buildQueue();
-    // skip any queued note that's since been decided
-    do { current = queue.shift(); } while(current && decisions[current.id] && decisions[current.id].status!=='new');
-    if(!current){ buildQueue(); current=queue.shift(); }
+    if(!newPool().length){ endState(); return; }
+    queue = queue.filter(eligible);
+    if(!queue.length) buildQueue();
+    current = queue.shift();
     if(!current){ endState(); return; }
     showNote(current.body, current.type);
+    registerView(current.id);
     decide.classList.add('on');
-    count.textContent='';
     burst(window.innerWidth/2, window.innerHeight*0.42, 6, ["💛","🌸","✨"]);
     if(!newPool().some(function(n){return n.live;})) freshpill.style.display='none';
   }
 
   function endState(){
-    current=null; decide.classList.remove('on');
-    note.style.transition=''; note.classList.remove('tossing');
+    current=null; decide.classList.remove('on'); viewsEl.textContent='';
+    note.style.transition=''; note.classList.remove('tossing','snoozing','keeping');
     var msg = keptArr.length ? "that's everything for now — peek at the ones you kept? 💛" : "that's the whole jar for now 💛 come back whenever.";
     showNote(msg, "the jar is empty");
   }
 
-  function postDecision(id, status, body, type){
+  function postDecision(id, status, body, type, until){
     fetch(API+"/api/decisions", {method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({id:id, status:status, body:body, type:type})}).catch(function(){});
+      body:JSON.stringify({id:id, status:status, body:body, type:type, until:until})}).catch(function(){});
   }
 
   function decideCurrent(status){
     if(!current) return;
-    var n=current;
-    decisions[n.id]={id:n.id, status:status, body:n.body, type:n.type, ts:Date.now()};
+    var n=current, until = status==='snoozed' ? Date.now()+SNOOZE_MS : undefined;
+    decisions[n.id]={id:n.id, status:status, body:n.body, type:n.type, ts:Date.now(), until:until};
     var qi=queue.indexOf(n); if(qi>-1) queue.splice(qi,1);
     recompute();
-    postDecision(n.id, status, n.body, n.type);
+    postDecision(n.id, status, n.body, n.type, until);
     decide.classList.remove('on');
-    bump(status==='kept' ? 'keptOpen' : 'basketOpen');
     current=null;
     if(status==='kept'){
+      bump('keptOpen');
       note.classList.remove('keeping'); void note.offsetWidth; note.classList.add('keeping');
       burst(window.innerWidth/2, window.innerHeight*0.42, 7, ["💛","💗","✨"]);
       setTimeout(function(){ note.classList.remove('keeping'); pull(); }, 500);
-    } else {
+    } else if(status==='discarded'){
+      bump('basketOpen');
       note.classList.remove('tossing'); void note.offsetWidth; note.classList.add('tossing');
       setTimeout(function(){ note.style.transition='none'; note.classList.remove('tossing'); note.classList.remove('show'); void note.offsetWidth; note.style.transition=''; pull(); }, 500);
+    } else { // snoozed — slips away, comes back in a while
+      hint.textContent="see you later 😴"; clearTimeout(petTimer); petTimer=setTimeout(function(){hint.textContent="pet me 🐾";},1600);
+      burst(window.innerWidth/2, window.innerHeight*0.42, 4, ["😴","💤","🌙"]);
+      note.classList.remove('snoozing'); void note.offsetWidth; note.classList.add('snoozing');
+      setTimeout(function(){ note.style.transition='none'; note.classList.remove('snoozing'); note.classList.remove('show'); void note.offsetWidth; note.style.transition=''; pull(); }, 450);
     }
   }
 
   // ---- kept / basket panels ----
   function setStatus(id, status){
-    if(status==='new'){ delete decisions[id]; postDecision(id, 'new'); }
-    else { var n=findNote(id); decisions[id]={id:id, status:status, body:decisions[id]?decisions[id].body:(n?n.body:''), type:decisions[id]?decisions[id].type:(n?n.type:''), ts:Date.now()}; postDecision(id, status, decisions[id].body, decisions[id].type); }
+    if(status==='new'){ delete decisions[id]; postDecision(id,'new'); }
+    else { var n=findNote(id); var prev=decisions[id];
+      decisions[id]={id:id, status:status, body:prev?prev.body:(n?n.body:''), type:prev?prev.type:(n?n.type:''), ts:Date.now()};
+      postDecision(id, status, decisions[id].body, decisions[id].type); }
     recompute(); openCollection(currentColl);
   }
 
@@ -340,11 +364,12 @@
       collList.innerHTML = '<div class="collempty">' + (which==='kept' ? 'nothing kept yet —<br>keep the ones you love 💛' : 'the basket is empty 🌸') + '</div>';
     } else {
       collList.innerHTML = list.map(function(x){
+        var v = views[x.id] ? '<small>'+esc(x.type||'')+(x.type?' · ':'')+'seen '+views[x.id]+'×</small>' : (x.type?'<small>'+esc(x.type)+'</small>':'');
         var move = which==='kept'
           ? '<button class="mini" data-act="discarded" data-id="'+esc(x.id)+'">to the basket</button>'
           : '<button class="mini" data-act="kept" data-id="'+esc(x.id)+'">keep this 💛</button>';
         var back = '<button class="mini ghost" data-act="new" data-id="'+esc(x.id)+'">back to the jar</button>';
-        return '<div class="collitem"><p>'+esc(x.body)+'</p>'+(x.type?'<small>'+esc(x.type)+'</small>':'')+'<div class="minirow">'+move+back+'</div></div>';
+        return '<div class="collitem"><p>'+esc(x.body)+'</p>'+v+'<div class="minirow">'+move+back+'</div></div>';
       }).join('');
     }
     collOverlay.classList.add('show');
@@ -363,7 +388,6 @@
   }
   function bump(id){ var el=document.getElementById(id); if(!el)return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
-  var petTimer;
   function pet(){
     pets++;
     cat.classList.remove('wiggle'); void cat.offsetWidth; cat.classList.add('wiggle');
@@ -392,6 +416,7 @@
   document.getElementById('pullBtn').addEventListener('click', pull);
   document.getElementById('petBtn').addEventListener('click', pet);
   document.getElementById('keepBtn').addEventListener('click', function(){ decideCurrent('kept'); });
+  document.getElementById('snoozeBtn').addEventListener('click', function(){ decideCurrent('snoozed'); });
   document.getElementById('tossBtn').addEventListener('click', function(){ decideCurrent('discarded'); });
   cat.addEventListener('click', pet);
   document.getElementById('bigClose').addEventListener('click', function(){ big.classList.remove('show'); });
