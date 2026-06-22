@@ -281,7 +281,7 @@
   ]).then(function(arr){
     live = (arr[0].notes||[]).map(function(n){ return {id:n.id, body:n.body, type:n.type||"for you", live:true}; });
     decisions = {}; (arr[1].decisions||[]).forEach(function(d){ decisions[d.id]=d; });
-    views = (arr[2] && arr[2].counts) || {};
+    views = (arr[2] && arr[2].views) || {};
     recompute(); buildQueue();
     if(newPool().some(function(n){return n.live;})) freshpill.style.display='inline-block';
   }).catch(function(){ recompute(); buildQueue(); });
@@ -289,10 +289,24 @@
   // ---- the jar ----
   function showNote(text, from){ note.classList.remove('show'); void note.offsetWidth; noteText.textContent=text; noteFrom.textContent=from; note.classList.add('show'); }
 
+  function ago(ts){
+    if(!ts) return "a while";
+    var s=Math.max(1,Math.floor((Date.now()-ts)/1000));
+    if(s<60) return s+(s===1?" second":" seconds");
+    var m=Math.floor(s/60); if(m<60) return m+(m===1?" minute":" minutes");
+    var h=Math.floor(m/60); if(h<24) return h+(h===1?" hour":" hours");
+    var d=Math.floor(h/24); if(d<7) return d+(d===1?" day":" days");
+    var w=Math.floor(d/7); if(w<5) return w+(w===1?" week":" weeks");
+    var mo=Math.floor(d/30); if(mo<12) return mo+(mo===1?" month":" months");
+    var y=Math.floor(d/365); return y+(y===1?" year":" years");
+  }
+  function viewRec(id){ var p=views[id]; if(typeof p==='number') p={count:p,last:0}; return p||{count:0,last:0}; }
   function registerView(id){
-    views[id]=(views[id]||0)+1;
-    var c=views[id];
-    viewsEl.textContent = c===1 ? "✨ first time seeing this one" : ("👁 seen " + c + " times");
+    var prev=viewRec(id), c=prev.count+1;
+    viewsEl.textContent = prev.count===0
+      ? "✨ first time seeing this one"
+      : ("👁 seen " + c + " times · last visit " + ago(prev.last) + " ago");
+    views[id]={count:c, last:Date.now()};
     fetch(API+"/api/views", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:id})}).catch(function(){});
   }
 
@@ -364,7 +378,8 @@
       collList.innerHTML = '<div class="collempty">' + (which==='kept' ? 'nothing kept yet —<br>keep the ones you love 💛' : 'the basket is empty 🌸') + '</div>';
     } else {
       collList.innerHTML = list.map(function(x){
-        var v = views[x.id] ? '<small>'+esc(x.type||'')+(x.type?' · ':'')+'seen '+views[x.id]+'×</small>' : (x.type?'<small>'+esc(x.type)+'</small>':'');
+        var vr = viewRec(x.id);
+        var v = vr.count ? '<small>'+esc(x.type||'')+(x.type?' · ':'')+'seen '+vr.count+'× · last '+ago(vr.last)+' ago</small>' : (x.type?'<small>'+esc(x.type)+'</small>':'');
         var move = which==='kept'
           ? '<button class="mini" data-act="discarded" data-id="'+esc(x.id)+'">to the basket</button>'
           : '<button class="mini" data-act="kept" data-id="'+esc(x.id)+'">keep this 💛</button>';
