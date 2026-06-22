@@ -150,6 +150,8 @@
       <small id="noteFrom">a little jar of good things</small>
     </div></div>
 
+    <div id="freshpill" style="display:none;margin:16px auto 0;font-family:'Caveat',cursive;font-size:22px;color:#ef6f93">💌 Charles left something new — pull a note</div>
+
     <div class="btnrow">
       <button class="act" id="pullBtn">tell me something nice ✨</button>
       <button class="act soft" id="petBtn">give the cat a pet 🐱</button>
@@ -197,20 +199,34 @@
       noteFrom=document.getElementById('noteFrom'), hint=document.getElementById('hint'),
       cat=document.getElementById('cat'), count=document.getElementById('count'),
       big=document.getElementById('big');
-  var deck=[], pulled=0, pets=0, bigShown=false;
+  var LIVE = [];                 // fresh notes left by Charles (and his little helpers)
+  var baseDeck=[], liveDeck=[], pulled=0, pets=0, bigShown=false;
 
-  function shuffle(){ deck = NOTES.map(function(n,i){return i;}); for(var i=deck.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=deck[i];deck[i]=deck[j];deck[j]=t;} }
-  shuffle();
+  function shuffleIdx(arr){ var d=arr.map(function(_,i){return i;}); for(var i=d.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=d[i];d[i]=d[j];d[j]=t;} return d; }
+  function rebuild(){ baseDeck=shuffleIdx(NOTES); liveDeck=shuffleIdx(LIVE); }
+  rebuild();
 
   function pull(){
-    if(deck.length===0){ shuffle(); }
-    var i=deck.pop(); pulled++;
+    var text, from;
+    if(liveDeck.length){ var li=liveDeck.pop(); text=LIVE[li][0]; from=LIVE[li][1]; }   // show his real notes first
+    else { if(!baseDeck.length) baseDeck=shuffleIdx(NOTES); var bi=baseDeck.pop(); text=NOTES[bi][0]; from=NOTES[bi][1]; }
+    pulled++;
     note.classList.remove('show'); void note.offsetWidth;
-    noteText.textContent = NOTES[i][0]; noteFrom.textContent = NOTES[i][1];
+    noteText.textContent = text; noteFrom.textContent = from;
     note.classList.add('show');
     count.textContent = pulled===1 ? "" : "note #"+pulled;
     burst(window.innerWidth/2, window.innerHeight*0.42, 6, ["💛","🌸","✨"]);
+    var fp=document.getElementById('freshpill'); if(fp && !liveDeck.length) fp.style.display='none';
   }
+
+  // pull in live notes left for her (from chloe-notes.vercel.app)
+  fetch("https://chloe-notes.vercel.app/api/notes").then(function(r){return r.json();}).then(function(d){
+    if(d && d.notes && d.notes.length){
+      LIVE = d.notes.map(function(n){ return [n.body, n.type || "for you"]; });
+      rebuild();
+      var fp=document.getElementById('freshpill'); if(fp) fp.style.display='inline-block';
+    }
+  }).catch(function(){});
 
   var petTimer;
   function pet(){
