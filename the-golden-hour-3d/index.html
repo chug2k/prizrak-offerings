@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Golden Hour · Vault | Prízrak</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- THREE.js r128 — UMD build, exposes a global `THREE`. No ES modules / importmaps. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#f59e0b;            /* the light leaving — amber */
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ background:var(--bg); height:100%; margin:0; padding:0; overflow:hidden; }
+    body{
+      color:var(--ink);
+      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      overscroll-behavior:none; -webkit-user-select:none; user-select:none;
+      touch-action:none;
+    }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    #stage{ position:fixed; inset:0; z-index:0; }
+    #scene{ display:block; width:100%; height:100%; touch-action:none; cursor:grab; }
+    #scene.orbiting{ cursor:grabbing; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 82%, transparent);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .label{ color:var(--ink-dim); font-size:0.6rem; text-transform:uppercase; letter-spacing:0.18em; }
+    .num{ color:var(--accent); }
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+    input[type="date"]{ color-scheme:dark; }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .field{
+      background:var(--bg-sunk); border:1px solid var(--line); color:var(--ink);
+      border-radius:8px; padding:6px 9px; font-size:12px; font-family:inherit; width:100%;
+      transition:border-color .15s, box-shadow .15s;
+    }
+    .field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 70%, transparent);
+      cursor:pointer; font-family:inherit; border-radius:8px;
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* ===== ambient motion vocabulary (mirrors the siblings) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:4;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* header, floating top-left */
+    header{ position:fixed; top:0; left:0; z-index:3; padding:16px 18px; pointer-events:none; max-width:22rem; }
+    header h1{ font-size:1.4rem; font-weight:600; color:#fff; margin:4px 0 0; }
+    header p{ font-size:11px; margin:5px 0 0; max-width:20rem; color:var(--ink-dim); line-height:1.55; }
+
+    /* status / caption line, just under header */
+    #caption{ position:fixed; top:162px; left:0; z-index:3; padding:0 18px;
+      max-width:21rem; font-size:11px; color:var(--accent); line-height:1.5; pointer-events:none;
+      text-shadow:0 0 12px var(--glow); }
+    #caption::before{ content:"— "; color:var(--ink-ghost); }
+
+    /* control panel, floating bottom */
+    .bench-wrap{ position:fixed; bottom:0; left:0; right:0; z-index:3; padding:10px 12px 12px; display:flex; justify-content:center; pointer-events:none; }
+    .bench{ pointer-events:auto; width:100%; max-width:64rem; border-radius:14px; padding:11px 13px; }
+
+    .grid-inputs{ display:grid; grid-template-columns:1.3fr .8fr .8fr .7fr; gap:9px; margin-bottom:9px; }
+    .grid-inputs .cell .label{ display:block; margin-bottom:3px; }
+
+    .presets{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; align-items:center; }
+    .presets .btn{ padding:5px 10px; font-size:10.5px; }
+
+    .timerow{ display:flex; align-items:center; gap:11px; }
+    .timerow .clock{ font-size:13px; color:#fff; min-width:108px; white-space:nowrap; }
+    .timerow .clock small{ color:var(--ink-dim); font-size:10px; }
+    #time{ flex:1; height:8px; border-radius:99px; appearance:none; -webkit-appearance:none;
+      background:linear-gradient(90deg,#0d1326,#1e3a5f,#c2730c,#5a6680,#c2730c,#1e3a5f,#0d1326);
+      border:1px solid var(--line-soft); cursor:pointer; }
+    #time::-webkit-slider-thumb{ -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+      background:var(--accent); box-shadow:0 0 10px var(--glow); border:1px solid #1a1208; }
+    #time::-moz-range-thumb{ width:14px; height:14px; border-radius:50%; background:var(--accent);
+      box-shadow:0 0 10px var(--glow); border:1px solid #1a1208; }
+
+    .hintrow{ margin-top:9px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    #hint{ font-size:10px; color:var(--ink-ghost); line-height:1.4; }
+    .badges{ display:flex; gap:6px; align-items:center; }
+    .badge{ font-size:10px; border-radius:6px; padding:4px 8px; }
+
+    /* phase readout chips (top-right) */
+    .readout{ position:fixed; top:14px; right:16px; z-index:3; text-align:right; pointer-events:none;
+      display:flex; flex-direction:column; gap:5px; align-items:flex-end; }
+    .readout .chip{ font-size:10.5px; color:var(--ink-dim); }
+    .readout .chip b{ color:var(--accent); font-weight:500; }
+    .readout .phaseName{ font-size:12px; color:#fff; text-shadow:0 0 10px var(--glow); }
+    #moonChip{ display:flex; align-items:center; gap:6px; justify-content:flex-end; }
+
+    /* whispers, below readout */
+    .whispers{ position:fixed; top:96px; right:16px; z-index:3; text-align:right; pointer-events:none; }
+    .whispers p{ font-size:10px; margin:3px 0 0; color:var(--ink-ghost); }
+    #idleLine{ opacity:0; transition:opacity 1.2s ease; }
+
+    /* fatal */
+    #fatal{ display:none; position:fixed; inset:0; z-index:9; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; padding:24px; background:color-mix(in srgb, var(--bg) 92%, transparent); }
+    #fatal h2{ font-size:clamp(1.4rem,5vw,1.9rem); font-weight:600; color:#fff; margin:8px 0; }
+    #fatal p{ font-size:13px; max-width:30rem; color:var(--ink-dim); line-height:1.6; }
+
+    @media (max-width:820px){
+      .grid-inputs{ grid-template-columns:1fr 1fr; }
+      header p{ display:none; }
+      #caption{ top:84px; max-width:62vw; }
+      .readout{ top:10px; right:12px; }
+      .whispers{ display:none; }
+    }
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the dome itself -->
+  <div id="stage"><canvas id="scene"></canvas></div>
+
+  <!-- header -->
+  <header class="select-none">
+    <div class="mono label flicker">prízrak / instrument 17 — heliograph · vault</div>
+    <h1 id="appTitle" class="h1-glow breathe" style="pointer-events:auto;cursor:default;display:inline-block">The Golden Hour · Vault</h1>
+    <p>Stand under the dome. The sun's true path for a date and a place, arced overhead. Scrub time to watch the light leave — night, blue, gold, day. Drag to look; scroll to fall closer.</p>
+  </header>
+
+  <div id="caption" class="mono"></div>
+
+  <!-- phase readout -->
+  <div class="readout">
+    <div class="chip phaseName mono" id="phaseName">—</div>
+    <div class="chip mono">alt <b id="altOut">—</b> · az <b id="azOut">—</b></div>
+    <div class="chip mono" id="moonChip"><span id="moonGlyphWrap"></span><span id="moonLit">—</span></div>
+  </div>
+
+  <!-- whispers -->
+  <div class="whispers">
+    <p id="nightWhisper" class="mono" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono" style="display:none">still here. still watching the light leave.</p>
+  </div>
+
+  <!-- control bench -->
+  <div class="bench-wrap">
+    <div class="bench glass">
+      <div class="grid-inputs">
+        <div class="cell">
+          <span class="label">Date</span>
+          <input id="date" type="date" class="field mono">
+        </div>
+        <div class="cell">
+          <span class="label">Latitude</span>
+          <input id="lat" type="number" step="0.0001" min="-90" max="90" class="field mono" placeholder="10.82">
+        </div>
+        <div class="cell">
+          <span class="label">Longitude</span>
+          <input id="lon" type="number" step="0.0001" min="-180" max="180" class="field mono" placeholder="106.63">
+        </div>
+        <div class="cell">
+          <span class="label">UTC offset</span>
+          <input id="tz" type="number" step="0.25" min="-14" max="14" class="field mono" placeholder="7">
+        </div>
+      </div>
+
+      <div class="presets">
+        <span class="label" style="margin-right:2px">place</span>
+        <button class="btn mono" data-lat="10.82" data-lon="106.63" data-tz="7">Saigon</button>
+        <button class="btn mono" data-lat="13.7563" data-lon="100.5018" data-tz="7">Bangkok</button>
+        <button class="btn mono" data-lat="49.17" data-lon="20.08" data-tz="1">High Tatras</button>
+        <div style="flex:1"></div>
+        <button id="btnNow" class="btn mono">◉ now</button>
+        <button id="btnReset" class="btn mono" title="re-center the view">⌖ recenter</button>
+        <button id="btnReduce" class="btn mono" title="calm the chrome">◐ motion: full</button>
+      </div>
+
+      <div class="timerow">
+        <div class="clock mono"><span id="clockOut">—</span> <small id="tzOut"></small></div>
+        <input id="time" type="range" min="0" max="1439" step="1" value="720">
+      </div>
+
+      <div class="hintrow">
+        <p id="hint" class="mono">drag to look around the dome · scroll to zoom · scrub the bar to move the sun along its arc</p>
+        <div class="badges">
+          <span class="badge btn mono num" id="fpsBadge">— fps</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebGL failure -->
+  <div id="fatal">
+    <div class="mono label">prízrak / instrument 17</div>
+    <h2 class="h1-glow">the light will not open the way</h2>
+    <p>This dome needs WebGL, and your browser will not open the way. Try a current Chrome, Firefox, Safari, or Edge — then the sun will keep its arc.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    /* ========================================================================
+       WEBGL GUARD
+       ======================================================================== */
+    function webglOK(){
+      try {
+        const c = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch(e){ return false; }
+    }
+    const el = id => document.getElementById(id);
+    if (typeof THREE === 'undefined' || !webglOK()){
+      el('fatal').style.display='flex';
+      return;
+    }
+
+    /* ================================================================
+       ASTRONOMY — pure, client-side. KEPT VERBATIM from the 2D original.
+       Sun: NOAA solar-position algorithm (the spreadsheet formulae).
+       Moon: standard mean-phase / illuminated-fraction calculation.
+       Added below the original block: a continuous sun alt/az function
+       (same NOAA pieces) so the 3D arc + scrubber are driven by the
+       identical math that produces the rise/set/golden/blue times.
+       ================================================================ */
+
+    const RAD = Math.PI / 180, DEG = 180 / Math.PI;
+
+    // Julian day from a Date's UTC components (calendar date at 00:00 UTC + frac)
+    function toJulian(y, m, d){
+      if (m <= 2){ y -= 1; m += 12; }
+      const A = Math.floor(y / 100);
+      const B = 2 - A + Math.floor(A / 4);
+      return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+    }
+
+    // NOAA pieces. `t` = Julian centuries since J2000.
+    function noaaSolar(t){
+      const geomMeanLong = (280.46646 + t * (36000.76983 + t * 0.0003032)) % 360; // deg
+      const L0 = (geomMeanLong < 0 ? geomMeanLong + 360 : geomMeanLong);
+      const M = 357.52911 + t * (35999.05029 - 0.0001537 * t); // deg
+      const e = 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
+      const Mrad = M * RAD;
+      const C = Math.sin(Mrad) * (1.914602 - t * (0.004817 + 0.000014 * t))
+              + Math.sin(2 * Mrad) * (0.019993 - 0.000101 * t)
+              + Math.sin(3 * Mrad) * 0.000289;
+      const trueLong = L0 + C;            // deg
+      const omega = 125.04 - 1934.136 * t;
+      const lambda = trueLong - 0.00569 - 0.00478 * Math.sin(omega * RAD); // apparent long, deg
+      // obliquity
+      const seconds = 21.448 - t * (46.8150 + t * (0.00059 - t * 0.001813));
+      let e0 = 23 + (26 + (seconds / 60)) / 60;
+      const obliqCorr = e0 + 0.00256 * Math.cos(omega * RAD); // deg
+      const decl = Math.asin(Math.sin(obliqCorr * RAD) * Math.sin(lambda * RAD)) * DEG; // deg
+      // equation of time (minutes)
+      const y = Math.tan((obliqCorr / 2) * RAD) ** 2;
+      const eot = 4 * DEG * (
+          y * Math.sin(2 * L0 * RAD)
+        - 2 * e * Math.sin(Mrad)
+        + 4 * e * y * Math.sin(Mrad) * Math.cos(2 * L0 * RAD)
+        - 0.5 * y * y * Math.sin(4 * L0 * RAD)
+        - 1.25 * e * e * Math.sin(2 * Mrad)
+      ); // minutes
+      return { decl, eot };
+    }
+
+    // Hour-angle (deg) for a given altitude angle below/above horizon.
+    // zenith in degrees (90.833 = sunrise/sunset w/ refraction, 96 = civil, etc.)
+    function hourAngle(zenithDeg, latDeg, declDeg){
+      const cosH = (Math.cos(zenithDeg * RAD) / (Math.cos(latDeg * RAD) * Math.cos(declDeg * RAD)))
+                 - Math.tan(latDeg * RAD) * Math.tan(declDeg * RAD);
+      if (cosH > 1) return { ha: null, state: 'always-below' };   // sun never rises to this angle
+      if (cosH < -1) return { ha: null, state: 'always-above' };  // sun never sinks to this angle
+      return { ha: Math.acos(cosH) * DEG, state: 'ok' };
+    }
+
+    // Returns local-clock minutes-from-midnight for the event at the given zenith.
+    // which: 'rise' or 'set'. Solves with one NOAA refinement pass for accuracy.
+    function eventMinutes(jdDate, lonDeg, latDeg, tzHours, zenithDeg, which){
+      // first estimate at solar noon for this calendar day
+      const tNoon = (jdDate + 0.5 - 2451545.0) / 36525.0;
+      let sun = noaaSolar(tNoon);
+      let ha = hourAngle(zenithDeg, latDeg, sun.decl);
+      if (ha.state !== 'ok') return { minutes: null, state: ha.state };
+
+      // NOAA: solar-noon (minutes, UTC) then offset by hour angle
+      const computeAt = (decl, eot) => {
+        const solarNoonUTC = 720 - 4 * lonDeg - eot; // minutes UTC at local solar noon
+        const h = hourAngle(zenithDeg, latDeg, decl);
+        if (h.state !== 'ok') return { minutes: null, state: h.state };
+        const delta = 4 * h.ha; // minutes
+        const utcMin = which === 'rise' ? (solarNoonUTC - delta) : (solarNoonUTC + delta);
+        return { minutes: utcMin, state: 'ok' };
+      };
+
+      let first = computeAt(sun.decl, sun.eot);
+      if (first.state !== 'ok') return first;
+      // refine: re-evaluate the sun at the event's own fractional time
+      const tEvt = (jdDate + first.minutes / 1440 - 2451545.0) / 36525.0;
+      sun = noaaSolar(tEvt);
+      let refined = computeAt(sun.decl, sun.eot);
+      if (refined.state !== 'ok') refined = first;
+      // shift to requested timezone, normalize to 0..1440
+      let local = refined.minutes + tzHours * 60;
+      return { minutes: local, state: 'ok' };
+    }
+
+    function solarNoonMinutes(jdDate, lonDeg, tzHours){
+      const tNoon = (jdDate + 0.5 - 2451545.0) / 36525.0;
+      const sun = noaaSolar(tNoon);
+      const solarNoonUTC = 720 - 4 * lonDeg - sun.eot;
+      return solarNoonUTC + tzHours * 60;
+    }
+
+    // ---- Moon: illuminated fraction + phase from a robust mean-elongation model
+    function moonInfo(date){
+      // days since known new moon (2000-01-06 18:14 UTC), synodic month 29.530588853
+      const synodic = 29.530588853;
+      const knownNew = Date.UTC(2000, 0, 6, 18, 14, 0) / 86400000; // in days
+      const now = date.getTime() / 86400000;
+      let age = (now - knownNew) % synodic;
+      if (age < 0) age += synodic;
+      const phaseFrac = age / synodic;                 // 0..1 (0 = new)
+      // illuminated fraction via phase angle
+      const illum = (1 - Math.cos(2 * Math.PI * phaseFrac)) / 2;
+      let name;
+      const waxing = phaseFrac < 0.5;
+      if (phaseFrac < 0.0206 || phaseFrac > 0.9794) name = 'New Moon';
+      else if (phaseFrac < 0.2294) name = 'Waxing Crescent';
+      else if (phaseFrac < 0.2706) name = 'First Quarter';
+      else if (phaseFrac < 0.4794) name = 'Waxing Gibbous';
+      else if (phaseFrac < 0.5206) name = 'Full Moon';
+      else if (phaseFrac < 0.7294) name = 'Waning Gibbous';
+      else if (phaseFrac < 0.7706) name = 'Last Quarter';
+      else name = 'Waning Crescent';
+      return { age, phaseFrac, illum, name, waxing };
+    }
+
+    // Zeniths (degrees from vertical). Sun-center geometry per NOAA. (From original.)
+    const ZEN = {
+      rise_set: 90.833,        // 0° (with refraction)
+      civil:    96.0,          // -6°
+      blue_in:  94.0,          // -4° (inner blue edge, toward day)
+      golden_hi: 84.0          // +6° (golden hour upper edge, sun above horizon)
+    };
+
+    function computeDay(lat, lon, tz, dateObj){
+      const y = dateObj.getFullYear(), mo = dateObj.getMonth() + 1, da = dateObj.getDate();
+      const jd = toJulian(y, mo, da);
+
+      const ev = (zen, which) => eventMinutes(jd, lon, lat, tz, zen, which).minutes;
+      const evState = (zen, which) => eventMinutes(jd, lon, lat, tz, zen, which).state;
+
+      const sunrise = ev(ZEN.rise_set, 'rise');
+      const sunset  = ev(ZEN.rise_set, 'set');
+      const noon    = solarNoonMinutes(jd, lon, tz);
+
+      const civilDawn = ev(ZEN.civil, 'rise');     // -6° morning
+      const civilDusk = ev(ZEN.civil, 'set');      // -6° evening
+      const goldenHiDawn = ev(ZEN.golden_hi, 'rise'); // +6° morning
+      const goldenHiDusk = ev(ZEN.golden_hi, 'set');  // +6° evening
+
+      const riseState = evState(ZEN.rise_set, 'rise');
+
+      let dayLength = null;
+      if (sunrise !== null && sunset !== null) dayLength = sunset - sunrise;
+
+      return {
+        jd, sunrise, sunset, noon, dayLength,
+        blueMorning: [civilDawn, sunrise],
+        blueEvening: [sunset, civilDusk],
+        goldenMorning: [sunrise, goldenHiDawn],
+        goldenEvening: [goldenHiDusk, sunset],
+        riseState
+      };
+    }
+
+    /* ----------------------------------------------------------------
+       CONTINUOUS SUN ALT/AZ — same NOAA pieces, evaluated at an exact
+       local clock minute. This is what plots the 3D arc and drives the
+       scrubber. It is consistent with the event-time math above.
+       ---------------------------------------------------------------- */
+    // localMin = minutes-from-midnight in the chosen tz. Returns {alt, az}
+    // alt: degrees above horizon (true geometric, refraction ignored for the
+    //   continuous plot — events still come from the refraction-aware solver).
+    // az: degrees clockwise from true North (0=N, 90=E, 180=S, 270=W).
+    function sunPosition(jd, lat, lon, tz, localMin){
+      // convert local clock minute to UTC time, then Julian centuries
+      const utcMin = localMin - tz * 60;
+      const t = (jd + utcMin / 1440 - 2451545.0) / 36525.0;
+      const s = noaaSolar(t);
+      const decl = s.decl;                       // deg
+      // true solar time (minutes): clock + EoT + longitude correction
+      // tst = utcMinutes + eot + 4*lon  (NOAA worksheet)
+      let tst = (utcMin + s.eot + 4 * lon) % 1440;
+      if (tst < 0) tst += 1440;
+      // hour angle (deg): 0 at solar noon, negative morning, positive afternoon
+      let ha = tst / 4 - 180;                     // deg
+      const haR = ha * RAD, latR = lat * RAD, decR = decl * RAD;
+      // zenith
+      const cosZen = Math.sin(latR) * Math.sin(decR) + Math.cos(latR) * Math.cos(decR) * Math.cos(haR);
+      const zen = Math.acos(Math.max(-1, Math.min(1, cosZen)));
+      const alt = 90 - zen * DEG;
+      // azimuth (NOAA convention, clockwise from north)
+      let az;
+      const denom = Math.cos(latR) * Math.sin(zen);
+      if (Math.abs(denom) < 1e-8){
+        az = (lat > decl) ? 180 : 0;
+      } else {
+        let cosAz = (Math.sin(latR) * Math.cos(zen) - Math.sin(decR)) / denom;
+        cosAz = Math.max(-1, Math.min(1, cosAz));
+        const a = Math.acos(cosAz) * DEG;
+        az = (ha > 0) ? (360 - a) : a;   // afternoon -> west of south
+      }
+      return { alt, az };
+    }
+
+    /* ================================================================
+       FORMATTING HELPERS (from original, lightly adapted)
+       ================================================================ */
+    function fmtTime(minFromMidnight){
+      if (minFromMidnight === null || minFromMidnight === undefined) return '—';
+      let m = minFromMidnight, dayTag = '';
+      if (m < 0){ m += 1440; dayTag = ' −1d'; }
+      else if (m >= 1440){ m -= 1440; dayTag = ' +1d'; }
+      m = Math.round(m);
+      const hh = Math.floor(m / 60) % 24, mm = m % 60;
+      const h12 = ((hh + 11) % 12) + 1;
+      const ap = hh < 12 ? 'AM' : 'PM';
+      return `${h12}:${String(mm).padStart(2,'0')} ${ap}${dayTag}`;
+    }
+    function fmtClock(min){
+      let m = ((Math.round(min) % 1440) + 1440) % 1440;
+      const hh = Math.floor(m/60), mm = m%60;
+      const h12 = ((hh+11)%12)+1, ap = hh<12?'AM':'PM';
+      return `${h12}:${String(mm).padStart(2,'0')} ${ap}`;
+    }
+    function fmtDur(mins){
+      if (mins === null || mins === undefined || !isFinite(mins)) return '—';
+      const m = Math.round(mins), h = Math.floor(m/60), r = m%60;
+      return `${h}h ${String(r).padStart(2,'0')}m`;
+    }
+    function fmtAz(az){
+      const dirs=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      const i = Math.round(((az%360)/22.5))%16;
+      return `${az.toFixed(0)}° ${dirs[i]}`;
+    }
+
+    /* ================================================================
+       STATE + PERSISTENCE
+       ================================================================ */
+    const KEY = 'golden-hour-3d-v1';
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    const state = {
+      lat: 10.82, lon: 106.63, tz: 7,
+      date: null, jd: 0,
+      timeMin: 720,        // scrubber minutes-from-midnight (local tz)
+      day: null,           // computeDay result
+      reduced: reduceMQ.matches,
+      followNow: false
+    };
+
+    function localDateString(dt){
+      const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), d=String(dt.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
+    }
+
+    /* ================================================================
+       THREE.JS SETUP — a sky DOME over a horizon ground plane.
+       The dome is a large sphere seen from inside; we paint its color
+       per-frame from a vertical sky gradient that depends on sun altitude.
+       The sun is a glowing disc on the dome at its true alt/az.
+       ================================================================ */
+    const canvas = el('scene');
+    const DOME_R = 500;          // dome radius (world units)
+    let renderer, scene, camera;
+    let sunLight, ambient, hemi;
+    let domeMesh, groundMesh, sunMesh, sunGlow, sunHalo, moonMesh, moonGlowMesh;
+    let arcLine, arcPast, arcFuture;
+    let starField;
+    let markGroup;               // sunrise/sunset/noon/golden/blue markers
+    let compassGroup;
+    const clock = new THREE.Clock();
+
+    // dome shader uniforms — we drive sky color from JS each frame
+    const skyUniforms = {
+      topColor:    { value: new THREE.Color(0x0a1230) },
+      midColor:    { value: new THREE.Color(0x14305a) },
+      horizonColor:{ value: new THREE.Color(0xf0a040) },
+      bottomColor: { value: new THREE.Color(0x05060a) },
+      sunDir:      { value: new THREE.Vector3(0,1,0) },
+      sunColor:    { value: new THREE.Color(0xffd9a0) },
+      sunStrength: { value: 0.0 },
+      horizonBlend:{ value: 0.5 }
+    };
+
+    function makeRenderer(){
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+      renderer.setClearColor(0x05060a, 1);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(62, 1, 0.1, 4000);
+
+      ambient = new THREE.AmbientLight(0x223046, 0.5);
+      scene.add(ambient);
+      hemi = new THREE.HemisphereLight(0x88aaff, 0x0a0805, 0.4);
+      scene.add(hemi);
+
+      sunLight = new THREE.DirectionalLight(0xfff0cf, 1.0);
+      sunLight.position.set(0, 200, 0);
+      scene.add(sunLight);
+
+      buildDome();
+      buildGround();
+      buildStarfield();
+      buildSun();
+      buildMoon();
+      buildCompass();
+
+      markGroup = new THREE.Group();
+      scene.add(markGroup);
+
+      resize();
+      window.addEventListener('resize', resize);
+    }
+
+    function resize(){
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    // ---- the sky dome (inside-out sphere with a gradient shader) ----
+    function buildDome(){
+      const geo = new THREE.SphereGeometry(DOME_R, 48, 32);
+      const mat = new THREE.ShaderMaterial({
+        uniforms: skyUniforms,
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        vertexShader: `
+          varying vec3 vWorld;
+          void main(){
+            vWorld = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 topColor, midColor, horizonColor, bottomColor, sunColor;
+          uniform vec3 sunDir;
+          uniform float sunStrength, horizonBlend;
+          varying vec3 vWorld;
+          void main(){
+            float h = vWorld.y;                 // -1 .. 1 (up)
+            vec3 col;
+            if (h > 0.0){
+              // above horizon: horizon -> mid -> top
+              float a = pow(clamp(h, 0.0, 1.0), 0.55);
+              vec3 lower = mix(horizonColor, midColor, smoothstep(0.0, horizonBlend, a));
+              col = mix(lower, topColor, smoothstep(horizonBlend, 1.0, a));
+            } else {
+              // below horizon: horizon -> dark ground-glow
+              float a = clamp(-h, 0.0, 1.0);
+              col = mix(horizonColor, bottomColor, pow(a, 0.4));
+            }
+            // sun proximity glow on the dome
+            float d = max(0.0, dot(normalize(vWorld), normalize(sunDir)));
+            float halo = pow(d, 7.0) * sunStrength;
+            col += sunColor * halo * 0.9;
+            // a soft wide aureole near the sun
+            col += sunColor * pow(d, 2.0) * sunStrength * 0.12;
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `
+      });
+      domeMesh = new THREE.Mesh(geo, mat);
+      scene.add(domeMesh);
+    }
+
+    // ---- horizon ground plane (a large disc with a faint radial grid) ----
+    function buildGround(){
+      const geo = new THREE.CircleGeometry(DOME_R*0.999, 96);
+      geo.rotateX(-Math.PI/2);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x0c0e12, roughness: 1.0, metalness: 0.0,
+        transparent:true, opacity:0.96
+      });
+      groundMesh = new THREE.Mesh(geo, mat);
+      groundMesh.position.y = -0.4;
+      scene.add(groundMesh);
+
+      // faint horizon ring
+      const ringGeo = new THREE.RingGeometry(DOME_R*0.985, DOME_R*0.999, 128);
+      ringGeo.rotateX(-Math.PI/2);
+      const ringMat = new THREE.MeshBasicMaterial({ color:0x2a2e3a, transparent:true, opacity:0.5, side:THREE.DoubleSide });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.y = 0.1;
+      scene.add(ring);
+
+      // a few concentric radial grid rings for depth
+      for (let k=1;k<=3;k++){
+        const r = DOME_R * (0.3*k);
+        const g = new THREE.RingGeometry(r-1.2, r+1.2, 96);
+        g.rotateX(-Math.PI/2);
+        const m = new THREE.MeshBasicMaterial({ color:0x1a1d26, transparent:true, opacity:0.35, side:THREE.DoubleSide });
+        const mm = new THREE.Mesh(g, m);
+        mm.position.y = 0.05;
+        scene.add(mm);
+      }
+    }
+
+    // ---- faint stars on the inside of the dome (visible at night) ----
+    let starMat;
+    function buildStarfield(){
+      const N = 1100;
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(N*3);
+      const col = new Float32Array(N*3);
+      const R = DOME_R*0.96;
+      let n=0;
+      for (let i=0;i<N;i++){
+        // upper hemisphere mostly
+        const u = Math.random();             // 0..1
+        const y = Math.pow(u, 0.7);          // bias upward
+        const t = Math.random()*Math.PI*2;
+        const s = Math.sqrt(1-y*y);
+        pos[n*3]   = R * s * Math.cos(t);
+        pos[n*3+1] = R * y;
+        pos[n*3+2] = R * s * Math.sin(t);
+        const b = 0.45 + Math.random()*0.55;
+        if (Math.random()<0.14){ col[n*3]=b; col[n*3+1]=b*0.86; col[n*3+2]=b*0.6; }
+        else { col[n*3]=b*0.75; col[n*3+1]=b*0.82; col[n*3+2]=b; }
+        n++;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+      starMat = new THREE.PointsMaterial({ size:2.2, sizeAttenuation:false, vertexColors:true, transparent:true, opacity:0.0, depthWrite:false });
+      starField = new THREE.Points(geo, starMat);
+      scene.add(starField);
+    }
+
+    // ---- the sun: a bright disc + additive glow halo on the dome ----
+    const discGeo = new THREE.SphereGeometry(1, 24, 18);
+    function buildSun(){
+      const core = new THREE.MeshBasicMaterial({ color:0xfff4d6, fog:false });
+      sunMesh = new THREE.Mesh(discGeo, core);
+      sunMesh.scale.setScalar(14);
+      scene.add(sunMesh);
+
+      const glowMat = new THREE.MeshBasicMaterial({ color:0xffd49a, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending, depthWrite:false, fog:false });
+      sunGlow = new THREE.Mesh(discGeo, glowMat);
+      sunGlow.scale.setScalar(30);
+      scene.add(sunGlow);
+
+      const haloMat = new THREE.MeshBasicMaterial({ color:0xffb060, transparent:true, opacity:0.18, blending:THREE.AdditiveBlending, depthWrite:false, fog:false });
+      sunHalo = new THREE.Mesh(discGeo, haloMat);
+      sunHalo.scale.setScalar(70);
+      scene.add(sunHalo);
+    }
+
+    // ---- the moon: a sphere with a phase-driven terminator (shader) ----
+    const moonUniforms = {
+      litDir:  { value: new THREE.Vector3(1,0,0) },  // direction (in moon-local view) the sun lights from
+      litColor:{ value: new THREE.Color(0xf3ecd8) },
+      darkColor:{ value: new THREE.Color(0x14161f) }
+    };
+    function buildMoon(){
+      const geo = new THREE.SphereGeometry(1, 32, 24);
+      const mat = new THREE.ShaderMaterial({
+        uniforms: moonUniforms,
+        fog:false,
+        vertexShader:`
+          varying vec3 vN;
+          void main(){
+            vN = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+          }`,
+        fragmentShader:`
+          uniform vec3 litDir, litColor, darkColor;
+          varying vec3 vN;
+          void main(){
+            float d = dot(normalize(vN), normalize(litDir));
+            float lit = smoothstep(-0.06, 0.06, d);
+            vec3 col = mix(darkColor, litColor, lit);
+            // a touch of earthshine on the dark side
+            col += darkColor * 0.4 * (1.0-lit);
+            gl_FragColor = vec4(col, 1.0);
+          }`
+      });
+      moonMesh = new THREE.Mesh(geo, mat);
+      moonMesh.scale.setScalar(11);
+      scene.add(moonMesh);
+
+      const gMat = new THREE.MeshBasicMaterial({ color:0xbfc6e0, transparent:true, opacity:0.16, blending:THREE.AdditiveBlending, depthWrite:false, fog:false });
+      moonGlowMesh = new THREE.Mesh(discGeo, gMat);
+      moonGlowMesh.scale.setScalar(20);
+      scene.add(moonGlowMesh);
+    }
+
+    // ---- compass cardinal markers on the horizon ----
+    function makeTextSprite(text, color){
+      const c = document.createElement('canvas');
+      const S = 128; c.width=S; c.height=S;
+      const g = c.getContext('2d');
+      g.clearRect(0,0,S,S);
+      g.font = 'bold 64px "JetBrains Mono", monospace';
+      g.textAlign='center'; g.textBaseline='middle';
+      g.fillStyle = color || '#d4cfc8';
+      g.shadowColor = color || '#f59e0b'; g.shadowBlur = 16;
+      g.fillText(text, S/2, S/2);
+      const tex = new THREE.CanvasTexture(c);
+      tex.anisotropy = 2;
+      const mat = new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false, fog:false });
+      const sp = new THREE.Sprite(mat);
+      return sp;
+    }
+    function buildCompass(){
+      compassGroup = new THREE.Group();
+      scene.add(compassGroup);
+      // azimuth 0=N along -Z; east=+X. World: x=sin(az), z=-cos(az)
+      const cardinals = [
+        ['N', 0, '#f59e0b'], ['E', 90, '#9aa3b8'], ['S', 180, '#9aa3b8'], ['W', 270, '#9aa3b8'],
+        ['NE',45,'#6a7184'], ['SE',135,'#6a7184'], ['SW',225,'#6a7184'], ['NW',315,'#6a7184']
+      ];
+      const ring = DOME_R*0.93;
+      cardinals.forEach(([t, az, col])=>{
+        const sp = makeTextSprite(t, col);
+        const a = az*RAD;
+        sp.position.set(Math.sin(a)*ring, 8, -Math.cos(a)*ring);
+        const sc = (t.length>1) ? 20 : 30;
+        sp.scale.set(sc, sc, 1);
+        compassGroup.add(sp);
+        // a tick line up from horizon
+        const tickGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(Math.sin(a)*ring, 0, -Math.cos(a)*ring),
+          new THREE.Vector3(Math.sin(a)*ring, t.length>1?6:14, -Math.cos(a)*ring)
+        ]);
+        const tickMat = new THREE.LineBasicMaterial({ color: t==='N'?0xf59e0b:0x3a3e4a, transparent:true, opacity:0.7 });
+        compassGroup.add(new THREE.Line(tickGeo, tickMat));
+      });
+    }
+
+    /* ----------------------------------------------------------------
+       map sun alt/az to a world-space point on the dome.
+       az: 0=N (-Z), 90=E (+X). alt: degrees above horizon.
+       ---------------------------------------------------------------- */
+    function altAzToVec(altDeg, azDeg, radius){
+      const a = altDeg*RAD, z = azDeg*RAD;
+      const cosA = Math.cos(a);
+      return new THREE.Vector3(
+        Math.sin(z)*cosA*radius,
+        Math.sin(a)*radius,
+        -Math.cos(z)*cosA*radius
+      );
+    }
+
+    /* ----------------------------------------------------------------
+       Build the sun's ARC for the whole day + event markers.
+       Called whenever date/location changes.
+       ---------------------------------------------------------------- */
+    function disposeGroup(group){
+      while(group.children.length){
+        const c = group.children.pop();
+        if (c.geometry) c.geometry.dispose();
+        if (c.material){ if (c.material.map) c.material.map.dispose(); c.material.dispose(); }
+      }
+    }
+
+    function buildArc(){
+      // remove old arc lines
+      [arcPast, arcFuture].forEach(l=>{ if(l){ scene.remove(l); l.geometry.dispose(); l.material.dispose(); } });
+      disposeGroup(markGroup);
+
+      const d = state.day;
+      const R = DOME_R*0.985;
+      // sample the full day; split visually into below/above horizon segments
+      const pts = [];
+      const STEP = 4; // minutes
+      for (let m=0; m<=1440; m+=STEP){
+        const p = sunPosition(state.jd, state.lat, state.lon, state.tz, m);
+        pts.push({ m, alt:p.alt, az:p.az, v: altAzToVec(p.alt, p.az, R) });
+      }
+
+      // arc above horizon (bright amber) and below (dim, dashed-look via low opacity)
+      const above = [], below = [];
+      for (const p of pts){ (p.alt >= 0 ? above : below).push(p.v); }
+
+      function lineFromPts(arr, color, opacity){
+        if (arr.length < 2) return null;
+        const g = new THREE.BufferGeometry().setFromPoints(arr);
+        const m = new THREE.LineBasicMaterial({ color, transparent:true, opacity, fog:false });
+        const ln = new THREE.Line(g, m);
+        ln.frustumCulled = false;
+        return ln;
+      }
+      // Because above/below can be non-contiguous arrays, draw the full path dim
+      // then overlay the above-horizon points bright.
+      arcFuture = lineFromPts(pts.map(p=>p.v), 0x3a3e4a, 0.45); // full ghost path
+      if (arcFuture) scene.add(arcFuture);
+      // overlay bright above-horizon as a contiguous run (sunrise..sunset)
+      const dayPts = pts.filter(p=>p.alt >= -0.3).map(p=>p.v);
+      arcPast = lineFromPts(dayPts, 0xf59e0b, 0.85);
+      if (arcPast) scene.add(arcPast);
+
+      // ---- event markers ----
+      const addMark = (min, label, color, dotR)=>{
+        if (min === null || min === undefined) return;
+        const mm = ((Math.round(min)%1440)+1440)%1440;
+        const p = sunPosition(state.jd, state.lat, state.lon, state.tz, mm);
+        const v = altAzToVec(p.alt, p.az, R);
+        // dot
+        const dg = new THREE.SphereGeometry(dotR||4, 12, 10);
+        const dm = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.95, fog:false });
+        const dot = new THREE.Mesh(dg, dm);
+        dot.position.copy(v);
+        markGroup.add(dot);
+        // glow
+        const gm = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.4, blending:THREE.AdditiveBlending, depthWrite:false, fog:false });
+        const gl = new THREE.Mesh(discGeo, gm);
+        gl.scale.setScalar((dotR||4)*2.6);
+        gl.position.copy(v);
+        markGroup.add(gl);
+        // label
+        const sp = makeTextSprite(label, '#'+new THREE.Color(color).getHexString());
+        sp.position.copy(v).multiplyScalar(1.02);
+        sp.position.y += 14;
+        sp.scale.set(16,16,1);
+        markGroup.add(sp);
+        // a thin drop line to the horizon point for grounding
+        const horizV = altAzToVec(0, p.az, R);
+        const lg = new THREE.BufferGeometry().setFromPoints([v, horizV]);
+        const lm = new THREE.LineBasicMaterial({ color, transparent:true, opacity:0.25, fog:false });
+        markGroup.add(new THREE.Line(lg, lm));
+      };
+
+      addMark(d.sunrise, '↑', 0xffcf6b, 5);
+      addMark(d.sunset,  '↓', 0xff8a4a, 5);
+      addMark(d.noon,    '☀', 0xfff0c0, 6);
+      // golden / blue window edges (subtle, smaller)
+      addMark(d.goldenMorning[1], '', 0xf0a040, 3);
+      addMark(d.goldenEvening[0], '', 0xf0a040, 3);
+      addMark(d.blueMorning[0],   '', 0x6f9fd6, 3);
+      addMark(d.blueEvening[1],   '', 0x6f9fd6, 3);
+    }
+
+    /* ----------------------------------------------------------------
+       SKY COLOR by sun altitude — the heart of the band feeling.
+       Returns the palette + lighting for a given sun altitude.
+       Bands (sun altitude):
+         alt < -18      deep night
+         -18..-6        astronomical/nautical -> blue rising
+         -6..-4         blue hour
+         -4..+6         golden hour
+         > +6           daylight
+       ---------------------------------------------------------------- */
+    const _c1=new THREE.Color(), _c2=new THREE.Color();
+    // target may be a THREE.Color OR a uniform wrapper { value: Color } — unwrap.
+    function lerpCol(target, hexA, hexB, t){
+      const col = (target && target.isColor) ? target : target.value;
+      _c1.setHex(hexA); _c2.setHex(hexB);
+      col.copy(_c1).lerp(_c2, Math.max(0,Math.min(1,t)));
+    }
+
+    function bandFor(alt){
+      if (alt < -6) return 'night';
+      if (alt < -4) return 'blue';
+      if (alt < 6)  return 'golden';
+      return 'day';
+    }
+
+    function applySky(alt, az){
+      const u = skyUniforms;
+      // sun direction on the dome (unit)
+      const sd = altAzToVec(alt, az, 1).normalize();
+      u.sunDir.value.copy(sd);
+
+      // helper smooth ramp
+      const seg = (x,a,b)=> Math.max(0, Math.min(1, (x-a)/(b-a)));
+
+      // pick palettes by altitude with smooth blends across thresholds
+      // anchor colors
+      // night
+      const NIGHT_TOP=0x05060f, NIGHT_MID=0x0a1024, NIGHT_HOR=0x141a2e, NIGHT_BOT=0x04050a;
+      // blue hour
+      const BLUE_TOP=0x0e1a3a, BLUE_MID=0x1e3a6a, BLUE_HOR=0x3f6aa8, BLUE_BOT=0x070a16;
+      // golden
+      const GOLD_TOP=0x2a3a6a, GOLD_MID=0x6a5a8a, GOLD_HOR=0xf0a040, GOLD_BOT=0x0a0a12;
+      // day
+      const DAY_TOP=0x2a5fb0, DAY_MID=0x5a93d6, DAY_HOR=0xbfd8f0, DAY_BOT=0x0c0e14;
+
+      let top, mid, hor, bot, sunStr, sunCol, hb;
+
+      if (alt < -6){
+        // night -> blue as alt rises toward -6
+        const t = seg(alt, -18, -6);
+        lerpCol(u.topColor, NIGHT_TOP, BLUE_TOP, t);
+        lerpCol(u.midColor, NIGHT_MID, BLUE_MID, t);
+        lerpCol(u.horizonColor, NIGHT_HOR, BLUE_HOR, t);
+        lerpCol(u.bottomColor, NIGHT_BOT, BLUE_BOT, t);
+        sunStr = 0.05 + t*0.15;
+        u.sunColor.value.setHex(0x3f6aa8);
+        hb = 0.55;
+      } else if (alt < -4){
+        // blue hour proper -> toward golden
+        const t = seg(alt, -6, -4);
+        lerpCol(u.topColor, BLUE_TOP, GOLD_TOP, t);
+        lerpCol(u.midColor, BLUE_MID, GOLD_MID, t);
+        lerpCol(u.horizonColor, BLUE_HOR, GOLD_HOR, t);
+        lerpCol(u.bottomColor, BLUE_BOT, GOLD_BOT, t);
+        sunStr = 0.2 + t*0.35;
+        u.sunColor.value.copy(_c1.setHex(0x6f9fd6).lerp(_c2.setHex(0xf0a040), t));
+        hb = 0.5;
+      } else if (alt < 6){
+        // golden hour -> toward day
+        const t = seg(alt, -4, 6);
+        lerpCol(u.topColor, GOLD_TOP, DAY_TOP, t);
+        lerpCol(u.midColor, GOLD_MID, DAY_MID, t);
+        lerpCol(u.horizonColor, GOLD_HOR, DAY_HOR, t);
+        lerpCol(u.bottomColor, GOLD_BOT, DAY_BOT, t);
+        sunStr = 0.55 + t*0.3;
+        u.sunColor.value.copy(_c1.setHex(0xffb060).lerp(_c2.setHex(0xfff0d0), t));
+        hb = 0.45 + t*0.1;
+      } else {
+        // full daylight, deepen blue as the sun climbs
+        const t = seg(alt, 6, 60);
+        lerpCol(u.topColor, DAY_TOP, 0x1f4fa0, t);
+        lerpCol(u.midColor, DAY_MID, 0x4f8ad0, t);
+        lerpCol(u.horizonColor, DAY_HOR, 0xd8e8f8, t);
+        u.bottomColor.value.setHex(0x0c0e14);
+        sunStr = 0.9;
+        u.sunColor.value.setHex(0xfff4e0);
+        hb = 0.55;
+      }
+      u.sunStrength.value = sunStr;
+      u.horizonBlend.value = hb;
+
+      // ---- lighting ----
+      // directional sun light: color + intensity by band
+      const above = Math.max(0, alt);
+      let li, lc;
+      if (alt < -8){ li = 0.0; lc = 0x223046; }
+      else if (alt < -4){ li = 0.12 * seg(alt,-8,-4); lc = 0x4a5a86; }
+      else if (alt < 6){
+        const t = seg(alt,-4,6);
+        li = 0.25 + t*0.85; lc = _c1.setHex(0xff9a40).lerp(_c2.setHex(0xfff0d0), t).getHex();
+      } else {
+        li = 1.15; lc = 0xfff3df;
+      }
+      sunLight.color.setHex(lc);
+      sunLight.intensity = li;
+      const ld = altAzToVec(alt, az, 200);
+      sunLight.position.copy(ld);
+
+      // ambient & hemi dim at night
+      const dayAmt = Math.max(0, Math.min(1, (alt+6)/12));   // 0 below -6, 1 above +6
+      ambient.intensity = 0.18 + dayAmt*0.45;
+      hemi.intensity = 0.12 + dayAmt*0.55;
+      ambient.color.setHex(alt < -4 ? 0x1a2236 : 0x2a3346);
+
+      // stars: visible at night, fade out by blue hour
+      if (starMat){
+        const so = Math.max(0, Math.min(1, (-4 - alt)/14)); // 1 deep night -> 0 at -4
+        starMat.opacity = so*0.9;
+      }
+      // renderer clear color follows the bottom-of-dome tone faintly
+      renderer.setClearColor(u.bottomColor.value.getHex(), 1);
+    }
+
+    /* ----------------------------------------------------------------
+       Update the SUN + MOON positions for the current scrubbed time.
+       ---------------------------------------------------------------- */
+    function updateSunMoon(){
+      const sp = sunPosition(state.jd, state.lat, state.lon, state.tz, state.timeMin);
+      const R = DOME_R*0.985;
+      const v = altAzToVec(sp.alt, sp.az, R);
+      sunMesh.position.copy(v);
+      sunGlow.position.copy(v);
+      sunHalo.position.copy(v);
+      // hide the sun disc when well below horizon (it lives "underground")
+      const visible = sp.alt > -2;
+      sunMesh.visible = visible;
+      sunGlow.visible = sp.alt > -8;
+      sunHalo.visible = sp.alt > -8;
+      // shrink/redden the sun near the horizon
+      const horizK = Math.max(0, Math.min(1, (10 - sp.alt)/20));
+      sunGlow.material.color.copy(_c1.setHex(0xffd49a).lerp(_c2.setHex(0xff7a30), horizK*0.8));
+      sunGlow.scale.setScalar(26 + horizK*22);
+
+      applySky(sp.alt, sp.az);
+
+      // ---- MOON ----
+      const m = moonInfo(state.dateAtTime());
+      // moon's sky position: approximate — opposite-ish the sun, shifted by phase.
+      // For a faithful-but-light model, place the moon along the ecliptic plane:
+      // its hour angle lags the sun by ~ (phaseFrac * 360deg) + 180 at full.
+      // We compute a pseudo-moon RA offset from the sun of (phaseFrac)*360 and
+      // reuse the sun-position machinery with that longitude offset in time.
+      const moonLagHours = (m.phaseFrac) * 24.0;  // new=0 (with sun), full=12 (opposite)
+      const moonMin = state.timeMin - moonLagHours*60; // moon trails the sun by its phase
+      const mp = sunPosition(state.jd, state.lat, state.lon, state.tz, ((moonMin%1440)+1440)%1440);
+      const mv = altAzToVec(mp.alt, mp.az, R*0.95);
+      moonMesh.position.copy(mv);
+      moonGlowMesh.position.copy(mv);
+      const moonUp = mp.alt > -2;
+      moonMesh.visible = moonUp;
+      moonGlowMesh.visible = moonUp && m.illum > 0.04;
+      moonGlowMesh.material.opacity = 0.05 + m.illum*0.18;
+
+      // light direction on the moon: toward the sun's direction in world space
+      // (so the lit limb faces the sun even when both are on the dome)
+      const sunWorld = altAzToVec(sp.alt, sp.az, 1).normalize();
+      // transform into moon's view: the shader uses normalMatrix*normal (view space),
+      // so we feed the sun direction in view space.
+      const sunView = sunWorld.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(camera.matrixWorldInverse));
+      moonUniforms.litDir.value.copy(sunView).normalize();
+
+      // ---- READOUTS ----
+      const band = bandFor(sp.alt);
+      const bandNames = { night:'Night', blue:'Blue hour', golden:'Golden hour', day:'Daylight' };
+      el('phaseName').textContent = bandNames[band] + (sp.alt < -18 ? ' · deep' : '');
+      el('altOut').textContent = sp.alt.toFixed(1)+'°';
+      el('azOut').textContent = fmtAz(sp.az);
+      el('clockOut').textContent = fmtClock(state.timeMin);
+      el('moonLit').textContent = Math.round(m.illum*100)+'% · '+m.name;
+      el('moonGlyphWrap').innerHTML = moonGlyphSVG(m.phaseFrac, m.illum, m.waxing);
+
+      updateCaption(band, sp, m);
+    }
+
+    // a tiny moon glyph for the readout chip (reuse original glyph idea)
+    function moonGlyphSVG(phaseFrac, illum, waxing){
+      const R=8, cx=10, cy=10;
+      const k = Math.cos(2*Math.PI*phaseFrac);
+      const bright='#f3ecd8', shadow='#14161f';
+      let inner;
+      if (illum<0.01){ inner=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${shadow}"/>`; }
+      else if (illum>0.99){ inner=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${bright}"/>`; }
+      else {
+        const rx=Math.abs(k)*R, litRight=waxing, big=illum>0.5;
+        const top=`${cx},${cy-R}`, bot=`${cx},${cy+R}`;
+        const outer=litRight?1:0, innerSw=big?outer:(1-outer);
+        inner=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${shadow}"/>
+          <path d="M ${top} A ${R} ${R} 0 0 ${outer} ${bot} A ${rx} ${R} 0 0 ${innerSw} ${top} Z" fill="${bright}"/>`;
+      }
+      return `<svg width="20" height="20" viewBox="0 0 20 20">${inner}
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#000" stroke-opacity="0.4"/></svg>`;
+    }
+
+    /* ----------------------------------------------------------------
+       Terse Prízrak captions about the light.
+       ---------------------------------------------------------------- */
+    const CAPS = {
+      night: [
+        'the sun is gone. only the cold arc remains, a memory drawn underground.',
+        'deep night. the light has left the dome to the stars.',
+        'no sun, no warmth. the ghost counts the hours until it returns.'
+      ],
+      blue: [
+        'the blue hour. the world holds its breath before color.',
+        'civil twilight — everything turns to ash and indigo.',
+        'the light is bending in from below. soft, brief, leaving.'
+      ],
+      golden: [
+        'the golden hour. low light, long shadows, the kindest the day will be.',
+        'gold pours along the horizon. shoot now — it does not wait.',
+        'the sun grazes the land. everything it touches turns warm and temporary.'
+      ],
+      day: [
+        'full day. the sun rides high; the light is plain and honest.',
+        'daylight. the arc is at its proudest. the gold is hours away yet.',
+        'the sun holds its court overhead. nothing hidden, nothing soft.'
+      ]
+    };
+    let lastBand=null, capIdx=0;
+    function updateCaption(band, sp, m){
+      const cap = el('caption');
+      if (band !== lastBand){ lastBand = band; capIdx = (Math.random()*CAPS[band].length)|0; }
+      let line = CAPS[band][capIdx];
+      // append a directional note near the events
+      const d = state.day;
+      if (d.sunrise!==null && Math.abs(state.timeMin - d.sunrise) < 14){
+        line = 'sunrise — the sun breaks the horizon in the '+azWord(sunPosition(state.jd,state.lat,state.lon,state.tz,d.sunrise).az)+'.';
+      } else if (d.sunset!==null && Math.abs(state.timeMin - d.sunset) < 14){
+        line = 'sunset — the light leaves through the '+azWord(sunPosition(state.jd,state.lat,state.lon,state.tz,d.sunset).az)+'.';
+      }
+      cap.textContent = line;
+    }
+    function azWord(az){
+      if (az<22.5||az>=337.5) return 'north';
+      if (az<67.5) return 'northeast'; if (az<112.5) return 'east';
+      if (az<157.5) return 'southeast'; if (az<202.5) return 'south';
+      if (az<247.5) return 'southwest'; if (az<292.5) return 'west';
+      return 'northwest';
+    }
+
+    /* ----------------------------------------------------------------
+       state.dateAtTime — a Date object at the scrubbed local time,
+       converted to a real UTC instant, for moon-age accuracy.
+       ---------------------------------------------------------------- */
+    state.dateAtTime = function(){
+      // local clock minute in chosen tz -> UTC ms
+      const base = state.date; // local Date at noon of the calendar day (device tz irrelevant; we use components)
+      const y=base.getFullYear(), mo=base.getMonth(), da=base.getDate();
+      // UTC ms for (y-mo-da 00:00 in the chosen tz) + timeMin
+      const utcMidnight = Date.UTC(y, mo, da, 0, 0, 0) - state.tz*3600000;
+      return new Date(utcMidnight + state.timeMin*60000);
+    };
+
+    /* ================================================================
+       CAMERA — look-around orbit from near the ground, facing the dome.
+       Spherical controller (no OrbitControls dep). Eye is near origin,
+       looking out toward a target on the dome; drag rotates the look
+       direction, scroll changes FOV-ish zoom (dolly the target distance).
+       ================================================================ */
+    const cam = {
+      // we orbit a look-direction around the standing point (slightly above ground)
+      eye: new THREE.Vector3(0, 12, 0),
+      yaw: Math.PI,        // facing -Z (north) initially? we set to face SE on init
+      pitch: 0.35,         // look slightly up
+      dist: 0.1,           // we look outward; dist just nudges target
+      fov: 62, minFov: 28, maxFov: 80
+    };
+    function clampPitch(){ cam.pitch = Math.max(-0.35, Math.min(1.45, cam.pitch)); }
+    function applyCamera(){
+      clampPitch();
+      camera.position.copy(cam.eye);
+      const cp = Math.cos(cam.pitch);
+      const dir = new THREE.Vector3(
+        Math.sin(cam.yaw)*cp,
+        Math.sin(cam.pitch),
+        -Math.cos(cam.yaw)*cp
+      );
+      const target = cam.eye.clone().addScaledVector(dir, 100);
+      camera.lookAt(target);
+      camera.fov = cam.fov;
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
+    }
+
+    /* ================================================================
+       INPUT — drag to look, wheel to zoom (fov), touch supported.
+       ================================================================ */
+    const drag = { active:false, lastX:0, lastY:0 };
+    function pointer(e){ const t=(e.touches&&e.touches[0])?e.touches[0]:e; return {x:t.clientX, y:t.clientY}; }
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      drag.active = true;
+      const p = pointer(e); drag.lastX=p.x; drag.lastY=p.y;
+      canvas.classList.add('orbiting');
+      lastInteract();
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!drag.active) return;
+      const p = pointer(e);
+      // pinch zoom
+      if (e.touches && e.touches.length>=2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        const dist=Math.hypot(dx,dy);
+        if (drag._pinch!=null){ cam.fov = Math.max(cam.minFov, Math.min(cam.maxFov, cam.fov + (drag._pinch-dist)*0.12)); }
+        drag._pinch = dist;
+      }
+      const dx=p.x-drag.lastX, dy=p.y-drag.lastY;
+      cam.yaw   += dx*0.004;
+      cam.pitch += dy*0.004;
+      clampPitch();
+      drag.lastX=p.x; drag.lastY=p.y;
+      lastInteract();
+      e.preventDefault();
+    }
+    function onUp(e){ drag.active=false; drag._pinch=null; canvas.classList.remove('orbiting'); }
+    function onWheel(e){
+      e.preventDefault();
+      cam.fov = Math.max(cam.minFov, Math.min(cam.maxFov, cam.fov * Math.exp(e.deltaY*0.0011)));
+      lastInteract();
+    }
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('wheel', onWheel, { passive:false });
+    canvas.addEventListener('contextmenu', e=>e.preventDefault());
+    canvas.addEventListener('touchstart', onDown, { passive:false });
+    window.addEventListener('touchmove', onMove, { passive:false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+
+    /* ================================================================
+       RECOMPUTE — when date / location changes, rebuild day + arc.
+       ================================================================ */
+    function recompute(){
+      const y=state.date.getFullYear(), mo=state.date.getMonth()+1, da=state.date.getDate();
+      state.jd = toJulian(y, mo, da);
+      state.day = computeDay(state.lat, state.lon, state.tz, state.date);
+      buildArc();
+      // face the camera toward the more interesting event (sunrise if morning bias)
+      updateSunMoon();
+      updateClockTz();
+    }
+
+    function updateClockTz(){
+      const sign = state.tz>=0?'+':'';
+      el('tzOut').textContent = 'UTC'+sign+(Number.isInteger(state.tz)?state.tz:state.tz);
+    }
+
+    /* ================================================================
+       PERSISTENCE
+       ================================================================ */
+    function save(){
+      try { localStorage.setItem(KEY, JSON.stringify({ lat:state.lat, lon:state.lon, tz:state.tz, reduced:state.reduced })); } catch(e){}
+    }
+    function load(){
+      let s=null; try{ s=JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+      return s;
+    }
+
+    /* ================================================================
+       UI WIRING
+       ================================================================ */
+    function readInputs(){
+      const dStr = el('date').value;
+      const parts = dStr.split('-').map(Number);
+      state.date = (parts.length===3) ? new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0) : new Date();
+      let lat=parseFloat(el('lat').value), lon=parseFloat(el('lon').value), tz=parseFloat(el('tz').value);
+      if (!isFinite(lat)) lat=0; if (!isFinite(lon)) lon=0; if (!isFinite(tz)) tz=0;
+      state.lat = Math.max(-90, Math.min(90, lat));
+      state.lon = Math.max(-180, Math.min(180, lon));
+      state.tz  = Math.max(-14, Math.min(14, tz));
+    }
+
+    function fullUpdate(){
+      readInputs();
+      recompute();
+      save();
+    }
+
+    function setPreset(lat, lon, tz){
+      el('lat').value = lat; el('lon').value = lon; el('tz').value = tz;
+      state.followNow = false; el('btnNow').classList.remove('btn-on');
+      fullUpdate();
+      markPresetButtons();
+    }
+    function markPresetButtons(){
+      document.querySelectorAll('.presets .btn[data-lat]').forEach(b=>{
+        const on = parseFloat(b.dataset.lat)===state.lat && parseFloat(b.dataset.lon)===state.lon;
+        b.classList.toggle('btn-on', on);
+      });
+    }
+
+    function goNow(){
+      // set date + time to the real "now" in the chosen tz
+      const now = new Date();
+      const utcMin = now.getUTCHours()*60 + now.getUTCMinutes() + now.getUTCSeconds()/60;
+      let localMin = utcMin + state.tz*60;
+      // date in chosen tz
+      const utcMs = now.getTime();
+      const localMs = utcMs + state.tz*3600000;
+      const ld = new Date(localMs);
+      el('date').value = `${ld.getUTCFullYear()}-${String(ld.getUTCMonth()+1).padStart(2,'0')}-${String(ld.getUTCDate()).padStart(2,'0')}`;
+      localMin = ((localMin%1440)+1440)%1440;
+      state.timeMin = localMin;
+      el('time').value = Math.round(localMin);
+      state.followNow = true;
+      el('btnNow').classList.add('btn-on');
+      fullUpdate();
+    }
+
+    function initInputs(){
+      const saved = load();
+      const devTz = -new Date().getTimezoneOffset()/60;
+      if (saved && isFinite(saved.lat) && isFinite(saved.lon)){
+        el('lat').value = saved.lat; el('lon').value = saved.lon;
+        el('tz').value = isFinite(saved.tz) ? saved.tz : devTz;
+        if (typeof saved.reduced === 'boolean') state.reduced = saved.reduced;
+      } else {
+        el('lat').value = 10.82; el('lon').value = 106.63; el('tz').value = 7;
+      }
+      el('date').value = localDateString(new Date());
+
+      // time slider -> noon by default
+      el('time').value = 720; state.timeMin = 720;
+
+      // listeners
+      ['date','lat','lon','tz'].forEach(id=>{
+        el(id).addEventListener('change', ()=>{ state.followNow=false; el('btnNow').classList.remove('btn-on'); fullUpdate(); markPresetButtons(); });
+        el(id).addEventListener('keydown', e=>{ if(e.key==='Enter') el(id).blur(); });
+      });
+      el('time').addEventListener('input', ()=>{
+        state.timeMin = +el('time').value;
+        state.followNow = false; el('btnNow').classList.remove('btn-on');
+        updateSunMoon();
+        lastInteract();
+      });
+      document.querySelectorAll('.presets .btn[data-lat]').forEach(b=>{
+        b.addEventListener('click', ()=> setPreset(b.dataset.lat, b.dataset.lon, b.dataset.tz));
+      });
+      el('btnNow').addEventListener('click', goNow);
+      el('btnReset').addEventListener('click', ()=>{ cam.yaw=Math.PI*0.25; cam.pitch=0.35; cam.fov=62; });
+      el('btnReduce').addEventListener('click', ()=>{
+        state.reduced=!state.reduced; syncReduce(); save();
+      });
+
+      syncReduce();
+      markPresetButtons();
+    }
+
+    function syncReduce(){
+      const rb=el('btnReduce');
+      rb.classList.toggle('btn-on', state.reduced);
+      rb.textContent = state.reduced ? '◐ motion: calm' : '◐ motion: full';
+    }
+
+    /* ================================================================
+       MAIN LOOP
+       ================================================================ */
+    let fpsAccum=0, fpsFrames=0, nowAccum=0;
+    function loop(){
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.05, clock.getDelta());
+
+      // gentle idle sky drift (reduced-motion safe), only when not dragging
+      if (!state.reduced && !drag.active){
+        cam.yaw += dt*0.006;
+      }
+
+      // if "now" follow is on, advance the scrubber to track real time
+      nowAccum += dt;
+      if (state.followNow && nowAccum > 5){
+        nowAccum = 0;
+        const now = new Date();
+        const utcMin = now.getUTCHours()*60 + now.getUTCMinutes() + now.getUTCSeconds()/60;
+        let lm = ((utcMin + state.tz*60)%1440+1440)%1440;
+        state.timeMin = lm; el('time').value = Math.round(lm);
+        updateSunMoon();
+      }
+
+      // subtle sun pulse
+      if (sunMesh && sunMesh.visible && !state.reduced){
+        const p = 1 + Math.sin(clock.elapsedTime*1.8)*0.04;
+        sunGlow.material.opacity = 0.42 + Math.sin(clock.elapsedTime*1.4)*0.06;
+      }
+
+      applyCamera();
+      // moon light dir depends on camera; refresh cheaply
+      if (moonMesh && moonMesh.visible){
+        const sp = sunPosition(state.jd, state.lat, state.lon, state.tz, state.timeMin);
+        const sunWorld = altAzToVec(sp.alt, sp.az, 1).normalize();
+        const sunView = sunWorld.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(camera.matrixWorldInverse));
+        moonUniforms.litDir.value.copy(sunView).normalize();
+      }
+      renderer.render(scene, camera);
+
+      fpsAccum += dt; fpsFrames++;
+      if (fpsAccum>=0.5){ const f=Math.round(fpsFrames/fpsAccum); window.__ghFPS=f; el('fpsBadge').textContent=f+' fps'; fpsAccum=0; fpsFrames=0; }
+    }
+
+    /* ================================================================
+       BOOT
+       ================================================================ */
+    try {
+      makeRenderer();
+    } catch(err){
+      el('fatal').style.display='flex';
+      console.error(err);
+      return;
+    }
+    initInputs();
+    // initial camera: stand and face the eastern sky (sunrise side) a touch up
+    cam.yaw = Math.PI*0.25; cam.pitch = 0.35;
+    fullUpdate();
+    applyCamera();
+    loop();
+
+    // read-only console handle (the ghost keeps no secrets)
+    window.goldenHour3D = {
+      get fps(){ return window.__ghFPS||0; },
+      get sun(){ return sunPosition(state.jd, state.lat, state.lon, state.tz, state.timeMin); },
+      get day(){ return state.day; },
+      get moon(){ return moonInfo(state.dateAtTime()); },
+      get time(){ return state.timeMin; },
+      get loc(){ return { lat:state.lat, lon:state.lon, tz:state.tz, date:localDateString(state.date) }; },
+      _setTime(min){ state.timeMin=((Math.round(min)%1440)+1440)%1440; el('time').value=state.timeMin; state.followNow=false; updateSunMoon(); return state.timeMin; },
+      _preset(lat,lon,tz){ setPreset(lat,lon,tz); return this.loc; },
+      _now(){ goNow(); return this.time; },
+      _look(yaw,pitch){ if(yaw!=null)cam.yaw=yaw; if(pitch!=null)cam.pitch=pitch; return {yaw:cam.yaw,pitch:cam.pitch}; },
+      // sanity helper: event times as clock strings
+      _times(){ const d=state.day; return {
+        sunrise:fmtTime(d.sunrise), sunset:fmtTime(d.sunset), noon:fmtTime(d.noon),
+        goldenAM:fmtTime(d.goldenMorning[1]), goldenPM:fmtTime(d.goldenEvening[0]),
+        blueAM:fmtTime(d.blueMorning[0]), bluePM:fmtTime(d.blueEvening[1]),
+        dayLength:fmtDur(d.dayLength)
+      }; }
+    };
+
+    /* ===== ambient embers (capped, reduced-motion-safe) ===== */
+    (function(){
+      if (reduceMQ.matches) return;
+      const host=el('embers');
+      for (let i=0;i<6;i++){
+        const e=document.createElement('div');
+        e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*16)+'s';
+        e.style.animationDuration=(13+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    })();
+
+    /* ===== night-hours whisper (00:00–03:00 local device time) ===== */
+    (function(){ const h=new Date().getHours(); if (h>=0&&h<3){ const w=el('nightWhisper'); if(w) w.style.display='block'; } })();
+
+    /* ===== easter egg: type "prizrak" → the watcher opens an eye ===== */
+    (function(){
+      let buf='';
+      window.addEventListener('keydown',(ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=el('ghostLine');
+          if (g){ g.textContent='a watcher opens its eye. it has been counting sunrises since before you were born.'; g.style.display='block'; g.classList.add('flicker'); }
+          // a brief crimson flare on the horizon: jump time to the nearest event
+          const d=state.day;
+          if (d.sunset!==null){ state.timeMin=d.sunset; el('time').value=Math.round(d.sunset); state.followNow=false; el('btnNow').classList.remove('btn-on'); updateSunMoon(); }
+        }
+      });
+    })();
+
+    /* ===== easter egg: triple-click the title → one extra ember ===== */
+    (function(){
+      const t=el('appTitle'); if(!t) return;
+      t.addEventListener('click',(ev)=>{
+        if (ev.detail===3 && !reduceMQ.matches){
+          const e=document.createElement('div'); e.className='ember';
+          e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='12s';
+          el('embers').appendChild(e); setTimeout(()=>e.remove(),13000);
+        }
+      });
+    })();
+
+    /* ===== idle 60s → the watcher leans in (UI chrome; reduced-motion gated) ===== */
+    let idleTimer=null;
+    function lastInteract(){
+      const line=el('idleLine'); if(line) line.style.opacity='0';
+      clearTimeout(idleTimer);
+      if (reduceMQ.matches) return;
+      idleTimer=setTimeout(()=>{
+        if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+          setTimeout(()=>{ if(line) line.style.opacity='0'; }, 6000); }
+      }, 60000);
+    }
+    ['mousemove','keydown','click','wheel','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev,lastInteract,{passive:true}));
+    lastInteract();
+
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change',(e)=>{ state.reduced=e.matches; syncReduce(); save(); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>
