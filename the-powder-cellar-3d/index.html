@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Powder Cellar · Vault | Prízrak</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- THREE.js r128 — UMD build, exposes a global `THREE`. No ES modules / importmaps. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#5fd0b0;            /* foxfire teal — the cellar's one living light */
+      --accent-deep:#3aa88c;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ background:var(--bg); height:100%; margin:0; padding:0; overflow:hidden; }
+    body{
+      color:var(--ink);
+      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      overscroll-behavior:none; -webkit-user-select:none; user-select:none;
+      touch-action:none;
+    }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    #stage{ position:fixed; inset:0; z-index:0; }
+    #scene{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+    #scene.painting{ cursor:cell; }
+    #scene.orbiting{ cursor:move; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 82%, transparent);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .label{ color:var(--ink-dim); font-size:0.62rem; text-transform:uppercase; letter-spacing:0.18em; }
+    .num{ color:var(--accent); }
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 70%, transparent);
+      cursor:pointer; font-family:inherit;
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* element palette swatch */
+    .swatch{
+      transition:transform .1s, box-shadow .15s, border-color .15s, opacity .15s;
+      border:1px solid var(--line); position:relative; opacity:.82;
+      display:flex; align-items:center; gap:6px; border-radius:8px; padding:5px 8px;
+      font-size:10px; cursor:pointer; background:color-mix(in srgb, var(--bg-raised) 55%, transparent);
+    }
+    .swatch:hover{ opacity:1; transform:translateY(-1px); }
+    .swatch:active{ transform:translateY(0); }
+    .swatch.sel{ opacity:1; border-color:var(--swatch); box-shadow:0 0 0 1px var(--swatch), 0 0 14px -2px var(--swatch); }
+    .swatch .dot{ width:11px; height:11px; border-radius:2px; background:var(--swatch); box-shadow:0 0 7px -1px var(--swatch); flex:none; }
+    .swatch .nm{ color:var(--ink-dim); white-space:nowrap; }
+    .swatch.sel .nm{ color:var(--ink); }
+
+    /* ===== ambient motion vocabulary (mirrors the siblings) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:4;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* header, floating top-left */
+    header{ position:fixed; top:0; left:0; z-index:3; padding:18px 20px; pointer-events:none; }
+    header h1{ font-size:1.5rem; font-weight:600; color:#fff; margin:4px 0 0; }
+    header p{ font-size:11px; margin:4px 0 0; max-width:17rem; color:var(--ink-dim); line-height:1.5; }
+
+    /* the bench of controls, floating bottom */
+    .bench-wrap{ position:fixed; bottom:0; left:0; right:0; z-index:3; padding:10px 12px 14px; display:flex; justify-content:center; pointer-events:none; }
+    .bench{ pointer-events:auto; width:100%; max-width:64rem; border-radius:16px; padding:12px 14px; }
+
+    #palette{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:11px; }
+
+    .transport{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-bottom:11px; }
+    .transport .btn{ border-radius:9px; padding:6px 11px; font-size:11px; }
+
+    .sliders{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+    .sliders .slabel{ display:flex; justify-content:space-between; margin-bottom:5px; }
+    .sliders input[type=range]{ width:100%; height:6px; border-radius:99px; appearance:none; -webkit-appearance:none; background:var(--bg-sunk); border:1px solid var(--line-soft); cursor:pointer; }
+
+    .hintrow{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    #hint{ font-size:10px; color:var(--ink-ghost); line-height:1.4; }
+    #seed{ font-size:10px; border-radius:7px; padding:5px 10px; white-space:nowrap; }
+
+    /* whispers top-right */
+    .whispers{ position:fixed; top:14px; right:16px; z-index:3; text-align:right; pointer-events:none; }
+    .whispers p{ font-size:10px; margin:3px 0 0; color:var(--ink-ghost); }
+    #idleLine{ opacity:0; transition:opacity 1.2s ease; }
+
+    /* fatal */
+    #fatal{ display:none; position:fixed; inset:0; z-index:9; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; padding:24px; background:color-mix(in srgb, var(--bg) 92%, transparent); }
+    #fatal h2{ font-size:clamp(1.4rem,5vw,1.9rem); font-weight:600; color:#fff; margin:8px 0; }
+    #fatal p{ font-size:13px; max-width:30rem; color:var(--ink-dim); line-height:1.6; }
+
+    @media (max-width:820px){
+      #palette{ grid-template-columns:repeat(3,1fr); }
+      .sliders{ grid-template-columns:repeat(2,1fr); }
+      header p{ display:none; }
+      .hintrow{ flex-wrap:wrap; }
+    }
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the vault itself -->
+  <div id="stage"><canvas id="scene"></canvas></div>
+
+  <!-- header -->
+  <header>
+    <div class="mono label flicker">prízrak / instrument 27 — sediment · vault</div>
+    <h1 id="appTitle" class="h1-glow breathe" style="pointer-events:auto;cursor:default;display:inline-block">The Powder Cellar · Vault</h1>
+    <p>A cubed Tatra cellar in real depth. Paint the elements onto the walls of the void; gravity and damp do the rest. Right-drag turns the chamber; scroll falls toward the dark.</p>
+  </header>
+
+  <!-- whispers -->
+  <div class="whispers">
+    <p id="nightWhisper" class="mono" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono" style="display:none">still here. the damp keeps its own time.</p>
+  </div>
+
+  <!-- bench -->
+  <div class="bench-wrap">
+    <div class="bench glass">
+      <div id="palette"></div>
+
+      <div class="transport">
+        <button id="btnPause" class="btn mono" title="space">⏸ pause</button>
+        <button id="btnErase" class="btn mono" title="e — toggle eraser">⌫ erase</button>
+        <button id="btnClear" class="btn mono" title="c — empty the vault">↺ clear</button>
+        <button id="btnReduce" class="btn mono" title="r — calm the chrome">◐ motion: full</button>
+        <button id="btnReset" class="btn mono" title="re-center the view">⌖ recenter</button>
+        <div style="flex:1"></div>
+        <div class="mono label" style="align-self:center">cells <span id="countOut" class="num">0</span> · <span id="fpsOut" class="num">—</span> fps</div>
+      </div>
+
+      <div class="sliders">
+        <div>
+          <div class="slabel"><span class="mono label">brush</span><span id="brushOut" class="mono num" style="font-size:11px">2</span></div>
+          <input type="range" id="brush" min="0" max="6" value="2">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">gravity</span><span id="gravOut" class="mono num" style="font-size:11px">1.0×</span></div>
+          <input type="range" id="gravity" min="20" max="200" value="100">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">cave temp</span><span id="tempOut" class="mono num" style="font-size:11px">cold</span></div>
+          <input type="range" id="temp" min="0" max="100" value="22">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">slice y</span><span id="sliceOut" class="mono num" style="font-size:11px">off</span></div>
+          <input type="range" id="slice" min="0" max="100" value="100">
+        </div>
+      </div>
+
+      <div class="hintrow">
+        <p id="hint" class="mono">left-drag paints on the surface · right-drag (two-finger) turns the vault · scroll zooms</p>
+        <p id="seed" class="btn mono" title="seed the cellar">⁂ seed the cellar</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebGL failure -->
+  <div id="fatal">
+    <div class="mono label">prízrak / instrument 27</div>
+    <h2 class="h1-glow">the vault will not open</h2>
+    <p>This cellar needs WebGL, and your browser will not open the way. Try a current Chrome, Firefox, Safari, or Edge — then the damp will keep its own time.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // ========================================================================
+    //  WEBGL GUARD
+    // ========================================================================
+    function webglOK(){
+      try {
+        const c = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch(e){ return false; }
+    }
+    if (typeof THREE === 'undefined' || !webglOK()){
+      document.getElementById('fatal').style.display='flex';
+      return;
+    }
+
+    const KEY = 'powder-cellar-3d-v1';
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const el = id => document.getElementById(id);
+
+    // ========================================================================
+    //  GRID DIMENSIONS — modest for performance. ~62k cells.
+    // ========================================================================
+    const GW = 36, GH = 48, GD = 36;         // width(x), height(y, up), depth(z)
+    const N  = GW*GH*GD;
+    const MAX_INSTANCES = 26000;             // cap on drawn cubes (surface set)
+    const SIM_HZ = 22;                        // simulation ticks per second (decoupled from render)
+    const SIM_DT = 1000 / SIM_HZ;
+
+    // ========================================================================
+    //  ELEMENTS — id ordering matters; 0 is always empty.
+    // ========================================================================
+    const EMPTY=0, WALL=1, SAND=2, WATER=3, STONE=4, SALT=5, OIL=6,
+          FIRE=7, EMBER=8, STEAM=9, SPORE=10, FOXFIRE=11, BRINE=12, ASH=13;
+
+    // base colors (0..1 rgb), emissive flag/strength for glow in the dark
+    const ELEMENTS = {
+      [EMPTY]:  { name:'empty',   label:'erase',    sw:'#3a3530', col:[0.04,0.04,0.04], emit:0 },
+      [WALL]:   { name:'wall',    label:'bedrock',  sw:'#4b4640', col:[0.16,0.15,0.13], emit:0 },
+      [SAND]:   { name:'sand',    label:'sand',     sw:'#c9a86a', col:[0.69,0.57,0.34], emit:0 },
+      [WATER]:  { name:'water',   label:'water',    sw:'#4a90d9', col:[0.18,0.42,0.70], emit:0.10 },
+      [STONE]:  { name:'stone',   label:'mineral',  sw:'#8a8a92', col:[0.42,0.42,0.46], emit:0 },
+      [SALT]:   { name:'salt',    label:'salt',     sw:'#dfe3ea', col:[0.78,0.80,0.85], emit:0.05 },
+      [OIL]:    { name:'oil',     label:'oil',      sw:'#7a5fb0', col:[0.27,0.21,0.39], emit:0.04 },
+      [FIRE]:   { name:'fire',    label:'fire',     sw:'#ff7a3c', col:[1.0,0.47,0.18], emit:1.0 },
+      [EMBER]:  { name:'ember',   label:'ember',    sw:'#ff5a2c', col:[0.85,0.30,0.13], emit:0.7 },
+      [STEAM]:  { name:'steam',   label:'steam',    sw:'#9fb6c4', col:[0.59,0.67,0.72], emit:0.18 },
+      [SPORE]:  { name:'spore',   label:'foxspore', sw:'#7fe6c0', col:[0.43,0.78,0.67], emit:0.5 },
+      [FOXFIRE]:{ name:'foxfire', label:'foxfire',  sw:'#5fd0b0', col:[0.37,0.82,0.69], emit:0.95 },
+      [BRINE]:  { name:'brine',   label:'brine',    sw:'#5fb0c8', col:[0.27,0.55,0.66], emit:0.10 },
+      [ASH]:    { name:'ash',     label:'ash',      sw:'#5a564f', col:[0.31,0.29,0.27], emit:0 },
+    };
+    const PALETTE = [SAND, WATER, STONE, SALT, OIL, FIRE, SPORE, EMBER, STEAM, WALL, BRINE, EMPTY];
+
+    // density: higher sinks below lower
+    const DENSITY = new Float32Array(16);
+    DENSITY[SAND]=9; DENSITY[STONE]=10; DENSITY[WALL]=20; DENSITY[SALT]=8.5; DENSITY[ASH]=7;
+    DENSITY[WATER]=4; DENSITY[BRINE]=4.4; DENSITY[OIL]=3.2;
+    DENSITY[STEAM]=-2; DENSITY[SPORE]=-1.4; DENSITY[FIRE]=-3;
+
+    const isLiquid = (t)=> t===WATER||t===OIL||t===BRINE;
+    const isPowder = (t)=> t===SAND||t===SALT||t===ASH;
+    const isGas    = (t)=> t===STEAM||t===SPORE||t===FIRE;
+    const isStatic = (t)=> t===WALL||t===STONE||t===FOXFIRE;
+    const FLAMMABLE = new Uint8Array(16);
+    FLAMMABLE[OIL]=1; FLAMMABLE[SPORE]=1;
+
+    // ========================================================================
+    //  GRID STORAGE  (flat typed arrays — index = x + y*GW + z*GW*GH)
+    // ========================================================================
+    const grid  = new Uint8Array(N);      // element id
+    const life  = new Uint8Array(N);      // per-cell timer for live elements
+    const tint  = new Uint8Array(N);      // per-cell brightness variation
+    const moved = new Uint8Array(N);      // moved-this-tick flag (prevents double-step)
+
+    const idx = (x,y,z)=> x + y*GW + z*GW*GH;
+    const inB = (x,y,z)=> x>=0&&x<GW&&y>=0&&y<GH&&z>=0&&z<GD;
+
+    function initialLife(t){
+      if (t===FIRE)    return 24 + (Math.random()*22|0);
+      if (t===EMBER)   return 90 + (Math.random()*120|0);
+      if (t===STEAM)   return 70 + (Math.random()*90|0);
+      if (t===FOXFIRE) return 150 + (Math.random()*150|0);
+      if (t===SPORE)   return 120 + (Math.random()*90|0);
+      return 0;
+    }
+    function setCell(i,t){
+      grid[i]=t; life[i]=initialLife(t); tint[i]= t? (Math.random()*255|0):0;
+    }
+    function swap(a,b){
+      const g=grid[b]; grid[b]=grid[a]; grid[a]=g;
+      const l=life[b]; life[b]=life[a]; life[a]=l;
+      const ti=tint[b]; tint[b]=tint[a]; tint[a]=ti;
+      moved[a]=1; moved[b]=1;
+    }
+
+    // settings (persisted)
+    const defaults = { brush:2, gravity:100, temp:22, slice:100, paused:false, erasing:false, sel:SAND, reduced:reduceMQ.matches };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s==='object') cfg = Object.assign(cfg, s.cfg||{}); } catch(e){}
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify({ cfg })); } catch(e){} }
+    let saveTimer=null; function saveSoon(){ clearTimeout(saveTimer); saveTimer=setTimeout(save, 800); }
+
+    // ========================================================================
+    //  THREE.JS SETUP
+    // ========================================================================
+    const canvas = el('scene');
+    let renderer, scene, camera, ambient, keyLight, fillLight;
+    const clock = new THREE.Clock();
+
+    function makeRenderer(){
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+      renderer.setClearColor(0x070708, 1);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x070708, 0.0085);
+
+      camera = new THREE.PerspectiveCamera(58, 1, 0.1, 2000);
+
+      ambient = new THREE.AmbientLight(0x202830, 0.55);
+      scene.add(ambient);
+      // a cold key light from above-front so dry matter reads as carved stone
+      keyLight = new THREE.DirectionalLight(0xbfd0e0, 0.55);
+      keyLight.position.set(0.6, 1.0, 0.4);
+      scene.add(keyLight);
+      fillLight = new THREE.DirectionalLight(0x6a5a8a, 0.22);
+      fillLight.position.set(-0.5, -0.3, -0.6);
+      scene.add(fillLight);
+
+      buildChamber();
+      buildInstances();
+
+      resize();
+      window.addEventListener('resize', resize);
+    }
+
+    function resize(){
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    // world-space helpers: center the grid on origin, 1 unit per voxel.
+    const HX = GW/2, HY = GH/2, HZ = GD/2;
+    const worldX = (x)=> x - HX + 0.5;
+    const worldY = (y)=> y - HY + 0.5;
+    const worldZ = (z)=> z - HZ + 0.5;
+
+    // ---- the cave frame: a wireframe vault + faint floor plate ----
+    function buildChamber(){
+      const box = new THREE.BoxGeometry(GW, GH, GD);
+      const edges = new THREE.EdgesGeometry(box);
+      const mat = new THREE.LineBasicMaterial({ color:0x2a2f33, transparent:true, opacity:0.55 });
+      const frame = new THREE.LineSegments(edges, mat);
+      scene.add(frame);
+
+      // a faint floor plate so falling matter has a visible bed
+      const floorGeo = new THREE.PlaneGeometry(GW, GD);
+      const floorMat = new THREE.MeshBasicMaterial({ color:0x0d0f10, transparent:true, opacity:0.5, side:THREE.DoubleSide });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI/2;
+      floor.position.y = -HY;
+      scene.add(floor);
+    }
+
+    // ---- the one instanced mesh of cubes ----
+    let inst;
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _s = new THREE.Vector3(1,1,1);
+    const _p = new THREE.Vector3();
+    const _c = new THREE.Color();
+
+    function buildInstances(){
+      const geo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+      // emissive material so living light glows in the dark; vertex/instance color drives hue
+      const mat = new THREE.MeshLambertMaterial({ color:0xffffff, emissive:0xffffff, emissiveIntensity:0.0 });
+      // We fake emissive-per-instance by lifting instanceColor and relying on a custom blend:
+      // Lambert won't multiply emissive by instanceColor, so we instead bake brightness into
+      // instanceColor and keep emissive modest globally; living elements get boosted color.
+      inst = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES);
+      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      inst.count = 0;
+      // allocate instance color buffer
+      const colArr = new Float32Array(MAX_INSTANCES*3);
+      inst.instanceColor = new THREE.InstancedBufferAttribute(colArr, 3);
+      inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
+      inst.frustumCulled = false;
+      scene.add(inst);
+    }
+
+    // ========================================================================
+    //  SURFACE EXTRACTION + INSTANCE REBUILD
+    //  Only draw a voxel if it is non-empty AND has at least one exposed face
+    //  (a neighbour that is empty / transparent), OR it is above the slice plane
+    //  cut. Built once per sim tick (dirty), pushed to the GPU.
+    // ========================================================================
+    let liveCount = 0;
+    let pulse = 0;
+
+    // visual "transparent-ish" test for face exposure — gases & empty expose faces
+    const exposes = new Uint8Array(16);  // does element t expose a solid neighbour's face?
+    exposes[EMPTY]=1; exposes[STEAM]=1; exposes[SPORE]=1; exposes[FIRE]=1;
+
+    function rebuildInstances(){
+      const sliceY = cfg.slice>=100 ? GH : Math.round((cfg.slice/100)*GH);
+      let n = 0; let live = 0;
+      const colArr = inst.instanceColor.array;
+      const fl = Math.sin(pulse);
+      for (let z=0; z<GD; z++){
+        for (let y=0; y<GH; y++){
+          if (y >= sliceY) continue;  // clip: show only below the slice plane
+          for (let x=0; x<GW; x++){
+            const i = idx(x,y,z);
+            const t = grid[i];
+            if (t===EMPTY) continue;
+            live++;
+            // face-exposure cull: skip fully-buried opaque voxels (huge win)
+            const buried =
+              (x>0   ? grid[i-1]      : EMPTY) && !exposes[x>0?grid[i-1]:EMPTY] &&
+              (x<GW-1? grid[i+1]      : EMPTY) && !exposes[x<GW-1?grid[i+1]:EMPTY] &&
+              (y>0   ? grid[i-GW]     : EMPTY) && !exposes[y>0?grid[i-GW]:EMPTY] &&
+              (y<GH-1? grid[i+GW]     : EMPTY) && !exposes[y<GH-1?grid[i+GW]:EMPTY] &&
+              (z>0   ? grid[i-GW*GH]  : EMPTY) && !exposes[z>0?grid[i-GW*GH]:EMPTY] &&
+              (z<GD-1? grid[i+GW*GH]  : EMPTY) && !exposes[z<GD-1?grid[i+GW*GH]:EMPTY];
+            // when slicing, the top face of the cut is exposed, so always show the slice layer
+            const onSliceFace = (sliceY < GH && y === sliceY-1);
+            if (buried && !onSliceFace) continue;
+            if (n >= MAX_INSTANCES) { z=GD; y=GH; break; }
+
+            // position
+            _p.set(worldX(x), worldY(y), worldZ(z));
+            _m.compose(_p, _q, _s);
+            inst.setMatrixAt(n, _m);
+
+            // color (bake brightness + living flicker into instanceColor)
+            colorFor(t, i, fl, _c);
+            colArr[n*3]   = _c.r;
+            colArr[n*3+1] = _c.g;
+            colArr[n*3+2] = _c.b;
+            n++;
+          }
+        }
+      }
+      inst.count = n;
+      inst.instanceMatrix.needsUpdate = true;
+      inst.instanceColor.needsUpdate = true;
+      liveCount = live;
+    }
+
+    // per-element instance color, with tint variation + living glow boost
+    function colorFor(t, i, fl, out){
+      const e = ELEMENTS[t];
+      const v = ((tint[i]/255)-0.5)*0.22;   // small variation
+      let r=e.col[0], g=e.col[1], b=e.col[2];
+      // emissive elements get boosted so MeshLambert ambient + their bright color reads as glow
+      if (t===FIRE){
+        const f = 0.65 + 0.35*Math.sin(pulse*3 + i*0.7);
+        r = Math.min(1.6, 1.0*f*1.4); g = 0.42*f; b = 0.12*f;
+      } else if (t===EMBER){
+        const lf = life[i]/200;
+        const f = 0.5 + 0.5*fl;
+        r = 0.9*(0.6+0.4*f) + lf*0.3; g = 0.28*f; b = 0.10*f;
+      } else if (t===FOXFIRE){
+        const f = 0.55 + 0.45*Math.sin(pulse*1.6 + (i%7));
+        r = 0.30*f; g = 0.95*f; b = 0.78*f;
+      } else if (t===SPORE){
+        const f = 0.5 + 0.5*fl;
+        r = 0.35*f; g = 0.80*f; b = 0.66*f;
+      } else if (t===STEAM){
+        r = 0.55+0.05*fl; g = 0.64; b = 0.70;
+      } else if (t===WATER || t===BRINE){
+        r = e.col[0]*(1+v); g = e.col[1]*(1+v); b = e.col[2]*(1+v)+0.05;
+      } else {
+        r = e.col[0]*(1+v); g = e.col[1]*(1+v); b = e.col[2]*(1+v);
+      }
+      out.setRGB(Math.max(0,r), Math.max(0,g), Math.max(0,b));
+    }
+
+    // ========================================================================
+    //  THE 3D SIMULATION STEP
+    //  Bottom-up scan (low y first so settled matter is processed before what
+    //  falls into it). Alternating sweep directions to remove directional bias.
+    //  Probabilistic moves keep it cheap. `moved` guards against double-steps.
+    // ========================================================================
+    let parity = 0;
+    // 6-neighbour and lateral offsets reused below
+    const LAT = [ [1,0],[-1,0],[0,1],[0,-1] ]; // (dx,dz) lateral directions
+
+    function simulate(){
+      parity ^= 1;
+      moved.fill(0);
+      const g = cfg.gravity/100;
+      const fallChance = Math.min(1, 0.6 + g*0.4);
+      const tNorm = cfg.temp/100;
+
+      // gases first, top-down, so rising matter advances cleanly
+      for (let y=GH-1; y>=0; y--){
+        const fwd = ((parity ^ (y&1)) === 0);
+        for (let zz=0; zz<GD; zz++){
+          const z = fwd ? zz : GD-1-zz;
+          for (let xx=0; xx<GW; xx++){
+            const x = fwd ? xx : GW-1-xx;
+            const i = idx(x,y,z);
+            const t = grid[i];
+            if (t!==STEAM && t!==SPORE && t!==FIRE) continue;
+            if (moved[i]) continue;
+            if (t===FIRE)  fireStep(x,y,z,i,tNorm);
+            else if (t===STEAM) steamStep(x,y,z,i,tNorm);
+            else sporeStep(x,y,z,i);
+          }
+        }
+      }
+
+      // everything else bottom-up (falling/flowing matter)
+      for (let y=0; y<GH; y++){
+        const fwd = ((parity ^ (y&1)) === 0);
+        for (let zz=0; zz<GD; zz++){
+          const z = fwd ? zz : GD-1-zz;
+          for (let xx=0; xx<GW; xx++){
+            const x = fwd ? xx : GW-1-xx;
+            const i = idx(x,y,z);
+            const t = grid[i];
+            if (t===EMPTY || moved[i]) continue;
+            if (t===WALL||t===STONE){ continue; }
+            switch(t){
+              case SAND: case SALT: case ASH: powderStep(x,y,z,i,t,fallChance); break;
+              case WATER: case BRINE: liquidStep(x,y,z,i,t); break;
+              case OIL: liquidStep(x,y,z,i,t); break;
+              case EMBER: emberStep(x,y,z,i,tNorm); break;
+              case FOXFIRE: foxfireStep(x,y,z,i); break;
+            }
+          }
+        }
+      }
+    }
+
+    // ---- POWDERS: fall straight, then to a random lower-diagonal; sink through liquids ----
+    function powderStep(x,y,z,i,t,fallChance){
+      if (Math.random() > fallChance) return;
+      // salt dissolves on contact with water -> brine (reaction)
+      if (t===SALT){
+        for (let k=0;k<6;k++){
+          const nx=x+NX6[k], ny=y+NY6[k], nz=z+NZ6[k];
+          if (!inB(nx,ny,nz)) continue;
+          const ni=idx(nx,ny,nz);
+          if (grid[ni]===WATER){ setCell(ni,BRINE); setCell(i,EMPTY); moved[ni]=1; return; }
+        }
+      }
+      if (y>0){
+        const bi = i - GW;
+        const bt = grid[bi];
+        if (bt===EMPTY || isGas(bt) || (isLiquid(bt) && DENSITY[t]>DENSITY[bt])){ swap(i,bi); return; }
+      } else return; // floor
+      // diagonal-down: try the 4 lower-diagonal cells in random order
+      const o = (Math.random()*4)|0;
+      for (let k=0;k<4;k++){
+        const d = LAT[(o+k)&3];
+        const nx=x+d[0], nz=z+d[1], ny=y-1;
+        if (!inB(nx,ny,nz)) continue;
+        const ni=idx(nx,ny,nz); const nt=grid[ni];
+        if (nt===EMPTY || isGas(nt) || (isLiquid(nt)&&DENSITY[t]>DENSITY[nt])){ swap(i,ni); return; }
+      }
+    }
+
+    // ---- LIQUIDS: fall, fall-diagonal, then spread laterally to seek level ----
+    function liquidStep(x,y,z,i,t){
+      if (y>0){
+        const bi=i-GW; const bt=grid[bi];
+        if (bt===EMPTY || isGas(bt) || (isLiquid(bt)&&DENSITY[t]>DENSITY[bt])){ swap(i,bi); return; }
+      }
+      // diagonal down
+      const o=(Math.random()*4)|0;
+      for (let k=0;k<4;k++){
+        const d=LAT[(o+k)&3]; const nx=x+d[0], nz=z+d[1], ny=y-1;
+        if (!inB(nx,ny,nz)) continue;
+        const ni=idx(nx,ny,nz); const nt=grid[ni];
+        if (nt===EMPTY || isGas(nt) || (isLiquid(nt)&&DENSITY[t]>DENSITY[nt])){ swap(i,ni); return; }
+      }
+      // lateral spread: pick a random direction, flow if open (prefer a drop)
+      for (let k=0;k<4;k++){
+        const d=LAT[(o+k)&3]; const nx=x+d[0], nz=z+d[1];
+        if (!inB(nx,y,nz)) continue;
+        const ni=idx(nx,y,nz); const nt=grid[ni];
+        if (nt===EMPTY || isGas(nt) || (isLiquid(nt)&&DENSITY[t]>DENSITY[nt]&&nt!==t)){
+          // bias: only flow ~70% of the time so pools settle visibly
+          if (Math.random()<0.72){ swap(i,ni); return; }
+        }
+      }
+    }
+
+    // ---- FIRE: rises, consumes fuel, makes steam from water, dies to ember/ash ----
+    function fireStep(x,y,z,i,tNorm){
+      let l = life[i];
+      for (let k=0;k<6;k++){
+        const nx=x+NX6[k], ny=y+NY6[k], nz=z+NZ6[k];
+        if (!inB(nx,ny,nz)) continue;
+        const ni=idx(nx,ny,nz); const nt=grid[ni];
+        if (FLAMMABLE[nt]){
+          if (Math.random() < (nt===OIL?0.6:0.5)){
+            // spore meeting fire becomes foxfire seed sometimes (reaction)
+            if (nt===SPORE && Math.random()<0.7) setCell(ni,FOXFIRE);
+            else setCell(ni,FIRE);
+            moved[ni]=1;
+          }
+        } else if (nt===WATER){
+          setCell(ni,STEAM); setCell(i,EMPTY); moved[ni]=1; return;     // water+fire -> steam (reaction)
+        } else if (nt===BRINE){
+          setCell(ni,STEAM);                                            // brine boils -> steam, leaves salt
+          setCell(i, Math.random()<0.5?SALT:EMPTY); moved[ni]=1; return;
+        }
+      }
+      // climb
+      if (y<GH-1 && grid[i+GW]===EMPTY && Math.random()<0.5){ swap(i,i+GW); }
+      else {
+        // flicker sideways
+        const d=LAT[(Math.random()*4)|0]; const nx=x+d[0], nz=z+d[1];
+        if (inB(nx,y,nz) && grid[idx(nx,y,nz)]===EMPTY && Math.random()<0.25) swap(i, idx(nx,y,nz));
+      }
+      l -= 1 + (Math.random() < (0.5 - tNorm*0.4) ? 1 : 0);
+      if (l<=0){
+        const r=Math.random();
+        if (r<0.16) setCell(i,EMBER);
+        else if (r<0.28) setCell(i,ASH);
+        else setCell(i,EMPTY);
+      } else life[i]=l;
+    }
+
+    // ---- EMBER: glowing heavy mote; reignites fuel, dies to ash; quenched by water ----
+    function emberStep(x,y,z,i,tNorm){
+      let l=life[i];
+      for (let k=0;k<6;k++){
+        const nx=x+NX6[k], ny=y+NY6[k], nz=z+NZ6[k];
+        if (!inB(nx,ny,nz)) continue;
+        const ni=idx(nx,ny,nz); const nt=grid[ni];
+        if (FLAMMABLE[nt] && Math.random()<0.10){ setCell(ni,FIRE); moved[ni]=1; }
+        else if (nt===WATER && Math.random()<0.6){ setCell(i,ASH); return; }
+      }
+      // settle like heavy powder
+      if (y>0){
+        const bt=grid[i-GW];
+        if (bt===EMPTY||isLiquid(bt)||isGas(bt)){ if(Math.random()<0.7) swap(i,i-GW); }
+        else {
+          const d=LAT[(Math.random()*4)|0]; const nx=x+d[0], nz=z+d[1];
+          if (inB(nx,y-1,nz) && grid[idx(nx,y-1,nz)]===EMPTY) swap(i,idx(nx,y-1,nz));
+        }
+      }
+      l-=1;
+      if (l<=0) setCell(i, Math.random()<0.5?ASH:EMPTY); else life[i]=l;
+    }
+
+    // ---- STEAM: rises, drifts, condenses back to water on cold stone / ceiling ----
+    function steamStep(x,y,z,i,tNorm){
+      let l=life[i];
+      const cold = 1 - tNorm;
+      // condense at the ceiling or against cold solids
+      if (y>=GH-1){
+        if (Math.random() < 0.05 + cold*0.07){ setCell(i,WATER); return; }
+      }
+      for (let k=0;k<6;k++){
+        const nx=x+NX6[k], ny=y+NY6[k], nz=z+NZ6[k];
+        if (!inB(nx,ny,nz)) continue;
+        const nt=grid[idx(nx,ny,nz)];
+        if ((nt===STONE||nt===WALL) && Math.random() < 0.02 + cold*0.035){ setCell(i,WATER); return; }
+      }
+      // rise
+      if (y<GH-1 && grid[i+GW]===EMPTY){ if(Math.random()<0.85){ swap(i,i+GW); } }
+      else {
+        const d=LAT[(Math.random()*4)|0]; const nx=x+d[0], nz=z+d[1];
+        if (inB(nx,y+1,nz) && grid[idx(nx,y+1,nz)]===EMPTY) swap(i,idx(nx,y+1,nz));
+        else if (inB(nx,y,nz) && grid[idx(nx,y,nz)]===EMPTY && Math.random()<0.4) swap(i,idx(nx,y,nz));
+      }
+      l-=1;
+      if (l<=0) setCell(i, Math.random()<0.55?WATER:EMPTY); else life[i]=l;
+    }
+
+    // ---- SPORE (foxspore): drifts upward lazily, flammable, blooms on damp stone ----
+    function sporeStep(x,y,z,i){
+      let l=life[i];
+      // bloom into foxfire if next to damp stone (reaction). A spore that has found
+      // damp stone clings to it (skips wandering this tick) and blooms readily — so
+      // the cellar reliably lights with foxfire rather than letting spores drift off.
+      let touchingDamp=false;
+      for (let k=0;k<6;k++){
+        const nx=x+NX6[k], ny=y+NY6[k], nz=z+NZ6[k];
+        if (!inB(nx,ny,nz)) continue;
+        const nt=grid[idx(nx,ny,nz)];
+        if (nt===STONE && nearDamp(nx,ny,nz)){
+          touchingDamp=true;
+          if (Math.random()<0.45){ setCell(i,FOXFIRE); return; }
+        }
+      }
+      if (touchingDamp){ l-=1; if(l<=0) setCell(i,EMPTY); else life[i]=l; return; } // cling, don't wander
+      // wander, biased upward
+      const r=Math.random();
+      let nx=x, ny=y, nz=z;
+      if (r<0.45) ny=y+1;
+      else if (r<0.60) nx=x-1;
+      else if (r<0.75) nx=x+1;
+      else if (r<0.88) nz=z-1;
+      else if (r<0.97) nz=z+1;
+      else ny=y-1;
+      if (inB(nx,ny,nz)){ const ni=idx(nx,ny,nz); if(grid[ni]===EMPTY||isGas(grid[ni])) swap(i,ni); }
+      l-=1;
+      if (l<=0) setCell(i,EMPTY); else life[i]=l;
+    }
+
+    function nearDamp(x,y,z){
+      for (let k=0;k<6;k++){
+        const nx=x+NX6[k], ny=y+NY6[k], nz=z+NZ6[k];
+        if (!inB(nx,ny,nz)) continue;
+        const t=grid[idx(nx,ny,nz)];
+        if (t===WATER||t===BRINE) return true;
+      }
+      return false;
+    }
+
+    // ---- FOXFIRE: living teal light. Creeps across damp stone, glows, fades to stone ----
+    function foxfireStep(x,y,z,i){
+      let l=life[i];
+      if (Math.random()<0.12){
+        for (let k=0;k<6;k++){
+          const nx=x+NX6[k], ny=y+NY6[k], nz=z+NZ6[k];
+          if (!inB(nx,ny,nz)) continue;
+          const ni=idx(nx,ny,nz); const nt=grid[ni];
+          if (nt===STONE && nearDamp(nx,ny,nz) && Math.random()<0.5){ setCell(ni,FOXFIRE); break; }
+          if (nt===SPORE){ setCell(ni,FOXFIRE); break; }
+        }
+      }
+      l -= (Math.random()<0.35?1:0);
+      if (l<=0) setCell(i, Math.random()<0.6?STONE:EMPTY); else life[i]=l;
+    }
+
+    // 6-neighbour offset tables
+    const NX6 = [ 1,-1, 0, 0, 0, 0];
+    const NY6 = [ 0, 0, 1,-1, 0, 0];
+    const NZ6 = [ 0, 0, 0, 0, 1,-1];
+
+    // ========================================================================
+    //  ORBIT CAMERA — self-contained spherical controller (no OrbitControls dep)
+    // ========================================================================
+    const cam = {
+      target: new THREE.Vector3(0,0,0),
+      radius: GW*1.9,
+      minR: 8, maxR: GW*5,
+      theta: Math.PI*0.25,
+      phi: 1.15
+    };
+    function clampPhi(){ const e=0.08; cam.phi = Math.max(e, Math.min(Math.PI-e, cam.phi)); }
+    function applyCamera(){
+      clampPhi();
+      const sinP=Math.sin(cam.phi);
+      camera.position.set(
+        cam.target.x + cam.radius*sinP*Math.cos(cam.theta),
+        cam.target.y + cam.radius*Math.cos(cam.phi),
+        cam.target.z + cam.radius*sinP*Math.sin(cam.theta)
+      );
+      camera.lookAt(cam.target);
+    }
+
+    // ========================================================================
+    //  INPUT — left-drag paint (raycast to instanced cubes; fallback bounding box),
+    //  right-drag / two-finger orbit, wheel/pinch zoom.
+    // ========================================================================
+    const _ray = new THREE.Raycaster();
+    const _ndc = new THREE.Vector2();
+    const drag = { mode:null, lastX:0, lastY:0, active:false, _pinch:null };
+
+    // bounding box of the voxel volume (for painting into empty space on the shell)
+    const volBox = new THREE.Box3(
+      new THREE.Vector3(-HX,-HY,-HZ), new THREE.Vector3(HX,HY,HZ)
+    );
+
+    function setNDC(clientX, clientY){
+      const rect = canvas.getBoundingClientRect();
+      _ndc.x = ((clientX-rect.left)/rect.width)*2 - 1;
+      _ndc.y = -((clientY-rect.top)/rect.height)*2 + 1;
+    }
+
+    // returns a voxel coord {x,y,z} to paint at, or null
+    function pickVoxel(clientX, clientY){
+      setNDC(clientX, clientY);
+      _ray.setFromCamera(_ndc, camera);
+      // 1) try hitting an existing cube; paint on the face we hit (one voxel out, toward the ray origin)
+      if (inst.count > 0){
+        const hits = _ray.intersectObject(inst, false);
+        if (hits.length){
+          const h = hits[0];
+          // step slightly back along the ray toward camera so we land in the empty neighbour
+          const back = h.point.clone().addScaledVector(_ray.ray.direction, -0.5);
+          let gx = Math.floor(back.x + HX), gy = Math.floor(back.y + HY), gz = Math.floor(back.z + HZ);
+          if (cfg.erasing){
+            // erase the actual hit cell instead
+            gx = Math.floor(h.point.x + HX - _ray.ray.direction.x*0.25);
+            gy = Math.floor(h.point.y + HY - _ray.ray.direction.y*0.25);
+            gz = Math.floor(h.point.z + HZ - _ray.ray.direction.z*0.25);
+            const instId = h.instanceId; // not directly a grid index; use point-based instead
+            // resolve actual filled cell by sampling the hit point a touch INTO the cube
+            const inP = h.point.clone().addScaledVector(_ray.ray.direction, 0.25);
+            gx = Math.floor(inP.x + HX); gy = Math.floor(inP.y + HY); gz = Math.floor(inP.z + HZ);
+          }
+          if (inB(gx,gy,gz)) return {x:gx,y:gy,z:gz};
+        }
+      }
+      // 2) fallback: intersect the volume bounding box and paint on its near shell
+      const hit = _ray.ray.intersectBox(volBox, _p);
+      if (hit){
+        // nudge inward so we are inside the grid
+        const inP = _p.clone().addScaledVector(_ray.ray.direction, 0.5);
+        const gx=Math.floor(inP.x+HX), gy=Math.floor(inP.y+HY), gz=Math.floor(inP.z+HZ);
+        if (inB(gx,gy,gz)) return {x:gx,y:gy,z:gz};
+      }
+      return null;
+    }
+
+    function paintBrush(cx,cy,cz){
+      const t = cfg.erasing ? EMPTY : cfg.sel;
+      const r = cfg.brush;
+      const r2 = r*r;
+      // sparse paint thins out a *large* brush of fire/fluid/gas so you don't dump a
+      // solid brick — but a tiny brush always lays at least the center cell.
+      const sparse = (r>=2) && (t===FIRE||t===STEAM||t===SPORE||isLiquid(t));
+      for (let dz=-r;dz<=r;dz++) for (let dy=-r;dy<=r;dy++) for (let dx=-r;dx<=r;dx++){
+        if (dx*dx+dy*dy+dz*dz > r2) continue;
+        const x=cx+dx, y=cy+dy, z=cz+dz;
+        if (!inB(x,y,z)) continue;
+        const i=idx(x,y,z);
+        if (t===EMPTY){ setCell(i,EMPTY); continue; }
+        if (grid[i]===WALL && t!==WALL) continue;          // don't overwrite bedrock
+        const isCenter = (dx===0&&dy===0&&dz===0);
+        if (sparse && !isCenter && Math.random()>0.68) continue;
+        if ((isLiquid(t)||isGas(t)) && grid[i]!==EMPTY && grid[i]!==t) continue; // fluids fill empties only
+        setCell(i,t);
+      }
+      simDirty = true;
+    }
+
+    function pointer(e){ const t=(e.touches&&e.touches[0])?e.touches[0]:e; return { x:t.clientX, y:t.clientY }; }
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      const isTouch = !!e.touches;
+      let orbit = false;
+      if (isTouch) orbit = (e.touches.length>=2);
+      else orbit = (e.button===2 || e.button===1 || e.shiftKey);
+      drag.active = true;
+      const p = pointer(e);
+      drag.lastX=p.x; drag.lastY=p.y;
+      lastInteract();
+      if (orbit){ drag.mode='orbit'; canvas.classList.add('orbiting'); }
+      else {
+        drag.mode='paint'; canvas.classList.add('painting');
+        const v = pickVoxel(p.x,p.y); if (v) paintBrush(v.x,v.y,v.z);
+        markFirstPaint();
+      }
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!drag.active) return;
+      const p = pointer(e);
+      if (drag.mode==='orbit'){
+        if (e.touches && e.touches.length>=2){
+          const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+          const dist=Math.hypot(dx,dy);
+          if (drag._pinch!=null){ const delta=drag._pinch-dist; cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*(1+delta*0.004))); }
+          drag._pinch=dist;
+        }
+        const dx=p.x-drag.lastX, dy=p.y-drag.lastY;
+        cam.theta -= dx*0.006; cam.phi -= dy*0.006; clampPhi();
+        drag.lastX=p.x; drag.lastY=p.y;
+      } else if (drag.mode==='paint'){
+        const v = pickVoxel(p.x,p.y); if (v) paintBrush(v.x,v.y,v.z);
+      }
+      lastInteract();
+      e.preventDefault();
+    }
+    function onUp(e){
+      if (!drag.active) return;
+      drag.active=false; drag._pinch=null;
+      canvas.classList.remove('painting'); canvas.classList.remove('orbiting');
+      if (drag.mode==='paint') saveSoon();
+      drag.mode=null;
+      e.preventDefault && e.preventDefault();
+    }
+    function onWheel(e){
+      e.preventDefault();
+      const f=Math.exp(e.deltaY*0.0012);
+      cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*f));
+      lastInteract();
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('wheel', onWheel, { passive:false });
+    canvas.addEventListener('contextmenu', e=>e.preventDefault());
+    canvas.addEventListener('touchstart', onDown, { passive:false });
+    window.addEventListener('touchmove', onMove, { passive:false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+
+    // ========================================================================
+    //  SEED / CLEAR
+    // ========================================================================
+    function clearGrid(){ grid.fill(0); life.fill(0); tint.fill(0); liveCount=0; simDirty=true; }
+
+    function fillBox(x0,y0,z0,x1,y1,z1,t,prob){
+      for (let z=z0;z<=z1;z++) for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++){
+        if (!inB(x,y,z)) continue;
+        if (prob!=null && Math.random()>prob) continue;
+        setCell(idx(x,y,z),t);
+      }
+    }
+
+    function seedCellar(){
+      clearGrid();
+      const W=GW, H=GH, D=GD;
+      // bedrock floor (1 cell)
+      fillBox(0,0,0,W-1,0,D-1,WALL);
+      // stone shelves jutting from two walls (cave architecture)
+      fillBox(2, Math.floor(H*0.42), 2, Math.floor(W*0.45), Math.floor(H*0.42)+1, Math.floor(D*0.5), STONE);
+      fillBox(Math.floor(W*0.55), Math.floor(H*0.30), Math.floor(D*0.45), W-3, Math.floor(H*0.30)+1, D-3, STONE);
+      // a mineral pillar
+      fillBox(Math.floor(W*0.66), 1, Math.floor(D*0.66), Math.floor(W*0.66)+2, Math.floor(H*0.55), Math.floor(D*0.66)+2, STONE);
+
+      // a basin of water resting low
+      fillBox(Math.floor(W*0.10), 1, Math.floor(D*0.10), Math.floor(W*0.34), Math.floor(H*0.14), Math.floor(D*0.34), WATER);
+      // an oil slick floating on a second pool
+      fillBox(Math.floor(W*0.55), 1, Math.floor(D*0.10), Math.floor(W*0.78), Math.floor(H*0.10), Math.floor(D*0.30), WATER);
+      fillBox(Math.floor(W*0.55), Math.floor(H*0.11), Math.floor(D*0.10), Math.floor(W*0.78), Math.floor(H*0.12), Math.floor(D*0.30), OIL, 0.85);
+
+      // a sand drift
+      fillBox(Math.floor(W*0.36), 1, Math.floor(D*0.55), Math.floor(W*0.52), Math.floor(H*0.12), Math.floor(D*0.74), SAND, 0.9);
+      // a pinch of salt on the high shelf
+      fillBox(Math.floor(W*0.12), Math.floor(H*0.43), Math.floor(D*0.18), Math.floor(W*0.24), Math.floor(H*0.43), Math.floor(D*0.34), SALT, 0.8);
+
+      // a trickle keeping the right shelf damp
+      fillBox(Math.floor(W*0.70), Math.floor(H*0.30), Math.floor(D*0.70), Math.floor(W*0.70), H-3, Math.floor(D*0.70), WATER, 0.45);
+
+      // a drifting cloud of spores up high — they rise & seek the damp
+      fillBox(Math.floor(W*0.30), Math.floor(H*0.78), Math.floor(D*0.30), Math.floor(W*0.52), Math.floor(H*0.86), Math.floor(D*0.52), SPORE, 0.30);
+
+      // a couple of embers tucked on the left shelf (a guttering lamp)
+      fillBox(Math.floor(W*0.10), Math.floor(H*0.43), Math.floor(D*0.20), Math.floor(W*0.11), Math.floor(H*0.43), Math.floor(D*0.21), EMBER);
+
+      simDirty=true; saveSoon();
+      flashHint('the vault is seeded. drop fire on the oil, or let spores find the damp stone.');
+    }
+
+    // ========================================================================
+    //  PALETTE + HUD WIRING
+    // ========================================================================
+    const paletteEl = el('palette');
+    function buildPalette(){
+      paletteEl.innerHTML='';
+      for (const id of PALETTE){
+        const e = ELEMENTS[id];
+        const b = document.createElement('button');
+        b.className='swatch mono'; b.style.setProperty('--swatch', e.sw); b.dataset.id=id;
+        b.innerHTML = `<span class="dot"></span><span class="nm">${e.label}</span>`;
+        b.addEventListener('click', ()=>{
+          cfg.sel=id; cfg.erasing = (id===EMPTY);
+          syncPalette(); syncErase(); save();
+        });
+        paletteEl.appendChild(b);
+      }
+    }
+    function syncPalette(){
+      [...paletteEl.children].forEach(b=>{
+        const on = (+b.dataset.id===cfg.sel) || (cfg.erasing && +b.dataset.id===EMPTY);
+        b.classList.toggle('sel', on);
+      });
+    }
+
+    const brushEl=el('brush'), brushOut=el('brushOut');
+    const gravEl=el('gravity'), gravOut=el('gravOut');
+    const tempEl=el('temp'), tempOut=el('tempOut');
+    const sliceEl=el('slice'), sliceOut=el('sliceOut');
+
+    function tempWord(v){ if(v<18)return'frigid'; if(v<35)return'cold'; if(v<55)return'cool'; if(v<75)return'warm'; return'hot'; }
+    function sliceWord(v){ return v>=100?'off':Math.round((v/100)*GH)+'y'; }
+
+    function syncSliders(){
+      brushEl.value=cfg.brush; brushOut.textContent=cfg.brush;
+      gravEl.value=cfg.gravity; gravOut.textContent=(cfg.gravity/100).toFixed(1)+'×';
+      tempEl.value=cfg.temp; tempOut.textContent=tempWord(cfg.temp);
+      sliceEl.value=cfg.slice; sliceOut.textContent=sliceWord(cfg.slice);
+    }
+    brushEl.addEventListener('input',()=>{ cfg.brush=+brushEl.value; brushOut.textContent=cfg.brush; save(); });
+    gravEl.addEventListener('input',()=>{ cfg.gravity=+gravEl.value; gravOut.textContent=(cfg.gravity/100).toFixed(1)+'×'; save(); });
+    tempEl.addEventListener('input',()=>{ cfg.temp=+tempEl.value; tempOut.textContent=tempWord(cfg.temp); save(); });
+    sliceEl.addEventListener('input',()=>{ cfg.slice=+sliceEl.value; sliceOut.textContent=sliceWord(cfg.slice); simDirty=true; save(); });
+
+    const btnPause=el('btnPause');
+    function togglePause(){ cfg.paused=!cfg.paused; btnPause.textContent=cfg.paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on',cfg.paused); save(); }
+    btnPause.addEventListener('click', togglePause);
+
+    const btnErase=el('btnErase');
+    function syncErase(){ btnErase.classList.toggle('btn-on',cfg.erasing); canvas.classList.toggle('painting',false); btnErase.textContent=cfg.erasing?'⌫ erasing':'⌫ erase'; }
+    btnErase.addEventListener('click', ()=>{ cfg.erasing=!cfg.erasing; if(!cfg.erasing && cfg.sel===EMPTY) cfg.sel=SAND; if(cfg.erasing) cfg.sel=EMPTY; syncErase(); syncPalette(); save(); });
+
+    el('btnClear').addEventListener('click', ()=>{ clearGrid(); saveSoon(); flashHint('the vault is empty. it waits.'); });
+    el('seed').addEventListener('click', seedCellar);
+
+    const btnReduce=el('btnReduce');
+    function syncReduce(){ btnReduce.classList.toggle('btn-on',cfg.reduced); btnReduce.textContent=cfg.reduced?'◐ motion: calm':'◐ motion: full'; }
+    btnReduce.addEventListener('click', ()=>{ cfg.reduced=!cfg.reduced; syncReduce(); save(); });
+
+    el('btnReset').addEventListener('click', ()=>{ cam.radius=GW*1.9; cam.theta=Math.PI*0.25; cam.phi=1.15; cam.target.set(0,0,0); });
+
+    // keyboard
+    const NUMKEYS=[SAND,WATER,STONE,SALT,OIL,FIRE,SPORE,EMBER,STEAM];
+    window.addEventListener('keydown',(e)=>{
+      if (/INPUT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
+      const k=e.key.toLowerCase();
+      if (e.code==='Space'){ e.preventDefault(); togglePause(); }
+      else if (k==='c'){ clearGrid(); saveSoon(); }
+      else if (k==='s'){ seedCellar(); }
+      else if (k==='e'){ cfg.erasing=!cfg.erasing; if(!cfg.erasing&&cfg.sel===EMPTY)cfg.sel=SAND; if(cfg.erasing)cfg.sel=EMPTY; syncErase(); syncPalette(); save(); }
+      else if (k==='r'){ cfg.reduced=!cfg.reduced; syncReduce(); save(); }
+      else if (k==='['){ cfg.brush=Math.max(0,cfg.brush-1); syncSliders(); save(); }
+      else if (k===']'){ cfg.brush=Math.min(6,cfg.brush+1); syncSliders(); save(); }
+      else if (/[1-9]/.test(k)){ const id=NUMKEYS[+k-1]; if(id!=null){ cfg.sel=id; cfg.erasing=false; syncPalette(); syncErase(); save(); } }
+    });
+
+    // hint helper
+    const hintEl=el('hint'); const defaultHint=hintEl.textContent;
+    let hintTimer=null, painted=false;
+    function flashHint(msg){
+      hintEl.textContent=msg; hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer=setTimeout(()=>{ hintEl.classList.remove('flicker'); hintEl.textContent = painted ? 'space pauses · e erases · s seeds · c clears · 1-9 pick element' : defaultHint; }, 3000);
+    }
+    function markFirstPaint(){ if(!painted){ painted=true; hintEl.textContent='space pauses · e erases · s seeds · c clears · 1-9 pick element'; } }
+
+    // ========================================================================
+    //  MAIN LOOP — sim ticks decoupled from render frames
+    // ========================================================================
+    let simAccum=0, lastT=performance.now();
+    let simDirty=true;          // grid changed since last instance rebuild
+    let fpsAccum=0, fpsFrames=0;
+
+    function loop(now){
+      requestAnimationFrame(loop);
+      let dt = now - lastT; lastT = now;
+      if (dt>120) dt=120;
+
+      // advance simulation in fixed steps (cap to avoid spiral of death)
+      if (!cfg.paused){
+        simAccum += dt;
+        let steps=0;
+        while (simAccum >= SIM_DT && steps<3){
+          simulate();
+          simAccum -= SIM_DT; steps++; simDirty=true;
+        }
+      } else simAccum=0;
+
+      // pulse drives living-light flicker; advance even when paused for ambience
+      pulse += (cfg.reduced?0:dt*0.004);
+
+      // rebuild the instanced surface set only when the grid changed (or living
+      // light needs a recolor — throttled to ~12Hz when nothing moved)
+      const needColorRefresh = !cfg.reduced && hasLiveLight();
+      if (simDirty){ rebuildInstances(); simDirty=false; colorClock=now; }
+      else if (needColorRefresh && now-colorClock > 80){ rebuildInstances(); colorClock=now; }
+
+      // idle auto-drift of the chamber (reduced-motion safe)
+      if (!cfg.reduced && !drag.active) cam.theta += dt*0.00006;
+
+      applyCamera();
+      renderer.render(scene, camera);
+
+      // readouts
+      fpsFrames++; fpsAccum+=dt;
+      if (fpsAccum>=500){ const f=Math.round(fpsFrames*1000/fpsAccum); window.__cellarFPS=f; el('fpsOut').textContent=f; el('countOut').textContent=liveCount; fpsFrames=0; fpsAccum=0; }
+    }
+    let colorClock=0;
+    let _liveCheckT=0, _liveCheckV=false;
+    function hasLiveLight(){
+      // cheap throttled scan: are there any fire/foxfire/ember/spore/steam cells?
+      const now=performance.now();
+      if (now-_liveCheckT < 250) return _liveCheckV;
+      _liveCheckT=now; _liveCheckV=false;
+      for (let i=0;i<N;i++){ const t=grid[i]; if (t===FIRE||t===FOXFIRE||t===EMBER||t===SPORE||t===STEAM){ _liveCheckV=true; break; } }
+      return _liveCheckV;
+    }
+
+    // ========================================================================
+    //  BOOT
+    // ========================================================================
+    try { makeRenderer(); }
+    catch(err){ el('fatal').style.display='flex'; console.error(err); return; }
+
+    buildPalette();
+    syncSliders(); syncPalette(); syncErase(); syncReduce();
+    btnPause.textContent=cfg.paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on',cfg.paused);
+
+    seedCellar();
+    applyCamera();
+    requestAnimationFrame(loop);
+
+    window.addEventListener('beforeunload', save);
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); });
+
+    // read-only console handle (the ghost keeps no secrets)
+    window.powderCellar3D = {
+      get cells(){ return liveCount; },
+      get fps(){ return window.__cellarFPS||0; },
+      get paused(){ return cfg.paused; },
+      get dims(){ return {GW,GH,GD}; },
+      get instances(){ return inst.count; },
+      _seed(){ seedCellar(); return liveCount; },
+      _clear(){ clearGrid(); return liveCount; },
+      _orbit(dt,dp){ cam.theta+=dt||0; cam.phi+=dp||0; clampPhi(); return {theta:cam.theta,phi:cam.phi}; },
+      _zoom(f){ cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*(f||1))); return cam.radius; },
+      // paint a brush of element t at a voxel (for verification/testing)
+      _paint(x,y,z,t,r){ const sb=cfg.sel,se=cfg.erasing,sr=cfg.brush; cfg.sel=(t==null?cfg.sel:t); cfg.erasing=(t===0); cfg.brush=(r==null?cfg.brush:r); paintBrush(x|0,y|0,z|0); cfg.sel=sb; cfg.erasing=se; cfg.brush=sr; return liveCount; },
+      // count cells of a given element id (verification helper)
+      _count(t){ let n=0; for(let i=0;i<N;i++) if(grid[i]===t) n++; return n; },
+      _step(k){ for(let j=0;j<(k||1);j++) simulate(); simDirty=true; return liveCount; }
+    };
+
+    // ===== ambient embers (capped, reduced-motion-safe) =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const host=el('embers');
+      for (let i=0;i<6;i++){
+        const e=document.createElement('div'); e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*16)+'s';
+        e.style.animationDuration=(13+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    })();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){ const h=new Date().getHours(); if(h>=0&&h<3){ const w=el('nightWhisper'); if(w) w.style.display='block'; } })();
+
+    // ===== easter egg: type "prizrak" → a constellation of foxfire wakes on the ceiling =====
+    (function(){
+      let buf='';
+      window.addEventListener('keydown',(ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=el('ghostLine'); if(g){ g.style.display='block'; g.classList.add('flicker'); }
+          for (let k=0;k<60;k++){
+            const x=2+((Math.random()*(GW-4))|0);
+            const y=Math.floor(GH*0.7)+((Math.random()*(GH*0.28))|0);
+            const z=2+((Math.random()*(GD-4))|0);
+            const i=idx(x,y,z);
+            if (grid[i]===EMPTY) setCell(i, Math.random()<0.5?SPORE:FOXFIRE);
+          }
+          simDirty=true;
+          flashHint('the watcher breathes on the ceiling. foxfire wakes.');
+        }
+      });
+    })();
+
+    // ===== easter egg: triple-click the title → one extra drifting ember =====
+    (function(){
+      const t=el('appTitle'); if(!t) return;
+      t.addEventListener('click',(ev)=>{
+        if (ev.detail===3 && !reduceMQ.matches){
+          const e=document.createElement('div'); e.className='ember';
+          e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='12s';
+          el('embers').appendChild(e); setTimeout(()=>e.remove(),13000);
+        }
+      });
+    })();
+
+    // ===== idle 60s → the cellar leans in (reduced-motion gated) =====
+    let idleTimer=null;
+    function lastInteract(){
+      const line=el('idleLine'); if(line) line.style.opacity='0';
+      clearTimeout(idleTimer);
+      if (reduceMQ.matches) return;
+      idleTimer=setTimeout(()=>{
+        if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+          setTimeout(()=>{ if(line) line.style.opacity='0'; },6000); }
+      },60000);
+    }
+    ['mousemove','keydown','click','wheel','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev,lastInteract,{passive:true}));
+    lastInteract();
+
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change',(e)=>{ cfg.reduced=e.matches; syncReduce(); save(); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

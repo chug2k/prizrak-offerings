@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Sigil Forge · Vault | Prízrak</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- THREE.js r128 — UMD build, exposes a global `THREE`. No ES modules / importmaps. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#10b981;          /* emerald — the forge-light */
+      --accent-deep:#059669;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ background:var(--bg); height:100%; margin:0; padding:0; overflow:hidden; }
+    body{
+      color:var(--ink);
+      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      overscroll-behavior:none; -webkit-user-select:none; user-select:none;
+      touch-action:none;
+    }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    #stage{ position:fixed; inset:0; z-index:0; }
+    #scene{ display:block; width:100%; height:100%; touch-action:none; cursor:grab; }
+    #scene.grabbing{ cursor:grabbing; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 82%, transparent);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .label{ color:var(--ink-dim); font-size:0.62rem; text-transform:uppercase; letter-spacing:0.2em; }
+    .num{ color:var(--accent); }
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 70%, transparent);
+      cursor:pointer; font-family:inherit;
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); transform:translateY(-1px); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* the forge primary button */
+    .btn-forge{
+      background:var(--accent); color:#04140d; border-color:transparent;
+      font-weight:700; letter-spacing:0.18em; text-transform:uppercase;
+    }
+    .btn-forge:hover{ background:#34d399; color:#04140d; border-color:transparent; }
+
+    /* ===== ambient motion vocabulary (mirrors the siblings) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 32s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:4;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* header, floating top-left */
+    header{ position:fixed; top:0; left:0; z-index:3; padding:18px 20px; pointer-events:none; max-width:22rem; }
+    header h1{ font-size:1.5rem; font-weight:600; color:#fff; margin:4px 0 0; pointer-events:auto; cursor:default; display:inline-block; }
+    header p{ font-size:11px; margin:6px 0 0; max-width:19rem; color:var(--ink-dim); line-height:1.5; }
+
+    /* the forged plate — appears under the header once a sigil exists */
+    #plate{ margin-top:14px; pointer-events:auto; display:none; }
+    #plate .pname{ font-size:1.15rem; color:#fff; letter-spacing:0.14em; text-shadow:0 0 14px var(--glow); }
+    #plate .ptitle{ font-size:10px; color:var(--ink-dim); margin-top:3px; letter-spacing:0.08em; font-style:italic; }
+    #plate .pseed{ font-size:10px; color:var(--ink-ghost); margin-top:2px; }
+
+    /* the bench of controls, floating bottom */
+    .bench-wrap{ position:fixed; bottom:0; left:0; right:0; z-index:3; padding:10px 12px 14px; display:flex; justify-content:center; pointer-events:none; }
+    .bench{ pointer-events:auto; width:100%; max-width:54rem; border-radius:16px; padding:12px 14px; }
+
+    .forge-row{ display:flex; gap:8px; align-items:stretch; }
+    #seedInput{
+      flex:1; min-width:0; background:var(--bg-sunk); border:1px solid var(--line);
+      color:var(--ink); border-radius:9px; padding:9px 12px; font-family:inherit; font-size:13px;
+      -webkit-user-select:text; user-select:text;
+    }
+    #seedInput::placeholder{ color:var(--ink-ghost); }
+    #forgeBtn{ border-radius:9px; padding:9px 18px; font-size:12px; white-space:nowrap; }
+
+    .transport{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:11px; }
+    .transport .btn{ border-radius:9px; padding:6px 11px; font-size:11px; }
+
+    .hintrow{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    #hint{ font-size:10px; color:var(--ink-ghost); line-height:1.4; }
+    .stat{ font-size:10px; }
+
+    /* gallery — the rack of recent sigils */
+    .gallery-wrap{ position:fixed; top:0; right:0; z-index:3; padding:16px 16px 0; pointer-events:none; max-width:46vw; }
+    .gallery{ pointer-events:auto; display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end; max-width:13rem; }
+    .gallery-head{ width:100%; text-align:right; margin-bottom:2px; }
+    .chip{
+      width:52px; height:52px; border-radius:8px; padding:0; overflow:hidden;
+      background:var(--bg-sunk); border:1px solid var(--line);
+      transition:border-color .15s, transform .12s, box-shadow .15s; cursor:pointer;
+      display:block;
+    }
+    .chip:hover{ border-color:var(--accent); transform:translateY(-2px); box-shadow:0 0 18px -8px var(--glow); }
+    .chip:active{ transform:translateY(0); }
+    .chip canvas{ width:100%; height:100%; display:block; }
+    #clearGallery{ font-size:9px; }
+
+    /* whispers — top-center-ish, under header on small screens */
+    .whispers{ position:fixed; bottom:128px; left:0; right:0; z-index:2; text-align:center; pointer-events:none; }
+    .whispers p{ font-size:10px; margin:3px 0 0; color:var(--ink-ghost); }
+    #idleLine{ opacity:0; transition:opacity 1.2s ease; }
+
+    /* fatal */
+    #fatal{ display:none; position:fixed; inset:0; z-index:9; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; padding:24px; background:color-mix(in srgb, var(--bg) 92%, transparent); }
+    #fatal h2{ font-size:clamp(1.4rem,5vw,1.9rem); font-weight:600; color:#fff; margin:8px 0; }
+    #fatal p{ font-size:13px; max-width:30rem; color:var(--ink-dim); line-height:1.6; }
+
+    @media (max-width:760px){
+      header p{ display:none; }
+      .gallery-wrap{ max-width:40vw; }
+      .gallery{ max-width:7.2rem; }
+      .chip{ width:44px; height:44px; }
+      .whispers{ bottom:158px; }
+    }
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the forge stone itself -->
+  <div id="stage"><canvas id="scene"></canvas></div>
+
+  <!-- header + forged plate -->
+  <header class="select-none">
+    <div class="mono label flicker">prízrak / forge 09 — inscription · vault</div>
+    <h1 id="appTitle" class="h1-glow breathe">The Sigil Forge</h1>
+    <p>Give the forge a word. It hammers the same seed into the same mark in real depth — every time, nothing random. Drag to turn it; scroll to fall toward the light.</p>
+
+    <div id="plate">
+      <div class="mono label">forged true name</div>
+      <div id="plateName" class="mono pname breathe"></div>
+      <div id="plateTitle" class="mono ptitle"></div>
+      <div id="plateSeed" class="mono pseed"></div>
+    </div>
+  </header>
+
+  <!-- gallery rack -->
+  <div class="gallery-wrap">
+    <div class="gallery" id="gallery">
+      <div class="gallery-head">
+        <span class="mono label">recently forged</span>
+        <button id="clearGallery" class="btn mono" style="border:none;background:none;color:var(--ink-ghost);padding:2px 0;margin-left:6px;cursor:pointer;display:none">empty the rack</button>
+      </div>
+      <div id="galleryGrid" style="display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-end;width:100%"></div>
+    </div>
+  </div>
+
+  <!-- whispers -->
+  <div class="whispers">
+    <p id="nightWhisper" class="mono" style="display:none">the forge runs hottest while the valley sleeps.</p>
+    <p id="ghostLine" class="mono" style="display:none">the smith looks up from the anvil. you found the watcher.</p>
+    <p id="idleLine" class="mono" style="display:none">the coals are still warm. still watching.</p>
+  </div>
+
+  <!-- bench -->
+  <div class="bench-wrap">
+    <div class="bench glass">
+      <div class="forge-row">
+        <input id="seedInput" type="text" maxlength="120" autocomplete="off" spellcheck="false"
+          placeholder="a word, a name, an intention — e.g. unbroken, the long winter, Tatra">
+        <button id="forgeBtn" class="btn btn-forge mono">Forge</button>
+      </div>
+      <div class="transport">
+        <button id="btnSpin" class="btn mono btn-on" title="r — let the sigil turn">↻ auto-rotate</button>
+        <button id="btnReset" class="btn mono" title="re-center the view">⌖ recenter</button>
+        <button id="btnDownload" class="btn mono" title="pull the mark from the fire as a png" disabled style="opacity:.45">⤓ download (png)</button>
+        <button id="btnCopy" class="btn mono" title="copy the forged true name" disabled style="opacity:.45">⧉ copy true name</button>
+        <button id="btnReduce" class="btn mono" title="calm the forge">◐ motion: full</button>
+        <div style="flex:1"></div>
+        <div class="mono label stat" style="align-self:center">nodes <span id="nodeOut" class="num">—</span> · <span id="fpsOut" class="num">—</span> fps</div>
+      </div>
+      <div class="hintrow">
+        <p id="hint" class="mono">the stone is cold. feed it a word, then strike <span style="color:var(--ink-dim)">forge</span>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebGL failure -->
+  <div id="fatal">
+    <div class="mono label">prízrak / forge 09</div>
+    <h2 class="h1-glow">the iron will not heat</h2>
+    <p>This forge needs WebGL, and your browser will not open the way. Try a current Chrome, Firefox, Safari, or Edge — then the mark will burn in.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // ========================================================================
+    //  WEBGL GUARD
+    // ========================================================================
+    function webglOK(){
+      try {
+        const c = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch(e){ return false; }
+    }
+    if (typeof THREE === 'undefined' || !webglOK()){
+      document.getElementById('fatal').style.display='flex';
+      return;
+    }
+
+    const KEY = 'sigil-forge-3d-v1';
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const el = id => document.getElementById(id);
+
+    // ========================================================================
+    //  DETERMINISTIC PRNG — FNV-1a 32-bit hash seeds a mulberry32 stream.
+    //  NEVER Math.random for geometry. Same seed -> same sigil, forever.
+    // ========================================================================
+    function fnv1a(str){
+      let h = 0x811c9dc5;
+      for (let i = 0; i < str.length; i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      return h >>> 0;
+    }
+    function mulberry32(a){
+      return function(){
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // ========================================================================
+    //  THE FORGED TRUE NAME — rune-ish syllables stitched by the PRNG.
+    //  Deterministic from the seed (separate stream from geometry).
+    // ========================================================================
+    const ONSETS = ['Vr','Kh','Thr','Dr','Mor','Zel','Vy','Tor','Kra','Nyx','Sva','Gol','Ulm','Veth','Skar','Lho','Drav','Yzh'];
+    const MEDIALS = ['v','l','r','th','n','d','z','s','k','m'];
+    const NUCLEI = ['a','o','y','ae','u','i','e','ó','ou'];
+    const CODAS  = ['k','th','n','rr','sk','x','ld','m','st','l',''];
+    const TITLES = ['the Unhewn','of the Cold Pass','who Counts the Pines','the Late Frost','of Nine Stones','the Hollow Bell','who Walks the Ridgeline','the Unanswered','of the Black Tarn','the Long Watch','who Keeps the Wick','the Twice-Named'];
+
+    function forgeName(seed){
+      const rng = mulberry32(fnv1a('name::' + seed));
+      const syllables = 2 + Math.floor(rng() * 2);
+      let name = ONSETS[Math.floor(rng() * ONSETS.length)] + NUCLEI[Math.floor(rng() * NUCLEI.length)];
+      for (let i = 1; i < syllables; i++){
+        name += MEDIALS[Math.floor(rng() * MEDIALS.length)] + NUCLEI[Math.floor(rng() * NUCLEI.length)];
+      }
+      name += CODAS[Math.floor(rng() * CODAS.length)];
+      const title = TITLES[Math.floor(rng() * TITLES.length)];
+      return { name, title };
+    }
+
+    // ========================================================================
+    //  THREE.JS SETUP
+    // ========================================================================
+    const canvas = el('scene');
+    let renderer, scene, camera;
+    let ambient, keyLight, fillLight;
+    const clock = new THREE.Clock();
+
+    // The whole sigil lives under one group so we can rotate / assemble it.
+    const sigilGroup = new THREE.Group();
+    let emberField = null;          // ambient mote points (decorative, deterministic-free)
+
+    function makeRenderer(){
+      // preserveDrawingBuffer so the PNG export can read pixels back.
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance', preserveDrawingBuffer:true });
+      renderer.setClearColor(0x07080a, 1);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x07080a, 0.012);
+
+      camera = new THREE.PerspectiveCamera(52, 1, 0.1, 2000);
+
+      ambient = new THREE.AmbientLight(0x1a2a24, 0.6);
+      scene.add(ambient);
+
+      keyLight = new THREE.PointLight(0x34d399, 1.4, 0, 1.5);
+      keyLight.position.set(18, 24, 26);
+      scene.add(keyLight);
+
+      fillLight = new THREE.PointLight(0x0e6b50, 0.7, 0, 1.5);
+      fillLight.position.set(-22, -10, -18);
+      scene.add(fillLight);
+
+      scene.add(sigilGroup);
+
+      buildEmberField();
+      resize();
+      window.addEventListener('resize', resize);
+    }
+
+    function resize(){
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    // ---- a faint dust of motes hanging in the dark (purely ambient) ----
+    function buildEmberField(){
+      const N = 380;
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(N*3);
+      const R = 60;
+      // deterministic-free is fine here — these are background dust, not the sigil
+      for (let i=0;i<N;i++){
+        const u = Math.random()*2-1, t = Math.random()*Math.PI*2;
+        const r = R * (0.45 + Math.random()*0.55);
+        const s = Math.sqrt(1-u*u);
+        pos[i*3]   = r * s * Math.cos(t);
+        pos[i*3+1] = r * u;
+        pos[i*3+2] = r * s * Math.sin(t);
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+      const mat = new THREE.PointsMaterial({ color:0x10b981, size:0.5, sizeAttenuation:true, transparent:true, opacity:0.32, blending:THREE.AdditiveBlending, depthWrite:false });
+      emberField = new THREE.Points(geo, mat);
+      scene.add(emberField);
+    }
+
+    // ========================================================================
+    //  SHARED EMISSIVE MATERIALS (reused across all sigil parts)
+    // ========================================================================
+    const COL = {
+      ring:   0x10b981,
+      strut:  0x0e8a66,
+      path:   0x34d399,
+      chord:  0x059669,
+      node:   0x6ee7b7,
+      core:   0xa7f3d0
+    };
+    function lineMat(hex, opacity){
+      return new THREE.LineBasicMaterial({ color:hex, transparent:true, opacity:opacity==null?0.9:opacity, blending:THREE.AdditiveBlending, depthWrite:false });
+    }
+    function tubeMat(hex, emissiveMul){
+      const c = new THREE.Color(hex);
+      return new THREE.MeshStandardMaterial({
+        color: c.clone().multiplyScalar(0.35),
+        emissive: c.clone().multiplyScalar(emissiveMul==null?0.9:emissiveMul),
+        emissiveIntensity: 1.0, roughness:0.4, metalness:0.0,
+        transparent:true, opacity:0.96
+      });
+    }
+    function glowMat(hex, opacity){
+      return new THREE.MeshBasicMaterial({ color:hex, transparent:true, opacity:opacity==null?0.4:opacity, blending:THREE.AdditiveBlending, depthWrite:false });
+    }
+
+    // shared geometries (cheap to reuse)
+    const sphereGeo = new THREE.SphereGeometry(1, 20, 16);
+
+    // ========================================================================
+    //  SIGIL CONSTRUCTION — a pure function of the seed via the PRNG.
+    //
+    //  Nodes are placed in true 3D (a seeded blend of sphere / ring / torus),
+    //  connected by a glowing traced path of tubes, wrapped in a containing
+    //  cage ring with struts and tick-spurs, and stamped with a central rune.
+    //  Every drawable's geometry comes from the seeded stream only.
+    // ========================================================================
+    let current = null;   // { seed, name, title, parts:[], pathTubes:[], reveal:0, built }
+    const RADIUS = 11;    // working radius of the structure (world units)
+
+    // build a fresh sigil object from a seed (geometry only; visuals assembled lazily)
+    function buildSigil(seed){
+      const rng = mulberry32(fnv1a('glyph::' + seed));
+      const hash = fnv1a(seed);
+      const chars = seed.length ? seed : ' ';
+      const nodeCount = Math.max(4, Math.min(13, chars.length));
+
+      // overall seeded orientation of the whole glyph
+      const baseTilt = rng() * Math.PI * 2;
+      const baseRoll = (rng() - 0.5) * Math.PI;
+
+      // shape "mood": how the nodes distribute in depth — 0 ring-flat, 1 spherical
+      const sphericity = 0.25 + rng() * 0.7;
+      // torus knottiness for a secondary winding contribution
+      const knot = 1 + (hash % 4);
+
+      // ---- node placement in true 3D ----
+      const nodes = [];
+      for (let i = 0; i < nodeCount; i++){
+        const code = chars.charCodeAt(i % chars.length);
+        // azimuth tied to the actual text + index
+        const a = baseTilt + (i / nodeCount) * Math.PI * 2 + (code % 23) * 0.0317;
+        // polar lean: flat-ish for low sphericity, full sphere for high
+        const polarSpread = sphericity * Math.PI * 0.9;
+        const phi = Math.PI/2 + Math.sin(a * knot + baseRoll) * polarSpread * (0.4 + rng()*0.6);
+        const rr = RADIUS * (0.6 + rng() * 0.4);
+        const sinP = Math.sin(phi);
+        nodes.push(new THREE.Vector3(
+          Math.cos(a) * sinP * rr,
+          Math.cos(phi) * rr,
+          Math.sin(a) * sinP * rr
+        ));
+      }
+
+      // a deterministic, non-repeating traversal order (Fisher-Yates w/ seeded rng)
+      const order = Array.from({length:nodeCount}, (_,i)=>i);
+      for (let i = nodeCount - 1; i > 0; i--){
+        const j = Math.floor(rng() * (i + 1));
+        const t = order[i]; order[i] = order[j]; order[j] = t;
+      }
+
+      // ---- interior chords (seeded crossbars) ----
+      const chordCount = 2 + (hash % 4);
+      const chords = [];
+      for (let i = 0; i < chordCount; i++){
+        const ai = Math.floor(rng() * nodeCount);
+        let bi = Math.floor(rng() * nodeCount);
+        if (bi === ai) bi = (bi + 1) % nodeCount;
+        chords.push([ai, bi]);
+      }
+
+      // ---- containing cage: ring count, radius, tilt, tick count ----
+      const ringCount = 1 + (hash % 2) + (rng() > 0.55 ? 1 : 0);   // 1..3
+      const cageTilt = new THREE.Euler(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+      const tickCount = 16 + (hash % 20);
+      const strutCount = 3 + (hash % 4);                            // 3..6 struts
+      const spokes = 3 + (hash % 5);                                // central rune arms
+
+      return {
+        seed, ...forgeName(seed),
+        rng_consumed:true, hash,
+        nodes, order, chords,
+        nodeCount, ringCount, cageTilt, tickCount, strutCount, spokes,
+        baseTilt, baseRoll,
+        parts: [],            // {obj, group} mesh records for animation
+        segMeshes: [],        // path tube segments, in traced order, for reveal
+        nodeMeshes: [],       // node terminals
+        coreMeshes: [],       // central rune pieces
+        cageMeshes: [],       // ring/strut/tick pieces
+        chordMeshes: [],
+        built:false
+      };
+    }
+
+    // tube between two points (a glowing arc, slightly bowed toward center-out)
+    function makeArcTube(a, b, radius, hex, bow){
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      // bow the control point outward from origin a touch so arcs read as 3D
+      const out = mid.clone().normalize().multiplyScalar(bow || 0);
+      const ctrl = mid.add(out);
+      const curve = new THREE.QuadraticBezierCurve3(a.clone(), ctrl, b.clone());
+      const geo = new THREE.TubeGeometry(curve, 14, radius, 7, false);
+      return new THREE.Mesh(geo, tubeMat(hex, 1.0));
+    }
+
+    function torusRing(R, tube, hex){
+      const geo = new THREE.TorusGeometry(R, tube, 10, 96);
+      return new THREE.Mesh(geo, tubeMat(hex, 0.8));
+    }
+
+    // assemble the THREE objects for a sigil into sigilGroup
+    function assembleSigil(S){
+      clearSigilGroup();
+      const hex = COL;
+
+      // ---- containing cage rings ----
+      for (let i = 0; i < S.ringCount; i++){
+        const R = RADIUS * (1.18 + i * 0.12);
+        const ring = torusRing(R, RADIUS * 0.014, hex.ring);
+        // each ring slightly differently tilted, seeded
+        ring.rotation.set(
+          S.cageTilt.x + i * 0.5,
+          S.cageTilt.y + i * 0.33,
+          S.cageTilt.z + i * 0.21
+        );
+        ring.userData.cage = true;
+        sigilGroup.add(ring); S.cageMeshes.push(ring);
+      }
+
+      // ---- tick-spurs around the primary cage ring ----
+      const primR = RADIUS * 1.18;
+      const tickGeo = new THREE.CylinderGeometry(RADIUS*0.008, RADIUS*0.008, 1, 5);
+      for (let i = 0; i < S.tickCount; i++){
+        const a = (i / S.tickCount) * Math.PI * 2 + S.baseTilt;
+        const long = (i % 3 === 0);
+        const len = RADIUS * (long ? 0.16 : 0.09);
+        const m = new THREE.Mesh(tickGeo, tubeMat(hex.strut, long ? 0.9 : 0.55));
+        m.scale.y = len;
+        // position on the ring, in the ring's tilted frame
+        const base = new THREE.Vector3(Math.cos(a)*(primR+len*0.5), 0, Math.sin(a)*(primR+len*0.5));
+        base.applyEuler(S.cageTilt);
+        m.position.copy(base);
+        // orient the cylinder radially
+        const dir = new THREE.Vector3(Math.cos(a),0,Math.sin(a)).applyEuler(S.cageTilt).normalize();
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+        m.userData.cage = true;
+        sigilGroup.add(m); S.cageMeshes.push(m);
+      }
+
+      // ---- struts: spokes from origin out to the cage (structural skeleton) ----
+      for (let i = 0; i < S.strutCount; i++){
+        const a = (i / S.strutCount) * Math.PI * 2 + S.baseRoll;
+        const tip = new THREE.Vector3(Math.cos(a)*primR, 0, Math.sin(a)*primR).applyEuler(S.cageTilt);
+        const tube = makeArcTube(new THREE.Vector3(0,0,0), tip, RADIUS*0.01, hex.strut, RADIUS*0.06);
+        tube.userData.cage = true;
+        sigilGroup.add(tube); S.cageMeshes.push(tube);
+      }
+
+      // ---- the traced path: tubes connecting nodes in seeded order (closed loop) ----
+      for (let s = 0; s < S.order.length; s++){
+        const from = S.nodes[S.order[s]];
+        const to   = S.nodes[S.order[(s + 1) % S.order.length]];
+        const tube = makeArcTube(from, to, RADIUS*0.018, hex.path, RADIUS*0.10);
+        tube.userData.pathSeg = s;
+        sigilGroup.add(tube); S.segMeshes.push(tube);
+      }
+
+      // ---- interior chords ----
+      for (const [ai, bi] of S.chords){
+        const tube = makeArcTube(S.nodes[ai], S.nodes[bi], RADIUS*0.009, hex.chord, RADIUS*0.05);
+        tube.userData.chord = true;
+        sigilGroup.add(tube); S.chordMeshes.push(tube);
+      }
+
+      // ---- node terminals: a lit core sphere + an additive glow halo ----
+      const chars = S.seed.length ? S.seed : ' ';
+      S.nodes.forEach((n, i) => {
+        const code = chars.charCodeAt(i % chars.length);
+        const rad = RADIUS * (0.022 + (code % 5) * 0.008);
+        const core = new THREE.Mesh(sphereGeo, tubeMat(hex.node, 1.1));
+        core.scale.setScalar(rad);
+        core.position.copy(n);
+        sigilGroup.add(core);
+        const glow = new THREE.Mesh(sphereGeo, glowMat(hex.node, 0.5));
+        glow.scale.setScalar(rad*2.6);
+        glow.position.copy(n);
+        glow.userData.glow = true;
+        sigilGroup.add(glow);
+        S.nodeMeshes.push(core, glow);
+      });
+
+      // ---- the central rune: a small seeded armature ----
+      const cr = RADIUS * 0.26;
+      for (let i = 0; i < S.spokes; i++){
+        const a = (i / S.spokes) * Math.PI * 2;
+        const phi = Math.PI/2 + Math.sin(a * (1 + S.hash % 3) + S.baseRoll) * 0.7;
+        const tip = new THREE.Vector3(
+          Math.cos(a)*Math.sin(phi)*cr,
+          Math.cos(phi)*cr,
+          Math.sin(a)*Math.sin(phi)*cr
+        );
+        const tube = makeArcTube(new THREE.Vector3(0,0,0), tip, RADIUS*0.012, hex.core, RADIUS*0.02);
+        tube.userData.core = true;
+        sigilGroup.add(tube); S.coreMeshes.push(tube);
+      }
+      // a tiny inner ring at the heart
+      const heart = torusRing(cr*0.5, RADIUS*0.012, hex.core);
+      heart.rotation.set(S.baseTilt, S.baseRoll, 0);
+      heart.userData.core = true;
+      sigilGroup.add(heart); S.coreMeshes.push(heart);
+      // a bright mote at dead center
+      const seedDot = new THREE.Mesh(sphereGeo, glowMat(hex.core, 0.85));
+      seedDot.scale.setScalar(RADIUS*0.05);
+      seedDot.userData.core = true;
+      sigilGroup.add(seedDot); S.coreMeshes.push(seedDot);
+
+      S.built = true;
+      current = S;
+      el('nodeOut').textContent = S.nodeCount;
+    }
+
+    function clearSigilGroup(){
+      for (let i = sigilGroup.children.length - 1; i >= 0; i--){
+        const c = sigilGroup.children[i];
+        sigilGroup.remove(c);
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
+      }
+      sigilGroup.rotation.set(0,0,0);
+    }
+
+    // ========================================================================
+    //  FORGING ANIMATION — the structure assembles in sequence:
+    //  cage rings/struts ignite, the path traces node to node, nodes flare,
+    //  the central rune stamps in. Reduced-motion draws it whole instantly.
+    // ========================================================================
+    let forging = false, forgeStart = 0;
+    const FORGE_DUR = 1500; // ms
+
+    function startForge(){
+      if (cfg.reduced){ forging = false; revealAll(current); return; }
+      forging = true; forgeStart = performance.now();
+    }
+
+    function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+    function easeOut(t){ return 1 - Math.pow(1 - t, 3); }
+
+    // set visibility/scale of each part by the forge progress p (0..1)
+    function applyForgeProgress(S, p){
+      if (!S || !S.built) return;
+      // phase windows
+      const cageP = clamp01(p / 0.30);                 // 0.00 - 0.30 cage
+      const pathP = clamp01((p - 0.20) / 0.55);        // 0.20 - 0.75 path trace
+      const chordP= clamp01((p - 0.55) / 0.25);        // 0.55 - 0.80 chords
+      const nodeP = clamp01((p - 0.65) / 0.25);        // 0.65 - 0.90 nodes
+      const coreP = clamp01((p - 0.80) / 0.20);        // 0.80 - 1.00 core
+
+      // cage: fade + scale up from center
+      for (const m of S.cageMeshes){
+        const a = easeOut(cageP);
+        m.visible = a > 0.001;
+        setOpacity(m, a);
+        m.scale.setScalar(m.userData._baseScale ? m.userData._baseScale : 1);
+      }
+      // path: trace segment by segment
+      const segTotal = S.segMeshes.length;
+      const shown = easeOut(pathP) * segTotal;
+      for (let i = 0; i < segTotal; i++){
+        const m = S.segMeshes[i];
+        const local = clamp01(shown - i);     // this segment's own 0..1
+        m.visible = local > 0.001;
+        // grow the tube along by scaling — cheap "draw-on" feel
+        const g = 0.15 + local * 0.85;
+        m.scale.setScalar(g);
+        setOpacity(m, local);
+      }
+      // chords
+      for (const m of S.chordMeshes){ const a = easeOut(chordP); m.visible=a>0.001; setOpacity(m, a*0.85); }
+      // nodes (cores + glow)
+      for (const m of S.nodeMeshes){
+        const a = easeOut(nodeP);
+        m.visible = a > 0.001;
+        const base = m.userData.glow ? 0.5 : 1.0;
+        setOpacity(m, a * base);
+        m.scale.setScalar(m.userData._baseScale * (0.3 + a*0.7));
+      }
+      // core rune
+      for (const m of S.coreMeshes){ const a = easeOut(coreP); m.visible=a>0.001; setOpacity(m, a * (m.material.blending===THREE.AdditiveBlending?0.85:1)); }
+    }
+
+    function setOpacity(m, o){
+      if (m.material){ m.material.transparent = true; m.material.opacity = Math.max(0, Math.min(1, o)); }
+    }
+
+    // cache each mesh's intended base scale so animation can scale around it
+    function cacheBaseScales(S){
+      for (const m of [...S.nodeMeshes]){ m.userData._baseScale = m.scale.x; }
+      for (const m of [...S.cageMeshes, ...S.coreMeshes, ...S.chordMeshes]){ m.userData._baseScale = m.scale.x; }
+    }
+
+    function revealAll(S){
+      if (!S) return;
+      applyForgeProgress(S, 1);
+    }
+
+    // ========================================================================
+    //  ORBIT CAMERA — a self-contained spherical controller (no OrbitControls)
+    // ========================================================================
+    const cam = {
+      target: new THREE.Vector3(0,0,0),
+      radius: 34,
+      minR: 10, maxR: 120,
+      theta: Math.PI*0.5 + 0.6,
+      phi: 1.18
+    };
+    function clampPhi(){ const e=0.12; cam.phi = Math.max(e, Math.min(Math.PI-e, cam.phi)); }
+    function applyCamera(){
+      clampPhi();
+      const sinP = Math.sin(cam.phi);
+      camera.position.set(
+        cam.target.x + cam.radius * sinP * Math.cos(cam.theta),
+        cam.target.y + cam.radius * Math.cos(cam.phi),
+        cam.target.z + cam.radius * sinP * Math.sin(cam.theta)
+      );
+      camera.lookAt(cam.target);
+    }
+
+    // ---- input: drag rotate, wheel/pinch zoom ----
+    const drag = { active:false, lastX:0, lastY:0, pinch:null, moved:false };
+    function pointer(e){ const t = (e.touches && e.touches[0]) ? e.touches[0] : e; return { x:t.clientX, y:t.clientY }; }
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      drag.active = true; drag.moved = false;
+      const p = pointer(e); drag.lastX = p.x; drag.lastY = p.y;
+      canvas.classList.add('grabbing');
+      lastInteract();
+      if (e.cancelable) e.preventDefault();
+    }
+    function onMove(e){
+      if (!drag.active) return;
+      const p = pointer(e);
+      if (e.touches && e.touches.length >= 2){
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx,dy);
+        if (drag.pinch != null){
+          const delta = drag.pinch - dist;
+          cam.radius = Math.max(cam.minR, Math.min(cam.maxR, cam.radius * (1 + delta*0.004)));
+        }
+        drag.pinch = dist;
+      }
+      const dx = p.x - drag.lastX, dy = p.y - drag.lastY;
+      if (Math.abs(dx)+Math.abs(dy) > 2) drag.moved = true;
+      cam.theta -= dx * 0.006;
+      cam.phi   -= dy * 0.006;
+      clampPhi();
+      drag.lastX = p.x; drag.lastY = p.y;
+      lastInteract();
+      if (e.cancelable) e.preventDefault();
+    }
+    function onUp(){ drag.active = false; drag.pinch = null; canvas.classList.remove('grabbing'); }
+    function onWheel(e){
+      e.preventDefault();
+      const f = Math.exp(e.deltaY * 0.0014);
+      cam.radius = Math.max(cam.minR, Math.min(cam.maxR, cam.radius * f));
+      lastInteract();
+    }
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('wheel', onWheel, { passive:false });
+    canvas.addEventListener('touchstart', onDown, { passive:false });
+    window.addEventListener('touchmove', onMove, { passive:false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+
+    // ========================================================================
+    //  PERSISTENCE + CONFIG
+    // ========================================================================
+    const defaults = { spin:true, reduced:reduceMQ.matches };
+    let cfg = Object.assign({}, defaults);
+    let gallery = [];
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && typeof s==='object'){
+        if (typeof s.spin==='boolean') cfg.spin = s.spin;
+        if (typeof s.reduced==='boolean') cfg.reduced = s.reduced;
+        if (Array.isArray(s.gallery)) gallery = s.gallery.slice(0, 12);
+      }
+    } catch(e){}
+    function save(){
+      try { localStorage.setItem(KEY, JSON.stringify({ spin:cfg.spin, reduced:cfg.reduced, gallery })); } catch(e){}
+    }
+
+    // ========================================================================
+    //  FORGE FLOW — top-level: take a seed, build, assemble, animate, record
+    // ========================================================================
+    function forge(seedRaw, opts){
+      opts = opts || {};
+      const seed = (seedRaw || '').trim();
+      if (!seed){ flashHint('the forge takes a word, not silence.'); return; }
+
+      const S = buildSigil(seed);
+      assembleSigil(S);
+      cacheBaseScales(S);
+
+      // plate
+      el('plate').style.display = 'block';
+      el('plateName').textContent = S.name;
+      el('plateTitle').textContent = S.title;
+      el('plateSeed').textContent = '“' + seed + '”';
+
+      // enable actions
+      el('btnDownload').disabled = false; el('btnDownload').style.opacity = '1';
+      el('btnCopy').disabled = false; el('btnCopy').style.opacity = '1';
+
+      el('seedInput').value = seed;
+
+      if (opts.instant || cfg.reduced){ forging = false; revealAll(S); }
+      else { startForge(); }
+
+      if (!opts.noRecord) recordSeed(seed);
+      flashHint('struck. the iron holds “' + S.name + '”.');
+    }
+
+    // ---- the gallery rack ----
+    function recordSeed(seed){
+      gallery = gallery.filter(g => g.seed !== seed);
+      gallery.unshift({ seed, t: Date.now() });
+      gallery = gallery.slice(0, 12);
+      save();
+      renderGallery();
+    }
+
+    function renderGallery(){
+      const grid = el('galleryGrid');
+      grid.innerHTML = '';
+      el('clearGallery').style.display = gallery.length ? 'inline' : 'none';
+      gallery.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = 'chip';
+        btn.title = item.seed + ' — re-forge';
+        btn.setAttribute('aria-label', 'Re-forge ' + item.seed);
+        const c = document.createElement('canvas');
+        c.width = 104; c.height = 104;
+        btn.appendChild(c);
+        drawThumb(c, item.seed);
+        btn.addEventListener('click', () => {
+          forge(item.seed);
+        });
+        grid.appendChild(btn);
+      });
+    }
+
+    // a cheap 2D projection thumbnail of the sigil (deterministic, same seed = same thumb)
+    function drawThumb(canvasEl, seed){
+      const ctx = canvasEl.getContext('2d');
+      const W = canvasEl.width, H = canvasEl.height, cx = W/2, cy = H/2;
+      ctx.clearRect(0,0,W,H);
+      // faint wash
+      const g = ctx.createRadialGradient(cx,cy,2,cx,cy,W*0.6);
+      g.addColorStop(0,'rgba(16,185,129,0.08)'); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+      const S = buildSigil(seed);
+      const scale = (W*0.42) / RADIUS;
+      // project 3D nodes with a fixed isometric-ish view so thumbs read as 3D
+      const ay = 0.6, ax = 0.5;
+      const cay=Math.cos(ay), say=Math.sin(ay), cax=Math.cos(ax), sax=Math.sin(ax);
+      const proj = (v) => {
+        // rotate Y then X
+        let x = v.x*cay - v.z*say;
+        let z = v.x*say + v.z*cay;
+        let y = v.y*cax - z*sax;
+        return { x: cx + x*scale, y: cy + y*scale };
+      };
+      // cage ring (primary)
+      ctx.strokeStyle = 'rgba(16,185,129,0.5)'; ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let i=0;i<=48;i++){
+        const a=(i/48)*Math.PI*2;
+        const v=new THREE.Vector3(Math.cos(a)*RADIUS*1.18,0,Math.sin(a)*RADIUS*1.18).applyEuler(S.cageTilt);
+        const p=proj(v); if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);
+      }
+      ctx.stroke();
+      // traced path
+      ctx.strokeStyle = '#34d399'; ctx.lineWidth = 1.8; ctx.lineJoin='round';
+      ctx.beginPath();
+      for (let s=0;s<=S.order.length;s++){
+        const n=S.nodes[S.order[s % S.order.length]]; const p=proj(n);
+        if(s===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);
+      }
+      ctx.stroke();
+      // nodes
+      ctx.fillStyle = '#6ee7b7';
+      S.nodes.forEach(n=>{ const p=proj(n); ctx.beginPath(); ctx.arc(p.x,p.y,2.0,0,Math.PI*2); ctx.fill(); });
+      // core dot
+      ctx.fillStyle = '#a7f3d0'; ctx.beginPath(); ctx.arc(cx,cy,2.6,0,Math.PI*2); ctx.fill();
+    }
+
+    // ========================================================================
+    //  PNG EXPORT — render a clean frame, snapshot, sign it.
+    // ========================================================================
+    function downloadPNG(){
+      if (!current){ flashHint('forge a sigil first.'); return; }
+      // ensure the sigil is fully revealed for the export frame
+      const wasForging = forging; forging = false;
+      revealAll(current);
+      renderer.render(scene, camera);
+
+      let url;
+      try { url = renderer.domElement.toDataURL('image/png'); }
+      catch(err){ flashHint('the fire resists the frame. try again.'); forging = wasForging; return; }
+      forging = wasForging;
+
+      const img = new Image();
+      img.onload = () => {
+        const off = document.createElement('canvas');
+        off.width = img.width; off.height = img.height;
+        const o = off.getContext('2d');
+        o.drawImage(img, 0, 0);
+
+        // signature block, lower-right
+        const base = Math.round(img.height * 0.020);
+        o.textAlign = 'right'; o.textBaseline = 'bottom';
+        o.shadowColor = 'rgba(16,185,129,0.5)'; o.shadowBlur = img.height*0.012;
+        o.fillStyle = 'rgba(231,250,243,0.92)';
+        o.font = `600 ${Math.round(base*1.5)}px 'JetBrains Mono', monospace`;
+        o.fillText(current.name, img.width - 22, img.height - base*3.0);
+        o.shadowBlur = 0;
+        o.fillStyle = 'rgba(122,117,112,0.85)';
+        o.font = `${base}px 'JetBrains Mono', monospace`;
+        o.fillText('“' + current.seed + '” · ' + current.title, img.width - 22, img.height - base*1.5);
+        o.fillStyle = 'rgba(58,53,48,0.9)';
+        o.font = `${Math.round(base*0.85)}px 'JetBrains Mono', monospace`;
+        o.fillText('the sigil forge · vault · prízrak', img.width - 22, img.height - base*0.4);
+
+        const safe = current.seed.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32) || 'sigil';
+        off.toBlob((blob)=>{
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = u; a.download = 'sigil-3d-' + safe + '.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(()=>URL.revokeObjectURL(u), 1000);
+        }, 'image/png');
+      };
+      img.src = url;
+      flashHint('pulled from the fire. the mark is yours.');
+    }
+
+    function copyName(){
+      if (!current){ flashHint('forge a sigil first.'); return; }
+      const text = current.name + ', ' + current.title;
+      const done = () => flashHint('the true name, copied to the ledger.');
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(done);
+      } else { done(); }
+    }
+
+    // ========================================================================
+    //  HUD WIRING
+    // ========================================================================
+    function syncUI(){
+      const sb = el('btnSpin');
+      sb.classList.toggle('btn-on', cfg.spin);
+      sb.textContent = cfg.spin ? '↻ auto-rotate' : '↻ rotate: off';
+      const rb = el('btnReduce');
+      rb.classList.toggle('btn-on', cfg.reduced);
+      rb.textContent = cfg.reduced ? '◐ motion: calm' : '◐ motion: full';
+    }
+
+    el('forgeBtn').addEventListener('click', () => forge(el('seedInput').value));
+    el('seedInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') forge(el('seedInput').value); });
+    el('btnSpin').addEventListener('click', () => { cfg.spin = !cfg.spin; syncUI(); save(); });
+    el('btnReset').addEventListener('click', () => { cam.radius=34; cam.theta=Math.PI*0.5+0.6; cam.phi=1.18; cam.target.set(0,0,0); });
+    el('btnDownload').addEventListener('click', downloadPNG);
+    el('btnCopy').addEventListener('click', copyName);
+    el('btnReduce').addEventListener('click', () => {
+      cfg.reduced = !cfg.reduced; syncUI(); save();
+      if (cfg.reduced && current){ forging=false; revealAll(current); }
+    });
+    el('clearGallery').addEventListener('click', () => { gallery=[]; save(); renderGallery(); });
+
+    // keyboard
+    window.addEventListener('keydown', (e) => {
+      const tag = (e.target && e.target.tagName) || '';
+      if (/INPUT|TEXTAREA/.test(tag)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'r'){ cfg.spin = !cfg.spin; syncUI(); save(); }
+    });
+
+    // hint helper
+    const hintEl = el('hint'); const defaultHint = hintEl.innerHTML;
+    let hintTimer = null;
+    function flashHint(msg){
+      hintEl.textContent = msg; hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(() => { hintEl.classList.remove('flicker'); hintEl.textContent = 'drag to turn · scroll to zoom · r toggles the slow turn'; }, 2600);
+    }
+
+    // ========================================================================
+    //  MAIN LOOP
+    // ========================================================================
+    let fpsAccum = 0, fpsFrames = 0;
+    function loop(){
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.05, clock.getDelta());
+
+      // forging animation
+      if (forging){
+        const t = (performance.now() - forgeStart) / FORGE_DUR;
+        applyForgeProgress(current, clamp01(t));
+        if (t >= 1){ forging = false; revealAll(current); }
+      }
+
+      // slow self-rotation of the finished sigil (reduced-motion / toggle gated)
+      if (cfg.spin && !cfg.reduced && current && !forging){
+        sigilGroup.rotation.y += dt * 0.18;
+      }
+
+      // gentle idle auto-orbit of the camera when not dragging (reduced-motion safe)
+      if (!cfg.reduced && !drag.active){
+        cam.theta += dt * 0.02;
+      }
+
+      // ambient ember field slow drift + key light breathing
+      if (emberField && !cfg.reduced){ emberField.rotation.y += dt * 0.01; }
+      if (keyLight){
+        const pulse = cfg.reduced ? 0 : Math.sin(clock.elapsedTime*1.4)*0.18;
+        keyLight.intensity = 1.4 + pulse;
+      }
+
+      applyCamera();
+      renderer.render(scene, camera);
+
+      fpsAccum += dt; fpsFrames++;
+      if (fpsAccum >= 0.5){ const f=Math.round(fpsFrames/fpsAccum); window.__sigilFPS=f; const e=el('fpsOut'); if(e)e.textContent=f; fpsAccum=0; fpsFrames=0; }
+    }
+
+    // ========================================================================
+    //  BOOT
+    // ========================================================================
+    try {
+      makeRenderer();
+    } catch(err){
+      el('fatal').style.display='flex';
+      console.error(err);
+      return;
+    }
+
+    syncUI();
+    renderGallery();
+    applyCamera();
+    loop();
+
+    // forge an opening sigil so the stone isn't cold — the most recent seed,
+    // or a default, drawn instantly (no animation on load).
+    setTimeout(() => {
+      if (gallery.length){
+        forge(gallery[0].seed, { instant:true, noRecord:true });
+      } else {
+        forge('prízrak', { instant:true, noRecord:true });
+      }
+    }, 80);
+
+    // read-only console handle (the ghost keeps no secrets)
+    window.sigilForge3D = {
+      get fps(){ return window.__sigilFPS||0; },
+      get seed(){ return current ? current.seed : null; },
+      get name(){ return current ? current.name : null; },
+      get nodeCount(){ return current ? current.nodeCount : 0; },
+      get nodePositions(){ return current ? current.nodes.map(n=>({x:+n.x.toFixed(4),y:+n.y.toFixed(4),z:+n.z.toFixed(4)})) : []; },
+      get cam(){ return { radius:cam.radius, theta:cam.theta, phi:cam.phi }; },
+      get spin(){ return cfg.spin; },
+      get forging(){ return forging; },
+      _forge(seed){ forge(seed); return this.seed; },
+      // deterministic check: same seed -> identical node coordinates
+      _hash(seed){ return fnv1a('glyph::'+(seed||'')); },
+      _nodesFor(seed){ const S=buildSigil(seed); return S.nodes.map(n=>({x:+n.x.toFixed(6),y:+n.y.toFixed(6),z:+n.z.toFixed(6)})); }
+    };
+
+    // ===== ambient embers (DOM, capped, reduced-motion-safe) =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const host = el('embers');
+      for (let i=0;i<6;i++){
+        const e = document.createElement('div');
+        e.className = 'ember';
+        e.style.left = (6 + Math.random()*88) + '%';
+        e.style.animationDelay = (Math.random()*16) + 's';
+        e.style.animationDuration = (13 + Math.random()*9) + 's';
+        host.appendChild(e);
+      }
+    })();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){ const h=new Date().getHours(); if (h>=0&&h<3){ const w=el('nightWhisper'); if(w) w.style.display='block'; } })();
+
+    // ===== easter egg: type "prizrak" → wake the watcher (+ a violet rune flare) =====
+    (function(){
+      let buf='';
+      window.addEventListener('keydown', (ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=el('ghostLine'); if(g){ g.style.display='block'; g.classList.add('flicker'); }
+          // a brief violet flare ring around the sigil
+          if (!cfg.reduced){
+            const flare = new THREE.Mesh(new THREE.TorusGeometry(RADIUS*1.4, RADIUS*0.02, 8, 80),
+              new THREE.MeshBasicMaterial({ color:0xa78bfa, transparent:true, opacity:0.9, blending:THREE.AdditiveBlending, depthWrite:false }));
+            flare.rotation.x = Math.PI*0.5;
+            sigilGroup.add(flare);
+            let life = 1;
+            const fade = () => {
+              life -= 0.02;
+              flare.material.opacity = Math.max(0, life*0.9);
+              flare.scale.setScalar(1 + (1-life)*0.6);
+              if (life > 0) requestAnimationFrame(fade);
+              else { sigilGroup.remove(flare); flare.geometry.dispose(); flare.material.dispose(); }
+            };
+            fade();
+          }
+        }
+      });
+    })();
+
+    // ===== easter egg: triple-click the title → one extra ember =====
+    (function(){
+      const t=el('appTitle'); if(!t) return;
+      t.addEventListener('click', (ev)=>{
+        if (ev.detail===3 && !reduceMQ.matches){
+          const e=document.createElement('div'); e.className='ember';
+          e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='12s';
+          el('embers').appendChild(e); setTimeout(()=>e.remove(), 13000);
+        }
+      });
+    })();
+
+    // ===== idle 60s → the watcher leans in (UI chrome; reduced-motion gated) =====
+    let idleTimer=null;
+    function lastInteract(){
+      const line=el('idleLine');
+      if (line){ line.style.opacity='0'; }
+      clearTimeout(idleTimer);
+      if (reduceMQ.matches) return;
+      idleTimer=setTimeout(()=>{
+        if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+          setTimeout(()=>{ if(line) line.style.opacity='0'; }, 6000); }
+      }, 60000);
+    }
+    ['mousemove','keydown','click','wheel','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev, lastInteract, {passive:true}));
+    lastInteract();
+
+    // react to system reduced-motion changes
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change', (e)=>{ cfg.reduced=e.matches; syncUI(); save(); if(cfg.reduced && current){ forging=false; revealAll(current);} });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>
