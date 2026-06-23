@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Tuesday Triage | Prízlak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #18181b; }
+        .glow { text-shadow: 0 0 10px currentColor; }
+        .card-enter { animation: cardIn 0.3s ease-out; }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        textarea, input { background: #27272a; border-color: #3f3f46; color: #e4e4e7; }
+        textarea:focus, input:focus { outline: none; border-color: #7c3aed; }
+        .verdict-box { border-left: 3px solid; }
+    </style>
+</head>
+<body class="text-zinc-300 font-sans antialiased min-h-screen">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white mb-1">The Tuesday Triage</h1>
+            <p class="text-zinc-500 text-sm">Monday's intentions meet Wednesday's momentum. What actually landed? What drifted? What do you carry, and what do you drop?</p>
+        </header>
+
+        <div class="space-y-6">
+            <div class="bg-zinc-800/50 border border-zinc-700/60 rounded-lg p-5">
+                <h2 class="text-sm font-bold text-amber-400 mb-3">Monday's Promises</h2>
+                <p class="text-xs text-zinc-500 mb-3">What did you say you'd do this week? Be honest — the ghost doesn't care about your Monday bravado.</p>
+                <textarea id="promises" rows="3" class="w-full rounded-lg px-4 py-2.5 text-sm border border-zinc-700 resize-none placeholder-zinc-600" placeholder="1. Ship the H100 dashboard&#10;2. Call the investor&#10;3. Write the blog post"></textarea>
+            </div>
+
+            <div class="bg-zinc-800/50 border border-zinc-700/60 rounded-lg p-5">
+                <h2 class="text-sm font-bold text-cyan-400 mb-3">Actual State</h2>
+                <p class="text-xs text-zinc-500 mb-3">Tuesday's reality. Not Monday's. What actually happened?</p>
+                <textarea id="actual" rows="3" class="w-full rounded-lg px-4 py-2.5 text-sm border border-zinc-700 resize-none placeholder-zinc-600" placeholder="1. Dashboard is 60% done, hitting auth issues&#10;2. Didn't call — found a better time to reach out&#10;3. Wrote 200 words, felt like nothing"></textarea>
+            </div>
+
+            <div class="bg-zinc-800/50 border border-zinc-700/60 rounded-lg p-5">
+                <h2 class="text-sm font-bold text-rose-400 mb-3">The Drop</h2>
+                <p class="text-xs text-zinc-500 mb-3">What are you intentionally dropping today? Tuesday is the day to cut before Wednesday's momentum locks you in.</p>
+                <textarea id="drop" rows="2" class="w-full rounded-lg px-4 py-2.5 text-sm border border-zinc-700 resize-none placeholder-zinc-600" placeholder="The blog post — it's become approval-seeking, not useful"></textarea>
+            </div>
+
+            <div class="bg-zinc-800/50 border border-zinc-700/60 rounded-lg p-5">
+                <h2 class="text-sm font-bold text-emerald-400 mb-3">Wednesday's Lever</h2>
+                <p class="text-xs text-zinc-500 mb-3">One thing to pull on Wednesday that makes everything else easier. Not three things. One.</p>
+                <textarea id="lever" rows="2" class="w-full rounded-lg px-4 py-2.5 text-sm border border-zinc-700 resize-none placeholder-zinc-600" placeholder="Finish the auth flow — everything else depends on it"></textarea>
+            </div>
+
+            <div class="flex gap-3">
+                <button id="triageBtn" class="flex-1 bg-violet-700 hover:bg-violet-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-sm">
+                    Run the Triage
+                </button>
+                <button id="copyBtn" class="hidden bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-bold py-3 px-4 rounded-lg transition-colors text-sm">
+                    Copy Receipt
+                </button>
+            </div>
+
+            <div id="verdict" class="hidden verdict-box bg-zinc-800/30 rounded-lg p-5">
+                <div id="verdictContent"></div>
+            </div>
+
+            <div id="historySection" class="hidden">
+                <h2 class="text-sm font-bold text-zinc-400 mb-3">Previous Triage</h2>
+                <div id="history" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <footer class="mt-12 pt-6 border-t border-zinc-800 text-center">
+            <p class="text-xs text-zinc-600">I build assets. We measure the cold and build dashboards of our suffering.</p>
+        </footer>
+    </div>
+
+    <script>
+    const STORAGE_KEY = "tuesday_triage_v1";
+
+    function loadHistory() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+        catch(e) { return []; }
+    }
+
+    function saveEntry(entry) {
+        const h = loadHistory();
+        h.unshift(entry);
+        if (h.length > 20) h.length = 20;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(h));
+    }
+
+    function formatDate(ts) {
+        const d = new Date(ts);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function runTriage() {
+        const promises = document.getElementById('promises').value.trim();
+        const actual = document.getElementById('actual').value.trim();
+        const drop = document.getElementById('drop').value.trim();
+        const lever = document.getElementById('lever').value.trim();
+
+        if (!promises && !actual) {
+            alert("You need at least promises and actual state for the triage to work. The ghost can't judge nothing.");
+            return;
+        }
+
+        const promiseItems = promises.split('\n').filter(l => l.trim()).length;
+        const actualItems = actual.split('\n').filter(l => l.trim()).length;
+
+        let scored = 0;
+        let total = promiseItems;
+        let verdict = "";
+        let details = [];
+
+        if (total === 0) total = 1;
+
+        const actualLower = actual.toLowerCase();
+        const promiseLines = promises.split('\n').filter(l => l.trim());
+        const droppedLines = drop ? drop.split('\n').filter(l => l.trim()) : [];
+
+        let matched = 0;
+        let explicitlyDropped = 0;
+        let unfinished = [];
+
+        promiseLines.forEach((line) => {
+            const trimmed = line.replace(/^\d+[\.\)\-]\s*/, '').trim().toLowerCase();
+            const words = trimmed.split(/\s+/).slice(0, 2);
+            let isDropped = false;
+            droppedLines.forEach(dl => {
+                const dlTrimmed = dl.replace(/^\d+[\.\)\-]\s*/, '').trim().toLowerCase();
+                if (trimmed.includes(dlTrimmed.split(' ')[0]) || dlTrimmed.includes(trimmed.split(' ')[0])) {
+                    isDropped = true;
+                }
+            });
+            if (isDropped) {
+                explicitlyDropped++;
+            } else if (actualLower.includes(words[0]) || (words[1] && actualLower.includes(words[1]))) {
+                matched++;
+            } else {
+                unfinished.push(trimmed);
+            }
+        });
+
+        scored = matched;
+
+        const ratio = scored / total;
+        if (ratio >= 0.8) {
+            verdict = "Strong week. You're carrying the weight you said you would. Wednesday is about finishing, not starting.";
+        } else if (ratio >= 0.5) {
+            verdict = "Mid-week balance. Half the promises held, half didn't. That's not failure — that's Tuesday. The lever matters more than the list.";
+        } else if (ratio >= 0.2) {
+            verdict = "The promises are lying to you. Monday said one thing, Tuesday did another. The lever is the only honest thing you've named. Follow it.";
+        } else {
+            verdict = "Monday is a ghost. You named things you didn't do and called them intentions. Tuesday is the day to stop performing to your future self. The lever is the only real thing here.";
+        }
+
+        if (explicitlyDropped > 0) {
+            details.push(`You consciously dropped ${explicitlyDropped} item${explicitlyDropped > 1 ? 's' : ''}. That's discipline, not failure.`);
+        }
+        if (unfinished.length > 0 && total > 0) {
+            details.push(`${unfinished.length} item${unfinished.length > 1 ? 's' : ''} still in flight: ${unfinished.slice(0, 3).join(', ')}${unfinished.length > 3 ? '...' : ''}`);
+        }
+
+        const verdictEl = document.getElementById('verdict');
+        const contentEl = document.getElementById('verdictContent');
+        const copyBtn = document.getElementById('copyBtn');
+
+        let html = `<div class="mb-3"><span class="text-xs font-mono text-zinc-500">${formatDate(Date.now())}</span></div>`;
+        html += `<p class="text-sm leading-relaxed mb-3" style="border-color: #7c3aed;">${verdict}</p>`;
+
+        if (details.length > 0) {
+            html += `<div class="text-xs text-zinc-400 space-y-1 mb-3">`;
+            details.forEach(d => { html += `<p>• ${d}</p>`; });
+            html += `</div>`;
+        }
+
+        html += `<div class="text-[10px] font-mono text-zinc-600">`;
+        html += `Promises: ${promiseItems} | Landed: ${scored} | Dropped: ${explicitlyDropped} | In flight: ${unfinished.length}<br>`;
+        html += `Lever: ${lever || "(not set)"}`;
+        html += `</div>`;
+
+        contentEl.innerHTML = html;
+        verdictEl.classList.remove('hidden');
+        copyBtn.classList.remove('hidden');
+
+        const entry = {
+            date: Date.now(),
+            promises, actual, drop, lever,
+            verdict,
+            stats: { total, scored, dropped: explicitlyDropped, unfinished: unfinished.length }
+        };
+        saveEntry(entry);
+        renderHistory();
+    }
+
+    function copyReceipt() {
+        const promises = document.getElementById('promises').value.trim();
+        const actual = document.getElementById('actual').value.trim();
+        const drop = document.getElementById('drop').value.trim();
+        const lever = document.getElementById('lever').value.trim();
+        const verdict = document.getElementById('verdictContent').innerText;
+
+        const receipt = `TUESDAY TRIAGE — ${formatDate(Date.now())}\n\nPROMISES:\n${promises}\n\nACTUAL:\n${actual}\n\nDROP:\n${drop}\n\nLEVER:\n${lever}\n\nVERDICT:\n${verdict}`;
+
+        navigator.clipboard.writeText(receipt).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.textContent = "Copied";
+            setTimeout(() => { btn.textContent = "Copy Receipt"; }, 2000);
+        });
+    }
+
+    function renderHistory() {
+        const history = loadHistory();
+        const section = document.getElementById('historySection');
+        const container = document.getElementById('history');
+
+        if (history.length <= 1) {
+            section.classList.add('hidden');
+            return;
+        }
+
+        section.classList.remove('hidden');
+        container.innerHTML = history.slice(1, 6).map(entry => `
+            <div class="bg-zinc-800/30 border border-zinc-700/40 rounded-lg p-3">
+                <div class="text-[10px] font-mono text-zinc-500 mb-1">${formatDate(entry.date)}</div>
+                <div class="text-xs text-zinc-400 line-clamp-2">${entry.verdict}</div>
+                <div class="text-[10px] text-zinc-600 mt-1">
+                    ${entry.stats.scored}/${entry.stats.total} landed · ${entry.stats.dropped} dropped · ${entry.stats.unfinished} in flight
+                </div>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('triageBtn').addEventListener('click', runTriage);
+    document.getElementById('copyBtn').addEventListener('click', copyReceipt);
+    renderHistory();
+    </script>
+</body>
+</html>
