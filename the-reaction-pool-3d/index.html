@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Reaction Pool · Vault | Prízrak</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- THREE.js r128 — UMD build, exposes a global `THREE`. No ES modules / importmaps. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root{
+      --bg:#08090b;
+      --bg-raised:#101216;
+      --bg-sunk:#0a0c10;
+      --line:#23272e;
+      --line-soft:#181b20;
+      --ink:#cdd4d8;
+      --ink-dim:#727a82;
+      --ink-ghost:#343b42;
+      --accent:#34d6c8;            /* cave-pool teal — the mineral's faint phosphorescence */
+      --accent-deep:#1f9c92;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ background:var(--bg); height:100%; margin:0; padding:0; overflow:hidden; }
+    body{
+      color:var(--ink);
+      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      overscroll-behavior:none; -webkit-user-select:none; user-select:none;
+      touch-action:none;
+    }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    #stage{ position:fixed; inset:0; z-index:0; }
+    #scene{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+    #scene.painting{ cursor:cell; }
+    #scene.orbiting{ cursor:move; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 82%, transparent);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .label{ color:var(--ink-dim); font-size:0.62rem; text-transform:uppercase; letter-spacing:0.18em; }
+    .num{ color:var(--accent); }
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+    select{
+      background:var(--bg-sunk); color:var(--ink); border:1px solid var(--line);
+      font-family:'JetBrains Mono', ui-monospace, monospace;
+    }
+    select option{ background:#0a0c10; color:var(--ink); }
+
+    button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 70%, transparent);
+      cursor:pointer; font-family:inherit;
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* preset chips */
+    .chip{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line); color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 40%, transparent);
+      cursor:pointer; font-family:inherit;
+    }
+    .chip:hover{ border-color:var(--accent-deep); color:var(--ink); }
+    .chip:active{ transform:translateY(1px); }
+    .chip-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* ===== ambient motion vocabulary (mirrors the siblings) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 34s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.45}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 18s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6.5s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:4;opacity:.028;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    .vignette{position:fixed;inset:0;pointer-events:none;z-index:2;
+      box-shadow:inset 0 0 200px 40px rgba(0,0,0,0.7), inset 0 0 60px 0 rgba(0,0,0,0.4);}
+
+    /* header, floating top-left */
+    header{ position:fixed; top:0; left:0; z-index:3; padding:18px 20px; pointer-events:none; max-width:19rem; }
+    header h1{ font-size:1.5rem; font-weight:600; color:#fff; margin:4px 0 0; pointer-events:auto; cursor:default; display:inline-block; }
+    header p{ font-size:11px; margin:6px 0 0; color:var(--ink-dim); line-height:1.55; }
+
+    /* the bench of controls, floating right */
+    .bench-wrap{ position:fixed; top:0; right:0; bottom:0; z-index:3; padding:12px; display:flex; align-items:center; pointer-events:none; }
+    .bench{ pointer-events:auto; width:20rem; max-width:88vw; border-radius:16px; padding:14px;
+      max-height:min(92vh, 820px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+    .bench::-webkit-scrollbar{ width:8px; }
+    .bench::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+    .bench::-webkit-scrollbar-track{ background:transparent; }
+
+    .transport{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-bottom:12px; }
+    .transport .btn{ border-radius:9px; padding:6px 10px; font-size:11px; }
+
+    #presets{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .chip{ border-radius:7px; padding:5px 6px; font-size:10px; text-align:center; }
+
+    .sect{ padding-top:12px; margin-top:12px; border-top:1px solid var(--line-soft); }
+    .sliders > div{ margin-bottom:11px; }
+    .slabel{ display:flex; justify-content:space-between; margin-bottom:5px; }
+    .sliders input[type=range], .render input[type=range]{ width:100%; height:6px; border-radius:99px; appearance:none; -webkit-appearance:none; background:var(--bg-sunk); border:1px solid var(--line-soft); cursor:pointer; }
+    select{ width:100%; border-radius:8px; padding:7px 8px; font-size:11px; cursor:pointer; }
+
+    .hud{ display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-left:auto; }
+
+    #hint{ font-size:10px; color:var(--ink-ghost); line-height:1.45; }
+
+    /* whispers bottom-left */
+    .whispers{ position:fixed; bottom:12px; left:16px; z-index:3; pointer-events:none; }
+    .whispers p{ font-size:10px; margin:3px 0 0; color:var(--ink-ghost); }
+    #idleLine{ opacity:0; transition:opacity 1.2s ease; }
+
+    /* fatal */
+    #fatal{ display:none; position:fixed; inset:0; z-index:9; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; padding:24px; background:color-mix(in srgb, var(--bg) 92%, transparent); }
+    #fatal h2{ font-size:clamp(1.4rem,5vw,1.9rem); font-weight:600; color:#fff; margin:8px 0; }
+    #fatal p{ font-size:13px; max-width:30rem; color:var(--ink-dim); line-height:1.6; }
+
+    @media (max-width:760px){
+      header p{ display:none; }
+      .bench-wrap{ align-items:flex-end; padding:8px; }
+      .bench{ width:100%; max-width:none; max-height:48vh; }
+    }
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the pool itself, in real depth -->
+  <div id="stage"><canvas id="scene"></canvas></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- header -->
+  <header>
+    <div class="mono label flicker">prízrak / instrument 27 — mineral · vault</div>
+    <h1 id="appTitle" class="h1-glow breathe">The Reaction Pool · Vault</h1>
+    <p>A still pool with real depth. The chemistry breeds in the dark — paint a seed and watch the mineral bloom, branch, and self-organize in three dimensions. Drag turns the cube; scroll falls toward the center. Cut the slice to see inside.</p>
+  </header>
+
+  <!-- whispers -->
+  <div class="whispers">
+    <p id="nightWhisper" class="mono" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono" style="display:none">still here. still watching the water.</p>
+  </div>
+
+  <!-- bench -->
+  <div class="bench-wrap">
+    <div class="bench glass">
+
+      <!-- transport -->
+      <div class="transport">
+        <button id="btnPause" class="btn mono" title="space">⏸ pause</button>
+        <button id="btnReset" class="btn mono" title="r — still the pool">↺ still</button>
+        <button id="btnSeed" class="btn mono" title="s — scatter seeds">⁂ scatter</button>
+        <button id="btnRecenter" class="btn mono" title="re-center the view">⌖ view</button>
+        <div class="hud">
+          <span class="mono label" style="align-self:center">cells <span id="countOut" class="num">0</span> · <span id="fpsOut" class="num">—</span>fps</span>
+        </div>
+      </div>
+
+      <!-- regime presets -->
+      <div>
+        <div class="label" style="margin-bottom:7px">regime</div>
+        <div id="presets"></div>
+        <p id="presetNote" class="mono" style="font-size:10px;margin:8px 0 0;line-height:1.4;color:var(--ink-ghost)">choose a chemistry, then paint into the dark.</p>
+      </div>
+
+      <!-- chemistry sliders -->
+      <div class="sect sliders">
+        <div>
+          <div class="slabel"><span class="mono label">feed · f</span><span id="feedOut" class="mono num" style="font-size:11px">0.0367</span></div>
+          <input type="range" id="feed" min="0" max="100" value="40">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">kill · k</span><span id="killOut" class="mono num" style="font-size:11px">0.0610</span></div>
+          <input type="range" id="kill" min="0" max="100" value="50">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">diffuse · u</span><span id="duOut" class="mono num" style="font-size:11px">0.16</span></div>
+          <input type="range" id="du" min="0" max="100" value="55">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">diffuse · v</span><span id="dvOut" class="mono num" style="font-size:11px">0.08</span></div>
+          <input type="range" id="dv" min="0" max="100" value="40">
+        </div>
+      </div>
+
+      <!-- brush -->
+      <div class="sect sliders">
+        <div>
+          <div class="slabel"><span class="mono label">brush</span><span id="brushOut" class="mono num" style="font-size:11px">4</span></div>
+          <input type="range" id="brush" min="1" max="9" value="4">
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:0">
+          <button id="btnPaint" class="btn btn-on mono" style="border-radius:9px;padding:6px 10px;font-size:11px;flex:1" title="paint seeds (v chemical)">✦ seed</button>
+          <button id="btnErase" class="btn mono" style="border-radius:9px;padding:6px 10px;font-size:11px;flex:1" title="erase back to still">○ erase</button>
+        </div>
+      </div>
+
+      <!-- render -->
+      <div class="sect render">
+        <div style="margin-bottom:11px">
+          <div class="label" style="margin-bottom:6px">colormap</div>
+          <select id="palette"></select>
+        </div>
+        <div style="margin-bottom:11px">
+          <div class="slabel"><span class="mono label">threshold</span><span id="threshOut" class="mono num" style="font-size:11px">0.18</span></div>
+          <input type="range" id="thresh" min="6" max="45" value="18">
+        </div>
+        <div style="margin-bottom:11px">
+          <div class="slabel"><span class="mono label">slice z</span><span id="sliceOut" class="mono num" style="font-size:11px">off</span></div>
+          <input type="range" id="slice" min="0" max="100" value="100">
+        </div>
+        <div style="display:flex;gap:7px">
+          <button id="btnSpeed" class="btn mono" style="border-radius:9px;padding:6px 10px;font-size:11px;flex:1" title="iterations per tick">↯ flow: brisk</button>
+          <button id="btnReduce" class="btn mono" style="border-radius:9px;padding:6px 10px;font-size:11px;flex:1" title="calm the ambient chrome">◐ motion: full</button>
+        </div>
+      </div>
+
+      <!-- hint -->
+      <div class="sect" style="padding-top:11px;margin-top:11px">
+        <p id="hint" class="mono">left-drag paints a seed onto the cloud · right-drag (two-finger) turns the cube · scroll zooms</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebGL failure -->
+  <div id="fatal">
+    <div class="mono label">prízrak / instrument 27</div>
+    <h2 class="h1-glow">the pool will not open</h2>
+    <p>This pool needs WebGL, and your browser will not open the way. Try a current Chrome, Firefox, Safari, or Edge — then the chemistry will keep its own time.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // ========================================================================
+    //  WEBGL GUARD
+    // ========================================================================
+    function webglOK(){
+      try {
+        const c = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch(e){ return false; }
+    }
+    if (typeof THREE === 'undefined' || !webglOK()){
+      document.getElementById('fatal').style.display='flex';
+      return;
+    }
+
+    const KEY = 'reaction-pool-3d-v1';
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const el = id => document.getElementById(id);
+
+    // ========================================================================
+    //  VOLUMETRIC GRID — 48^3 ≈ 110k cells. 6-neighbour Laplacian, double-buffered.
+    // ========================================================================
+    const G = 48;                            // cube edge
+    const GW = G, GH = G, GD = G;
+    const N  = GW*GH*GD;
+    const MAX_INSTANCES = 60000;             // cap on drawn glowing cubes (the V > threshold set)
+    const SIM_HZ = 30;                       // simulation ticks per second (decoupled from render)
+    const SIM_DT = 1000 / SIM_HZ;
+
+    const idx = (x,y,z)=> x + y*GW + z*GW*GH;
+    const inB = (x,y,z)=> x>=0&&x<GW&&y>=0&&y<GH&&z>=0&&z<GD;
+
+    // double-buffered chemical concentrations (typed arrays)
+    let U  = new Float32Array(N);
+    let V  = new Float32Array(N);
+    let U2 = new Float32Array(N);
+    let V2 = new Float32Array(N);
+
+    // ========================================================================
+    //  REGIMES — feed/kill/Du/Dv produce dramatically different 3D worlds.
+    //  3D Gray-Scott lives in a slightly different parameter band than 2D
+    //  because the 6-neighbour Laplacian sums more diffusion; these are tuned
+    //  to bloom in the volume rather than dissolve or saturate.
+    // ========================================================================
+    const PRESETS = [
+      { id:'coral',       name:'coral',       f:0.0620, k:0.0610, du:0.16, dv:0.08, note:'slow branching reefs that reach outward through the dark.' },
+      { id:'mitosis',     name:'mitosis',     f:0.0367, k:0.0610, du:0.16, dv:0.08, note:'cells that bud, split, and divide — the pool breeds in space.' },
+      { id:'worms',       name:'worms',       f:0.0540, k:0.0620, du:0.16, dv:0.08, note:'restless crawling filaments that wander and braid in 3D.' },
+      { id:'spirals',     name:'scrolls',     f:0.0180, k:0.0480, du:0.16, dv:0.08, note:'excitable medium — slow rotating scroll-waves fill the cube.' },
+      { id:'bubbles',     name:'bubbles',     f:0.0820, k:0.0590, du:0.16, dv:0.08, note:'a froth of cells — pockets of light opening in the volume.' },
+      { id:'maze',        name:'maze',        f:0.0290, k:0.0570, du:0.16, dv:0.08, note:'labyrinth corridors that wall themselves into a 3D warren.' },
+      { id:'solids',      name:'solids',      f:0.0390, k:0.0580, du:0.18, dv:0.07, note:'dense polyhedral growth — mineral packing the chamber.' },
+      { id:'pulses',      name:'pulses',      f:0.0250, k:0.0550, du:0.16, dv:0.08, note:'travelling fronts that pulse and reconverge endlessly.' },
+      { id:'flux',        name:'unstable',    f:0.0260, k:0.0510, du:0.16, dv:0.08, note:'chaotic, self-replacing turbulence. never settles.' }
+    ];
+
+    // ========================================================================
+    //  COLORMAPS — cold luminous cave tones (256-entry RGB LUTs)
+    // ========================================================================
+    const PALETTES = {
+      'phosphor': { name:'phosphor',  stops:[[0,4,6,9],[0.35,8,28,34],[0.6,18,86,92],[0.82,52,214,200],[1,196,255,244]] },
+      'amethyst': { name:'amethyst',  stops:[[0,5,4,10],[0.35,28,16,52],[0.62,92,52,168],[0.85,168,120,246],[1,234,222,255]] },
+      'glacier':  { name:'glacier',   stops:[[0,3,7,12],[0.4,10,34,60],[0.65,30,96,150],[0.85,96,176,232],[1,220,242,255]] },
+      'malachite':{ name:'malachite', stops:[[0,3,8,6],[0.36,8,40,28],[0.62,22,118,80],[0.84,86,210,150],[1,214,255,228]] },
+      'ember':    { name:'ember',     stops:[[0,8,4,4],[0.35,46,14,8],[0.6,140,46,18],[0.82,230,128,40],[1,255,232,176]] },
+      'sulfur':   { name:'sulfur',    stops:[[0,6,7,4],[0.4,24,32,10],[0.64,92,112,22],[0.85,196,206,64],[1,248,250,196]] },
+      'bone':     { name:'bone',      stops:[[0,5,6,8],[0.5,40,44,50],[0.78,120,128,138],[1,232,236,242]] }
+    };
+    function buildLUT(stops){
+      const lut = new Float32Array(256*3);
+      for (let i=0;i<256;i++){
+        const t = i/255;
+        let a = stops[0], b = stops[stops.length-1];
+        for (let s=0;s<stops.length-1;s++){
+          if (t >= stops[s][0] && t <= stops[s+1][0]){ a = stops[s]; b = stops[s+1]; break; }
+        }
+        const span = (b[0]-a[0]) || 1;
+        let f = (t - a[0]) / span; if (f<0) f=0; if (f>1) f=1;
+        f = f*f*f*(f*(f*6-15)+10);             // smootherstep
+        lut[i*3]   = (a[1] + (b[1]-a[1])*f)/255;
+        lut[i*3+1] = (a[2] + (b[2]-a[2])*f)/255;
+        lut[i*3+2] = (a[3] + (b[3]-a[3])*f)/255;
+      }
+      return lut;
+    }
+    const LUTS = {};
+    for (const k in PALETTES) LUTS[k] = buildLUT(PALETTES[k].stops);
+
+    // ========================================================================
+    //  SETTINGS (persisted)
+    // ========================================================================
+    const defaults = {
+      feed:40, kill:50, du:55, dv:40,            // slider positions 0..100
+      brush:4, palette:'phosphor', preset:'mitosis',
+      thresh:18, slice:100, speed:6, paintMode:'seed',
+      paused:false, reduced:reduceMQ.matches
+    };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s==='object') cfg = Object.assign(cfg, s.cfg||{}); } catch(e){}
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify({ cfg })); } catch(e){} }
+    let saveTimer=null; function saveSoon(){ clearTimeout(saveTimer); saveTimer=setTimeout(save, 800); }
+
+    // slider 0..100 -> real chemistry parameters
+    function feedVal(){ return 0.010 + (cfg.feed/100) * 0.090; }   // 0.010 .. 0.100
+    function killVal(){ return 0.045 + (cfg.kill/100) * 0.032; }   // 0.045 .. 0.077
+    function duVal(){   return 0.10  + (cfg.du/100)   * 0.16;  }   // 0.10  .. 0.26
+    function dvVal(){   return 0.04  + (cfg.dv/100)   * 0.10;  }   // 0.04  .. 0.14
+    function threshVal(){ return cfg.thresh/100; }                // 0.06 .. 0.45
+
+    function paramsToSliders(p){
+      cfg.feed = clamp01((p.f - 0.010)/0.090)*100;
+      cfg.kill = clamp01((p.k - 0.045)/0.032)*100;
+      cfg.du   = clamp01((p.du- 0.10 )/0.16 )*100;
+      cfg.dv   = clamp01((p.dv- 0.04 )/0.10 )*100;
+    }
+    function clamp01(x){ return x<0?0:x>1?1:x; }
+
+    // ========================================================================
+    //  SEEDING
+    // ========================================================================
+    function stillPool(){ U.fill(1); V.fill(0); U2.fill(1); V2.fill(0); simDirty=true; }
+
+    function seedBlob(gx, gy, gz, radius, strength){
+      const r2 = radius*radius;
+      const r = Math.ceil(radius);
+      for (let dz=-r; dz<=r; dz++) for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++){
+        const d2 = dx*dx + dy*dy + dz*dz;
+        if (d2 > r2) continue;
+        const x=gx+dx, y=gy+dy, z=gz+dz;
+        if (!inB(x,y,z)) continue;
+        const i = idx(x,y,z);
+        const falloff = strength * (1 - d2/r2);
+        V[i] = Math.min(1, V[i] + falloff);
+        U[i] = Math.max(0, U[i] - falloff*0.6);
+      }
+      simDirty=true;
+    }
+    function eraseBlob(gx, gy, gz, radius){
+      const r2 = radius*radius;
+      const r = Math.ceil(radius);
+      for (let dz=-r; dz<=r; dz++) for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++){
+        const d2 = dx*dx + dy*dy + dz*dz;
+        if (d2 > r2) continue;
+        const x=gx+dx, y=gy+dy, z=gz+dz;
+        if (!inB(x,y,z)) continue;
+        const i = idx(x,y,z);
+        V[i] = 0; U[i] = 1;
+      }
+      simDirty=true;
+    }
+    function scatterSeeds(n){
+      n = n || (6 + Math.floor(Math.random()*6));
+      const m = 7;
+      for (let i=0;i<n;i++){
+        const gx = m + Math.random()*(GW-2*m);
+        const gy = m + Math.random()*(GH-2*m);
+        const gz = m + Math.random()*(GD-2*m);
+        seedBlob(Math.round(gx), Math.round(gy), Math.round(gz), 2+Math.random()*2, 0.9);
+      }
+    }
+
+    // ========================================================================
+    //  GRAY-SCOTT STEP — 6-neighbour Laplacian, toroidal wrap, double-buffered.
+    //  This is the heart: a genuine volumetric reaction-diffusion integration.
+    // ========================================================================
+    function step(){
+      const f = feedVal(), k = killVal(), Du = duVal(), Dv = dvVal();
+      const su = U, sv = V, du = U2, dv = V2;
+      const GWGH = GW*GH;
+      for (let z=0; z<GD; z++){
+        const zC = z*GWGH;
+        const zU = (z===0    ? GD-1 : z-1)*GWGH;
+        const zD = (z===GD-1 ? 0    : z+1)*GWGH;
+        for (let y=0; y<GH; y++){
+          const yC = y*GW;
+          const yU = (y===0    ? GH-1 : y-1)*GW;
+          const yD = (y===GH-1 ? 0    : y+1)*GW;
+          const rowC = zC + yC;
+          for (let x=0; x<GW; x++){
+            const xL = (x===0    ? GW-1 : x-1);
+            const xR = (x===GW-1 ? 0    : x+1);
+            const c  = rowC + x;
+            const u = su[c], v = sv[c];
+
+            // 6-neighbour Laplacian (orthogonal weight 1/6, center -1)
+            const lu =
+              ( su[zC+yC+xL] + su[zC+yC+xR]
+              + su[zC+yU+x]  + su[zC+yD+x]
+              + su[zU+yC+x]  + su[zD+yC+x] ) * (1/6) - u;
+            const lv =
+              ( sv[zC+yC+xL] + sv[zC+yC+xR]
+              + sv[zC+yU+x]  + sv[zC+yD+x]
+              + sv[zU+yC+x]  + sv[zD+yC+x] ) * (1/6) - v;
+
+            const uvv = u * v * v;
+            let nu = u + (Du*lu - uvv + f*(1-u));
+            let nv = v + (Dv*lv + uvv - (k+f)*v);
+            du[c] = nu < 0 ? 0 : nu > 1 ? 1 : nu;
+            dv[c] = nv < 0 ? 0 : nv > 1 ? 1 : nv;
+          }
+        }
+      }
+      // swap buffers
+      let t = U; U = U2; U2 = t;
+      t = V; V = V2; V2 = t;
+      simDirty = true;
+    }
+
+    // ========================================================================
+    //  THREE.JS SETUP
+    // ========================================================================
+    const canvas = el('scene');
+    let renderer, scene, camera, ambient, keyLight;
+    let inst;
+
+    function makeRenderer(){
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+      renderer.setClearColor(0x06070a, 1);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x06070a, 0.006);
+
+      camera = new THREE.PerspectiveCamera(56, 1, 0.1, 2000);
+
+      ambient = new THREE.AmbientLight(0x182230, 0.65);
+      scene.add(ambient);
+      keyLight = new THREE.DirectionalLight(0x9fcad0, 0.45);
+      keyLight.position.set(0.5, 1.0, 0.6);
+      scene.add(keyLight);
+
+      buildChamber();
+      buildInstances();
+      resize();
+      window.addEventListener('resize', resize);
+    }
+
+    function resize(){
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    // world-space helpers: center the grid on origin, 1 unit per voxel.
+    const HX = GW/2, HY = GH/2, HZ = GD/2;
+    const worldX = (x)=> x - HX + 0.5;
+    const worldY = (y)=> y - HY + 0.5;
+    const worldZ = (z)=> z - HZ + 0.5;
+
+    // ---- the vault frame: a wireframe cube so the volume reads as a chamber ----
+    function buildChamber(){
+      const box = new THREE.BoxGeometry(GW, GH, GD);
+      const edges = new THREE.EdgesGeometry(box);
+      const mat = new THREE.LineBasicMaterial({ color:0x223036, transparent:true, opacity:0.5 });
+      scene.add(new THREE.LineSegments(edges, mat));
+    }
+
+    // ---- the one instanced mesh of glowing cubes (the V > threshold surface set) ----
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _s = new THREE.Vector3(1,1,1);
+    const _p = new THREE.Vector3();
+
+    function buildInstances(){
+      const geo = new THREE.BoxGeometry(0.92, 0.92, 0.92);
+      // emissive material: instanceColor drives a luminous, self-lit mineral look
+      const mat = new THREE.MeshBasicMaterial({ vertexColors:true });
+      inst = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES);
+      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      inst.count = 0;
+      const colArr = new Float32Array(MAX_INSTANCES*3);
+      inst.instanceColor = new THREE.InstancedBufferAttribute(colArr, 3);
+      inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
+      inst.frustumCulled = false;
+      scene.add(inst);
+    }
+
+    // ========================================================================
+    //  SURFACE EXTRACTION + INSTANCE REBUILD
+    //  Draw a voxel only if V > threshold AND it has at least one neighbour
+    //  below threshold (an exposed face) — this skips fully-buried cells, a
+    //  huge win that still reads as a solid glowing structure. Respect the
+    //  slice plane so the interior can be inspected.
+    // ========================================================================
+    let liveCount = 0;
+    let pulse = 0;
+    let scalarMax = 1;
+
+    function rebuildInstances(){
+      const lut = LUTS[cfg.palette] || LUTS.phosphor;
+      const th = threshVal();
+      const sliceZ = cfg.slice>=100 ? GD : Math.round((cfg.slice/100)*GD);
+      const colArr = inst.instanceColor.array;
+      const GWGH = GW*GH;
+      let n = 0, live = 0;
+      // adaptive normalization: track the running peak so faint regimes still glow
+      let peak = 0.0001;
+      const fl = 0.85 + 0.15*Math.sin(pulse);   // global living shimmer
+
+      for (let z=0; z<sliceZ; z++){
+        const zC = z*GWGH;
+        for (let y=0; y<GH; y++){
+          const yC = y*GW;
+          const rowC = zC + yC;
+          for (let x=0; x<GW; x++){
+            const i = rowC + x;
+            const v = V[i];
+            if (v <= th) continue;
+            live++;
+            if (v > peak) peak = v;
+
+            // face-exposure cull: keep only voxels touching a sub-threshold cell,
+            // OR on the slice cut face (so the sliced interior shows a clean wall).
+            const onSliceFace = (sliceZ < GD && z === sliceZ-1);
+            if (!onSliceFace){
+              const xL = (x>0    ? V[i-1]      : 0);
+              const xR = (x<GW-1 ? V[i+1]      : 0);
+              const yD = (y>0    ? V[i-GW]     : 0);
+              const yUp= (y<GH-1 ? V[i+GW]     : 0);
+              const zB = (z>0    ? V[i-GWGH]   : 0);
+              const zF = (z<GD-1 ? V[i+GWGH]   : 0);
+              const buried = xL>th && xR>th && yD>th && yUp>th && zB>th && zF>th;
+              if (buried) continue;
+            }
+            if (n >= MAX_INSTANCES){ z=sliceZ; y=GH; break; }
+
+            // position
+            _p.set(worldX(x), worldY(y), worldZ(z));
+            _m.compose(_p, _q, _s);
+            inst.setMatrixAt(n, _m);
+
+            // color: map V through the LUT with a luminous low-end lift + shimmer
+            let t = (v - th) / Math.max(0.04, scalarMax - th);
+            t = t < 0 ? 0 : t > 1 ? 1 : t;
+            t = Math.sqrt(t);                      // gamma lift so faint growth glows
+            const li = (t*255)|0, l = li*3;
+            colArr[n*3]   = lut[l]   * fl;
+            colArr[n*3+1] = lut[l+1] * fl;
+            colArr[n*3+2] = lut[l+2] * fl;
+            n++;
+          }
+        }
+      }
+      // ease the normalization peak toward the observed maximum
+      scalarMax += (Math.min(1, peak) - scalarMax) * 0.1;
+      if (scalarMax < th + 0.05) scalarMax = th + 0.05;
+
+      inst.count = n;
+      inst.instanceMatrix.needsUpdate = true;
+      inst.instanceColor.needsUpdate = true;
+      liveCount = live;
+    }
+
+    // ========================================================================
+    //  ORBIT CAMERA — self-contained spherical controller (no OrbitControls dep)
+    // ========================================================================
+    const cam = {
+      target: new THREE.Vector3(0,0,0),
+      radius: G*1.85,
+      minR: 12, maxR: G*4.5,
+      theta: Math.PI*0.28,
+      phi: 1.08
+    };
+    function clampPhi(){ const e=0.08; cam.phi = Math.max(e, Math.min(Math.PI-e, cam.phi)); }
+    function applyCamera(){
+      clampPhi();
+      const sinP=Math.sin(cam.phi);
+      camera.position.set(
+        cam.target.x + cam.radius*sinP*Math.cos(cam.theta),
+        cam.target.y + cam.radius*Math.cos(cam.phi),
+        cam.target.z + cam.radius*sinP*Math.sin(cam.theta)
+      );
+      camera.lookAt(cam.target);
+    }
+
+    // ========================================================================
+    //  INPUT — left-drag paint (raycast to cubes; fallback to a slab plane that
+    //  faces the camera through the volume center), right-drag/two-finger orbit,
+    //  wheel/pinch zoom.
+    // ========================================================================
+    const _ray = new THREE.Raycaster();
+    const _ndc = new THREE.Vector2();
+    const drag = { mode:null, lastX:0, lastY:0, active:false, _pinch:null };
+
+    const volBox = new THREE.Box3(
+      new THREE.Vector3(-HX,-HY,-HZ), new THREE.Vector3(HX,HY,HZ)
+    );
+
+    function setNDC(clientX, clientY){
+      const rect = canvas.getBoundingClientRect();
+      _ndc.x = ((clientX-rect.left)/rect.width)*2 - 1;
+      _ndc.y = -((clientY-rect.top)/rect.height)*2 + 1;
+    }
+
+    // returns a voxel {x,y,z} to seed at, or null
+    function pickVoxel(clientX, clientY){
+      setNDC(clientX, clientY);
+      _ray.setFromCamera(_ndc, camera);
+      // 1) hit an existing glowing cube — paint right at it
+      if (inst.count > 0){
+        const hits = _ray.intersectObject(inst, false);
+        if (hits.length){
+          const inP = hits[0].point.clone().addScaledVector(_ray.ray.direction, 0.3);
+          const gx=Math.floor(inP.x+HX), gy=Math.floor(inP.y+HY), gz=Math.floor(inP.z+HZ);
+          if (inB(gx,gy,gz)) return {x:gx,y:gy,z:gz};
+        }
+      }
+      // 2) fallback: a plane through the volume center, perpendicular to the view,
+      //    so empty space can be seeded anywhere the cube is visible.
+      const nrm = camera.getWorldDirection(_p).clone().negate();
+      const plane = new THREE.Plane(nrm, 0);     // through origin (volume center)
+      const hitP = new THREE.Vector3();
+      if (_ray.ray.intersectPlane(plane, hitP)){
+        const gx=Math.floor(hitP.x+HX), gy=Math.floor(hitP.y+HY), gz=Math.floor(hitP.z+HZ);
+        if (inB(gx,gy,gz)) return {x:gx,y:gy,z:gz};
+      }
+      // 3) last resort: near shell of the bounding box
+      const hit = _ray.ray.intersectBox(volBox, _p);
+      if (hit){
+        const inP = _p.clone().addScaledVector(_ray.ray.direction, 0.5);
+        const gx=Math.floor(inP.x+HX), gy=Math.floor(inP.y+HY), gz=Math.floor(inP.z+HZ);
+        if (inB(gx,gy,gz)) return {x:gx,y:gy,z:gz};
+      }
+      return null;
+    }
+
+    function paintAt(x,y,z){
+      const r = Math.max(1, cfg.brush);
+      if (cfg.paintMode==='erase') eraseBlob(x,y,z,r);
+      else seedBlob(x,y,z,r,0.92);
+    }
+
+    function pointer(e){ const t=(e.touches&&e.touches[0])?e.touches[0]:e; return { x:t.clientX, y:t.clientY }; }
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      const isTouch = !!e.touches;
+      let orbit = false;
+      if (isTouch) orbit = (e.touches.length>=2);
+      else orbit = (e.button===2 || e.button===1 || e.shiftKey);
+      drag.active = true;
+      const p = pointer(e);
+      drag.lastX=p.x; drag.lastY=p.y;
+      lastInteract();
+      if (orbit){ drag.mode='orbit'; canvas.classList.add('orbiting'); }
+      else {
+        drag.mode='paint'; canvas.classList.add('painting');
+        const v = pickVoxel(p.x,p.y); if (v) paintAt(v.x,v.y,v.z);
+        markFirstSeed();
+      }
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!drag.active) return;
+      const p = pointer(e);
+      if (drag.mode==='orbit'){
+        if (e.touches && e.touches.length>=2){
+          const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+          const dist=Math.hypot(dx,dy);
+          if (drag._pinch!=null){ const delta=drag._pinch-dist; cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*(1+delta*0.004))); }
+          drag._pinch=dist;
+        }
+        const dx=p.x-drag.lastX, dy=p.y-drag.lastY;
+        cam.theta -= dx*0.006; cam.phi -= dy*0.006; clampPhi();
+        drag.lastX=p.x; drag.lastY=p.y;
+      } else if (drag.mode==='paint'){
+        const v = pickVoxel(p.x,p.y); if (v) paintAt(v.x,v.y,v.z);
+      }
+      lastInteract();
+      e.preventDefault();
+    }
+    function onUp(e){
+      if (!drag.active) return;
+      drag.active=false; drag._pinch=null;
+      canvas.classList.remove('painting'); canvas.classList.remove('orbiting');
+      drag.mode=null;
+      e && e.preventDefault && e.preventDefault();
+    }
+    function onWheel(e){
+      e.preventDefault();
+      const f=Math.exp(e.deltaY*0.0012);
+      cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*f));
+      lastInteract();
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('wheel', onWheel, { passive:false });
+    canvas.addEventListener('contextmenu', e=>e.preventDefault());
+    canvas.addEventListener('touchstart', onDown, { passive:false });
+    window.addEventListener('touchmove', onMove, { passive:false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+
+    // ========================================================================
+    //  UI WIRING
+    // ========================================================================
+    const feedEl=el('feed'), killEl=el('kill'), duEl=el('du'), dvEl=el('dv'), brushEl=el('brush');
+    const feedOut=el('feedOut'), killOut=el('killOut'), duOut=el('duOut'), dvOut=el('dvOut'), brushOut=el('brushOut');
+    const palEl=el('palette'), presetNote=el('presetNote');
+    const threshEl=el('thresh'), threshOut=el('threshOut'), sliceEl=el('slice'), sliceOut=el('sliceOut');
+
+    function syncReadouts(){
+      feedOut.textContent = feedVal().toFixed(4);
+      killOut.textContent = killVal().toFixed(4);
+      duOut.textContent   = duVal().toFixed(3);
+      dvOut.textContent   = dvVal().toFixed(3);
+      brushOut.textContent = cfg.brush;
+      threshOut.textContent = threshVal().toFixed(2);
+      sliceOut.textContent = cfg.slice>=100 ? 'off' : Math.round((cfg.slice/100)*GD)+'z';
+    }
+    function syncSliders(){
+      feedEl.value=cfg.feed; killEl.value=cfg.kill; duEl.value=cfg.du; dvEl.value=cfg.dv;
+      brushEl.value=cfg.brush; threshEl.value=cfg.thresh; sliceEl.value=cfg.slice;
+    }
+
+    // preset chips
+    const presetsHost = el('presets');
+    PRESETS.forEach(p=>{
+      const b = document.createElement('button');
+      b.className = 'chip mono'; b.textContent = p.name; b.dataset.id = p.id;
+      b.addEventListener('click', ()=>applyPreset(p, true));
+      presetsHost.appendChild(b);
+    });
+    function highlightPreset(){
+      [...presetsHost.children].forEach(c=>c.classList.toggle('chip-on', c.dataset.id===cfg.preset));
+    }
+    function applyPreset(p, reseed){
+      cfg.preset = p.id;
+      paramsToSliders(p);
+      syncSliders(); syncReadouts(); highlightPreset(); save();
+      presetNote.textContent = p.note;
+      presetNote.classList.remove('flicker'); void presetNote.offsetWidth; presetNote.classList.add('flicker');
+      if (reseed){
+        stillPool();
+        seedBlob(GW>>1, GH>>1, GD>>1, 4, 0.95);
+        scatterSeeds(6);
+        scalarMax = 1;
+        flashHint(p.note);
+      }
+    }
+    function presetById(id){ return PRESETS.find(p=>p.id===id) || PRESETS[1]; }
+
+    // palette select
+    for (const k in PALETTES){
+      const o = document.createElement('option');
+      o.value = k; o.textContent = PALETTES[k].name;
+      palEl.appendChild(o);
+    }
+    palEl.value = cfg.palette;
+    palEl.addEventListener('change', ()=>{ cfg.palette = palEl.value; simDirty=true; save(); });
+
+    feedEl.addEventListener('input', ()=>{ cfg.feed=+feedEl.value; cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    killEl.addEventListener('input', ()=>{ cfg.kill=+killEl.value; cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    duEl.addEventListener('input',   ()=>{ cfg.du=+duEl.value;   cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    dvEl.addEventListener('input',   ()=>{ cfg.dv=+dvEl.value;   cfg.preset='custom'; highlightPreset(); syncReadouts(); save(); });
+    brushEl.addEventListener('input',()=>{ cfg.brush=+brushEl.value; brushOut.textContent=cfg.brush; save(); });
+    threshEl.addEventListener('input',()=>{ cfg.thresh=+threshEl.value; threshOut.textContent=threshVal().toFixed(2); simDirty=true; save(); });
+    sliceEl.addEventListener('input',()=>{ cfg.slice=+sliceEl.value; sliceOut.textContent=cfg.slice>=100?'off':Math.round((cfg.slice/100)*GD)+'z'; simDirty=true; save(); });
+
+    // paint / erase
+    const btnPaint=el('btnPaint'), btnErase=el('btnErase');
+    function syncPaintMode(){
+      const seed = cfg.paintMode==='seed';
+      btnPaint.classList.toggle('btn-on', seed);
+      btnErase.classList.toggle('btn-on', !seed);
+    }
+    btnPaint.addEventListener('click', ()=>{ cfg.paintMode='seed'; syncPaintMode(); save(); });
+    btnErase.addEventListener('click', ()=>{ cfg.paintMode='erase'; syncPaintMode(); save(); });
+
+    // transport
+    const btnPause=el('btnPause');
+    function togglePause(){ cfg.paused=!cfg.paused; btnPause.textContent=cfg.paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on',cfg.paused); save(); }
+    btnPause.addEventListener('click', togglePause);
+    el('btnReset').addEventListener('click', ()=>{ stillPool(); scalarMax=1; flashHint('the pool is still again.'); });
+    el('btnSeed').addEventListener('click', ()=>{ scatterSeeds(); markFirstSeed(); });
+    el('btnRecenter').addEventListener('click', ()=>{ cam.radius=G*1.85; cam.theta=Math.PI*0.28; cam.phi=1.08; cam.target.set(0,0,0); });
+
+    // flow speed (iterations per sim tick)
+    const SPEEDS = [ {n:'languid', v:3}, {n:'brisk', v:6}, {n:'rushing', v:10} ];
+    const btnSpeed=el('btnSpeed');
+    function speedIndex(){ let i = SPEEDS.findIndex(s=>s.v===cfg.speed); return i<0?1:i; }
+    function syncSpeed(){ btnSpeed.textContent = '↯ flow: ' + SPEEDS[speedIndex()].n; }
+    btnSpeed.addEventListener('click', ()=>{ const i=(speedIndex()+1)%SPEEDS.length; cfg.speed=SPEEDS[i].v; syncSpeed(); save(); });
+
+    // motion calm
+    const btnReduce=el('btnReduce');
+    function syncReduce(){ btnReduce.classList.toggle('btn-on', cfg.reduced); btnReduce.textContent = cfg.reduced?'◐ motion: calm':'◐ motion: full'; applyReduce(); }
+    btnReduce.addEventListener('click', ()=>{ cfg.reduced=!cfg.reduced; syncReduce(); save(); });
+    function applyReduce(){
+      const host = el('embers');
+      if (cfg.reduced){ host.innerHTML=''; const fog=document.querySelector('.fog'); if(fog) fog.style.animation='none'; }
+      else { const fog=document.querySelector('.fog'); if(fog) fog.style.animation=''; buildEmbers(); }
+    }
+
+    // keyboard
+    window.addEventListener('keydown', (e)=>{
+      if (/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'')) return;
+      const k = e.key.toLowerCase();
+      if (e.code==='Space'){ e.preventDefault(); togglePause(); }
+      else if (k==='r'){ stillPool(); scalarMax=1; flashHint('the pool is still again.'); }
+      else if (k==='s'){ scatterSeeds(); markFirstSeed(); }
+      else if (k==='e'){ cfg.paintMode = cfg.paintMode==='erase'?'seed':'erase'; syncPaintMode(); save(); }
+      else if (k==='['){ cfg.brush=Math.max(1,cfg.brush-1); syncSliders(); syncReadouts(); save(); }
+      else if (k===']'){ cfg.brush=Math.min(9,cfg.brush+1); syncSliders(); syncReadouts(); save(); }
+    });
+
+    // hint helper
+    const hintEl=el('hint'); const defaultHint=hintEl.textContent;
+    let hintTimer=null, seeded=false;
+    function flashHint(msg){
+      hintEl.textContent=msg; hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer=setTimeout(()=>{ hintEl.classList.remove('flicker'); hintEl.textContent = seeded ? 'space stills time · e erases · [ ] resize brush · slice z to see inside' : defaultHint; }, 3000);
+    }
+    function markFirstSeed(){ if(!seeded){ seeded=true; hintEl.textContent='space stills time · e erases · [ ] resize brush · slice z to see inside'; } }
+
+    // ========================================================================
+    //  MAIN LOOP — sim ticks decoupled from render frames
+    // ========================================================================
+    let simAccum=0, lastT=performance.now();
+    let simDirty=true;
+    let fpsAccum=0, fpsFrames=0;
+    let colorClock=0;
+
+    function loop(now){
+      requestAnimationFrame(loop);
+      let dt = now - lastT; lastT = now;
+      if (dt>120) dt=120;
+
+      // advance simulation in fixed ticks; each tick runs `speed` Gray-Scott
+      // iterations. capped to avoid the spiral of death.
+      if (!cfg.paused){
+        simAccum += dt;
+        let ticks=0;
+        while (simAccum >= SIM_DT && ticks<3){
+          const iters = cfg.speed;
+          for (let s=0;s<iters;s++) step();
+          simAccum -= SIM_DT; ticks++;
+        }
+      } else simAccum=0;
+
+      pulse += (cfg.reduced?0:dt*0.003);
+
+      // rebuild the instanced surface only when the field changed, or to refresh
+      // the living shimmer (throttled to ~16Hz while paused/idle).
+      if (simDirty){ rebuildInstances(); simDirty=false; colorClock=now; }
+      else if (!cfg.reduced && now-colorClock > 60){ rebuildInstances(); colorClock=now; }
+
+      // idle auto-drift of the chamber (reduced-motion safe)
+      if (!cfg.reduced && !drag.active) cam.theta += dt*0.00006;
+
+      applyCamera();
+      renderer.render(scene, camera);
+
+      fpsFrames++; fpsAccum+=dt;
+      if (fpsAccum>=500){
+        const f=Math.round(fpsFrames*1000/fpsAccum);
+        window.__poolFPS=f; el('fpsOut').textContent=f; el('countOut').textContent=liveCount;
+        fpsFrames=0; fpsAccum=0;
+      }
+    }
+
+    // ========================================================================
+    //  BOOT
+    // ========================================================================
+    try { makeRenderer(); }
+    catch(err){ el('fatal').style.display='flex'; console.error(err); return; }
+
+    // restore UI state
+    palEl.value = cfg.palette;
+    if (cfg.preset && cfg.preset !== 'custom'){ paramsToSliders(presetById(cfg.preset)); }
+    syncSliders(); syncReadouts(); syncPaintMode(); syncSpeed(); syncReduce(); highlightPreset();
+    btnPause.textContent=cfg.paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on',cfg.paused);
+
+    // wake the pool with the current regime so the first frame already lives
+    stillPool();
+    (function firstBloom(){
+      const p = (cfg.preset && cfg.preset!=='custom') ? presetById(cfg.preset) : presetById('mitosis');
+      presetNote.textContent = p.note;
+      seedBlob(GW>>1, GH>>1, GD>>1, 4, 0.95);
+      scatterSeeds(7);
+    })();
+
+    applyCamera();
+    requestAnimationFrame(loop);
+
+    window.addEventListener('beforeunload', save);
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); });
+
+    // ========================================================================
+    //  read-only console handle (the ghost keeps no secrets) — also drives the
+    //  headless verification harness.
+    // ========================================================================
+    window.reactionPool3D = {
+      get cells(){ return liveCount; },
+      get instances(){ return inst.count; },
+      get fps(){ return window.__poolFPS||0; },
+      get paused(){ return cfg.paused; },
+      get dims(){ return {GW,GH,GD}; },
+      get params(){ return {f:feedVal(),k:killVal(),Du:duVal(),Dv:dvVal()}; },
+      get preset(){ return cfg.preset; },
+      // sum / max of the V field — proves the reaction is actually evolving
+      stats(){ let sum=0,mx=0; for(let i=0;i<N;i++){ const v=V[i]; sum+=v; if(v>mx)mx=v; } return {sum,max:mx}; },
+      _seed(){ stillPool(); seedBlob(GW>>1,GH>>1,GD>>1,4,0.95); scatterSeeds(7); rebuildInstances(); return liveCount; },
+      _still(){ stillPool(); rebuildInstances(); return liveCount; },
+      _preset(id){ const p=presetById(id); applyPreset(p,true); return cfg.preset; },
+      _step(k){ for(let j=0;j<(k||1);j++) step(); rebuildInstances(); return liveCount; },
+      _paint(x,y,z,r){ seedBlob(x|0,y|0,z|0,r||cfg.brush,0.92); rebuildInstances(); return liveCount; },
+      _orbit(dt,dp){ cam.theta+=dt||0; cam.phi+=dp||0; clampPhi(); applyCamera(); return {theta:cam.theta,phi:cam.phi}; },
+      _zoom(f){ cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*(f||1))); applyCamera(); return cam.radius; }
+    };
+
+    // ===== ambient embers (capped, reduced-motion-safe) =====
+    function buildEmbers(){
+      if (reduceMQ.matches || cfg.reduced) return;
+      const host=el('embers'); host.innerHTML='';
+      for (let i=0;i<6;i++){
+        const e=document.createElement('div'); e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*18)+'s';
+        e.style.animationDuration=(15+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    }
+    buildEmbers();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){ const h=new Date().getHours(); if(h>=0&&h<3){ const w=el('nightWhisper'); if(w) w.style.display='block'; } })();
+
+    // ===== easter egg: type "prizrak" → the watcher stirs a scroll-wave =====
+    (function(){
+      let buf='';
+      window.addEventListener('keydown',(ev)=>{
+        if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=el('ghostLine'); if(g){ g.style.display='block'; g.classList.add('flicker'); }
+          applyPreset(presetById('spirals'), false);
+          stillPool();
+          // an asymmetric seed + a cleared notch births a rotating 3D scroll-wave
+          seedBlob(GW>>1, GH>>1, GD>>1, 5, 0.95);
+          for (let z=GD>>1; z<GD; z++) for (let y=GH>>1; y<(GH>>1)+8; y++){
+            const i=idx(GW>>1, y, z); if(inB(GW>>1,y,z)){ V[i]=0; U[i]=1; }
+          }
+          scalarMax=1; simDirty=true;
+          flashHint('the watcher stirs the water. a scroll-wave wakes.');
+        }
+      });
+    })();
+
+    // ===== easter egg: triple-click the title → one extra ember + a seed bloom =====
+    (function(){
+      const t=el('appTitle'); if(!t) return;
+      t.addEventListener('click',(ev)=>{
+        if (ev.detail===3){
+          const m=7;
+          seedBlob(m+((Math.random()*(GW-2*m))|0), m+((Math.random()*(GH-2*m))|0), m+((Math.random()*(GD-2*m))|0), 3, 0.92);
+          if (!reduceMQ.matches && !cfg.reduced){
+            const e=document.createElement('div'); e.className='ember';
+            e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='13s';
+            el('embers').appendChild(e); setTimeout(()=>e.remove(),13000);
+          }
+        }
+      });
+    })();
+
+    // ===== idle 60s → the watcher leans in (reduced-motion gated) =====
+    let idleTimer=null;
+    function lastInteract(){
+      const line=el('idleLine'); if(line) line.style.opacity='0';
+      clearTimeout(idleTimer);
+      if (reduceMQ.matches) return;
+      idleTimer=setTimeout(()=>{
+        if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+          setTimeout(()=>{ if(line) line.style.opacity='0'; },6000); }
+      },60000);
+    }
+    ['mousemove','keydown','click','wheel','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev,lastInteract,{passive:true}));
+    lastInteract();
+
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change',(e)=>{ cfg.reduced=e.matches; syncReduce(); save(); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

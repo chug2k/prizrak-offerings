@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Karst Spring · Vault | Prízrak</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- THREE.js r128 — UMD build, exposes a global `THREE`. No ES modules / importmaps. (same pinned tag as the sibling) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root{
+      --bg:#08090b;
+      --bg-raised:#101216;
+      --bg-sunk:#0a0c0f;
+      --line:#1f242b;
+      --line-soft:#161a20;
+      --ink:#c9d2d8;
+      --ink-dim:#6c7780;
+      --ink-ghost:#2c343b;
+      --accent:#22d3ee;            /* cyan — the spring's lead */
+      --accent-deep:#0e7490;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ background:var(--bg); height:100%; margin:0; padding:0; overflow:hidden; }
+    body{
+      color:var(--ink);
+      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      overscroll-behavior:none; -webkit-user-select:none; user-select:none;
+      touch-action:none;
+    }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    #stage{ position:fixed; inset:0; z-index:0; }
+    #scene{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+    #scene.planting{ cursor:cell; }
+    #scene.orbiting{ cursor:move; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 82%, transparent);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .label{ color:var(--ink-dim); font-size:0.62rem; text-transform:uppercase; letter-spacing:0.18em; }
+    .num{ color:var(--accent); }
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 70%, transparent);
+      cursor:pointer; font-family:inherit;
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    /* ===== ambient motion vocabulary (mirrors the siblings) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 34s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.45}100%{transform:translateY(-92vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 16s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.86;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 7s steps(1) infinite}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:4;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* header, floating top-left */
+    header{ position:fixed; top:0; left:0; z-index:3; padding:18px 20px; pointer-events:none; }
+    header h1{ font-size:1.5rem; font-weight:600; color:#fff; margin:4px 0 0; }
+    header p{ font-size:11px; margin:5px 0 0; max-width:19rem; color:var(--ink-dim); line-height:1.55; }
+
+    /* the bench of controls, floating bottom */
+    .bench-wrap{ position:fixed; bottom:0; left:0; right:0; z-index:3; padding:10px 12px 14px; display:flex; justify-content:center; pointer-events:none; }
+    .bench{ pointer-events:auto; width:100%; max-width:62rem; border-radius:16px; padding:12px 14px; }
+
+    .transport{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-bottom:11px; }
+    .transport .btn{ border-radius:9px; padding:6px 11px; font-size:11px; }
+
+    .sliders{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+    .sliders .slabel{ display:flex; justify-content:space-between; margin-bottom:6px; }
+    .sliders input[type=range]{ width:100%; height:6px; border-radius:99px; appearance:none; -webkit-appearance:none; background:var(--bg-sunk); border:1px solid var(--line-soft); cursor:pointer; }
+
+    .hintrow{ margin-top:11px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    #hint{ font-size:10px; color:var(--ink-ghost); line-height:1.4; }
+    #seed{ font-size:10px; border-radius:7px; padding:5px 10px; white-space:nowrap; }
+
+    /* caption — the spring speaks */
+    .speak{ position:fixed; left:20px; bottom:188px; z-index:3; pointer-events:none; }
+    #caption{ font-size:12px; letter-spacing:.05em; color:var(--accent); text-shadow:0 0 12px var(--glow); transition:opacity .6s ease; }
+
+    /* whispers top-right */
+    .whispers{ position:fixed; top:14px; right:16px; z-index:3; text-align:right; pointer-events:none; }
+    .whispers p{ font-size:10px; margin:3px 0 0; color:var(--ink-ghost); }
+    #ageLine{ color:var(--ink-dim); }
+    #idleLine{ opacity:0; transition:opacity 1.2s ease; }
+
+    /* fatal */
+    #fatal{ display:none; position:fixed; inset:0; z-index:9; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; padding:24px; background:color-mix(in srgb, var(--bg) 92%, transparent); }
+    #fatal .label{ margin-bottom:4px; }
+    #fatal h2{ font-size:clamp(1.4rem,5vw,1.9rem); font-weight:600; color:#fff; margin:8px 0; }
+    #fatal p{ font-size:13px; max-width:30rem; color:var(--ink-dim); line-height:1.6; }
+
+    @media (max-width:820px){
+      .sliders{ grid-template-columns:repeat(1,1fr); gap:10px; }
+      header p{ display:none; }
+      .speak{ bottom:240px; }
+      .hintrow{ flex-wrap:wrap; }
+    }
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the cavern itself -->
+  <div id="stage"><canvas id="scene" aria-label="A generative 3D limestone cavern where mineral formations slowly grow."></canvas></div>
+
+  <!-- header -->
+  <header>
+    <div class="mono label flicker">prízrak / offerings — instrument 27 — accretion · vault</div>
+    <h1 id="appTitle" class="h1-glow breathe" style="pointer-events:auto;cursor:default;display:inline-block">The Karst Spring · Vault</h1>
+    <p>Water and mineral negotiate stone, in real depth. Stalactites descend, stalagmites rise to meet them. Nothing here is graded. It simply continues, with or without you.</p>
+  </header>
+
+  <!-- caption -->
+  <div class="speak"><span id="caption" class="mono">the stone is patient</span></div>
+
+  <!-- whispers -->
+  <div class="whispers">
+    <p id="ageLine" class="mono">age 0</p>
+    <p id="nightWhisper" class="mono" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono" style="display:none">still here. still listening to the drip.</p>
+  </div>
+
+  <!-- bench -->
+  <div class="bench-wrap">
+    <div class="bench glass">
+      <div class="transport">
+        <button id="btnPause" class="btn mono" title="space">⏸ pause</button>
+        <button id="btnNew" class="btn mono" title="n — a new, bare cavern">⁂ new spring</button>
+        <button id="btnReduce" class="btn mono" title="r — calm the chrome">◐ motion: full</button>
+        <button id="btnReset" class="btn mono" title="re-center the view">⌖ recenter</button>
+        <div style="flex:1"></div>
+        <div class="mono label" style="align-self:center">forms <span id="countOut" class="num">0</span> · <span id="fpsOut" class="num">—</span> fps</div>
+      </div>
+
+      <div class="sliders">
+        <div>
+          <div class="slabel"><span class="mono label">flow rate</span><span id="flowOut" class="mono num" style="font-size:11px">42%</span></div>
+          <input type="range" id="flow" min="0" max="100" value="42">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">mineral saturation</span><span id="mineralOut" class="mono num" style="font-size:11px">55%</span></div>
+          <input type="range" id="mineral" min="0" max="100" value="55">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">temperature</span><span id="tempOut" class="mono num" style="font-size:11px">cool</span></div>
+          <input type="range" id="temp" min="0" max="100" value="38">
+        </div>
+      </div>
+
+      <div class="hintrow">
+        <p id="hint" class="mono">click the ceiling to plant a drip · drag to guide the flow · right-drag (two-finger) turns the cave · scroll zooms</p>
+        <p id="seed" class="btn mono" title="let it forget">⌫ let it forget</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebGL failure -->
+  <div id="fatal">
+    <div class="mono label">prízrak / instrument 27</div>
+    <h2 class="h1-glow">the cave will not open</h2>
+    <p>This spring needs WebGL, and your browser will not open the way down. Try a current Chrome, Firefox, Safari, or Edge — then the stone can keep its own time.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // ========================================================================
+    //  WEBGL GUARD
+    // ========================================================================
+    function webglOK(){
+      try {
+        const c = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch(e){ return false; }
+    }
+    if (typeof THREE === 'undefined' || !webglOK()){
+      document.getElementById('fatal').style.display='flex';
+      return;
+    }
+
+    const KEY = 'karst-spring-3d-v1';
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const el = id => document.getElementById(id);
+
+    // ========================================================================
+    //  SEEDED PRNG (mulberry32) — the cavern's shape is deterministic from a seed
+    // ========================================================================
+    function makeRng(seed){
+      let a = seed >>> 0;
+      return function(){
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function newSeed(){ return (Math.random() * 4294967296) >>> 0; }
+
+    // ========================================================================
+    //  WORLD GEOMETRY — a chamber. y is up. caverns span roughly -CW..CW etc.
+    // ========================================================================
+    const CW = 46;          // half-width  (x)
+    const CD = 46;          // half-depth  (z)
+    const CEIL = 30;        // ceiling height (y)
+    const FLOOR = -22;      // floor base   (y)
+    const MAX_FORMATIONS = 240;   // soft cap on stalactites+stalagmites+columns
+    const MAX_SOURCES = 22;       // drip sources hanging from the ceiling
+    const SIM_HZ = 30;            // accretion ticks per second (decoupled from render)
+    const SIM_DT = 1000 / SIM_HZ;
+
+    // ========================================================================
+    //  STATE (persisted)
+    // ========================================================================
+    const params = { flow:42, mineral:55, temp:38 };
+    let seed = newSeed();
+    let rng = makeRng(seed);
+    let age = 0;            // accretion ticks — the spring's memory of time
+    let paused = false;
+    let reduced = reduceMQ.matches;
+
+    // ========================================================================
+    //  THREE.JS SETUP
+    // ========================================================================
+    const canvas = el('scene');
+    let renderer, scene, camera, ambient, keyLight, fillLight, springLight, pointGlow;
+    let stoneMat, mineralMat, wetMat, poolMat, sourceMat;
+    let ceilingMesh, floorMesh;
+    let formationGroup, sourceGroup, ripplePool;
+    let poolMesh, poolGeo, poolBase;
+    let dripInst;          // InstancedMesh of falling water drops (cheap)
+
+    function makeRenderer(){
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+      renderer.setClearColor(0x070b0f, 1);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+      scene = new THREE.Scene();
+      // light fog for depth, but thin enough that the far walls don't vanish into murk
+      scene.fog = new THREE.FogExp2(0x070b0f, 0.0052);
+
+      camera = new THREE.PerspectiveCamera(56, 1, 0.1, 4000);
+
+      ambient = new THREE.AmbientLight(0x2c3a44, 0.85);
+      scene.add(ambient);
+      // cold key light raking from above — carves the limestone
+      keyLight = new THREE.DirectionalLight(0xcfe6ee, 1.0);
+      keyLight.position.set(0.5, 1.0, 0.35);
+      scene.add(keyLight);
+      // a second key from the other side so formations are modelled all round
+      fillLight = new THREE.DirectionalLight(0x5b7d92, 0.55);
+      fillLight.position.set(-0.6, 0.5, -0.6);
+      scene.add(fillLight);
+      // the spring's one living cyan light, hovering over the pool — the room's heart
+      springLight = new THREE.PointLight(0x22d3ee, 2.2, 170, 1.5);
+      springLight.position.set(0, FLOOR + 8, 0);
+      scene.add(springLight);
+      // a deeper teal glow pooled low to anchor the eye on the water
+      pointGlow = new THREE.PointLight(0x0e9bb0, 1.1, 120, 1.8);
+      pointGlow.position.set(0, FLOOR + 3, 0);
+      scene.add(pointGlow);
+
+      buildMaterials();
+      buildShell();
+      buildPool();
+      buildDripInstances();
+
+      formationGroup = new THREE.Group(); scene.add(formationGroup);
+      sourceGroup = new THREE.Group(); scene.add(sourceGroup);
+      ripplePool = new THREE.Group(); scene.add(ripplePool);
+
+      resize();
+      window.addEventListener('resize', resize);
+    }
+
+    function resize(){
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    function buildMaterials(){
+      // limestone — pale enough to catch the raking key light and read as carved stone
+      stoneMat   = new THREE.MeshStandardMaterial({ color:0x5a6470, roughness:0.92, metalness:0.03, flatShading:true });
+      // mineral formations — brighter, faintly self-lit so stalactites glow in the dark
+      mineralMat = new THREE.MeshStandardMaterial({ color:0x8a99a4, roughness:0.6, metalness:0.06, emissive:0x12454f, emissiveIntensity:0.5, flatShading:true });
+      // a fused column reads wetter and brighter
+      wetMat     = new THREE.MeshStandardMaterial({ color:0xa6c0c8, roughness:0.28, metalness:0.12, emissive:0x1a5a66, emissiveIntensity:0.75 });
+      sourceMat  = new THREE.MeshBasicMaterial({ color:0x22d3ee, transparent:true, opacity:0.55 });
+    }
+
+    // ---- the cavern shell: a displaced ceiling and floor from seeded noise + 4 walls ----
+    const NOISE_SEGS = 40;
+    function noise2(x, z, s){
+      // cheap layered value-ish noise, deterministic in seed s
+      return Math.sin(x*0.18 + s*0.013) * Math.cos(z*0.16 + s*0.021) * 0.5
+           + Math.sin(x*0.46 + z*0.31 + s*0.007) * 0.28
+           + Math.cos(x*0.91 - z*0.55 + s*0.003) * 0.14;
+    }
+    function ceilingHeightAt(x, z){
+      // distance DOWN from CEIL (returns a y value). lower (toward floor) where pocketed.
+      return CEIL - 1.2 - (noise2(x, z, seed) + 1) * 3.2 - Math.abs(noise2(x*0.5, z*0.5, seed^0x9e37)) * 2.5;
+    }
+    function floorHeightAt(x, z){
+      // a y value for the floor surface (bumpy bed)
+      return FLOOR + 0.8 + (noise2(x, z, seed^0x51ed) + 1) * 2.4 + Math.abs(noise2(x*0.7, z*0.6, seed^0x2545)) * 1.8;
+    }
+
+    function displacedPlane(which){
+      const geo = new THREE.PlaneGeometry(CW*2, CD*2, NOISE_SEGS, NOISE_SEGS);
+      geo.rotateX(-Math.PI/2); // lie flat in xz, normal +y
+      const pos = geo.attributes.position;
+      for (let i=0;i<pos.count;i++){
+        const x = pos.getX(i), z = pos.getZ(i);
+        const y = which==='ceiling' ? ceilingHeightAt(x,z) : floorHeightAt(x,z);
+        pos.setY(i, y);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    let wallGroup;
+    function buildShell(){
+      if (ceilingMesh){ scene.remove(ceilingMesh); ceilingMesh.geometry.dispose(); }
+      if (floorMesh){ scene.remove(floorMesh); floorMesh.geometry.dispose(); }
+      if (wallGroup){ scene.remove(wallGroup); }
+
+      const ceilGeo = displacedPlane('ceiling');
+      ceilingMesh = new THREE.Mesh(ceilGeo, stoneMat);
+      ceilingMesh.scale.y = -1;               // flip so the lit faces point down into the room
+      ceilingMesh.renderOrder = 0;
+      scene.add(ceilingMesh);
+
+      const floorGeo = displacedPlane('floor');
+      floorMesh = new THREE.Mesh(floorGeo, stoneMat);
+      scene.add(floorMesh);
+
+      // four enclosing walls (dark, just to bound the void) + flowstone sheets accrete on them
+      wallGroup = new THREE.Group();
+      const wallMat = new THREE.MeshStandardMaterial({ color:0x343f49, roughness:1.0, metalness:0.0, side:THREE.DoubleSide, flatShading:true });
+      const mkWall = (w,h,px,py,pz,ry)=>{
+        const g = new THREE.PlaneGeometry(w,h,12,8);
+        // jitter the wall so it isn't a flat slab
+        const p=g.attributes.position;
+        for (let i=0;i<p.count;i++){ p.setZ(i, p.getZ(i) + (Math.sin(p.getX(i)*0.5+seed)*0.6 + Math.cos(p.getY(i)*0.4)*0.5)); }
+        g.computeVertexNormals();
+        const m = new THREE.Mesh(g, wallMat);
+        m.position.set(px,py,pz); m.rotation.y=ry;
+        wallGroup.add(m);
+      };
+      const H = CEIL - FLOOR + 8, midY = (CEIL+FLOOR)/2;
+      mkWall(CW*2, H, 0, midY, -CD, 0);
+      mkWall(CW*2, H, 0, midY,  CD, Math.PI);
+      mkWall(CD*2, H, -CW, midY, 0, Math.PI/2);
+      mkWall(CD*2, H,  CW, midY, 0, -Math.PI/2);
+      scene.add(wallGroup);
+    }
+
+    // ---- the spring pool: a translucent water surface that ripples ----
+    function buildPool(){
+      poolGeo = new THREE.PlaneGeometry(CW*1.7, CD*1.7, 32, 32);
+      poolGeo.rotateX(-Math.PI/2);
+      poolBase = FLOOR + 3.2;
+      poolMat = new THREE.MeshStandardMaterial({
+        color:0x0a2730, roughness:0.12, metalness:0.45,
+        transparent:true, opacity:0.78,
+        emissive:0x062a33, emissiveIntensity:0.45
+      });
+      poolMesh = new THREE.Mesh(poolGeo, poolMat);
+      poolMesh.position.y = poolBase;
+      scene.add(poolMesh);
+    }
+
+    // ---- falling drops as a single InstancedMesh (perf) ----
+    const MAX_DROPS = 260;
+    const _dm = new THREE.Matrix4();
+    const _dq = new THREE.Quaternion();
+    const _dp = new THREE.Vector3();
+    const _ds = new THREE.Vector3(1,1,1);
+    function buildDripInstances(){
+      const g = new THREE.SphereGeometry(0.42, 6, 5);
+      const m = new THREE.MeshBasicMaterial({ color:0x6fe9ff, transparent:true, opacity:0.9 });
+      dripInst = new THREE.InstancedMesh(g, m, MAX_DROPS);
+      dripInst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      dripInst.count = 0;
+      dripInst.frustumCulled = false;
+      scene.add(dripInst);
+    }
+
+    // ========================================================================
+    //  SIMULATION DATA
+    //  sources  — drip points on the ceiling; each grows a stalactite below it
+    //             and feeds a stalagmite directly under it on the floor.
+    //  drops    — falling water motes (visual + trigger ripples / deposition)
+    //  ripples  — expanding rings on the pool
+    //  Formations are real meshes (cones) whose target length grows; we scale
+    //  their geometry by adjusting a stored length and rebuilding lazily.
+    // ========================================================================
+    let sources = [];     // {x,z, ceilY, floorY, stalactite:{mesh,len,girth}, stalagmite:{mesh,len,girth}, rate, phase, wob}
+    let drops = [];        // {x,y,z, vy, srcRef}
+    let ripples = [];      // {mesh, r, max, a}
+    let wallFlow = [];     // flowstone sheets {mesh, grow}
+
+    const _cone = new THREE.ConeGeometry(1, 1, 7, 1, true);
+
+    function makeFormationMesh(material){
+      const m = new THREE.Mesh(_cone, material);
+      m.matrixAutoUpdate = true;
+      return m;
+    }
+
+    // shape a stalactite: apex at ceiling, point hanging down. length L, girth G.
+    function shapeStalactite(mesh, x, ceilY, L, G){
+      mesh.scale.set(G, Math.max(0.001, L), G);
+      mesh.position.set(x.x, ceilY - L/2, x.z);
+      mesh.rotation.set(Math.PI, 0, 0); // tip points down
+    }
+    // stalagmite: base on floor, point rising up. length L, girth G.
+    function shapeStalagmite(mesh, x, floorY, L, G){
+      mesh.scale.set(G, Math.max(0.001, L), G);
+      mesh.position.set(x.x, floorY + L/2, x.z);
+      mesh.rotation.set(0, 0, 0); // tip points up
+    }
+
+    function addSource(x, z, fromRng){
+      if (sources.length >= MAX_SOURCES) return null;
+      const r = fromRng || rng;
+      const ceilY = ceilingHeightAt(x, z);
+      const floorY = floorHeightAt(x, z);
+      const pos = { x, z };
+      const stalactite = makeFormationMesh(mineralMat);
+      const stalagmite = makeFormationMesh(mineralMat);
+      shapeStalactite(stalactite, pos, ceilY, 0.001, 0.6);
+      shapeStalagmite(stalagmite, pos, floorY, 0.001, 0.9);
+      formationGroup.add(stalactite);
+      formationGroup.add(stalagmite);
+      const s = {
+        x, z, ceilY, floorY,
+        stMesh: stalactite, sgMesh: stalagmite,
+        stLen: 0.001, sgLen: 0.001,
+        rate: 0.4 + r()*0.8,
+        phase: r()*6.28,
+        wob: 0.4 + r()*0.7,
+        joined: false
+      };
+      sources.push(s);
+      return s;
+    }
+
+    function seedSources(){
+      // clear existing
+      for (const s of sources){ formationGroup.remove(s.stMesh); formationGroup.remove(s.sgMesh); }
+      sources = [];
+      const n = 5 + Math.floor(rng()*5);
+      for (let i=0;i<n;i++){
+        const x = (rng()*2-1) * CW*0.78;
+        const z = (rng()*2-1) * CD*0.78;
+        addSource(x, z);
+      }
+    }
+
+    function clearRipples(){ for (const r of ripples){ ripplePool.remove(r.mesh); r.mesh.geometry.dispose(); } ripples=[]; }
+    function clearFlow(){ for (const f of wallFlow){ scene.remove(f.mesh); f.mesh.geometry.dispose(); } wallFlow=[]; }
+
+    function freshState(newSeedVal){
+      seed = (newSeedVal===undefined) ? newSeed() : (newSeedVal>>>0);
+      rng = makeRng(seed);
+      age = 0;
+      drops = [];
+      dripInst.count = 0;
+      clearRipples();
+      clearFlow();
+      buildShell();   // regenerate cavern silhouette for the new seed
+      seedSources();
+      seedFlowstone();
+    }
+
+    // ---- flowstone sheets bleed down the walls from a few seed points ----
+    function seedFlowstone(){
+      clearFlow();
+      const sheetMat = mineralMat;
+      const n = 3 + Math.floor(rng()*4);
+      for (let i=0;i<n;i++){
+        const wall = Math.floor(rng()*4);
+        const along = (rng()*2-1);
+        const w = 6 + rng()*10;
+        const g = new THREE.PlaneGeometry(w, 1, 4, 10);
+        const mesh = new THREE.Mesh(g, sheetMat);
+        // position on a wall, hugging it
+        const inset = 0.6;
+        let px,pz,ry;
+        if (wall===0){ px = along*CW*0.8; pz = -CD+inset; ry = 0; }
+        else if (wall===1){ px = along*CW*0.8; pz = CD-inset; ry = Math.PI; }
+        else if (wall===2){ px = -CW+inset; pz = along*CD*0.8; ry = Math.PI/2; }
+        else { px = CW-inset; pz = along*CD*0.8; ry = -Math.PI/2; }
+        mesh.position.set(px, CEIL - 4, pz);
+        mesh.rotation.y = ry;
+        mesh.scale.y = 0.01;
+        scene.add(mesh);
+        wallFlow.push({ mesh, grow: 0.01, top: CEIL - 4, maxH: (CEIL-FLOOR)*0.7*(0.5+rng()*0.5), rate: 0.5+rng()*0.8 });
+      }
+    }
+
+    // ========================================================================
+    //  PERSISTENCE — seed + params + formation lengths + away-time note
+    // ========================================================================
+    function save(){
+      try{
+        const data = {
+          v:1, seed, age,
+          params:{ ...params },
+          sources: sources.map(s=>({ x:s.x, z:s.z, stLen:s.stLen, sgLen:s.sgLen, rate:s.rate, phase:s.phase, wob:s.wob })),
+          flow: wallFlow.map(f=>({ grow:f.grow })),
+          ts: Date.now()
+        };
+        localStorage.setItem(KEY, JSON.stringify(data));
+      }catch(e){}
+    }
+    let saveTimer=null; function saveSoon(){ clearTimeout(saveTimer); saveTimer=setTimeout(save, 1200); }
+
+    function load(){
+      try{
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return false;
+        const d = JSON.parse(raw);
+        if (!d || typeof d.seed!=='number') return false;
+        seed = d.seed>>>0;
+        rng = makeRng(seed ^ (d.age|0));
+        age = d.age || 0;
+        if (d.params){ params.flow=d.params.flow??42; params.mineral=d.params.mineral??55; params.temp=d.params.temp??38; }
+        buildShell();
+        // restore sources at their grown lengths
+        for (const s of sources){ formationGroup.remove(s.stMesh); formationGroup.remove(s.sgMesh); }
+        sources = [];
+        if (Array.isArray(d.sources) && d.sources.length){
+          for (const sv of d.sources){
+            const s = addSource(sv.x, sv.z);
+            if (!s) continue;
+            s.rate = sv.rate ?? s.rate; s.phase = sv.phase ?? s.phase; s.wob = sv.wob ?? s.wob;
+            s.stLen = Math.max(0.001, sv.stLen||0.001);
+            s.sgLen = Math.max(0.001, sv.sgLen||0.001);
+            applyFormation(s);
+          }
+        } else seedSources();
+        // restore flowstone
+        seedFlowstone();
+        if (Array.isArray(d.flow)){
+          for (let i=0;i<wallFlow.length && i<d.flow.length;i++){
+            wallFlow[i].grow = Math.max(0.01, d.flow[i].grow||0.01);
+            applyFlow(wallFlow[i]);
+          }
+        }
+        // memory note
+        const gap = Date.now() - (d.ts || Date.now());
+        const days = gap/86400000;
+        if (days >= 1) flashHint(`it dripped on without you for ${Math.floor(days)} day${Math.floor(days)===1?'':'s'}. the stone grew.`);
+        else if (gap > 3600000) flashHint('it kept dripping while you were gone.');
+        else if (gap > 60000) flashHint('the spring remembers. you were only briefly away.');
+        return true;
+      }catch(e){ return false; }
+    }
+
+    // ========================================================================
+    //  ACCRETION / DEPOSITION STEP
+    //  cold + high mineral => stone grows fast; heat dissolves (shrinks).
+    //  flow rate drives drip frequency. Drops fall, ripple, and deposit mineral
+    //  at the floor (broadening the stalagmite girth + raising tip).
+    // ========================================================================
+    function tipPos(s){ // bottom of the stalactite (where drops are born)
+      return s.ceilY - s.stLen;
+    }
+
+    function applyFormation(s){
+      const apexGirth = 0.5 + (params.mineral/100)*0.9 + Math.min(s.stLen,18)*0.03;
+      shapeStalactite(s.stMesh, {x:s.x,z:s.z}, s.ceilY, s.stLen, apexGirth);
+      const baseGirth = 0.9 + (params.mineral/100)*1.3 + Math.min(s.sgLen,18)*0.05;
+      shapeStalagmite(s.sgMesh, {x:s.x,z:s.z}, s.floorY, s.sgLen, baseGirth);
+      // when a stalactite and stalagmite meet, they read as a column (wet, brighter)
+      const span = s.ceilY - s.floorY;
+      const joined = (s.stLen + s.sgLen) >= span - 0.6;
+      if (joined && !s.joined){
+        s.joined = true;
+        s.stMesh.material = wetMat;
+        s.sgMesh.material = wetMat;
+      }
+    }
+
+    function applyFlow(f){
+      f.mesh.scale.y = Math.max(0.01, f.grow);
+      f.mesh.position.y = f.top - f.grow/2;
+    }
+
+    function spawnDrop(s){
+      if (drops.length >= MAX_DROPS) return;
+      drops.push({
+        x: s.x + Math.sin(age*0.04 + s.phase)*s.wob,
+        y: tipPos(s) - 0.4,
+        z: s.z + Math.cos(age*0.04 + s.phase)*s.wob*0.6,
+        vy: 0.1 + (params.flow/100)*0.25,
+        sref: s
+      });
+    }
+
+    function addRipple(x, z, strength){
+      const g = new THREE.RingGeometry(0.2, 0.5, 24);
+      g.rotateX(-Math.PI/2);
+      const m = new THREE.MeshBasicMaterial({ color:0x4fe6ff, transparent:true, opacity:0.5, side:THREE.DoubleSide });
+      const mesh = new THREE.Mesh(g, m);
+      mesh.position.set(x, poolBase + 0.05, z);
+      ripplePool.add(mesh);
+      ripples.push({ mesh, r:0.5, max: 4 + strength*7, a:0.5 });
+      if (ripples.length > 40){ const old = ripples.shift(); ripplePool.remove(old.mesh); old.mesh.geometry.dispose(); }
+    }
+
+    function step(){
+      age++;
+      const flow = params.flow/100;
+      const mineral = params.mineral/100;
+      const temp = params.temp/100;
+      // deposition lays down stone (cold + saturated water deposits mineral);
+      // dissolution carries it away (warm, hungry water eats limestone).
+      // net accretion goes NEGATIVE when warm -> the heat genuinely undoes the work.
+      const deposition = (0.006 + mineral*0.05) * (1 - temp);     // 0 at boiling, fastest when cold
+      const dissolution = 0.012 * Math.max(0, temp - 0.55);        // kicks in above "warm"
+      const accretion = deposition - dissolution;                  // can be < 0
+      const dissolving = accretion < 0;
+
+      for (const s of sources){
+        const span = s.ceilY - s.floorY;
+        // grow (or dissolve) the stalactite & stalagmite
+        s.stLen += accretion * (0.55 + flow*0.45);
+        s.sgLen += accretion * (0.40 + flow*0.50);
+        if (s.stLen < 0.001) s.stLen = 0.001;
+        if (s.sgLen < 0.001) s.sgLen = 0.001;
+        // can't pass each other by much (they fuse into a column)
+        const maxTotal = span - 0.2;
+        if (s.stLen + s.sgLen > maxTotal){
+          const over = (s.stLen + s.sgLen) - maxTotal;
+          s.stLen -= over*0.5; s.sgLen -= over*0.5;
+        }
+        applyFormation(s);
+
+        // drip spawning, driven by flow + the source's own eagerness
+        const dripChance = flow * s.rate * 0.05;
+        if (!paused && rng() < dripChance) spawnDrop(s);
+      }
+
+      // flowstone sheets accrete down the walls (cold + mineral), dissolve when warm
+      for (const f of wallFlow){
+        f.grow += accretion * f.rate * 0.9;
+        if (f.grow < 0.01) f.grow = 0.01;
+        if (f.grow > f.maxH) f.grow = f.maxH;
+        applyFlow(f);
+      }
+
+      // advance falling drops
+      const grav = 0.045 + temp*0.03;
+      for (let i=drops.length-1;i>=0;i--){
+        const d = drops[i];
+        d.vy += grav;
+        d.y -= d.vy;
+        if (d.y <= poolBase){
+          // impact: ripple + deposit a little mineral broadening the stalagmite below
+          addRipple(d.x, d.z, mineral);
+          const s = d.sref;
+          if (s && !dissolving){
+            s.sgLen += (0.02 + mineral*0.05);
+            // landed mineral also subtly thickens — handled by girth formula in applyFormation
+          }
+          drops.splice(i,1);
+        } else if (d.y < FLOOR - 4){
+          drops.splice(i,1);
+        }
+      }
+
+      // ripples expand & fade
+      for (let i=ripples.length-1;i>=0;i--){
+        const r = ripples[i];
+        r.r += 0.18; r.a -= 0.012;
+        const sc = r.r;
+        r.mesh.scale.set(sc, 1, sc);
+        r.mesh.material.opacity = Math.max(0, r.a);
+        if (r.r > r.max || r.a <= 0){
+          ripplePool.remove(r.mesh); r.mesh.geometry.dispose(); ripples.splice(i,1);
+        }
+      }
+    }
+
+    // push the drop array into the InstancedMesh
+    function syncDrops(){
+      const n = Math.min(drops.length, MAX_DROPS);
+      for (let i=0;i<n;i++){
+        const d = drops[i];
+        _dp.set(d.x, d.y, d.z);
+        _ds.set(1, 1.5, 1);   // teardrop-ish stretch
+        _dm.compose(_dp, _dq, _ds);
+        dripInst.setMatrixAt(i, _dm);
+      }
+      dripInst.count = n;
+      dripInst.instanceMatrix.needsUpdate = true;
+    }
+
+    // count "formations" for the HUD (grown stalactites + stalagmites + flow sheets)
+    function formationCount(){
+      let n = 0;
+      for (const s of sources){ if (s.stLen>0.6) n++; if (s.sgLen>0.6) n++; }
+      n += wallFlow.length;
+      return n;
+    }
+
+    // ========================================================================
+    //  PALETTE / LIGHT DRIFT — subtle slow cyan→teal drift, biased by temperature
+    // ========================================================================
+    const _tmpCol = new THREE.Color();
+    function driftPalette(t){
+      const warm = (params.temp-50)/50;             // -1..1
+      const hue = (188 + Math.sin(t*0.00015)*10 + warm*16) / 360;
+      const sat = 0.62 + Math.sin(t*0.0002)*0.08;
+      const lit = 0.5 + warm*0.05;
+      _tmpCol.setHSL(((hue%1)+1)%1, sat, lit);
+      springLight.color.copy(_tmpCol);
+      // mineral emissive gently breathes with saturation
+      mineralMat.emissiveIntensity = 0.18 + (params.mineral/100)*0.22 + Math.sin(t*0.0004)*0.04;
+      wetMat.emissiveIntensity = 0.35 + Math.sin(t*0.0005)*0.06;
+      poolMat.emissive.copy(_tmpCol).multiplyScalar(0.18);
+      // reflect the accent into CSS chrome
+      const hex = '#' + _tmpCol.getHexString();
+      document.documentElement.style.setProperty('--accent', hex);
+    }
+
+    // gentle pool surface ripple (vertex wobble) — reduced-motion safe
+    function rufflePool(t){
+      if (reduced) return;
+      const p = poolGeo.attributes.position;
+      for (let i=0;i<p.count;i++){
+        const x = p.getX(i), z = p.getZ(i);
+        const y = Math.sin(x*0.25 + t*0.0012)*0.18 + Math.cos(z*0.22 - t*0.0010)*0.18;
+        p.setY(i, y);
+      }
+      p.needsUpdate = true;
+    }
+
+    // ========================================================================
+    //  ORBIT CAMERA — self-contained spherical controller (no OrbitControls dep)
+    // ========================================================================
+    const cam = {
+      target: new THREE.Vector3(0, (CEIL+FLOOR)/2 - 1, 0),
+      radius: CW*1.9,
+      minR: 16, maxR: CW*4.5,
+      theta: Math.PI*0.25,
+      phi: 1.06
+    };
+    function clampPhi(){ const e=0.12; cam.phi = Math.max(e, Math.min(Math.PI-e, cam.phi)); }
+    function applyCamera(){
+      clampPhi();
+      const sinP=Math.sin(cam.phi);
+      camera.position.set(
+        cam.target.x + cam.radius*sinP*Math.cos(cam.theta),
+        cam.target.y + cam.radius*Math.cos(cam.phi),
+        cam.target.z + cam.radius*sinP*Math.sin(cam.theta)
+      );
+      camera.lookAt(cam.target);
+    }
+
+    // ========================================================================
+    //  INPUT — left-click ceiling = plant drip source; left-drag = guide flow
+    //  (nudges nearby sources + seeds drips); right-drag/two-finger orbit; wheel/pinch zoom
+    // ========================================================================
+    const _ray = new THREE.Raycaster();
+    const _ndc = new THREE.Vector2();
+    const drag = { mode:null, lastX:0, lastY:0, active:false, _pinch:null, moved:false, downX:0, downY:0 };
+
+    function setNDC(clientX, clientY){
+      const rect = canvas.getBoundingClientRect();
+      _ndc.x = ((clientX-rect.left)/rect.width)*2 - 1;
+      _ndc.y = -((clientY-rect.top)/rect.height)*2 + 1;
+    }
+
+    // Robust ceiling pick: intersect a horizontal math-plane near the ceiling.
+    // (The visible ceiling mesh has a flipped scale, so mesh raycasts are
+    //  winding-dependent and unreliable — a plane is exact and cheap.)
+    const _ceilPlane = new THREE.Plane(new THREE.Vector3(0,1,0), -(CEIL - 4));
+    const _floorPlane = new THREE.Plane(new THREE.Vector3(0,1,0), -(FLOOR + 3.2));
+    const _hitPt = new THREE.Vector3();
+    function withinRoom(p){ return Math.abs(p.x) <= CW && Math.abs(p.z) <= CD; }
+
+    function pickCeiling(clientX, clientY){
+      setNDC(clientX, clientY);
+      _ray.setFromCamera(_ndc, camera);
+      const hit = _ray.ray.intersectPlane(_ceilPlane, _hitPt);
+      if (hit && withinRoom(_hitPt)) return { x:_hitPt.x, z:_hitPt.z };
+      return null;
+    }
+    // intersect the pool/floor plane to guide flow
+    function pickGround(clientX, clientY){
+      setNDC(clientX, clientY);
+      _ray.setFromCamera(_ndc, camera);
+      const hit = _ray.ray.intersectPlane(_floorPlane, _hitPt);
+      if (hit && withinRoom(_hitPt)) return { x:_hitPt.x, z:_hitPt.z };
+      return null;
+    }
+
+    function plantDrip(x, z){
+      // clamp within the room
+      x = Math.max(-CW*0.9, Math.min(CW*0.9, x));
+      z = Math.max(-CD*0.9, Math.min(CD*0.9, z));
+      const s = addSource(x, z);
+      if (s){
+        // a little burst of fresh drops so the act is felt
+        for (let k=0;k<3;k++) spawnDrop(s);
+        flashHint('a new drip planted. the stone will answer, slowly.');
+        simDirty = true; saveSoon();
+      } else {
+        flashHint('the ceiling is crowded with drips already.');
+      }
+    }
+
+    function guideFlow(x, z){
+      // nudge the nearest source toward the cursor and shake a drip loose
+      if (!sources.length) return;
+      let best=null, bd=Infinity;
+      for (const s of sources){ const dx=s.x-x, dz=s.z-z; const dd=dx*dx+dz*dz; if (dd<bd){ bd=dd; best=s; } }
+      if (best && bd < 400){
+        best.x += (x-best.x)*0.04; best.z += (z-best.z)*0.04;
+        best.ceilY = ceilingHeightAt(best.x, best.z);
+        best.floorY = floorHeightAt(best.x, best.z);
+        applyFormation(best);
+        if (rng()<0.5) spawnDrop(best);
+      }
+    }
+
+    function pointer(e){ const t=(e.touches&&e.touches[0])?e.touches[0]:e; return { x:t.clientX, y:t.clientY }; }
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      const isTouch = !!e.touches;
+      let orbit = false;
+      if (isTouch) orbit = (e.touches.length>=2);
+      else orbit = (e.button===2 || e.button===1 || e.shiftKey);
+      drag.active=true; drag.moved=false;
+      const p = pointer(e);
+      drag.lastX=p.x; drag.lastY=p.y; drag.downX=p.x; drag.downY=p.y;
+      lastInteract();
+      if (orbit){ drag.mode='orbit'; canvas.classList.add('orbiting'); }
+      else { drag.mode='plant'; canvas.classList.add('planting'); }
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!drag.active) return;
+      const p = pointer(e);
+      if (drag.mode==='orbit'){
+        if (e.touches && e.touches.length>=2){
+          const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+          const dist=Math.hypot(dx,dy);
+          if (drag._pinch!=null){ const delta=drag._pinch-dist; cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*(1+delta*0.004))); }
+          drag._pinch=dist;
+        }
+        const dx=p.x-drag.lastX, dy=p.y-drag.lastY;
+        cam.theta -= dx*0.006; cam.phi -= dy*0.006; clampPhi();
+        drag.lastX=p.x; drag.lastY=p.y;
+      } else if (drag.mode==='plant'){
+        // once the pointer travels, treat as a flow-guiding drag (not a planting click)
+        if (Math.abs(p.x-drag.downX) + Math.abs(p.y-drag.downY) > 6){
+          drag.moved = true;
+          const g = pickGround(p.x, p.y);
+          if (g) guideFlow(g.x, g.z);
+        }
+      }
+      lastInteract();
+      e.preventDefault();
+    }
+    function onUp(e){
+      if (!drag.active) return;
+      const wasPlant = (drag.mode==='plant');
+      const moved = drag.moved;
+      drag.active=false; drag._pinch=null; drag.mode=null;
+      canvas.classList.remove('planting'); canvas.classList.remove('orbiting');
+      if (wasPlant && !moved){
+        // a clean click plants a drip on the ceiling above wherever the ray lands.
+        // try the ceiling plane first, then fall back to the floor/pool plane so a
+        // click anywhere inside the chamber still seeds a source.
+        const p = pointer(e.changedTouches&&e.changedTouches[0]?{touches:e.changedTouches}:e);
+        const c = pickCeiling(p.x, p.y) || pickGround(p.x, p.y);
+        if (c) plantDrip(c.x, c.z);
+        else flashHint('aim inside the cave — that is where drips are born.');
+      }
+      saveSoon();
+      e.preventDefault && e.preventDefault();
+    }
+    function onWheel(e){
+      e.preventDefault();
+      const f=Math.exp(e.deltaY*0.0012);
+      cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*f));
+      lastInteract();
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('wheel', onWheel, { passive:false });
+    canvas.addEventListener('contextmenu', e=>e.preventDefault());
+    canvas.addEventListener('touchstart', onDown, { passive:false });
+    window.addEventListener('touchmove', onMove, { passive:false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+
+    // ========================================================================
+    //  HUD WIRING
+    // ========================================================================
+    const flowEl=el('flow'), flowOut=el('flowOut');
+    const mineralEl=el('mineral'), mineralOut=el('mineralOut');
+    const tempEl=el('temp'), tempOut=el('tempOut');
+
+    function tempWord(v){ if(v<18)return'frozen'; if(v<35)return'cold'; if(v<55)return'cool'; if(v<78)return'warm'; return'hot'; }
+
+    function syncSliders(){
+      flowEl.value=params.flow; flowOut.textContent=params.flow+'%';
+      mineralEl.value=params.mineral; mineralOut.textContent=params.mineral+'%';
+      tempEl.value=params.temp; tempOut.textContent=tempWord(params.temp);
+    }
+    flowEl.addEventListener('input', ()=>{ params.flow=+flowEl.value; flowOut.textContent=params.flow+'%'; saveSoon(); });
+    mineralEl.addEventListener('input', ()=>{ params.mineral=+mineralEl.value; mineralOut.textContent=params.mineral+'%'; saveSoon(); });
+    tempEl.addEventListener('input', ()=>{ params.temp=+tempEl.value; tempOut.textContent=tempWord(params.temp); saveSoon(); });
+
+    const btnPause=el('btnPause');
+    function togglePause(){ paused=!paused; btnPause.textContent=paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on',paused); if(paused) save(); }
+    btnPause.addEventListener('click', togglePause);
+
+    el('btnNew').addEventListener('click', ()=>{ freshState(); flashHint('a new spring. the stone is bare.'); refreshCaption(); save(); });
+
+    const btnReduce=el('btnReduce');
+    function syncReduce(){ btnReduce.classList.toggle('btn-on',reduced); btnReduce.textContent=reduced?'◐ motion: calm':'◐ motion: full'; }
+    btnReduce.addEventListener('click', ()=>{ reduced=!reduced; syncReduce(); saveSoon(); });
+
+    el('btnReset').addEventListener('click', ()=>{ cam.radius=CW*1.9; cam.theta=Math.PI*0.25; cam.phi=1.06; cam.target.set(0,(CEIL+FLOOR)/2-1,0); });
+
+    el('seed').addEventListener('click', ()=>{
+      try{ localStorage.removeItem(KEY); }catch(e){}
+      freshState();
+      flashHint('the spring forgot everything. it begins again.');
+      refreshCaption();
+    });
+
+    // keyboard
+    window.addEventListener('keydown',(e)=>{
+      if (/INPUT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
+      const k=e.key.toLowerCase();
+      if (e.code==='Space'){ e.preventDefault(); togglePause(); }
+      else if (k==='n'){ freshState(); flashHint('a new spring. the stone is bare.'); refreshCaption(); save(); }
+      else if (k==='r'){ reduced=!reduced; syncReduce(); saveSoon(); }
+    });
+
+    // hint helper
+    const hintEl=el('hint'); const defaultHint=hintEl.textContent;
+    let hintTimer=null;
+    function flashHint(msg){
+      hintEl.textContent=msg; hintEl.classList.add('flicker');
+      clearTimeout(hintTimer);
+      hintTimer=setTimeout(()=>{ hintEl.classList.remove('flicker'); hintEl.textContent=defaultHint; }, 3400);
+    }
+
+    // ========================================================================
+    //  CAPTIONS — state -> terse Prízrak line
+    // ========================================================================
+    const captionEl = el('caption');
+    let lastCaption = '';
+    function pickCaption(){
+      const flow=params.flow, min=params.mineral, temp=params.temp;
+      let totalStone=0; for (const s of sources) totalStone += s.stLen + s.sgLen;
+      const dripCount = drops.length;
+      let pool;
+      if (flow>82 && min>60) pool=['the spring is overfed','too much, too fast — it floods'];
+      else if (flow<10) pool=['almost dry','the drip has nearly stopped','a long silence between drops'];
+      else if (temp>80) pool=['warm — it gives back what it built','the heat undoes the patient work'];
+      else if (temp<14) pool=['cold locks it in place','frozen patience'];
+      else if (min>78) pool=['it lays down stone with appetite','mineral wins this century'];
+      else if (min<12) pool=['clear water, leaves nothing behind','it passes through without a trace'];
+      else if (totalStone>140) pool=['old work, slow work','centuries are stacked here','the cave has been busy'];
+      else if (dripCount>40) pool=['a hundred small clocks, all dripping','the ceiling weeps'];
+      else if (totalStone<8) pool=['nothing yet, only beginning','bare stone, fresh water'];
+      else pool=['the stone is patient','drop by drop','it keeps its own time','water remembers the way down'];
+      const idx = (age >> 8) % pool.length;
+      return pool[idx];
+    }
+    function refreshCaption(){
+      const c = pickCaption();
+      if (c !== lastCaption){
+        lastCaption = c;
+        captionEl.style.opacity='0';
+        setTimeout(()=>{ captionEl.textContent=c; captionEl.style.opacity='1'; }, reduced?0:300);
+      }
+    }
+
+    // ========================================================================
+    //  MAIN LOOP — sim ticks decoupled from render frames
+    // ========================================================================
+    let simAccum=0, lastT=performance.now();
+    let simDirty=true;
+    let fpsAccum=0, fpsFrames=0, lastFps=0;
+    let uiAccum=0;
+
+    function loop(now){
+      requestAnimationFrame(loop);
+      let dt = now - lastT; lastT = now;
+      if (dt>120) dt=120;
+
+      if (!paused){
+        simAccum += dt;
+        let steps=0;
+        while (simAccum >= SIM_DT && steps<4){ step(); simAccum -= SIM_DT; steps++; }
+      } else simAccum=0;
+
+      driftPalette(now);
+      rufflePool(now);
+      syncDrops();
+
+      // idle auto-drift of the cavern (reduced-motion safe)
+      if (!reduced && !drag.active) cam.theta += dt*0.00004;
+
+      applyCamera();
+      renderer.render(scene, camera);
+
+      // periodic readouts + caption + persistence
+      fpsFrames++; fpsAccum+=dt; uiAccum+=dt;
+      if (fpsAccum>=500){ lastFps=Math.round(fpsFrames*1000/fpsAccum); window.__karstFPS=lastFps; el('fpsOut').textContent=lastFps; fpsFrames=0; fpsAccum=0; }
+      if (uiAccum>=2200){
+        uiAccum=0;
+        refreshCaption();
+        el('countOut').textContent=formationCount();
+        el('ageLine').textContent='age ' + Math.floor(age/SIM_HZ);
+        if (!paused) saveSoon();
+      }
+    }
+
+    // ========================================================================
+    //  REDUCED-MOTION STILL FALLBACK — fast-forward growth once, draw a frame
+    // ========================================================================
+    function renderStill(){
+      for (let i=0;i<800;i++) step();
+      driftPalette(performance.now());
+      syncDrops();
+      applyCamera();
+      renderer.render(scene, camera);
+      refreshCaption();
+      el('countOut').textContent=formationCount();
+      el('ageLine').textContent='age ' + Math.floor(age/SIM_HZ);
+      save();
+    }
+
+    // ========================================================================
+    //  BOOT
+    // ========================================================================
+    try { makeRenderer(); }
+    catch(err){ el('fatal').style.display='flex'; console.error(err); return; }
+
+    const restored = load();
+    if (!restored){
+      freshState();
+      flashHint('first visit. the stone is bare.');
+    }
+
+    syncSliders(); syncReduce();
+    btnPause.textContent=paused?'▶ resume':'⏸ pause';
+    refreshCaption();
+    applyCamera();
+
+    if (reduced){
+      // a single fast-forwarded frame; growth still visible, no churning animation
+      renderStill();
+      // still run a slow render loop for orbit, but skip sim unless user resumes
+      requestAnimationFrame(loop);
+    } else {
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); });
+
+    // read-only console handle (the ghost keeps no secrets) — used for verification
+    window.karstSpring3D = {
+      get formations(){ return formationCount(); },
+      get sources(){ return sources.length; },
+      get drops(){ return drops.length; },
+      get fps(){ return window.__karstFPS||0; },
+      get age(){ return age; },
+      get paused(){ return paused; },
+      get seed(){ return seed; },
+      get params(){ return { ...params }; },
+      _stoneTotal(){ let t=0; for(const s of sources) t+=s.stLen+s.sgLen; return +t.toFixed(2); },
+      _plant(x,z){ plantDrip(x==null?0:x, z==null?0:z); return sources.length; },
+      _step(k){ for(let j=0;j<(k||1);j++) step(); simDirty=true; return this._stoneTotal(); },
+      _orbit(dt,dp){ cam.theta+=dt||0; cam.phi+=dp||0; clampPhi(); return {theta:cam.theta,phi:cam.phi}; },
+      _zoom(f){ cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*(f||1))); return cam.radius; },
+      _new(){ freshState(); return sources.length; }
+    };
+
+    // ========================================================================
+    //  AMBIENT ATMOSPHERE + EASTER EGGS (mirrors the siblings)
+    // ========================================================================
+
+    // drifting embers
+    (function(){
+      if (reduceMQ.matches) return;
+      const host=el('embers');
+      for (let i=0;i<7;i++){
+        const e=document.createElement('div'); e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*16)+'s';
+        e.style.animationDuration=(13+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    })();
+
+    // night-hours whisper (00:00–03:00 local)
+    (function(){ const h=new Date().getHours(); if(h>=0&&h<3){ const w=el('nightWhisper'); if(w) w.style.display='block'; } })();
+
+    // easter egg: type "prizrak" → a constellation of fresh drips wakes on the ceiling
+    (function(){
+      let buf='';
+      window.addEventListener('keydown',(ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=el('ghostLine'); if(g){ g.style.display='block'; g.classList.add('flicker'); }
+          for (let k=0;k<5 && sources.length<MAX_SOURCES;k++){
+            const x=(Math.random()*2-1)*CW*0.7, z=(Math.random()*2-1)*CD*0.7;
+            const s=addSource(x,z); if(s){ s.stLen=1.5+Math.random()*2; applyFormation(s); spawnDrop(s); }
+          }
+          simDirty=true;
+          flashHint('the watcher breathes on the ceiling. new springs wake.');
+        }
+      });
+    })();
+
+    // easter egg: triple-click the title → an unbidden drip + a drifting ember
+    (function(){
+      const t=el('appTitle'); if(!t) return;
+      t.addEventListener('click',(ev)=>{
+        if (ev.detail===3){
+          if (sources.length){ spawnDrop(sources[Math.floor(Math.random()*sources.length)]); }
+          if (!reduceMQ.matches){
+            const e=document.createElement('div'); e.className='ember';
+            e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='12s';
+            el('embers').appendChild(e); setTimeout(()=>e.remove(),13000);
+          }
+        }
+      });
+    })();
+
+    // idle 60s → the watcher leans in (reduced-motion gated)
+    let idleTimer=null;
+    function lastInteract(){
+      const line=el('idleLine'); if(line) line.style.opacity='0';
+      clearTimeout(idleTimer);
+      if (reduceMQ.matches) return;
+      idleTimer=setTimeout(()=>{
+        if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+          setTimeout(()=>{ if(line) line.style.opacity='0'; },6000); }
+      },60000);
+    }
+    ['mousemove','keydown','click','wheel','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev,lastInteract,{passive:true}));
+    lastInteract();
+
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change',(e)=>{ reduced=e.matches; syncReduce(); saveSoon(); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>

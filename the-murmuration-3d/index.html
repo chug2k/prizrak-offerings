@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Murmuration · Vault | Prízrak</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- THREE.js r128 — UMD build, exposes a global `THREE`. No ES modules / importmaps. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --bg-raised:#111113;
+      --bg-sunk:#0d0d0f;
+      --line:#26262b;
+      --line-soft:#1a1a1d;
+      --ink:#d4cfc8;
+      --ink-dim:#7a7570;
+      --ink-ghost:#3a3530;
+      --accent:#e2b04a;            /* amber — the last light over the Tatras */
+      --accent-deep:#c8923a;
+      --glow:color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ background:var(--bg); height:100%; margin:0; padding:0; overflow:hidden; }
+    body{
+      color:var(--ink);
+      font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      overscroll-behavior:none; -webkit-user-select:none; user-select:none;
+      touch-action:none;
+    }
+    .mono{ font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    #stage{ position:fixed; inset:0; z-index:0; }
+    #scene{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+    #scene.placing{ cursor:cell; }
+    #scene.orbiting{ cursor:move; }
+
+    .glass{
+      background:color-mix(in srgb, var(--bg-raised) 80%, transparent);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);
+      box-shadow:0 0 0 1px var(--line-soft), 0 30px 80px -40px #000;
+    }
+    .well{ background:var(--bg-sunk); border:1px solid var(--line); }
+    .label{ color:var(--ink-dim); font-size:0.62rem; text-transform:uppercase; letter-spacing:0.18em; }
+    .num{ color:var(--accent); }
+    .h1-glow{ text-shadow:0 0 14px var(--glow); }
+
+    input[type="range"]{ accent-color:var(--accent); }
+
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible{
+      outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow);
+    }
+
+    .btn{
+      transition:transform .12s, box-shadow .15s, border-color .15s, color .15s, background-color .15s;
+      border:1px solid var(--line);
+      color:var(--ink-dim);
+      background:color-mix(in srgb, var(--bg-raised) 70%, transparent);
+      cursor:pointer; font-family:inherit;
+    }
+    .btn:hover{ border-color:var(--accent); color:var(--ink); }
+    .btn:active{ transform:translateY(1px); }
+    .btn-on{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+
+    .seg{ display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+    .seg button{ padding:6px 11px; font-size:11px; color:var(--ink-dim); transition:color .15s, background-color .15s; background:transparent; border:none; cursor:pointer; font-family:inherit; }
+    .seg button:hover{ color:var(--ink); }
+    .seg button.on{ color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); }
+
+    /* ===== ambient motion vocabulary (mirrors the siblings) ===== */
+    @keyframes fogDrift{0%{transform:translateX(-5%);opacity:.04}50%{opacity:.08}100%{transform:translateX(5%);opacity:.04}}
+    .fog{position:fixed;inset:-10% -10% auto;height:60vh;pointer-events:none;z-index:1;
+      background:radial-gradient(60% 50% at 50% 0,var(--glow),transparent 70%);
+      animation:fogDrift 38s ease-in-out infinite alternate}
+
+    @keyframes ember{0%{transform:translateY(0);opacity:0}10%{opacity:.5}100%{transform:translateY(-90vh);opacity:0}}
+    .ember{position:fixed;bottom:-10px;width:2px;height:2px;border-radius:50%;
+      background:var(--accent);box-shadow:0 0 6px var(--glow);pointer-events:none;z-index:1;
+      animation:ember 18s linear infinite}
+
+    @keyframes breathe{0%,100%{opacity:.85;text-shadow:0 0 8px var(--glow)}50%{opacity:1;text-shadow:0 0 18px var(--glow)}}
+    .breathe{animation:breathe 4.5s ease-in-out infinite}
+
+    @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}94%{opacity:1}97%{opacity:.7}98%{opacity:1}}
+    .flicker{animation:flicker 6s steps(1) infinite}
+
+    @keyframes captionIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .caption-in{animation:captionIn 1.1s ease-out both}
+
+    .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:4;opacity:.03;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+    /* header, floating top-left */
+    header{ position:fixed; top:0; left:0; z-index:3; padding:18px 20px; pointer-events:none; }
+    header h1{ font-size:1.5rem; font-weight:600; color:#fff; margin:4px 0 0; pointer-events:auto; cursor:default; display:inline-block; }
+    header p{ font-size:11px; margin:4px 0 0; max-width:17rem; color:var(--ink-dim); line-height:1.5; }
+    #caption{ font-size:11px; margin:12px 0 0; max-width:17rem; color:var(--accent); min-height:1.2em; line-height:1.5; }
+
+    /* the bench of controls, floating bottom */
+    .bench-wrap{ position:fixed; bottom:0; left:0; right:0; z-index:3; padding:10px 12px 14px; display:flex; justify-content:center; pointer-events:none; }
+    .bench{ pointer-events:auto; width:100%; max-width:62rem; border-radius:16px; padding:12px 14px; }
+
+    .transport{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-bottom:11px; }
+    .transport .btn{ border-radius:9px; padding:6px 11px; font-size:11px; }
+
+    .sliders{ display:grid; grid-template-columns:repeat(6,1fr); gap:14px; }
+    .sliders .slabel{ display:flex; justify-content:space-between; margin-bottom:5px; }
+    .sliders input[type=range]{ width:100%; height:6px; border-radius:99px; appearance:none; -webkit-appearance:none; background:var(--bg-sunk); border:1px solid var(--line-soft); cursor:pointer; }
+
+    .hintrow{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    #hint{ font-size:10px; color:var(--ink-ghost); line-height:1.4; }
+    #dusk{ font-size:10px; border-radius:7px; padding:5px 10px; white-space:nowrap; }
+
+    /* whispers top-right */
+    .whispers{ position:fixed; top:14px; right:16px; z-index:3; text-align:right; pointer-events:none; }
+    .whispers p{ font-size:10px; margin:3px 0 0; color:var(--ink-ghost); }
+    #idleLine{ opacity:0; transition:opacity 1.2s ease; }
+
+    /* fatal */
+    #fatal{ display:none; position:fixed; inset:0; z-index:9; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; padding:24px; background:color-mix(in srgb, var(--bg) 92%, transparent); }
+    #fatal h2{ font-size:clamp(1.4rem,5vw,1.9rem); font-weight:600; color:#fff; margin:8px 0; }
+    #fatal p{ font-size:13px; max-width:30rem; color:var(--ink-dim); line-height:1.6; }
+
+    @media (max-width:860px){
+      .sliders{ grid-template-columns:repeat(3,1fr); }
+    }
+    @media (max-width:560px){
+      .sliders{ grid-template-columns:repeat(2,1fr); }
+      header p{ display:none; }
+      .hintrow{ flex-wrap:wrap; }
+    }
+    @media (prefers-reduced-motion:reduce){
+      .fog,.ember,.breathe,.flicker,.caption-in{animation:none!important}
+      .ember{display:none}
+      .breathe,.flicker{opacity:1!important}
+    }
+  </style>
+</head>
+<body class="grain">
+
+  <div class="fog" aria-hidden="true"></div>
+  <div id="embers" aria-hidden="true"></div>
+
+  <!-- the dusk sky itself -->
+  <div id="stage"><canvas id="scene"></canvas></div>
+
+  <!-- header -->
+  <header class="select-none">
+    <div class="mono label flicker">prízrak / instrument 27 — aviary · vault</div>
+    <h1 id="appTitle" class="h1-glow breathe">The Murmuration · Vault</h1>
+    <p>A flock of jackdaws wheeling through a volume of dusk air over the High Tatras. Drag to turn the sky; scroll to fall closer. Press into the air to set a roost — or hold the bludička and watch them break.</p>
+    <p id="caption" class="caption-in">the birds gather.</p>
+  </header>
+
+  <!-- whispers -->
+  <div class="whispers">
+    <p id="nightWhisper" class="mono" style="display:none">the mountain does not sleep.</p>
+    <p id="ghostLine" class="mono" style="display:none">you found the watcher.</p>
+    <p id="idleLine" class="mono" style="display:none">still here. still watching.</p>
+  </div>
+
+  <!-- bench -->
+  <div class="bench-wrap">
+    <div class="bench glass">
+      <div class="transport">
+        <button id="btnPause" class="btn mono" title="space">⏸ pause</button>
+        <button id="btnClear" class="btn mono" title="c — disperse and regather">↺ regather</button>
+        <button id="btnTrails" class="btn mono" title="t">≈ trails</button>
+        <button id="btnReduce" class="btn mono" title="r — calm the flock">◐ motion: full</button>
+        <button id="btnReset" class="btn mono" title="re-center the view">⌖ recenter</button>
+
+        <div style="flex:1"></div>
+
+        <div class="seg mono" role="group" aria-label="tool">
+          <button id="toolRoost" class="on" title="press the air to draw the flock home — key 1">⌖ roost</button>
+          <button id="toolRaptor" title="press the air to send the bludička hunting — key 2">✦ raptor</button>
+        </div>
+        <div class="mono label" style="align-self:center; margin-left:6px">birds <span id="countOut" class="num">0</span> · <span id="fpsOut" class="num">—</span> fps</div>
+      </div>
+
+      <div class="sliders">
+        <div>
+          <div class="slabel"><span class="mono label">cohesion</span><span id="cohOut" class="mono num" style="font-size:11px">1.0</span></div>
+          <input type="range" id="cohesion" min="0" max="200" value="100">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">align</span><span id="aliOut" class="mono num" style="font-size:11px">1.0</span></div>
+          <input type="range" id="align" min="0" max="200" value="100">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">separate</span><span id="sepOut" class="mono num" style="font-size:11px">1.0</span></div>
+          <input type="range" id="separate" min="0" max="200" value="100">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">speed</span><span id="spdOut" class="mono num" style="font-size:11px">1.0×</span></div>
+          <input type="range" id="speed" min="30" max="220" value="100">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">vision</span><span id="visOut" class="mono num" style="font-size:11px">1.0×</span></div>
+          <input type="range" id="vision" min="45" max="190" value="100">
+        </div>
+        <div>
+          <div class="slabel"><span class="mono label">flock</span><span id="flkOut" class="mono num" style="font-size:11px">260</span></div>
+          <input type="range" id="flock" min="60" max="640" value="260" step="20">
+        </div>
+      </div>
+
+      <div class="hintrow">
+        <p id="hint" class="mono">drag the sky to orbit · scroll zooms · press the air for the tool you hold</p>
+        <p id="dusk" class="btn mono" title="let the night come faster">☾ hasten dusk</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebGL failure -->
+  <div id="fatal">
+    <div class="mono label">prízrak / instrument 27</div>
+    <h2 class="h1-glow">the flock will not rise</h2>
+    <p>This murmuration needs WebGL, and your browser will not open the way. Try a current Chrome, Firefox, Safari, or Edge — then the birds will wheel for you.</p>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // ========================================================================
+    //  WEBGL GUARD
+    // ========================================================================
+    function webglOK(){
+      try {
+        const c = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+      } catch(e){ return false; }
+    }
+    if (typeof THREE === 'undefined' || !webglOK()){
+      document.getElementById('fatal').style.display='flex';
+      return;
+    }
+
+    const KEY = 'murmuration-3d-v1';
+    const reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const el = id => document.getElementById(id);
+
+    // ========================================================================
+    //  PERSISTENCE
+    // ========================================================================
+    const defaults = {
+      cohesion:100, align:100, separate:100, speed:100, vision:100, flock:260,
+      trails:false, tool:'roost', reduced:reduceMQ.matches
+    };
+    let cfg = Object.assign({}, defaults);
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s==='object') cfg = Object.assign(cfg, s); } catch(e){}
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch(e){} }
+
+    // ========================================================================
+    //  WORLD VOLUME — the box of dusk air the flock lives inside
+    // ========================================================================
+    const HALF = new THREE.Vector3(120, 70, 120);   // half-extents of the viewing volume
+    const MARGIN = 28;                                // soft turn-back band near the walls
+
+    // ========================================================================
+    //  FLOCK STATE — structure-of-arrays for cache friendliness
+    // ========================================================================
+    let N = 0;
+    let px, py, pz, vx, vy, vz;      // Float32 position / velocity
+    let panic;                        // per-bird panic 0..1 (for amber flare)
+    const MAX_BIRDS = 700;
+
+    // perception radii (world units). separation tight, others wide. scaled by vision slider.
+    const BASE_SEP = 6.5, BASE_ALI = 16, BASE_COH = 22;
+    function visionScale(){ return cfg.vision/100; }
+    function rSep(){ return BASE_SEP * (0.7 + visionScale()*0.3); } // separation grows only a little
+    function rAli(){ return BASE_ALI * visionScale(); }
+    function rCoh(){ return BASE_COH * visionScale(); }
+
+    function cohW(){ return (cfg.cohesion/100) * 0.9; }
+    function aliW(){ return (cfg.align/100)    * 1.30; }
+    function sepW(){ return (cfg.separate/100) * 1.75; }
+    function maxSpeed(){ return (cfg.speed/100) * 34.0; }   // world units / sim-second
+    const MIN_SPEED_FRAC = 0.5;
+    const MAX_FORCE = 60.0;                                  // accel cap (world units / s^2)
+
+    const R_ROOST = 90;          // roost pull radius
+    const R_RAPTOR = 82;         // raptor flee radius
+    let raptorR2 = R_RAPTOR*R_RAPTOR;
+
+    // ========================================================================
+    //  3D SPATIAL HASH — grid buckets sized to the largest perception radius
+    // ========================================================================
+    let CELL = BASE_COH;
+    let gx0, gy0, gz0, gcols, grows, gdeps;   // grid origin + dims
+    let cellHeads = null;    // Int32Array head index per cell (-1 empty)
+    let cellNext  = null;    // Int32Array linked-list next per bird
+
+    function buildHash(){
+      CELL = Math.max(8, rCoh());
+      // grid spans the volume plus a generous skirt for strays
+      const minX=-HALF.x-40, minY=-HALF.y-40, minZ=-HALF.z-40;
+      const maxX= HALF.x+40, maxY= HALF.y+40, maxZ= HALF.z+40;
+      gx0=minX; gy0=minY; gz0=minZ;
+      gcols = Math.max(1, Math.ceil((maxX-minX)/CELL));
+      grows = Math.max(1, Math.ceil((maxY-minY)/CELL));
+      gdeps = Math.max(1, Math.ceil((maxZ-minZ)/CELL));
+      const nc = gcols*grows*gdeps;
+      if (!cellHeads || cellHeads.length !== nc) cellHeads = new Int32Array(nc);
+      cellHeads.fill(-1);
+      if (!cellNext || cellNext.length !== N) cellNext = new Int32Array(N);
+      for (let i=0;i<N;i++){
+        const ci = cellIndex(px[i], py[i], pz[i]);
+        cellNext[i] = cellHeads[ci];
+        cellHeads[ci] = i;
+      }
+    }
+    function clampi(v,hi){ return v<0?0:(v>=hi?hi-1:v); }
+    function cellIndex(x,y,z){
+      const cx = clampi(((x-gx0)/CELL)|0, gcols);
+      const cy = clampi(((y-gy0)/CELL)|0, grows);
+      const cz = clampi(((z-gz0)/CELL)|0, gdeps);
+      return (cz*grows + cy)*gcols + cx;
+    }
+
+    // ========================================================================
+    //  ALLOCATE / RESIZE THE FLOCK
+    // ========================================================================
+    function randSpawnInVolume(i){
+      // born in a loose cloud near the centre-upper part of the volume
+      px[i] = (Math.random()-0.5)*HALF.x*0.9;
+      py[i] = (Math.random()-0.2)*HALF.y*0.7;
+      pz[i] = (Math.random()-0.5)*HALF.z*0.9;
+      const ms = maxSpeed()*0.6;
+      const a = Math.random()*Math.PI*2, b = (Math.random()-0.5)*Math.PI;
+      vx[i] = Math.cos(a)*Math.cos(b)*ms;
+      vy[i] = Math.sin(b)*ms*0.5;
+      vz[i] = Math.sin(a)*Math.cos(b)*ms;
+      panic[i] = 0;
+    }
+    function randSpawnAtEdge(i){
+      // newcomers fly in from a face of the volume — a flock joining
+      const ms = maxSpeed()*0.7;
+      const face = (Math.random()*6)|0;
+      px[i]=(Math.random()-0.5)*2*HALF.x; py[i]=(Math.random()-0.5)*2*HALF.y; pz[i]=(Math.random()-0.5)*2*HALF.z;
+      if (face===0){ px[i]=-HALF.x; } else if (face===1){ px[i]=HALF.x; }
+      else if (face===2){ py[i]=HALF.y; } else if (face===3){ py[i]=-HALF.y; }
+      else if (face===4){ pz[i]=-HALF.z; } else { pz[i]=HALF.z; }
+      // velocity roughly toward centre
+      const inv = ms / (Math.hypot(px[i],py[i],pz[i])||1);
+      vx[i]=-px[i]*inv; vy[i]=-py[i]*inv; vz[i]=-pz[i]*inv;
+      panic[i]=0;
+    }
+
+    function allocate(n){
+      n = Math.max(60, Math.min(MAX_BIRDS, n|0));
+      N = n;
+      px=new Float32Array(n); py=new Float32Array(n); pz=new Float32Array(n);
+      vx=new Float32Array(n); vy=new Float32Array(n); vz=new Float32Array(n);
+      panic=new Float32Array(n);
+      for (let i=0;i<n;i++) randSpawnInVolume(i);
+      cellNext=null;
+      rebuildInstances();
+      updateCount();
+    }
+
+    function setFlockSize(n){
+      n = Math.max(60, Math.min(MAX_BIRDS, n|0));
+      if (n === N) return;
+      const oN=N, oPx=px,oPy=py,oPz=pz,oVx=vx,oVy=vy,oVz=vz,oPa=panic;
+      px=new Float32Array(n); py=new Float32Array(n); pz=new Float32Array(n);
+      vx=new Float32Array(n); vy=new Float32Array(n); vz=new Float32Array(n);
+      panic=new Float32Array(n);
+      for (let i=0;i<n;i++){
+        if (i<oN){ px[i]=oPx[i];py[i]=oPy[i];pz[i]=oPz[i];vx[i]=oVx[i];vy[i]=oVy[i];vz[i]=oVz[i];panic[i]=oPa[i]; }
+        else randSpawnAtEdge(i);
+      }
+      N=n; cellNext=null;
+      rebuildInstances();
+      updateCount();
+    }
+    function updateCount(){ const e=el('countOut'); if (e) e.textContent = N; }
+
+    // ========================================================================
+    //  THREE.JS SETUP
+    // ========================================================================
+    const canvas = el('scene');
+    let renderer, scene, camera;
+    let birdMesh;               // InstancedMesh of oriented "birds"
+    let watcherMesh;            // a pale lone crow (easter egg)
+    const clock = new THREE.Clock();
+
+    // dusk: 0 = dusk, 1 = full night. creeps upward over minutes.
+    let dusk = 0, duskHaste = 0;
+
+    function makeRenderer(){
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+      scene = new THREE.Scene();
+      // dusk-to-night fog gives depth; colour driven by dusk in updateSky()
+      scene.fog = new THREE.FogExp2(0x121426, 0.0042);
+
+      camera = new THREE.PerspectiveCamera(58, 1, 0.1, 4000);
+
+      const ambient = new THREE.AmbientLight(0x39406a, 0.85);
+      scene.add(ambient);
+      // a low warm key from the horizon (the last amber light) + a cool fill from the zenith
+      const key = new THREE.DirectionalLight(0xffcf8c, 0.85); key.position.set(-0.4,-0.5,0.6); scene.add(key);
+      const fill = new THREE.DirectionalLight(0x9fb0ff, 0.55); fill.position.set(0.3,0.9,-0.2); scene.add(fill);
+
+      buildSky();
+      buildStars();
+      buildVolumeFrame();
+      buildBirds();
+      buildMarkers();
+
+      resize();
+      window.addEventListener('resize', resize);
+    }
+
+    function resize(){
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w/h;
+      camera.updateProjectionMatrix();
+    }
+
+    // ---- the dusk sky: a large inward-facing gradient dome ----
+    let skyMesh, skyMat;
+    function buildSky(){
+      const geo = new THREE.SphereGeometry(1800, 32, 24);
+      // vertex shader passes world-space y for the gradient; fragment lerps dusk colours
+      skyMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide, depthWrite:false, fog:false,
+        uniforms:{
+          uDusk:{ value:0 },
+          uTop:{ value:new THREE.Color() },
+          uHorizon:{ value:new THREE.Color() },
+          uGround:{ value:new THREE.Color() }
+        },
+        vertexShader:`
+          varying vec3 vDir;
+          void main(){
+            vDir = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+          }`,
+        fragmentShader:`
+          varying vec3 vDir;
+          uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uGround;
+          void main(){
+            float h = vDir.y;                 // -1..1
+            vec3 c;
+            if (h >= 0.0){
+              c = mix(uHorizon, uTop, pow(clamp(h,0.0,1.0), 0.7));
+            } else {
+              c = mix(uHorizon, uGround, pow(clamp(-h,0.0,1.0), 0.6));
+            }
+            gl_FragColor = vec4(c, 1.0);
+          }`
+      });
+      skyMesh = new THREE.Mesh(geo, skyMat);
+      skyMesh.frustumCulled = false;
+      scene.add(skyMesh);
+    }
+    function lerp(a,b,t){ return a+(b-a)*t; }
+    function updateSky(){
+      const d = dusk;
+      // top of sky (zenith): deep indigo -> near black
+      skyMat.uniforms.uTop.value.setRGB(
+        lerp(28,5,d)/255, lerp(32,7,d)/255, lerp(60,15,d)/255);
+      // horizon glow over the Tatras: warm amber -> dim ember
+      skyMat.uniforms.uHorizon.value.setRGB(
+        lerp(196,38,d)/255, lerp(112,24,d)/255, lerp(66,30,d)/255);
+      // ground/nadir: dark mountain
+      skyMat.uniforms.uGround.value.setRGB(
+        lerp(14,3,d)/255, lerp(13,3,d)/255, lerp(20,6,d)/255);
+      skyMat.uniforms.uDusk.value = d;
+      // fog colour tracks the horizon, deepening into night
+      scene.fog.color.setRGB(
+        lerp(40,8,d)/255, lerp(34,9,d)/255, lerp(54,18,d)/255);
+      scene.fog.density = lerp(0.0030, 0.0058, d);
+    }
+
+    // ---- stars on a far shell, fading in as night deepens ----
+    let starPoints, starMat;
+    function buildStars(){
+      const n = 900;
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(n*3);
+      const R = 1500;
+      for (let i=0;i<n;i++){
+        // bias toward the upper hemisphere
+        const u = Math.random()*0.9 + 0.02;     // 0.02..0.92 (mostly above horizon)
+        const t = Math.random()*Math.PI*2;
+        const s = Math.sqrt(1-u*u);
+        pos[i*3]   = R*s*Math.cos(t);
+        pos[i*3+1] = R*u;
+        pos[i*3+2] = R*s*Math.sin(t);
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+      starMat = new THREE.PointsMaterial({ color:0xcdd2e6, size:2.2, sizeAttenuation:false, transparent:true, opacity:0, depthWrite:false });
+      starPoints = new THREE.Points(geo, starMat);
+      starPoints.frustumCulled = false;
+      scene.add(starPoints);
+    }
+
+    // ---- a faint wireframe of the viewing volume so the box reads in space ----
+    function buildVolumeFrame(){
+      const g = new THREE.BoxGeometry(HALF.x*2, HALF.y*2, HALF.z*2);
+      const edges = new THREE.EdgesGeometry(g);
+      const mat = new THREE.LineBasicMaterial({ color:0x2a2c3a, transparent:true, opacity:0.5 });
+      const frame = new THREE.LineSegments(edges, mat);
+      frame.frustumCulled = false;
+      scene.add(frame);
+      g.dispose();
+    }
+
+    // ========================================================================
+    //  BIRDS — a single InstancedMesh of small oriented cones ("chevrons")
+    // ========================================================================
+    let birdGeo;
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _pos = new THREE.Vector3();
+    const _scl = new THREE.Vector3();
+    const _fwd = new THREE.Vector3();
+    const _up  = new THREE.Vector3(0,1,0);
+    const _right = new THREE.Vector3();
+    const _trueUp = new THREE.Vector3();
+    const _rotM = new THREE.Matrix4();
+    const _col = new THREE.Color();
+
+    function buildBirds(){
+      // a flattened cone: nose along +Z, swept wings. Low-poly, cheap.
+      birdGeo = new THREE.ConeGeometry(1.0, 3.2, 4, 1);
+      birdGeo.rotateX(Math.PI/2);     // point the cone tip along +Z
+      birdGeo.scale(1.0, 0.32, 1.0);  // flatten into a winged dart
+      const mat = new THREE.MeshStandardMaterial({
+        color:0x20222c, roughness:0.85, metalness:0.0,
+        emissive:0x000000, vertexColors:false
+      });
+      rebuildInstancesInto(mat);
+    }
+    function rebuildInstancesInto(mat){
+      if (birdMesh){ scene.remove(birdMesh); birdMesh.geometry = birdMesh.geometry; birdMesh.dispose && birdMesh.dispose(); }
+      birdMesh = new THREE.InstancedMesh(birdGeo, mat || birdMesh.material, MAX_BIRDS);
+      birdMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      birdMesh.frustumCulled = false;
+      // per-instance colour so we can flare birds amber near the raptor
+      const colors = new Float32Array(MAX_BIRDS*3);
+      birdMesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
+      birdMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+      scene.add(birdMesh);
+    }
+    function rebuildInstances(){
+      if (!birdMesh) return;
+      birdMesh.count = N;
+    }
+
+    // orient a bird to its velocity, banking into turns
+    function orientInstance(i){
+      const sx=vx[i], sy=vy[i], sz=vz[i];
+      const sp = Math.hypot(sx,sy,sz) || 1e-4;
+      _fwd.set(sx/sp, sy/sp, sz/sp);
+      // build a basis: forward (+Z), with a banked up vector
+      // bank: roll proportional to horizontal turning — approximate with lateral accel sign
+      _right.crossVectors(_up, _fwd);
+      if (_right.lengthSq() < 1e-6) _right.set(1,0,0); else _right.normalize();
+      _trueUp.crossVectors(_fwd, _right).normalize();
+      _rotM.makeBasis(_right, _trueUp, _fwd);
+      _q.setFromRotationMatrix(_rotM);
+
+      _pos.set(px[i], py[i], pz[i]);
+      // size scales faintly with speed so fast birds look streaked
+      const len = 1.0 + Math.min(0.5, sp/maxSpeed()*0.5);
+      _scl.set(1, 1, len);
+      _m.compose(_pos, _q, _scl);
+      birdMesh.setMatrixAt(i, _m);
+
+      // colour: base ink darkens toward night; panic flares amber
+      const inkV = lerp(0.20, 0.10, dusk);
+      const p = panic[i];
+      const r = lerp(inkV, 0.92, p);
+      const g = lerp(inkV*0.95, 0.62, p);
+      const b = lerp(inkV*1.1, 0.22, p);
+      _col.setRGB(r,g,b);
+      birdMesh.setColorAt(i, _col);
+    }
+
+    // ========================================================================
+    //  ROOST / RAPTOR MARKERS
+    // ========================================================================
+    let roost = null;     // { pos:Vector3, life:0..1 }
+    let raptor = null;    // { pos:Vector3, target:Vector3, active:bool }
+    let roostMesh, roostGlow, raptorCore, raptorGlow, raptorRing;
+
+    function buildMarkers(){
+      // roost — a soft amber breathing orb
+      const rg = new THREE.SphereGeometry(1, 18, 14);
+      roostMesh = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color:0xe2b04a, transparent:true, opacity:0.85 }));
+      roostMesh.scale.setScalar(2.4); roostMesh.visible=false; scene.add(roostMesh);
+      roostGlow = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color:0xe2b04a, transparent:true, opacity:0.18, blending:THREE.AdditiveBlending, depthWrite:false }));
+      roostGlow.scale.setScalar(9); roostGlow.visible=false; scene.add(roostGlow);
+
+      // raptor / bludička — a cold pale glint with a dark heart + amber flare halo
+      raptorGlow = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color:0xffc66e, transparent:true, opacity:0.30, blending:THREE.AdditiveBlending, depthWrite:false }));
+      raptorGlow.scale.setScalar(10); raptorGlow.visible=false; scene.add(raptorGlow);
+      raptorCore = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color:0xdfe6ff, transparent:true, opacity:0.95 }));
+      raptorCore.scale.setScalar(2.0); raptorCore.visible=false; scene.add(raptorCore);
+      // faint reach ring (a torus billboarded loosely)
+      const ringGeo = new THREE.TorusGeometry(R_RAPTOR, 0.4, 6, 48);
+      raptorRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color:0xffc66e, transparent:true, opacity:0.12, blending:THREE.AdditiveBlending, depthWrite:false }));
+      raptorRing.visible=false; scene.add(raptorRing);
+    }
+
+    function clampToVolume(p){
+      p.x = Math.max(-HALF.x, Math.min(HALF.x, p.x));
+      p.y = Math.max(-HALF.y, Math.min(HALF.y, p.y));
+      p.z = Math.max(-HALF.z, Math.min(HALF.z, p.z));
+    }
+
+    // ========================================================================
+    //  FLOCKING — real 3D boids, spatial-hash accelerated
+    // ========================================================================
+    let order = 0, density = 0, measTick = 0;
+
+    function step(dt){
+      buildHash();
+      const cw=cohW(), aw=aliW(), sw=sepW();
+      const ms=maxSpeed(), ms2=ms*ms, minS=ms*MIN_SPEED_FRAC, minS2=minS*minS;
+      const RS=rSep(), RA=rAli(), RC=rCoh();
+      const RS2=RS*RS, RA2=RA*RA, RC2=RC*RC;
+      raptorR2 = R_RAPTOR*R_RAPTOR;
+
+      // a slow shared wander, so the whole flock breathes one direction in 3D
+      const t = clock.elapsedTime*0.13;
+      const wgx = Math.cos(t)*3.2, wgy = Math.sin(t*0.7)*1.6, wgz = Math.sin(t*0.9+1.3)*3.2;
+
+      const reach = Math.ceil(RC/CELL);
+
+      for (let i=0;i<N;i++){
+        const xi=px[i], yi=py[i], zi=pz[i];
+        const vxi=vx[i], vyi=vy[i], vzi=vz[i];
+
+        let cohX=0,cohY=0,cohZ=0,cohN=0;
+        let aliX=0,aliY=0,aliZ=0,aliN=0;
+        let sepX=0,sepY=0,sepZ=0;
+
+        const cx = clampi(((xi-gx0)/CELL)|0, gcols);
+        const cy = clampi(((yi-gy0)/CELL)|0, grows);
+        const cz = clampi(((zi-gz0)/CELL)|0, gdeps);
+        const x0=Math.max(0,cx-reach), x1=Math.min(gcols-1,cx+reach);
+        const y0=Math.max(0,cy-reach), y1=Math.min(grows-1,cy+reach);
+        const z0=Math.max(0,cz-reach), z1=Math.min(gdeps-1,cz+reach);
+
+        for (let gz=z0; gz<=z1; gz++){
+          for (let gy=y0; gy<=y1; gy++){
+            const rowBase=(gz*grows + gy)*gcols;
+            for (let gxx=x0; gxx<=x1; gxx++){
+              let j = cellHeads[rowBase+gxx];
+              while (j !== -1){
+                if (j !== i){
+                  const dx=px[j]-xi, dy=py[j]-yi, dz=pz[j]-zi;
+                  const d2=dx*dx+dy*dy+dz*dz;
+                  if (d2 < RC2){
+                    if (d2 < RS2 && d2 > 1e-4){
+                      const inv = 1/Math.sqrt(d2);
+                      // separation away from neighbour, weighted by closeness
+                      sepX -= dx*inv; sepY -= dy*inv; sepZ -= dz*inv;
+                    }
+                    if (d2 < RA2){ aliX+=vx[j]; aliY+=vy[j]; aliZ+=vz[j]; aliN++; }
+                    cohX+=px[j]; cohY+=py[j]; cohZ+=pz[j]; cohN++;
+                  }
+                }
+                j = cellNext[j];
+              }
+            }
+          }
+        }
+
+        let ax=0, ay=0, az=0;
+
+        // RAPTOR / bludička — compute fear FIRST so panic can break the formation.
+        // Panic suppresses cohesion & alignment locally (the flock tears, not bulges)
+        // and lets the bird burst past its normal speed cap.
+        let pTarget = 0, fleeX=0, fleeY=0, fleeZ=0;
+        if (raptor && raptor.active){
+          const dx=xi-raptor.pos.x, dy=yi-raptor.pos.y, dz=zi-raptor.pos.z;
+          const d2=dx*dx+dy*dy+dz*dz;
+          if (d2 < raptorR2 && d2>1e-4){
+            const d=Math.sqrt(d2);
+            const fear = 1 - d/R_RAPTOR;
+            pTarget = fear;
+            const mag = fear*fear * 520.0;   // sharply nonlinear panic, overpowers the boids
+            const inv=mag/d;
+            fleeX = dx*inv; fleeY = dy*inv; fleeZ = dz*inv;
+          }
+        }
+        // ease panic toward its target (fast attack, slow release) for the amber flare
+        const pv = panic[i] + ((pTarget>panic[i]) ? (pTarget-panic[i])*0.5 : (pTarget-panic[i])*0.06);
+        panic[i] = pv;
+        // social forces dissolve under panic — a frightened jackdaw forgets the flock
+        const social = 1 - pv*0.9;
+
+        // COHESION — steer toward neighbourhood centre of mass
+        if (cohN>0 && social>0.02){
+          let tx=cohX/cohN - xi, ty=cohY/cohN - yi, tz=cohZ/cohN - zi;
+          const tl=Math.hypot(tx,ty,tz);
+          if (tl>1e-4){
+            const inv=ms/tl; tx=tx*inv-vxi; ty=ty*inv-vyi; tz=tz*inv-vzi;
+            const f=clampForce(tx,ty,tz,MAX_FORCE);
+            ax+=f.x*cw*social; ay+=f.y*cw*social; az+=f.z*cw*social;
+          }
+        }
+        // ALIGNMENT — match neighbourhood heading
+        if (aliN>0 && social>0.02){
+          let tx=aliX/aliN, ty=aliY/aliN, tz=aliZ/aliN;
+          const tl=Math.hypot(tx,ty,tz);
+          if (tl>1e-4){
+            const inv=ms/tl; tx=tx*inv-vxi; ty=ty*inv-vyi; tz=tz*inv-vzi;
+            const f=clampForce(tx,ty,tz,MAX_FORCE);
+            ax+=f.x*aw*social; ay+=f.y*aw*social; az+=f.z*aw*social;
+          }
+        }
+        // SEPARATION — keep personal space (never suppressed; panic needs elbow room)
+        if (sepX!==0 || sepY!==0 || sepZ!==0){
+          const sl=Math.hypot(sepX,sepY,sepZ);
+          const inv=ms/sl;
+          let tx=sepX*inv-vxi, ty=sepY*inv-vyi, tz=sepZ*inv-vzi;
+          const f=clampForce(tx,ty,tz,MAX_FORCE*1.3);
+          ax+=f.x*sw; ay+=f.y*sw; az+=f.z*sw;
+        }
+
+        // ROOST attractor — a gentle long pull toward home (also eased by panic)
+        if (roost){
+          const dx=roost.pos.x-xi, dy=roost.pos.y-yi, dz=roost.pos.z-zi;
+          const d=Math.hypot(dx,dy,dz);
+          if (d>0.5){
+            const pull = roost.life * 26.0 * Math.min(1, d/R_ROOST) * (0.3+0.7*social);
+            const inv=pull/d;
+            ax+=dx*inv; ay+=dy*inv; az+=dz*inv;
+          }
+        }
+
+        // apply the flee burst
+        ax+=fleeX; ay+=fleeY; az+=fleeZ;
+
+        // soft BOUNDARY turn-back — turn before the wall, never bounce
+        const turn = 46.0;
+        if (xi >  HALF.x-MARGIN) ax -= (1-(HALF.x-xi)/MARGIN)*turn;
+        else if (xi < -HALF.x+MARGIN) ax += (1-(xi+HALF.x)/MARGIN)*turn;
+        if (yi >  HALF.y-MARGIN) ay -= (1-(HALF.y-yi)/MARGIN)*turn;
+        else if (yi < -HALF.y+MARGIN) ay += (1-(yi+HALF.y)/MARGIN)*turn;
+        if (zi >  HALF.z-MARGIN) az -= (1-(HALF.z-zi)/MARGIN)*turn;
+        else if (zi < -HALF.z+MARGIN) az += (1-(zi+HALF.z)/MARGIN)*turn;
+
+        // gentle WANDER — shared breath + tiny private jitter
+        ax += wgx + (Math.random()-0.5)*8;
+        ay += wgy + (Math.random()-0.5)*8;
+        az += wgz + (Math.random()-0.5)*8;
+
+        // integrate (semi-implicit Euler)
+        let nvx=vxi+ax*dt, nvy=vyi+ay*dt, nvz=vzi+az*dt;
+        // frightened birds burst past the cruising cap (up to ~1.7×)
+        const cap = ms*(1 + pv*0.7), cap2 = cap*cap;
+        const sp2=nvx*nvx+nvy*nvy+nvz*nvz;
+        if (sp2>cap2){ const s=cap/Math.sqrt(sp2); nvx*=s;nvy*=s;nvz*=s; }
+        else if (sp2<minS2 && sp2>1e-4){ const s=minS/Math.sqrt(sp2); nvx*=s;nvy*=s;nvz*=s; }
+        vx[i]=nvx; vy[i]=nvy; vz[i]=nvz;
+
+        let nx=xi+nvx*dt, ny=yi+nvy*dt, nz=zi+nvz*dt;
+        // hard clamp as a last resort so nothing escapes the vault
+        const L=HALF.x+38, Ly=HALF.y+38, Lz=HALF.z+38;
+        if (nx<-L)nx=-L; else if (nx>L)nx=L;
+        if (ny<-Ly)ny=-Ly; else if (ny>Ly)ny=Ly;
+        if (nz<-Lz)nz=-Lz; else if (nz>Lz)nz=Lz;
+        px[i]=nx; py[i]=ny; pz[i]=nz;
+      }
+
+      // advance roost/raptor lifetimes & predator drift
+      if (roost){ roost.life = Math.min(1, roost.life + dt*1.4); }
+      if (raptor && raptor.active){
+        raptor.pos.lerp(raptor.target, Math.min(1, dt*7));
+      }
+
+      measureFlock();
+    }
+
+    const _f = new THREE.Vector3();
+    function clampForce(x,y,z,m){
+      const l=Math.hypot(x,y,z);
+      if (l>m && l>1e-4){ const s=m/l; _f.set(x*s,y*s,z*s); }
+      else _f.set(x,y,z);
+      return _f;
+    }
+
+    // ========================================================================
+    //  FLOCK MEASUREMENT → captions + readouts
+    // ========================================================================
+    let cMx=0,cMy=0,cMz=0, cSpread=0, cPanic=0;
+    function measureFlock(){
+      if ((measTick++ % 8) !== 0) return;
+      let sx=0,sy=0,sz=0, mx=0,my=0,mz=0, pp=0;
+      for (let i=0;i<N;i++){
+        const sp=Math.hypot(vx[i],vy[i],vz[i])||1e-4;
+        sx+=vx[i]/sp; sy+=vy[i]/sp; sz+=vz[i]/sp;
+        mx+=px[i]; my+=py[i]; mz+=pz[i];
+        pp+=panic[i];
+      }
+      order = Math.hypot(sx,sy,sz)/N;     // 1 = perfect formation, ~0 = chaos
+      mx/=N; my/=N; mz/=N;
+      let spread=0;
+      for (let i=0;i<N;i++){ spread+=Math.hypot(px[i]-mx, py[i]-my, pz[i]-mz); }
+      spread/=N;
+      density = 1 - Math.min(1, spread/(HALF.length()*0.55));
+      cMx=mx; cMy=my; cMz=mz; cSpread=spread; cPanic=pp/N;
+      window.__murmOrder=order; window.__murmDensity=density;
+      updateCaption();
+    }
+
+    // ---- captions: terse, wry, reactive ----
+    const capEl = el('caption');
+    let lastCap='', capHold=0;
+    const CAP = {
+      panic:['the bludička hunts. they break like glass.','panic moves faster than wings.','they flee what you summoned.','the flock tears open and reseals.','a hole opens in the air where the fear is.'],
+      tight:['they pour like one dark liquid.','a single mind, four hundred bodies.','the shape no one drew on purpose.','the birds know something you don\'t.','the volume folds in on itself.'],
+      roosting:['the mountain pulls them home.','they spiral down to the roost.','dusk calls them in.','home is a place you pressed into the air.'],
+      loose:['scattered. searching. listening.','the formation forgets itself.','loose threads of birds in the dark.','they drift through the volume, untethered.'],
+      calm:['they wheel without urgency.','the air holds them, lightly.','slow helices over the ridge.','nothing to flee from. for now.'],
+      night:['the night swallows the ridge.','soon only the sound of wings.','darker. they fly by memory now.','the last light leaves the peaks.']
+    };
+    function pick(a){ return a[(Math.random()*a.length)|0]; }
+    function setCaption(txt){
+      if (txt===lastCap) return;
+      lastCap=txt; capEl.textContent=txt;
+      capEl.classList.remove('caption-in'); void capEl.offsetWidth; capEl.classList.add('caption-in');
+    }
+    function updateCaption(){
+      if (capHold>0){ capHold--; return; }
+      capHold=7;
+      let pool;
+      if (raptor && raptor.active) pool=CAP.panic;
+      else if (roost && roost.life>0.5 && density>0.4) pool=CAP.roosting;
+      else if (order>0.82 && density>0.36) pool=CAP.tight;
+      else if (dusk>0.7 && Math.random()<0.5) pool=CAP.night;
+      else if (order<0.4) pool=CAP.loose;
+      else pool=CAP.calm;
+      setCaption(pick(pool));
+    }
+
+    // ========================================================================
+    //  ORBIT CAMERA — self-contained spherical controller
+    // ========================================================================
+    const cam = {
+      target:new THREE.Vector3(0,0,0),
+      radius:260, minR:24, maxR:900,
+      theta:Math.PI*0.5+0.6,   // azimuth
+      phi:1.15                  // polar from +Y
+    };
+    function clampPhi(){ const e=0.12; cam.phi=Math.max(e, Math.min(Math.PI-e, cam.phi)); }
+    function applyCamera(){
+      clampPhi();
+      const sinP=Math.sin(cam.phi);
+      camera.position.set(
+        cam.target.x + cam.radius*sinP*Math.cos(cam.theta),
+        cam.target.y + cam.radius*Math.cos(cam.phi),
+        cam.target.z + cam.radius*sinP*Math.sin(cam.theta)
+      );
+      camera.lookAt(cam.target);
+    }
+
+    // ---- pick a 3D point in the volume from a screen ray ----
+    // We intersect the ray with a plane through the volume centre facing the camera.
+    const _ray = new THREE.Raycaster();
+    const _ndc = new THREE.Vector2();
+    const _planeN = new THREE.Vector3();
+    const _plane = new THREE.Plane();
+    const _hit = new THREE.Vector3();
+    function updatePickPlane(){
+      camera.getWorldDirection(_planeN);
+      _plane.setFromNormalAndCoplanarPoint(_planeN.clone().negate(), cam.target);
+    }
+    function screenToVolume(clientX, clientY, out){
+      const rect = canvas.getBoundingClientRect();
+      _ndc.x = ((clientX-rect.left)/rect.width)*2 - 1;
+      _ndc.y = -((clientY-rect.top)/rect.height)*2 + 1;
+      _ray.setFromCamera(_ndc, camera);
+      const r = _ray.ray.intersectPlane(_plane, out);
+      if (!r) return false;
+      clampToVolume(out);
+      return true;
+    }
+
+    // ========================================================================
+    //  INPUT — left-drag orbits; with a tool engaged a quick press places it.
+    //  We disambiguate: a press that moves little = "place"; a drag = "orbit".
+    // ========================================================================
+    const drag = { active:false, mode:null, lastX:0, lastY:0, downX:0, downY:0, moved:0, pinch:null, placing:false };
+
+    function pointer(e){ const t=(e.touches&&e.touches[0])?e.touches[0]:e; return { x:t.clientX, y:t.clientY }; }
+
+    function placeAt(clientX, clientY){
+      updatePickPlane();
+      if (!screenToVolume(clientX, clientY, _hit)) return;
+      if (cfg.tool==='raptor'){
+        if (!raptor) raptor = { pos:_hit.clone(), target:_hit.clone(), active:true };
+        else { raptor.target.copy(_hit); raptor.active=true; }
+        raptorHeld=true;
+        capHold=0; updateCaption();
+      } else {
+        if (!roost) roost = { pos:_hit.clone(), life:0.2 };
+        else { roost.pos.copy(_hit); }
+        roostHeld=true;
+      }
+      markFirstTouch();
+    }
+
+    let roostHeld=false, raptorHeld=false;
+
+    function onDown(e){
+      if (e.target !== canvas) return;
+      const isTouch=!!(e.touches);
+      const p=pointer(e);
+      drag.active=true; drag.lastX=p.x; drag.lastY=p.y; drag.downX=p.x; drag.downY=p.y; drag.moved=0;
+      // two-finger always orbits; otherwise begin as ambiguous → we resolve on move/up
+      if (isTouch && e.touches.length>=2){ drag.mode='orbit'; drag.placing=false; canvas.classList.add('orbiting'); }
+      else { drag.mode='press'; drag.placing=true; canvas.classList.add('placing');
+        // begin placing immediately for responsiveness; if it turns into a drag we orbit instead
+        placeAt(p.x, p.y);
+      }
+      lastInteract();
+      e.preventDefault();
+    }
+    function onMove(e){
+      if (!drag.active) return;
+      const p=pointer(e);
+      const dx=p.x-drag.lastX, dy=p.y-drag.lastY;
+      drag.moved += Math.abs(dx)+Math.abs(dy);
+
+      if (e.touches && e.touches.length>=2){
+        // pinch zoom
+        const a=e.touches[0], b=e.touches[1];
+        const dist=Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+        if (drag.pinch!=null){ const d=drag.pinch-dist; cam.radius=Math.max(cam.minR,Math.min(cam.maxR, cam.radius*(1+d*0.004))); }
+        drag.pinch=dist;
+        drag.mode='orbit';
+      }
+
+      if (drag.mode==='press'){
+        // if the pointer travels beyond a small threshold, this is an orbit, not a placement
+        if (drag.moved > 8){
+          drag.mode='orbit'; drag.placing=false;
+          // stop holding the marker we tentatively placed; let it linger/decay
+          roostHeld=false; raptorHeld=false;
+          canvas.classList.remove('placing'); canvas.classList.add('orbiting');
+        } else {
+          // still a press: keep dragging the marker with the pointer
+          updatePickPlane();
+          if (screenToVolume(p.x, p.y, _hit)){
+            if (raptorHeld && raptor) raptor.target.copy(_hit);
+            else if (roostHeld && roost) roost.pos.copy(_hit);
+          }
+        }
+      }
+      if (drag.mode==='orbit'){
+        cam.theta -= dx*0.006;
+        cam.phi   -= dy*0.006;
+        clampPhi();
+      }
+      drag.lastX=p.x; drag.lastY=p.y;
+      lastInteract();
+      e.preventDefault();
+    }
+    function onUp(e){
+      if (!drag.active) return;
+      drag.active=false; drag.pinch=null;
+      canvas.classList.remove('placing'); canvas.classList.remove('orbiting');
+      roostHeld=false; raptorHeld=false;
+      capHold=0;
+      drag.mode=null; drag.placing=false;
+      e && e.preventDefault && e.preventDefault();
+    }
+    function onWheel(e){
+      e.preventDefault();
+      cam.radius = Math.max(cam.minR, Math.min(cam.maxR, cam.radius*Math.exp(e.deltaY*0.0012)));
+      lastInteract();
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('wheel', onWheel, { passive:false });
+    canvas.addEventListener('contextmenu', e=>e.preventDefault());
+    canvas.addEventListener('touchstart', onDown, { passive:false });
+    window.addEventListener('touchmove', onMove, { passive:false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+
+    // ========================================================================
+    //  REGATHER — disperse to the faces, then let boids reform
+    // ========================================================================
+    function regather(){
+      for (let i=0;i<N;i++) randSpawnAtEdge(i);
+      roost=null; raptor=null; roostHeld=false; raptorHeld=false;
+      capHold=0; setCaption('the flock disperses, then remembers itself.'); capHold=9;
+    }
+
+    // ========================================================================
+    //  HUD WIRING
+    // ========================================================================
+    const E = {
+      coh:el('cohesion'), ali:el('align'), sep:el('separate'), spd:el('speed'), vis:el('vision'), flk:el('flock'),
+      cohO:el('cohOut'), aliO:el('aliOut'), sepO:el('sepOut'), spdO:el('spdOut'), visO:el('visOut'), flkO:el('flkOut')
+    };
+    function syncUI(){
+      E.coh.value=cfg.cohesion; E.ali.value=cfg.align; E.sep.value=cfg.separate;
+      E.spd.value=cfg.speed; E.vis.value=cfg.vision; E.flk.value=cfg.flock;
+      E.cohO.textContent=(cfg.cohesion/100).toFixed(1);
+      E.aliO.textContent=(cfg.align/100).toFixed(1);
+      E.sepO.textContent=(cfg.separate/100).toFixed(1);
+      E.spdO.textContent=(cfg.speed/100).toFixed(1)+'×';
+      E.visO.textContent=(cfg.vision/100).toFixed(1)+'×';
+      E.flkO.textContent=cfg.flock;
+      el('btnTrails').classList.toggle('btn-on', cfg.trails && !cfg.reduced);
+      const rb=el('btnReduce');
+      rb.classList.toggle('btn-on', cfg.reduced);
+      rb.textContent = cfg.reduced ? '◐ motion: calm' : '◐ motion: full';
+      el('toolRoost').classList.toggle('on', cfg.tool==='roost');
+      el('toolRaptor').classList.toggle('on', cfg.tool==='raptor');
+    }
+    E.coh.addEventListener('input', ()=>{ cfg.cohesion=+E.coh.value; E.cohO.textContent=(cfg.cohesion/100).toFixed(1); save(); });
+    E.ali.addEventListener('input', ()=>{ cfg.align=+E.ali.value; E.aliO.textContent=(cfg.align/100).toFixed(1); save(); });
+    E.sep.addEventListener('input', ()=>{ cfg.separate=+E.sep.value; E.sepO.textContent=(cfg.separate/100).toFixed(1); save(); });
+    E.spd.addEventListener('input', ()=>{ cfg.speed=+E.spd.value; E.spdO.textContent=(cfg.speed/100).toFixed(1)+'×'; save(); });
+    E.vis.addEventListener('input', ()=>{ cfg.vision=+E.vis.value; E.visO.textContent=(cfg.vision/100).toFixed(1)+'×'; save(); });
+    E.flk.addEventListener('input', ()=>{ cfg.flock=+E.flk.value; E.flkO.textContent=cfg.flock; save(); });
+    E.flk.addEventListener('change', ()=>{ setFlockSize(cfg.flock); });
+
+    const btnPause=el('btnPause');
+    let paused=false;
+    function togglePause(){ paused=!paused; btnPause.textContent=paused?'▶ resume':'⏸ pause'; btnPause.classList.toggle('btn-on', paused); }
+    btnPause.addEventListener('click', togglePause);
+    el('btnClear').addEventListener('click', regather);
+    el('btnTrails').addEventListener('click', ()=>{ cfg.trails=!cfg.trails; syncUI(); save(); applyTrailMode(); });
+    el('btnReduce').addEventListener('click', ()=>{ cfg.reduced=!cfg.reduced; syncUI(); save(); applyTrailMode(); });
+    el('btnReset').addEventListener('click', ()=>{ cam.radius=260; cam.theta=Math.PI*0.5+0.6; cam.phi=1.15; cam.target.set(0,0,0); });
+    el('toolRoost').addEventListener('click', ()=>{ cfg.tool='roost'; syncUI(); save(); });
+    el('toolRaptor').addEventListener('click', ()=>{ cfg.tool='raptor'; syncUI(); save(); });
+    el('dusk').addEventListener('click', ()=>{
+      if (dusk>=0.999){ dusk=0; setCaption('dawn, briefly. the dusk begins again.'); capHold=9; }
+      else duskHaste += 0.06;
+    });
+
+    window.addEventListener('keydown', (e)=>{
+      const tag=(e.target&&e.target.tagName)||'';
+      if (/INPUT|TEXTAREA/.test(tag)) return;
+      const k=e.key.toLowerCase();
+      if (e.code==='Space'){ e.preventDefault(); togglePause(); }
+      else if (k==='c'){ regather(); }
+      else if (k==='t'){ cfg.trails=!cfg.trails; syncUI(); save(); applyTrailMode(); }
+      else if (k==='r'){ cfg.reduced=!cfg.reduced; syncUI(); save(); applyTrailMode(); }
+      else if (k==='1'){ cfg.tool='roost'; syncUI(); save(); }
+      else if (k==='2'){ cfg.tool='raptor'; syncUI(); save(); }
+    });
+
+    // hint / first touch
+    const hintEl=el('hint'); const defaultHint=hintEl.textContent;
+    let touched=false;
+    function markFirstTouch(){ if(!touched){ touched=true; hintEl.textContent='space pauses · t trails · 1 roost · 2 raptor · c regathers · drag orbits'; } }
+
+    // ========================================================================
+    //  TRAILS — faint motion blur via a persistence pass on a render target.
+    //  When trails on: we fade the previous frame rather than clearing fully.
+    // ========================================================================
+    let trailRT=null, fadeScene=null, fadeCam=null, fadeQuad=null, fadeMat=null, copyMat=null, copyQuad=null;
+    function buildTrailPipeline(){
+      const w=window.innerWidth, h=window.innerHeight;
+      trailRT = new THREE.WebGLRenderTarget(Math.floor(w*Math.min(window.devicePixelRatio||1,2)), Math.floor(h*Math.min(window.devicePixelRatio||1,2)), { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter });
+      fadeCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+      fadeScene = new THREE.Scene();
+      // a translucent dark quad we draw over the accumulation buffer each frame to fade it
+      fadeMat = new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.16, depthWrite:false, depthTest:false });
+      fadeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), fadeMat);
+      fadeScene.add(fadeQuad);
+      // quad to composite the accumulation buffer to screen
+      copyMat = new THREE.MeshBasicMaterial({ map:trailRT.texture, depthWrite:false, depthTest:false });
+      copyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), copyMat);
+    }
+    function trailsActive(){ return cfg.trails && !cfg.reduced; }
+    function applyTrailMode(){
+      // nothing persistent to tear down; pipeline lazily built. Just clear RT next pass.
+      if (trailRT){ renderer.setRenderTarget(trailRT); renderer.setClearColor(0x000000,1); renderer.clear(); renderer.setRenderTarget(null); }
+    }
+
+    // ========================================================================
+    //  MAIN LOOP
+    // ========================================================================
+    let fpsAccum=0, fpsFrames=0;
+    function loop(){
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.04, clock.getDelta());
+
+      if (!paused){
+        // advance dusk: full night in ~5 minutes (+haste)
+        let dRate = 1/300;
+        if (duskHaste>0){ dRate += duskHaste; duskHaste = Math.max(0, duskHaste - dt*0.02); }
+        dusk = Math.min(1, dusk + dt*dRate);
+
+        step(dt);
+
+        // roost & raptor decay when not held
+        if (roost && !roostHeld){ roost.life -= dt*0.35; if (roost.life<=0) roost=null; }
+        if (raptor && !raptorHeld){ raptor.active=false; raptor=null; }
+      }
+
+      // push physics into the InstancedMesh
+      for (let i=0;i<N;i++) orientInstance(i);
+      birdMesh.count = N;
+      birdMesh.instanceMatrix.needsUpdate = true;
+      if (birdMesh.instanceColor) birdMesh.instanceColor.needsUpdate = true;
+      if (watcherMesh && watcherIdx>=0 && watcherIdx<N) updateWatcher();
+
+      updateSky();
+      // stars fade in with night
+      starMat.opacity = Math.max(0, (dusk-0.2)/0.8) * 0.9;
+
+      // markers
+      syncMarkers();
+
+      // idle auto-orbit (reduced-motion safe), only when not dragging
+      if (!cfg.reduced && !drag.active){ cam.theta += dt*0.04; }
+      applyCamera();
+
+      // ---- render (with optional trail persistence) ----
+      if (trailsActive()){
+        if (!trailRT) buildTrailPipeline();
+        // fade the accumulation buffer slightly
+        renderer.setRenderTarget(trailRT);
+        renderer.autoClear=false;
+        renderer.render(fadeScene, fadeCam);     // darken previous frame
+        renderer.render(scene, camera);          // draw current frame on top
+        renderer.setRenderTarget(null);
+        renderer.autoClear=true;
+        renderer.render(copyScene(), fadeCam);   // composite to screen
+      } else {
+        renderer.autoClear=true;
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
+      }
+
+      // fps
+      fpsAccum+=dt; fpsFrames++;
+      if (fpsAccum>=0.5){ const f=Math.round(fpsFrames/fpsAccum); window.__murmFPS=f; const e=el('fpsOut'); if(e)e.textContent=f; fpsAccum=0; fpsFrames=0; }
+    }
+    // lazily-created scene wrapping the composite quad
+    let _copyScene=null;
+    function copyScene(){ if(!_copyScene){ _copyScene=new THREE.Scene(); _copyScene.add(copyQuad);} return _copyScene; }
+
+    function syncMarkers(){
+      const t = clock.elapsedTime;
+      if (roost){
+        roostMesh.visible=true; roostGlow.visible=true;
+        roostMesh.position.copy(roost.pos); roostGlow.position.copy(roost.pos);
+        const pr = 2.4 + Math.sin(t*4)*0.6;
+        roostMesh.scale.setScalar(pr*roost.life + 0.6);
+        roostGlow.scale.setScalar((9 + Math.sin(t*2)*1.5)*roost.life + 1);
+        roostMesh.material.opacity = 0.85*roost.life;
+        roostGlow.material.opacity = 0.18*roost.life;
+      } else { roostMesh.visible=false; roostGlow.visible=false; }
+
+      if (raptor && raptor.active){
+        raptorCore.visible=true; raptorGlow.visible=true; raptorRing.visible=true;
+        raptorCore.position.copy(raptor.pos); raptorGlow.position.copy(raptor.pos); raptorRing.position.copy(raptor.pos);
+        const fl = 10 + Math.sin(t*9)*2.4;
+        raptorGlow.scale.setScalar(fl);
+        raptorRing.lookAt(camera.position);
+        raptorRing.material.opacity = 0.12 + Math.abs(Math.sin(t*5))*0.06;
+      } else { raptorCore.visible=false; raptorGlow.visible=false; raptorRing.visible=false; }
+    }
+
+    // ========================================================================
+    //  WATCHER BIRD (easter egg) — a pale lone crow that joins the flock
+    // ========================================================================
+    let watcherIdx=-1;
+    function spawnWatcher(){
+      if (N<=0) return;
+      watcherIdx = (Math.random()*N)|0;
+      if (!watcherMesh){
+        const g = birdGeo.clone();
+        watcherMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color:0xf0f2fa, transparent:true, opacity:0.96 }));
+        watcherMesh.frustumCulled=false;
+        scene.add(watcherMesh);
+      }
+      watcherMesh.visible=true;
+    }
+    function updateWatcher(){
+      const i=watcherIdx;
+      const sp=Math.hypot(vx[i],vy[i],vz[i])||1e-4;
+      _fwd.set(vx[i]/sp, vy[i]/sp, vz[i]/sp);
+      _right.crossVectors(_up,_fwd); if(_right.lengthSq()<1e-6)_right.set(1,0,0); else _right.normalize();
+      _trueUp.crossVectors(_fwd,_right).normalize();
+      _rotM.makeBasis(_right,_trueUp,_fwd);
+      watcherMesh.quaternion.setFromRotationMatrix(_rotM);
+      watcherMesh.position.set(px[i],py[i],pz[i]);
+      watcherMesh.scale.set(1.5,1.5,1.7);
+    }
+
+    // ========================================================================
+    //  BOOT
+    // ========================================================================
+    try {
+      makeRenderer();
+    } catch(err){
+      el('fatal').style.display='flex';
+      console.error(err);
+      return;
+    }
+    syncUI();
+    allocate(cfg.flock);
+    applyCamera();
+    loop();
+
+    // read-only console handle (the ghost keeps no secrets)
+    window.murmuration3D = {
+      get birds(){ return N; },
+      get fps(){ return window.__murmFPS||0; },
+      get order(){ return window.__murmOrder||0; },
+      get density(){ return window.__murmDensity||0; },
+      get spread(){ return cSpread; },
+      get meanPanic(){ return cPanic; },
+      get centroid(){ return { x:cMx, y:cMy, z:cMz }; },
+      get paused(){ return paused; },
+      get hasRoost(){ return !!roost; },
+      get hasRaptor(){ return !!(raptor&&raptor.active); },
+      get cam(){ return { radius:cam.radius, theta:cam.theta, phi:cam.phi }; },
+      _orbit(dTheta,dPhi){ cam.theta+=dTheta||0; cam.phi+=(dPhi||0); clampPhi(); return this.cam; },
+      _zoom(f){ cam.radius=Math.max(cam.minR,Math.min(cam.maxR,cam.radius*(f||1))); return cam.radius; },
+      _roost(x,y,z){ roost={ pos:new THREE.Vector3(x||0,y||0,z||0), life:1 }; return true; },
+      _raptor(x,y,z){ raptor={ pos:new THREE.Vector3(x||0,y||0,z||0), target:new THREE.Vector3(x||0,y||0,z||0), active:true }; return true; },
+      _clearTools(){ roost=null; raptor=null; return true; },
+      _regather(){ regather(); return N; }
+    };
+
+    // ===== ambient embers (capped, reduced-motion-safe) =====
+    (function(){
+      if (reduceMQ.matches) return;
+      const host=el('embers');
+      for (let i=0;i<6;i++){
+        const e=document.createElement('div'); e.className='ember';
+        e.style.left=(6+Math.random()*88)+'%';
+        e.style.animationDelay=(Math.random()*18)+'s';
+        e.style.animationDuration=(15+Math.random()*9)+'s';
+        host.appendChild(e);
+      }
+    })();
+
+    // ===== night-hours whisper (00:00–03:00 local) =====
+    (function(){ const h=new Date().getHours(); if (h>=0&&h<3){ const w=el('nightWhisper'); if(w) w.style.display='block'; } })();
+
+    // ===== easter egg: type "prizrak" → a pale watcher joins the flock =====
+    (function(){
+      let buf='';
+      window.addEventListener('keydown', (ev)=>{
+        if (ev.target && /INPUT|TEXTAREA/.test(ev.target.tagName)) return;
+        if (!ev.key || ev.key.length!==1) return;
+        buf=(buf+ev.key.toLowerCase()).slice(-7);
+        if (buf==='prizrak'){
+          const g=el('ghostLine'); if(g){ g.style.display='block'; g.classList.add('flicker'); }
+          spawnWatcher();
+          setCaption('a pale bird joins the flock. you did not summon it.'); capHold=12;
+        }
+      });
+    })();
+
+    // ===== easter egg: triple-click the title → one extra ember =====
+    (function(){
+      const t=el('appTitle'); if(!t) return;
+      t.addEventListener('click', (ev)=>{
+        if (ev.detail===3 && !reduceMQ.matches){
+          const e=document.createElement('div'); e.className='ember';
+          e.style.left=(40+Math.random()*20)+'%'; e.style.animationDuration='13s';
+          el('embers').appendChild(e); setTimeout(()=>e.remove(), 14000);
+        }
+      });
+    })();
+
+    // ===== idle 60s → the watcher leans in (UI chrome; reduced-motion gated) =====
+    let idleTimer=null;
+    function lastInteract(){
+      const line=el('idleLine');
+      if (line) line.style.opacity='0';
+      clearTimeout(idleTimer);
+      if (reduceMQ.matches) return;
+      idleTimer=setTimeout(()=>{
+        if (line){ line.style.display='block'; requestAnimationFrame(()=>{ line.style.opacity='1'; });
+          setTimeout(()=>{ if(line) line.style.opacity='0'; }, 6000); }
+      }, 60000);
+    }
+    ['mousemove','keydown','click','wheel','touchstart','mousedown'].forEach(ev=>window.addEventListener(ev, lastInteract, {passive:true}));
+    lastInteract();
+
+    // resize the trail RT with the window
+    window.addEventListener('resize', ()=>{ if (trailRT){ const dpr=Math.min(window.devicePixelRatio||1,2); trailRT.setSize(Math.floor(window.innerWidth*dpr), Math.floor(window.innerHeight*dpr)); applyTrailMode(); } });
+
+    // react to system reduced-motion changes
+    if (reduceMQ.addEventListener){
+      reduceMQ.addEventListener('change', (e)=>{ cfg.reduced=e.matches; syncUI(); save(); applyTrailMode(); });
+    }
+
+  })();
+  </script>
+
+  <script src="/shared/star-widget.js"></script>
+</body>
+</html>
