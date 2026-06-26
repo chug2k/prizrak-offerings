@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Fridge Fortune Teller</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,800;1,9..144,500&family=Spectral:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      :root{
+        --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+        --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+        --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+        --fox:#86e0c0; --fox-dim:#3f6b5f; --amber:#e3b341; --mystic:#a78bfa; --mystic-dim:#4c3d8a;
+      }
+      *{ box-sizing:border-box; }
+      body{ background:var(--ink); color:var(--bone); font-family:'Spectral',Georgia,serif;
+        font-feature-settings:"liga" 1,"onum" 1; min-height:100vh; position:relative; overflow-x:hidden; }
+      body::before{ content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+        background:radial-gradient(125% 80% at 50% -12%, rgba(167,139,250,.06), transparent 55%),radial-gradient(100% 60% at 50% 120%, rgba(70,58,92,.10), transparent 60%), var(--ink); }
+      body::after{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+      .font-display{ font-family:'Fraunces',Georgia,serif; } .font-mono{ font-family:'JetBrains Mono',ui-monospace,monospace; }
+      .specter{ color:var(--fox); } .mystic{ color:var(--mystic); }
+      .kicker{ font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+      .glow{ text-shadow:0 0 16px currentColor; }
+      a{ color:inherit; text-decoration:none; }
+      ::selection{ background:rgba(167,139,250,.22); color:#fff; }
+
+      .input-row{ display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+      .fridge-input{ flex:1; background:transparent; border:0; border-bottom:1px solid var(--rule-2);
+        font-family:'Spectral',serif; font-size:15px; color:var(--bone); padding:8px 2px; outline:none; transition:border-color .2s; }
+      .fridge-input::placeholder{ color:var(--ash-3); font-style:italic; }
+      .fridge-input:focus{ border-bottom-color:var(--mystic); }
+      .remove-btn{ background:none; border:none; color:var(--ash-3); cursor:pointer; font-size:16px; padding:4px 8px; transition:color .15s; }
+      .remove-btn:hover{ color:#e08a8a; }
+
+      .add-btn{ font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.12em; font-size:11px;
+        color:var(--mystic); background:none; border:1px solid var(--mystic-dim); border-radius:2px;
+        padding:6px 14px; cursor:pointer; transition:all .18s; }
+      .add-btn:hover{ color:var(--bone); border-color:var(--mystic); background:rgba(167,139,250,.08); }
+      .add-btn:disabled{ opacity:.3; cursor:not-allowed; }
+
+      .read-btn{ font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.15em; font-size:12px;
+        color:var(--ink); background:var(--mystic); border:none; border-radius:2px;
+        padding:12px 28px; cursor:pointer; transition:all .25s; box-shadow:0 0 20px -4px rgba(167,139,250,.4); }
+      .read-btn:hover{ background:#b794f6; box-shadow:0 0 32px -4px rgba(167,139,250,.6); transform:translateY(-1px); }
+      .read-btn:disabled{ opacity:.3; cursor:not-allowed; transform:none; }
+
+      .reading-card{ background:linear-gradient(180deg,var(--ink-1),var(--ink));
+        border:1px solid rgba(167,139,250,.2); border-radius:3px; padding:28px 24px;
+        position:relative; overflow:hidden; }
+      .reading-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:2px;
+        background:var(--mystic); opacity:.5; }
+      .reading-card::after{ content:""; position:absolute; inset:0; pointer-events:none; opacity:.03;
+        background:radial-gradient(ellipse at 30% 20%, var(--mystic), transparent 60%); }
+
+      .reading-item{ padding:14px 0; border-bottom:1px solid var(--rule); }
+      .reading-item:last-child{ border-bottom:none; }
+      .reading-label{ font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.12em;
+        font-size:10px; color:var(--mystic); margin-bottom:6px; }
+      .reading-text{ font-family:'Spectral',serif; font-size:15px; line-height:1.6; color:var(--parch); }
+      .reading-text em{ color:var(--fox); font-style:italic; }
+
+      .item-tag{ display:inline-block; font-family:'JetBrains Mono',monospace; font-size:11px;
+        color:var(--bone); background:rgba(167,139,250,.1); border:1px solid rgba(167,139,250,.2);
+        border-radius:2px; padding:3px 8px; margin:2px 4px 2px 0; }
+
+      .reveal{ animation:rise .6s cubic-bezier(.2,.7,.2,1) both; }
+      @keyframes rise{ from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:translateY(0); } }
+
+      .shake{ animation:shake .5s cubic-bezier(.36,.07,.19,.97) both; }
+      @keyframes shake{ 10%,90%{ transform:translateX(-1px); } 20%,80%{ transform:translateX(2px); } 30%,50%,70%{ transform:translateX(-3px); } 40%,60%{ transform:translateX(3px); } }
+
+      .sparkle{ position:absolute; width:3px; height:3px; background:var(--mystic); border-radius:50%;
+        pointer-events:none; opacity:0; animation:sparkle 2s ease-in-out infinite; }
+      @keyframes sparkle{ 0%,100%{ opacity:0; transform:scale(0); } 50%{ opacity:.6; transform:scale(1); } }
+
+      @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } body::after{ display:none; } }
+    </style>
+</head>
+<body>
+    <div class="max-w-2xl mx-auto px-5 sm:px-8 py-10 sm:py-14">
+        <header class="mb-10">
+            <div class="kicker mb-3">Random App · The Fridge Fortune Teller</div>
+            <h1 class="font-display" style="font-size:clamp(2.4rem,8vw,4rem);font-weight:800;line-height:.9;letter-spacing:-.022em">
+                The <span class="mystic" style="font-style:italic;font-weight:500">Fridge</span> Fortune Teller
+            </h1>
+            <p class="mt-4" style="max-width:34rem;font-family:'Spectral',serif;font-style:italic;font-size:14px;line-height:1.55;color:var(--ash)">
+                List 3–7 items from your fridge. The oracle reads your future in condiments, leftovers, and regret.
+            </p>
+        </header>
+
+        <div id="input-section">
+            <div class="kicker" style="margin-bottom:12px">Your <span id="item-count">3</span> of 7 offerings</div>
+            <div id="inputs"></div>
+            <div class="flex items-center gap-4 mt-6">
+                <button id="add-btn" class="add-btn" onclick="addInput()">+ add item</button>
+                <button id="read-btn" class="read-btn" onclick="readFortune()" disabled>read the futures</button>
+            </div>
+        </div>
+
+        <div id="result-section" class="hidden mt-10"></div>
+
+        <footer class="mt-16 pt-7" style="border-top:1px solid var(--rule)">
+            <p class="kicker" style="text-align:center;margin-top:.7rem;letter-spacing:.18em">The fridge remembers all</p>
+        </footer>
+    </div>
+
+    <script>
+    const MAX_ITEMS = 7;
+    const MIN_ITEMS = 3;
+    let itemCount = 3;
+
+    const INGREDIENT_ORACLE = {
+        opening: [
+            "The fridge hums. The light flickers. Something ancient stirs behind the milk.",
+            "You open the door. The cold air speaks. It has been waiting for this moment.",
+            "The compressor kicks on like a sleeping beast. It knows why you are here.",
+            "In the half-light of the open door, the contents arrange themselves into a pattern you almost recognize.",
+            "The fridge door groans. It has been holding its breath for you.",
+            "A draft of cold air escapes, carrying the scent of things long abandoned and things yet to come.",
+            "The interior light catches condensation on a jar no one remembers buying. The oracle begins.",
+            "Behind the expired mustard, something glints. Not metal. Something older.",
+            "The shelves have been arranged by fate, not by you. You simply opened the door to confirm.",
+            "The fridge has been preparing this reading since last Tuesday."
+        ],
+        item_readings: [
+            {
+                prefix: "The",
+                suffix: "you have placed here speaks of",
+                mid: [
+                    "a period of unexpected preservation — things you thought were gone are still good, still waiting.",
+                    "a hunger you haven't admitted to yourself. Not for food. For something the grocery store doesn't carry.",
+                    "the ghost of a meal you were going to cook three days ago and now consider a philosophical position.",
+                    "a threshold. You are between the person who shops and the person who eats. The space between is where the oracle lives.",
+                    "a quiet rebellion against waste, or perhaps against hope. The distinction is thinner than the cheese beside it.",
+                    "a lesson in patience that no one asked you to learn. The thing will be ready when it is ready.",
+                    "the architecture of a life built around a single ingredient. The rest is garnish.",
+                    "a message from your future self, delivered through the medium of condiment.",
+                    "a reminder that everything has a shelf life, even the things that don't expire.",
+                    "the particular loneliness of a food that was once part of a plan but is now just... there.",
+                    "a secret about your kitchen that you've told no one, not even the leftovers.",
+                    "a pattern. You've been here before. The fridge remembers. It always remembers.",
+                    "a question you're not ready to answer: what comes after the expiration date?",
+                    "the weight of a promise you made to yourself in a different lighting, with different hunger.",
+                    "a door closing. Not dramatically. Just the quiet click of something you thought was open becoming closed."
+                ]
+            },
+            {
+                prefix: "Beneath the",
+                suffix: "you carry a hidden reservoir of",
+                mid: [
+                    "untapped potential, like the half-empty bottle you keep meaning to use for the recipe you'll make someday.",
+                    "quiet determination, the kind that doesn't announce itself but shows up every day and stays.",
+                    "strange energy, the kind that makes houseplants grow toward it and strangers offer unsolicited advice.",
+                    "a depth that surprises even you, like discovering the bottom drawer contains more than you thought.",
+                    "a patience that borders on superstition. You wait. You always wait. Something will break first.",
+                    "a quiet magnetism. Not for people. For the right moment, the right temperature, the right light.",
+                    "an archive of almosts — the conversations you almost had, the trips you almost took, the meals you almost cooked.",
+                    "a stillness that is not emptiness. The difference matters. The oracle notices.",
+                    "a gravity that pulls small things toward it. Paperclips. Opinions. The occasional lost fork.",
+                    "a warmth you didn't know you carried, revealed only when the fridge light catches it at just the right angle.",
+                    "a collection of small mercies. None of them grand. All of them exactly what you needed.",
+                    "a frequency that most people can't hear but some animals can. Your cat knows. It always knows.",
+                    "a history written in layers. You can see them if you look. The layers are older than you think.",
+                    "a quiet insistence. Not demanding. Just... present. Like the thing in the back of the fridge you forgot about.",
+                    "a signal. Faint. Intermittent. But real. The oracle has never been wrong about signals."
+                ]
+            },
+            {
+                prefix: "The",
+                suffix: "sits at the intersection of",
+                mid: [
+                    "memory and decay, and you are the witness to both. Neither is a crime.",
+                    "hunger and discipline, and the tension between them is where your next decision lives.",
+                    "the known and the expired, and the oracle advises: test before you trust, but trust before you test.",
+                    "abundance and absence, and you are standing in the space between them right now.",
+                    "planning and improvisation, and the oracle sees you doing both simultaneously without realizing it.",
+                    "the shelf and the floor, between which you have been walking for weeks without noticing.",
+                    "satiety and the search for it, and the oracle says: you are closer than you think, further than you'd like.",
+                    "the beginning of a meal and the end of a week, and the oracle sees the shape of both.",
+                    "what you bought and what you became since buying it, and the gap between them is where growth happens.",
+                    "the recipe and the reality, and the oracle says: the recipe was never the point.",
+                    "abundance and the fear of waste, and the oracle sees you performing a quiet calculus every time you open the door.",
+                    "certainty and the slow creep of doubt, and the oracle says: doubt is just certainty learning new information.",
+                    "the full and the empty, and you are the bridge between them.",
+                    "the past you stocked and the future you haven't, and the oracle sees the shape of the gap.",
+                    "a yes and a no, and the oracle says: the thing you're looking for is in the space between them."
+                ]
+            }
+        ],
+        verdicts: [
+            {
+                heading: "The Oracle's Verdict",
+                lines: [
+                    "The fridge has spoken. What it said was not what you expected. That is the point.",
+                    "Read the signs. The signs are in the condiment section. Pay attention.",
+                    "This reading is valid until the next time you open the fridge and forget why. Then it resets.",
+                    "The oracle does not deal in guarantees. It deals in probabilities, probabilities, and one very specific probability about the yogurt.",
+                    "Take this as guidance, not gospel. The fridge is wise but occasionally confused about which shelf is which.",
+                    "The future is not written. But the contents of your fridge are, and that is a start.",
+                    "The oracle's final word: stop buying things you don't eat. Not advice. A reading.",
+                    "This was not a coincidence. You were always going to open the fridge. You were always going to see these things.",
+                    "The oracle has one more thing to say: the thing you're looking for is behind the thing you're looking behind.",
+                    "Close the door. The reading is complete. The fridge will remember you opened it."
+                ]
+            },
+            {
+                heading: "The Fridge Speaks",
+                lines: [
+                    "The compressor falls silent. The reading is complete. The fridge returns to its eternal vigil.",
+                    "A cold draft settles. The oracle has finished. What remains is for you to interpret — or ignore.",
+                    "The light dims. The items rearrange themselves back into chaos. The oracle is done.",
+                    "The fridge exhales. The reading is sealed. You may now close the door and pretend you don't know what you saw.",
+                    "The oracle steps back into the cold. The reading hangs in the air like the scent of something you can't identify.",
+                    "Silence returns to the kitchen. The fridge has said what it needed to say. Whether you listen is another matter.",
+                    "The reading dissolves like ice. What remains is the cold, the light, and the knowledge that you now know more than you should.",
+                    "The oracle withdraws. The fridge is just a fridge again. But you are not just you anymore.",
+                    "The light flickers once. Twice. Then steady. The reading is complete. The fridge resumes its watch.",
+                    "The oracle has departed. What it left behind is not certainty. It is curiosity. That may be enough."
+                ]
+            },
+            {
+                heading: "A Warning",
+                lines: [
+                    "The oracle warns: do not leave the fridge door open while contemplating these truths. The cold will get in.",
+                    "The oracle cautions: the next time you open this fridge, something may have moved. Do not be alarmed. It is always watching.",
+                    "The oracle reminds you: expiration dates are suggestions. The fridge knows which ones matter.",
+                    "The oracle says: you have been warned. The thing in the back of the fridge has been there longer than you think.",
+                    "The oracle's warning is simple: trust the cold. The cold has never lied to you.",
+                    "The oracle advises: when in doubt, check the back of the fridge. That is where the oracle puts the important things.",
+                    "The oracle warns: the reading you just received was accurate. The reading you receive next may not be. The fridge is selective.",
+                    "The oracle says: the thing you threw away last week was not expired. The fridge remembers. The oracle remembers.",
+                    "The oracle's final caution: do not ask the fridge about the same three items twice. It gets annoyed.",
+                    "The oracle warns: you now know too much about the contents of your own fridge. This cannot be unlearned."
+                ]
+            }
+        ],
+        closing: [
+            "Close the door. The reading is complete. The fridge will remember.",
+            "The oracle has spoken. Whether you believed it is irrelevant. The fridge already knew.",
+            "The light fades. The reading is sealed. You may return to your life, slightly altered.",
+            "The fridge falls silent. But the reading lingers, like the smell of something you can't quite identify.",
+            "The oracle departs into the cold. The reading remains. What you do with it is your business.",
+            "The reading is complete. The fridge returns to its eternal vigil. You have been seen.",
+            "The oracle's work is done. The items have spoken. Now it is your turn to listen.",
+            "The light goes out. The reading is complete. The fridge remembers everything.",
+            "The oracle withdraws. The fridge is quiet again. But you are not.",
+            "The reading is sealed. Close the door. The fridge has said its piece."
+        ]
+    };
+
+    function hash(str) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++) {
+            h = ((h << 5) - h) + str.charCodeAt(i);
+            h |= 0;
+        }
+        return Math.abs(h);
+    }
+
+    function pick(arr, seed) {
+        return arr[seed % arr.length];
+    }
+
+    function addInput() {
+        if (itemCount >= MAX_ITEMS) return;
+        itemCount++;
+        renderInputs();
+    }
+
+    function removeInput(idx) {
+        if (itemCount <= MIN_ITEMS) return;
+        const container = document.getElementById('inputs');
+        container.children[idx].remove();
+        itemCount--;
+        renderInputs();
+    }
+
+    function renderInputs() {
+        document.getElementById('item-count').textContent = itemCount;
+        const btn = document.getElementById('add-btn');
+        btn.disabled = itemCount >= MAX_ITEMS;
+
+        const container = document.getElementById('inputs');
+        // Rebuild from scratch
+        container.innerHTML = '';
+        const placeholders = [
+            "an ingredient, a leftover, a condiment...",
+            "what's behind the milk?",
+            "the thing you forgot about...",
+            "what's on the second shelf?",
+            "the jar with no label...",
+            "what survived the purge?",
+            "the mystery Tupperware..."
+        ];
+        for (let i = 0; i < itemCount; i++) {
+            const row = document.createElement('div');
+            row.className = 'input-row';
+            row.innerHTML = `
+                <input type="text" class="fridge-input" placeholder="${placeholders[i] || 'item...'}" data-idx="${i}">
+                ${itemCount > MIN_ITEMS ? `<button class="remove-btn" onclick="removeInput(${i})" title="remove">✕</button>` : '<span style="width:28px"></span>'}
+            `;
+            container.appendChild(row);
+        }
+        updateReadBtn();
+    }
+
+    function updateReadBtn() {
+        const inputs = document.querySelectorAll('.fridge-input');
+        const hasValue = Array.from(inputs).some(inp => inp.value.trim().length > 0);
+        document.getElementById('read-btn').disabled = !hasValue;
+    }
+
+    document.addEventListener('input', (e) => {
+        if (e.target.classList.contains('fridge-input')) {
+            updateReadBtn();
+        }
+    });
+
+    function readFortune() {
+        const inputs = document.querySelectorAll('.fridge-input');
+        const items = Array.from(inputs).map(i => i.value.trim()).filter(v => v.length > 0);
+
+        if (items.length < MIN_ITEMS) {
+            const btn = document.getElementById('read-btn');
+            btn.classList.add('shake');
+            setTimeout(() => btn.classList.remove('shake'), 500);
+            return;
+        }
+
+        // Generate seed from items
+        const seedStr = items.join('::').toLowerCase();
+        const seed = hash(seedStr);
+
+        // Build reading
+        let reading = [];
+
+        // Opening
+        reading.push({
+            label: "The Opening",
+            text: pick(INGREDIENT_ORACLE.opening, seed),
+            items: items
+        });
+
+        // Item-specific readings
+        const readingTypes = INGREDIENT_ORACLE.item_readings;
+        items.forEach((item, i) => {
+            const typeIdx = (seed + i) % readingTypes.length;
+            const type = readingTypes[typeIdx];
+            const textIdx = (hash(item) + i * 7) % type.mid.length;
+            const text = `${type.prefix} ${item.toLowerCase()} ${type.suffix} ${type.mid[textIdx]}`;
+            reading.push({
+                label: `On the ${item}`,
+                text: text,
+                items: [item]
+            });
+        });
+
+        // Verdict
+        const verdictIdx = (seed + items.length) % INGREDIENT_ORACLE.verdicts.length;
+        const verdict = INGREDIENT_ORACLE.verdicts[verdictIdx];
+        const verdictLine = pick(verdict.lines, (seed + 100) % verdict.lines.length);
+        reading.push({
+            label: verdict.heading,
+            text: verdictLine,
+            items: items
+        });
+
+        // Closing
+        reading.push({
+            label: "The Closing",
+            text: pick(INGREDIENT_ORACLE.closing, (seed + 200) % INGREDIENT_ORACLE.closing.length),
+            items: []
+        });
+
+        // Render
+        renderReading(reading, items, seed);
+    }
+
+    function renderReading(reading, items, seed) {
+        const section = document.getElementById('result-section');
+        section.classList.remove('hidden');
+
+        let html = '';
+
+        // Items display
+        html += '<div class="mb-6">';
+        html += '<div class="kicker mb-3">The offerings read</div>';
+        html += '<div class="flex flex-wrap gap-1">';
+        items.forEach(item => {
+            html += `<span class="item-tag">${escHtml(item)}</span>`;
+        });
+        html += '</div></div>';
+
+        // Reading cards
+        reading.forEach((r, i) => {
+            const delay = i * 80;
+            html += `<div class="reading-card reveal" style="animation-delay:${delay}ms">`;
+            html += `<div class="reading-label">${r.label}</div>`;
+            html += `<div class="reading-text">${r.text}</div>`;
+            html += '</div>';
+        });
+
+        // Reset button
+        html += `<div class="mt-8 text-center">`;
+        html += `<button class="add-btn" onclick="resetReading()">read again with new offerings</button>`;
+        html += `</div>`;
+
+        section.innerHTML = html;
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function resetReading() {
+        document.getElementById('result-section').classList.add('hidden');
+        document.getElementById('result-section').innerHTML = '';
+        const inputs = document.querySelectorAll('.fridge-input');
+        inputs.forEach(inp => inp.value = '');
+        updateReadBtn();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Init
+    renderInputs();
+    </script>
+</body>
+</html>
