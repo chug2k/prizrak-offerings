@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Overqualified Magic 8-Ball · Prizrak</title>
+  <style>
+    :root {
+      --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+      --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+      --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+      --fox:#86e0c0; --fox-dim:#3f6b5f; --amber:#e3b341; --violet:#a78bd6; --red:#e08a8a; --red-dim:#6b3f3f;
+      --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+      --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+    }
+    * { box-sizing:border-box; }
+    html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+    body {
+      margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+      min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+      -webkit-font-smoothing:antialiased;
+    }
+    body::before {
+      content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+      background:
+        radial-gradient(125% 80% at 50% -12%, rgba(134,224,192,.06), transparent 55%),
+        radial-gradient(100% 60% at 50% 120%, rgba(70,58,92,.10), transparent 60%),
+        var(--ink);
+    }
+    body::after {
+      content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .wrap { max-width:720px; margin:0 auto; padding:40px 20px 56px; }
+    @media (min-width:640px) { .wrap { padding:56px 32px; } }
+
+    .mono { font-family:var(--mono); }
+    .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+    .specter { color:var(--fox); font-style:italic; font-weight:500; }
+    a { color:inherit; text-decoration:none; }
+    ::selection { background:rgba(134,224,192,.22); color:#fff; }
+    ::-webkit-scrollbar { width:10px; }
+    ::-webkit-scrollbar-thumb { background:#1b1b22; border-radius:8px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+
+    header { text-align:center; margin-bottom:34px; }
+    h1 {
+      font-family:var(--serif); font-size:clamp(2.1rem,7.5vw,3.5rem); font-weight:800;
+      line-height:.96; letter-spacing:-.02em; margin:12px 0 0;
+    }
+    .sub {
+      margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+      max-width:34rem; line-height:1.6;
+    }
+
+    /* ---- the ball ---- */
+    .ball-stage { display:flex; flex-direction:column; align-items:center; margin:8px 0 30px; }
+    .ball {
+      width:190px; height:190px; border-radius:50%; position:relative; cursor:pointer;
+      background:
+        radial-gradient(circle at 34% 30%, #2a2a34 0%, #17171d 38%, #0c0c10 70%, #060608 100%);
+      box-shadow:
+        inset 0 0 40px rgba(0,0,0,.9),
+        inset -8px -10px 30px rgba(0,0,0,.7),
+        0 20px 50px -18px rgba(0,0,0,.9),
+        0 0 0 1px rgba(233,228,214,.05);
+      transition:transform .18s ease;
+      user-select:none; -webkit-tap-highlight-color:transparent;
+    }
+    .ball::after {
+      content:""; position:absolute; top:16px; left:34px; width:52px; height:34px; border-radius:50%;
+      background:radial-gradient(circle at 40% 40%, rgba(233,228,214,.20), transparent 70%);
+      pointer-events:none;
+    }
+    .ball:hover { transform:translateY(-2px); }
+    .ball.shaking { animation:shake .5s cubic-bezier(.36,.07,.19,.97); }
+    @keyframes shake {
+      10%,90% { transform:translate3d(-2px,0,0) rotate(-2deg); }
+      20%,80% { transform:translate3d(4px,0,0) rotate(3deg); }
+      30%,50%,70% { transform:translate3d(-8px,0,0) rotate(-4deg); }
+      40%,60% { transform:translate3d(8px,0,0) rotate(4deg); }
+    }
+    .window {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:96px; height:96px; border-radius:50%;
+      background:radial-gradient(circle at 50% 42%, #1a1533 0%, #120c26 55%, #0a0618 100%);
+      display:flex; align-items:center; justify-content:center; text-align:center;
+      box-shadow:inset 0 0 20px rgba(0,0,0,.8), 0 0 20px -6px rgba(167,139,214,.5);
+      overflow:hidden;
+    }
+    .triangle {
+      color:var(--violet); font-family:var(--mono); font-weight:700; letter-spacing:.02em;
+      font-size:9px; line-height:1.18; padding:0 6px; text-transform:uppercase;
+      text-shadow:0 0 10px rgba(167,139,214,.7); transition:opacity .3s;
+    }
+    .triangle.big { font-size:34px; }
+    .ball.thinking .window { animation:swirl 1.1s ease-in-out infinite; }
+    @keyframes swirl { 0%,100% { box-shadow:inset 0 0 20px rgba(0,0,0,.8), 0 0 18px -6px rgba(167,139,214,.4); } 50% { box-shadow:inset 0 0 28px rgba(0,0,0,.9), 0 0 30px -4px rgba(167,139,214,.85); } }
+
+    /* ---- input ---- */
+    .ask-row { width:100%; max-width:520px; margin:6px auto 0; }
+    .ask-label { font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.2em; color:var(--ash-3); margin-bottom:8px; text-align:center; }
+    .input-shell { display:flex; gap:8px; }
+    #question {
+      flex:1; font-family:var(--serif); font-size:15px; color:var(--bone);
+      background:var(--ink-1); border:1px solid var(--rule-2); border-radius:6px;
+      padding:12px 14px; outline:none; transition:border-color .2s, box-shadow .2s;
+    }
+    #question::placeholder { color:var(--ash-3); font-style:italic; }
+    #question:focus { border-color:var(--fox-dim); box-shadow:0 0 0 3px rgba(134,224,192,.08); }
+    .ask-btn {
+      font-family:var(--mono); text-transform:uppercase; letter-spacing:.14em; font-size:11px;
+      padding:0 20px; background:linear-gradient(135deg,var(--fox-dim),var(--fox));
+      border:none; border-radius:6px; color:var(--ink); cursor:pointer; font-weight:600; white-space:nowrap;
+      transition:transform .15s, box-shadow .2s, opacity .2s;
+    }
+    .ask-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 22px -10px rgba(134,224,192,.6); }
+    .ask-btn:active:not(:disabled) { transform:translateY(0); }
+    .ask-btn:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(.4); }
+    .suggest-row { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:12px; }
+    .sugg {
+      font-family:var(--mono); font-size:10px; color:var(--ash-2); background:transparent;
+      border:1px solid var(--rule); border-radius:20px; padding:5px 11px; cursor:pointer;
+      transition:border-color .2s, color .2s; line-height:1;
+    }
+    .sugg:hover { color:var(--fox); border-color:var(--fox-dim); }
+
+    /* ---- deliverable ---- */
+    #deck { margin-top:32px; }
+    .memo {
+      border:1px solid var(--rule-2); border-radius:8px; position:relative; overflow:hidden;
+      background:linear-gradient(180deg,var(--ink-1),var(--ink));
+      box-shadow:0 26px 64px -34px rgba(0,0,0,.85);
+      padding:26px 24px 22px;
+    }
+    .memo::before {
+      content:""; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,var(--violet),var(--fox),var(--amber));
+    }
+    .memo::after {
+      content:"CONFIDENTIAL"; position:absolute; top:44%; left:50%;
+      transform:translate(-50%,-50%) rotate(-22deg); font-family:var(--mono);
+      font-size:clamp(34px,10vw,80px); letter-spacing:.14em; color:rgba(233,228,214,.02);
+      pointer-events:none; white-space:nowrap; font-weight:700;
+    }
+    .memo > * { position:relative; }
+
+    .firm-bar {
+      font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+      color:var(--ash-3); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+      border-bottom:1px solid var(--rule); padding-bottom:12px; margin-bottom:16px;
+    }
+    .firm-bar .firm { color:var(--ash); }
+    .engagement { font-family:var(--mono); font-size:9px; color:var(--ash-3); letter-spacing:.1em; margin-bottom:4px; text-transform:uppercase; }
+    .re-line { font-family:var(--serif); font-size:15px; color:var(--parch); margin-bottom:2px; }
+    .re-line b { color:var(--bone); font-weight:700; }
+    .re-q { font-style:italic; color:var(--ash); }
+
+    .verdict-wrap { text-align:center; margin:22px 0 6px; }
+    .verdict {
+      font-family:var(--serif); font-weight:800; font-style:italic; line-height:1.02;
+      font-size:clamp(26px,7.5vw,40px); letter-spacing:-.01em;
+    }
+    .verdict.yes { color:var(--fox); text-shadow:0 0 26px rgba(134,224,192,.4); }
+    .verdict.no  { color:var(--red); text-shadow:0 0 26px rgba(224,138,138,.35); }
+    .verdict.maybe { color:var(--amber); text-shadow:0 0 26px rgba(227,179,65,.35); }
+    .verdict-tag { font-family:var(--mono); font-size:10px; color:var(--ash-2); letter-spacing:.08em; margin-top:8px; }
+
+    .section { margin:22px 0; }
+    .sec-label {
+      font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em;
+      color:var(--violet); margin-bottom:10px; display:flex; align-items:center; gap:9px;
+    }
+    .sec-label::after { content:""; flex:1; height:1px; background:var(--rule); }
+
+    .stats { display:grid; grid-template-columns:repeat(2,1fr); gap:16px 14px; }
+    @media (min-width:560px) { .stats { grid-template-columns:repeat(4,1fr); } }
+    .stat-label { font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.14em; color:var(--ash-2); margin-bottom:5px; }
+    .stat-value { font-family:var(--serif); font-weight:800; font-size:21px; color:var(--bone); line-height:1; }
+    .stat-value.sm { font-size:14px; font-style:italic; font-weight:600; }
+    .stat-sub { font-family:var(--mono); font-size:9px; color:var(--ash-3); letter-spacing:.08em; margin-top:5px; }
+
+    .exec { font-size:14px; line-height:1.75; color:var(--parch); }
+
+    /* 2x2 matrix */
+    .matrix-shell { display:grid; grid-template-columns:22px 1fr; gap:6px; }
+    .yaxis {
+      writing-mode:vertical-rl; transform:rotate(180deg); font-family:var(--mono); font-size:8px;
+      letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); text-align:center; align-self:center;
+    }
+    .matrix { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:6px; }
+    .quad {
+      border:1px solid var(--rule); border-radius:5px; padding:11px 12px; background:var(--ink-2);
+      min-height:78px; position:relative; overflow:hidden;
+    }
+    .quad .qname { font-family:var(--mono); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash-3); margin-bottom:5px; }
+    .quad .qitem { font-size:12px; line-height:1.4; color:var(--parch); }
+    .quad.hot { border-color:var(--red-dim); background:rgba(224,138,138,.05); }
+    .quad.warm { border-color:rgba(227,179,65,.28); background:rgba(227,179,65,.04); }
+    .quad.cool { border-color:var(--fox-dim); background:rgba(134,224,192,.04); }
+    .dot { position:absolute; width:9px; height:9px; border-radius:50%; box-shadow:0 0 10px currentColor; }
+    .xaxis { font-family:var(--mono); font-size:8px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); display:flex; justify-content:space-between; margin:6px 0 0 28px; }
+
+    .drivers { list-style:none; margin:0; padding:0; }
+    .drivers li {
+      display:grid; grid-template-columns:16px 1fr; gap:0 10px; padding:9px 0;
+      border-bottom:1px solid var(--rule); align-items:baseline;
+    }
+    .drivers li:last-child { border-bottom:none; }
+    .drivers .dmark { color:var(--fox); font-family:var(--mono); font-size:12px; }
+    .drivers .dtext { font-size:13.5px; line-height:1.6; color:var(--parch); }
+    .drivers .dtext b { color:var(--bone); font-weight:700; }
+
+    .footnote {
+      margin-top:18px; padding-top:14px; border-top:1px solid var(--rule);
+      font-family:var(--mono); font-size:10.5px; line-height:1.7; color:var(--ash-2); letter-spacing:.01em;
+    }
+    .footnote sup { color:var(--violet); }
+    .footnote em { color:var(--ash-3); font-style:normal; }
+
+    .disc { font-family:var(--mono); font-size:8.5px; line-height:1.6; color:var(--ash-3); letter-spacing:.04em; margin-top:14px; }
+
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+    .mini {
+      font-family:var(--mono); font-size:11px; padding:10px 16px; background:var(--ink-1);
+      border:1px solid var(--rule-2); border-radius:6px; color:var(--ash); cursor:pointer;
+      transition:border-color .2s,color .2s,background .2s; display:inline-flex; align-items:center; gap:7px;
+    }
+    .mini:hover { border-color:var(--fox); color:var(--bone); background:var(--ink-2); }
+    .mini:active { transform:translateY(1px); }
+    .mini.done { border-color:var(--fox); color:var(--fox); }
+
+    .empty {
+      text-align:center; font-family:var(--mono); font-size:11px; color:var(--ash-3);
+      letter-spacing:.06em; padding:14px; line-height:1.7;
+    }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .animate-in { animation:fadeUp .5s cubic-bezier(.2,.7,.2,1) both; }
+
+    .toast {
+      position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+      background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+      font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+      opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+      box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em;
+    }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    .footer { text-align:center; margin-top:48px; padding-top:24px; border-top:1px solid var(--rule); }
+    .footer .kicker { line-height:1.7; }
+    .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-3); }
+    .footer a:hover { color:var(--ash); }
+
+    @media (prefers-reduced-motion:reduce) {
+      *, *::before, *::after { animation:none !important; transition:none !important; }
+      body::after { display:none; }
+      .ball.shaking { transform:none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prizrak — random offering</div>
+      <h1>The <span class="specter">Overqualified</span> Magic 8-Ball</h1>
+      <p class="sub">It went to business school. Ask any yes/no question and it will not say "reply hazy." It will return a full engagement deliverable — executive verdict, confidence interval, a 2×2 risk matrix, three key drivers, and a footnote citing a study that does not exist.</p>
+    </header>
+
+    <div class="ball-stage">
+      <div id="ball" class="ball" role="button" tabindex="0" aria-label="Shake the 8-ball">
+        <div class="window">
+          <div id="triangle" class="triangle big">8</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ask-row">
+      <div class="ask-label">Pose a binary decision to the synergy sphere</div>
+      <div class="input-shell">
+        <input id="question" type="text" maxlength="180" autocomplete="off"
+          placeholder="Should I reply to that email tomorrow instead?">
+        <button id="ask-btn" class="ask-btn">Consult</button>
+      </div>
+      <div id="suggest" class="suggest-row"></div>
+    </div>
+
+    <div id="deck" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">Fees apply retroactively · deck is directional · do not forward to Legal</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ HELPERS ============================ */
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function pickFresh(a, last){ if(a.length<2) return a[0]; let v,g=0; do{ v=pick(a); }while(v===last && ++g<16); return v; }
+function rint(lo,hi){ return lo + Math.floor(Math.random()*(hi-lo+1)); }
+function chance(p){ return Math.random()<p; }
+function sample(a,n){ const c=a.slice(),o=[]; while(o.length<n && c.length){ o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]); } return o; }
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+/* ============================ CONTENT POOLS ============================ */
+
+const SUGGESTIONS = [
+  "Should I text them back?",
+  "Should I quit my job?",
+  "Is now a good time to buy?",
+  "Should I get bangs?",
+  "Should we do a reorg?",
+  "Do I need another coffee?",
+  "Should I merge to main on Friday?",
+];
+
+/* --- three-way verdict: YES / NO / MAYBE, each with headline verdicts --- */
+const VERDICTS = {
+  yes: [
+    "Yes. Proceed.",
+    "Affirmative — greenlight.",
+    "Yes, with conviction.",
+    "Directionally yes.",
+    "Yes. Lean in.",
+    "A qualified yes.",
+    "Yes. This is table stakes.",
+    "Proceed at pace.",
+    "Yes — the data insists.",
+    "Go. Do the thing.",
+  ],
+  no: [
+    "No. Hold.",
+    "Negative — do not proceed.",
+    "No, and quietly so.",
+    "A firm, load-bearing no.",
+    "No. Sunset this.",
+    "Respectfully, no.",
+    "No. Deprioritize.",
+    "Not at this juncture.",
+    "No — the runway disagrees.",
+    "Park it. Indefinitely.",
+  ],
+  maybe: [
+    "It depends. Materially.",
+    "Yes and no, in equal measure.",
+    "Inconclusive — pending a workshop.",
+    "Maybe. Circle back Q3.",
+    "Unclear. Escalate to no one.",
+    "Both true. Neither actionable.",
+    "Defer. The signal is soft.",
+    "TBD — needs a pre-read.",
+    "A confident maybe.",
+    "Ask again after the offsite.",
+  ],
+};
+const VERDICT_TAG = {
+  yes: ["High-conviction recommendation","Board-ready","Consensus reached (internally)","Endorsed by the model"],
+  no: ["Recommend against","Below the line","Failed the sniff test","De-scoped for now"],
+  maybe: ["No-regret optionality","Requires further diligence","Held for review","Directional only"],
+};
+
+/* --- executive summary sentence banks (combinatorial fill) --- */
+const EXEC_OPEN = [
+  "Following a rapid but rigorous diligence sprint, the working team has {stance} the proposed course of action.",
+  "Our analysis triangulates on a clear point of view: the initiative is {qual} and should be treated accordingly.",
+  "Having stress-tested the question against {n} distinct scenarios, we arrive at a {qual} recommendation.",
+  "The synergy sphere convened a virtual steering committee and reached {qual} alignment overnight.",
+  "Per the enclosed, we have pressure-tested the ask and find the underlying thesis {qual}.",
+];
+const EXEC_MID = [
+  "Key sensitivities cluster around {lever}, which the model flags as the single largest swing factor.",
+  "The critical path runs through {lever}; everything downstream is, candidly, noise.",
+  "Value creation hinges on {lever}, with a long tail of second-order effects we have chosen to ignore.",
+  "We see meaningful upside contingent on {lever} clearing its internal hurdle rate.",
+  "Materiality is concentrated in {lever}; the remainder rounds to zero.",
+];
+const EXEC_CLOSE = [
+  "Net-net, we recommend the reader {action} and revisit at the next gate.",
+  "On balance, the prudent move is to {action} while preserving optionality.",
+  "We would counsel the reader to {action}, pending nothing in particular.",
+  "The recommendation is to {action} — decisively, if quietly.",
+  "In short: {action}, socialize widely, and take the win.",
+];
+
+const EXEC_STANCE = { yes:"endorsed", no:"declined to endorse", maybe:"provisionally shelved" };
+const EXEC_QUAL = {
+  yes:["compelling","accretive","strategically sound","directionally correct","value-additive"],
+  no:["dilutive","structurally unattractive","a distraction","below the hurdle","misaligned with the North Star"],
+  maybe:["ambiguous","non-trivial","genuinely a coin flip","under-scoped","worth a second look"],
+};
+const EXEC_ACTION = {
+  yes:["proceed","greenlight and staff it","move to execution","lean in","commit the resources"],
+  no:["stand down","reallocate the calories elsewhere","politely decline","let it die in committee","choose inaction"],
+  maybe:["run a two-week spike","form a tiger team","socialize a pre-read","defer to the offsite","gather more signal"],
+};
+
+const LEVERS = [
+  "stakeholder appetite","the discount rate on regret","cross-functional buy-in","the underlying unit economics",
+  "your personal bandwidth","the vibes","total addressable enthusiasm","the sunk-cost gravitational field",
+  "second-mover dynamics","the change-management overhead","willingness-to-wait","the opportunity cost of doing nothing",
+  "downstream reputational beta","the coffee-to-clarity conversion rate","organizational antibodies","weekend recoverability",
+];
+
+/* --- 2x2 quadrant contents --- */
+const QUAD_HIGH_HIGH = [ // high impact, high effort — "big bets"
+  "the whole thing, honestly","a full re-platform of your Tuesday","asking them directly",
+  "the version that requires a spreadsheet","committing out loud","the ambitious read","doing it and telling nobody",
+  "the plan with a Gantt chart","burning the boats","the move your future self will Google",
+];
+const QUAD_HIGH_LOW = [ // high impact, low effort — "quick wins"
+  "just sending the text","sleeping on it once","doing nothing, expertly","the two-word reply","closing the tab",
+  "asking a friend instead","waiting until Monday","the shrug","picking the obvious one","trusting the gut",
+];
+const QUAD_LOW_HIGH = [ // low impact, high effort — "money pits"
+  "making a pros/cons list","a 40-slide deck about it","re-reading the thread","a poll of your group chat",
+  "over-optimizing the phrasing","a calendar hold to 'think'","rehearsing the outcome","a second opinion, then a third",
+  "color-coding the options","asking the internet",
+];
+const QUAD_LOW_LOW = [ // low impact, low effort — "fill"
+  "worrying about it briefly","one (1) dramatic sigh","a lap around the kitchen","checking your horoscope",
+  "flipping an actual coin","a snack","doomscrolling adjacent to the decision","the classic 'ugh'",
+  "staring at the ceiling","asking a magic 8-ball, ironically",
+];
+
+/* --- key drivers (bold lead + tail) --- */
+const DRIVER_LEAD = [
+  "Optionality preservation","Reversibility of the decision","Blast radius","Time-to-regret",
+  "Stakeholder heat map","Downside asymmetry","Momentum capture","Cognitive load","Narrative coherence",
+  "The counterfactual","Path dependency","Emotional runway","Signal-to-noise","Total cost of overthinking",
+];
+const DRIVER_TAIL = [
+  "scores in the top quartile and materially de-risks the ask.",
+  "is elevated and warrants an owner, a Slack channel, and a nap.",
+  "trends favorably once you stop refreshing the page.",
+  "remains the crux; ignore it and the model quietly weeps.",
+  "clears the hurdle rate by a comfortable-yet-suspicious margin.",
+  "is the tell here — everything else is decoration.",
+  "compounds daily, so latency is the true adversary.",
+  "sits below threshold, which is either great news or a rounding error.",
+  "should be socialized before it becomes a town-hall question.",
+  "is doing more work in this analysis than any human on the team.",
+  "flashes amber, but amber is a color we have learned to love.",
+  "is, per the model, the reason you already know the answer.",
+];
+
+/* --- fake studies for the footnote --- */
+const STUDY_AUTHORS = [
+  "Pemberton","Vasquez-Oyelaran","Krähenbühl","Dutta & Fong","Okonkwo","Steidl","the Halvorsen Group",
+  "Marchetti","Nakashima","Blythe-Farnsworth","the Quibble Institute","O'Dowd","Rosenkranz","Achebe & Lund",
+];
+const STUDY_TOPICS = [
+  "revealed preference in low-stakes binary choices",
+  "the marginal utility of a second opinion",
+  "decision latency and Sunday-night dread",
+  "the illusory precision of confidence intervals",
+  "coin-flip outcomes under managerial framing",
+  "regret decay in reversible decisions",
+  "the placebo effect of a well-formatted deck",
+  "sunk-cost persistence across time zones",
+  "gut instinct as an under-utilized asset class",
+  "the diminishing returns of overthinking",
+  "post-hoc rationalization in knowledge workers",
+  "why the answer you wanted is usually correct",
+];
+const STUDY_JOURNAL = [
+  "J. of Applied Dithering","Quarterly Review of Second-Guessing","Annals of Premature Optimization",
+  "Proceedings of the Society for Overthought","The Ledger of Small Regrets","Bulletin of Managerial Vibes",
+  "Journal of Load-Bearing Assumptions","Review of Frictionless Nonsense","Archives of Deferred Decisions",
+  "Transactions on Applied Hand-Wringing",
+];
+const STUDY_FINDING = [
+  "found the recommendation held at the 0.05 level, though nobody has replicated it",
+  "concluded the effect was 'probably real, ask again'",
+  "reported a confidence interval so wide it contained the opposite conclusion",
+  "was retracted, then un-retracted, then quietly forgotten",
+  "controlled for everything except whether the participant had eaten",
+  "achieved statistical significance and emotional insignificance simultaneously",
+  "was funded by a grant that no longer exists",
+  "notes the effect vanishes when observed by a manager",
+  "found n=1 sufficient, provided the 1 was very confident",
+  "remains, to this day, the most-cited paper nobody has read",
+];
+
+/* --- workstream / methodology fluff for firm bar --- */
+const FIRM_NAMES = [
+  "Prizrak & Partners","Octagon Sphere Advisory","Deloitte-adjacent","the Synergy Sphere Group",
+  "Bain-ish Strategy","McQuestionable & Co.","Kearney-of-the-Mind","Vibe Capital Partners",
+  "Fortune 8-Ball Advisory","The Directional Institute","Boston Sorting Group","Backend of the Envelope LLP",
+];
+const WORKSTREAMS = [
+  "Decision Sciences","Applied Divination","Corporate Fortune-Telling","Strategic Ambiguity",
+  "Predictive Vibes","Binary Outcomes Practice","Managerial Metaphysics","Executive Coin-Flip Unit",
+];
+const METHODS = [
+  "Monte Carlo + gut","Bottom-up, then vibes","Regression to the vibe","Triangulated hearsay",
+  "Weighted shrugging","First-principles guessing","Benchmarked against nothing","Directional modeling",
+];
+
+/* --- misc numbers --- */
+function confidenceInterval(stance){
+  const mid = stance==='yes' ? rint(64,94) : stance==='no' ? rint(58,89) : rint(46,58);
+  const spread = rint(6, 24);
+  const lo = Math.max(1, mid-spread), hi = Math.min(99, mid+spread);
+  return { mid, lo, hi };
+}
+function pval(){
+  const opts = ["p < 0.05","p ≈ 0.051","p = 'trust us'","p < 0.10","p = vibes","p ≪ 1"];
+  return pick(opts);
+}
+function ebitda(){
+  const n = (Math.random()*4.4 + 0.2).toFixed(1);
+  return "$" + n + rint(0,9) + "M";
+}
+
+/* ============================ GENERATION ============================ */
+
+let lastVerdict = null, lastExecOpen = null, lastLever = null;
+let currentDeck = null;
+
+function generateDeck(question){
+  // weighted: slightly favor a decisive answer, keep maybes flavorful
+  const r = Math.random();
+  const stance = r < 0.42 ? 'yes' : r < 0.82 ? 'no' : 'maybe';
+
+  let verdict = pickFresh(VERDICTS[stance], lastVerdict);
+  lastVerdict = verdict;
+
+  const ci = confidenceInterval(stance);
+  const nScen = rint(3, 9);
+
+  // exec summary
+  const lever = pickFresh(LEVERS, lastLever); lastLever = lever;
+  let openTpl = pickFresh(EXEC_OPEN, lastExecOpen); lastExecOpen = openTpl;
+  const open = openTpl
+    .replace("{stance}", EXEC_STANCE[stance])
+    .replace("{qual}", pick(EXEC_QUAL[stance]))
+    .replace("{n}", nScen);
+  const mid = pick(EXEC_MID).replace("{lever}", lever);
+  const close = pick(EXEC_CLOSE).replace("{action}", pick(EXEC_ACTION[stance]));
+  const exec = open + " " + mid + " " + close;
+
+  // 2x2 matrix contents (one item per quadrant)
+  const quads = {
+    hh: pick(QUAD_HIGH_HIGH),
+    hl: pick(QUAD_HIGH_LOW),
+    lh: pick(QUAD_LOW_HIGH),
+    ll: pick(QUAD_LOW_LOW),
+  };
+  // where does the recommendation "sit" — dot placement (0..1 each axis)
+  const dot = stance==='yes'
+    ? { x: 0.66+Math.random()*0.28, y: 0.62+Math.random()*0.3 }   // high impact / low effort-ish top-right
+    : stance==='no'
+    ? { x: 0.05+Math.random()*0.3, y: 0.05+Math.random()*0.3 }    // low/low
+    : { x: 0.35+Math.random()*0.3, y: 0.35+Math.random()*0.3 };   // muddled middle
+
+  // three key drivers, no repeat
+  const leads = sample(DRIVER_LEAD, 3);
+  const tails = sample(DRIVER_TAIL, 3);
+  const drivers = leads.map((l,i) => ({ lead:l, tail:tails[i] }));
+
+  // footnote study
+  const study = {
+    author: pick(STUDY_AUTHORS),
+    year: rint(1998, 2026),
+    topic: pick(STUDY_TOPICS),
+    journal: pick(STUDY_JOURNAL),
+    vol: rint(2, 48),
+    pp: rint(11, 340),
+    finding: pick(STUDY_FINDING),
+  };
+
+  return {
+    question: question,
+    stance,
+    verdict,
+    verdictTag: pick(VERDICT_TAG[stance]),
+    ci, nScen, exec, quads, dot, drivers, study,
+    pval: pval(),
+    ebitda: ebitda(),
+    firm: pick(FIRM_NAMES),
+    workstream: pick(WORKSTREAMS),
+    method: pick(METHODS),
+    engagementId: "ENG-" + rint(2000,9999) + "-" + String.fromCharCode(65+rint(0,25)),
+    hours: rint(0.2, 3.9).toFixed(1),
+  };
+}
+
+/* ============================ RENDER ============================ */
+
+const AXIS = {
+  yTop:"HIGH IMPACT", yBot:"LOW IMPACT",
+  xLeft:"LOW EFFORT", xRight:"HIGH EFFORT",
+};
+
+function renderDeck(d){
+  const q = d.question && d.question.trim() ? d.question.trim() : "Whether to proceed (unspecified)";
+  // dot: matrix is effort(x) vs impact(y). left=low effort, top=high impact.
+  const dotColor = d.stance==='yes' ? 'var(--fox)' : d.stance==='no' ? 'var(--red)' : 'var(--amber)';
+  const dotLeft = (d.dot.x*100).toFixed(0);
+  const dotTop = ((1-d.dot.y)*100).toFixed(0);
+
+  const driversHTML = d.drivers.map(dr =>
+    `<li><span class="dmark">▹</span><span class="dtext"><b>${esc(dr.lead)}</b> ${esc(dr.tail)}</span></li>`
+  ).join("");
+
+  return `
+  <div class="memo animate-in">
+    <div class="firm-bar">
+      <span class="firm">${esc(d.firm)}</span>
+      <span>${esc(d.workstream)} · ${esc(d.engagementId)}</span>
+    </div>
+
+    <div class="engagement">Re: strategic decision support &middot; ${esc(d.method)}</div>
+    <div class="re-line"><b>Matter:</b> <span class="re-q">&ldquo;${esc(q)}&rdquo;</span></div>
+
+    <div class="verdict-wrap">
+      <div class="verdict ${d.stance}">${esc(d.verdict)}</div>
+      <div class="verdict-tag">${esc(d.verdictTag)}</div>
+    </div>
+
+    <div class="section">
+      <div class="sec-label">Headline Metrics</div>
+      <div class="stats">
+        <div>
+          <div class="stat-label">Confidence</div>
+          <div class="stat-value">${d.ci.mid}%</div>
+          <div class="stat-sub">95% CI ${d.ci.lo}–${d.ci.hi}</div>
+        </div>
+        <div>
+          <div class="stat-label">Significance</div>
+          <div class="stat-value sm">${esc(d.pval)}</div>
+          <div class="stat-sub">two-tailed, allegedly</div>
+        </div>
+        <div>
+          <div class="stat-label">Scenarios Run</div>
+          <div class="stat-value">${d.nScen}</div>
+          <div class="stat-sub">of ~${d.nScen + rint(1,4)} planned</div>
+        </div>
+        <div>
+          <div class="stat-label">Value at Stake</div>
+          <div class="stat-value sm">${esc(d.ebitda)}</div>
+          <div class="stat-sub">EBITDA-adjacent</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-label">Executive Summary</div>
+      <div class="exec">${esc(d.exec)}</div>
+    </div>
+
+    <div class="section">
+      <div class="sec-label">Risk / Effort Matrix</div>
+      <div class="matrix-shell">
+        <div class="yaxis">Impact →</div>
+        <div class="matrix">
+          <div class="quad warm">
+            <div class="qname">Big Bets</div>
+            <div class="qitem">${esc(d.quads.hh)}</div>
+          </div>
+          <div class="quad hot">
+            <div class="qname">Money Pits</div>
+            <div class="qitem">${esc(d.quads.lh)}</div>
+          </div>
+          <div class="quad cool">
+            <div class="qname">Quick Wins</div>
+            <div class="qitem">${esc(d.quads.hl)}</div>
+            <span class="dot" style="right:10px;bottom:10px;color:${dotColor};background:${dotColor};"></span>
+          </div>
+          <div class="quad">
+            <div class="qname">Fill</div>
+            <div class="qitem">${esc(d.quads.ll)}</div>
+          </div>
+        </div>
+      </div>
+      <div class="xaxis"><span>Low effort</span><span>You are here ●</span><span>High effort</span></div>
+    </div>
+
+    <div class="section">
+      <div class="sec-label">Three Key Drivers</div>
+      <ul class="drivers">${driversHTML}</ul>
+    </div>
+
+    <div class="footnote">
+      <sup>1</sup>&nbsp;${esc(d.study.author)} (${d.study.year}), &ldquo;${esc(cap(d.study.topic))},&rdquo;
+      <em>${esc(d.study.journal)}</em> ${d.study.vol}(${rint(1,4)}), pp.&nbsp;${d.study.pp}–${d.study.pp + rint(4,29)}.
+      The study ${esc(d.study.finding)}. &lsquo;No relation to any real journal, living or peer-reviewed.&rsquo;
+    </div>
+
+    <div class="disc">
+      Prepared by ${esc(d.firm)}. ${d.hours} billable hours logged against ${esc(d.engagementId)}.
+      This deck is directional, not investment advice, not legal advice, and not, strictly, advice.
+      Past coin flips are not indicative of future results.
+    </div>
+
+    <div class="actions">
+      <button class="mini" id="reroll-btn">↻ Request a second opinion</button>
+      <button class="mini" id="copy-btn">⎘ Copy the deck</button>
+    </div>
+  </div>`;
+}
+
+/* ============================ PLAIN TEXT (copy) ============================ */
+function deckToText(d){
+  const q = d.question && d.question.trim() ? d.question.trim() : "Whether to proceed (unspecified)";
+  const L = [];
+  L.push("THE OVERQUALIFIED MAGIC 8-BALL — STRATEGIC DECISION SUPPORT");
+  L.push(d.firm + " · " + d.workstream + " · " + d.engagementId);
+  L.push("");
+  L.push('MATTER: "' + q + '"');
+  L.push("");
+  L.push("VERDICT: " + d.verdict + "  [" + d.verdictTag + "]");
+  L.push("Confidence: " + d.ci.mid + "% (95% CI " + d.ci.lo + "–" + d.ci.hi + ") · " + d.pval);
+  L.push("Scenarios run: " + d.nScen + " · Value at stake: " + d.ebitda + " (EBITDA-adjacent)");
+  L.push("");
+  L.push("EXECUTIVE SUMMARY");
+  L.push(d.exec);
+  L.push("");
+  L.push("RISK / EFFORT MATRIX (2x2)");
+  L.push("  Big Bets    : " + d.quads.hh);
+  L.push("  Quick Wins  : " + d.quads.hl + "   <-- recommendation sits here");
+  L.push("  Money Pits  : " + d.quads.lh);
+  L.push("  Fill        : " + d.quads.ll);
+  L.push("");
+  L.push("THREE KEY DRIVERS");
+  d.drivers.forEach((dr,i) => L.push("  " + (i+1) + ". " + dr.lead + " — " + dr.tail));
+  L.push("");
+  L.push("[1] " + d.study.author + " (" + d.study.year + "), \"" + cap(d.study.topic) + ",\" " +
+    d.study.journal + " " + d.study.vol + ", pp. " + d.study.pp + ". The study " + d.study.finding + ".");
+  L.push("");
+  L.push(d.hours + " billable hours logged. This deck is directional, not advice.");
+  return L.join("\n");
+}
+
+/* ============================ WIRING ============================ */
+
+const ball = document.getElementById('ball');
+const triangle = document.getElementById('triangle');
+const questionInput = document.getElementById('question');
+const askBtn = document.getElementById('ask-btn');
+const deck = document.getElementById('deck');
+const suggestRow = document.getElementById('suggest');
+
+const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// suggestion chips
+SUGGESTIONS.forEach(s => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'sugg'; b.textContent = s;
+  b.addEventListener('click', () => { questionInput.value = s; consult(); });
+  suggestRow.appendChild(b);
+});
+
+const THINK_MSGS = ["...", "aligning", "synergizing", "modeling", "triangulating", "circling back"];
+
+let busy = false;
+function consult(){
+  if(busy) return;
+  busy = true;
+  askBtn.disabled = true;
+  ball.classList.remove('thinking');
+
+  const q = questionInput.value;
+
+  if(prefersReduced){
+    reveal(q);
+    busy = false; askBtn.disabled = false;
+    return;
+  }
+
+  // shake + swirl
+  ball.classList.add('shaking');
+  ball.classList.add('thinking');
+  triangle.classList.remove('big');
+  let ticks = 0;
+  const thinkTimer = setInterval(() => {
+    triangle.textContent = THINK_MSGS[ticks % THINK_MSGS.length];
+    ticks++;
+  }, 190);
+
+  setTimeout(() => { ball.classList.remove('shaking'); }, 520);
+  setTimeout(() => {
+    clearInterval(thinkTimer);
+    ball.classList.remove('thinking');
+    reveal(q);
+    busy = false; askBtn.disabled = false;
+  }, 1150);
+}
+
+function reveal(q){
+  const d = generateDeck(q);
+  currentDeck = d;
+  // put short verdict word in the ball window
+  const shortWord = d.stance === 'yes' ? 'YES' : d.stance === 'no' ? 'NO' : 'ASK\nLEGAL';
+  triangle.textContent = shortWord;
+  triangle.classList.remove('big');
+  deck.innerHTML = renderDeck(d);
+  wireDeckButtons();
+  if(!prefersReduced){
+    deck.querySelector('.memo').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+}
+
+function wireDeckButtons(){
+  const reroll = document.getElementById('reroll-btn');
+  const copy = document.getElementById('copy-btn');
+  if(reroll) reroll.addEventListener('click', () => { if(!busy) consult(); });
+  if(copy) copy.addEventListener('click', () => {
+    const text = deckToText(currentDeck);
+    const done = () => {
+      copy.textContent = '✓ Copied to the record';
+      copy.classList.add('done');
+      showToast('Deck copied — bill accordingly');
+      setTimeout(() => { copy.textContent = '⎘ Copy the deck'; copy.classList.remove('done'); }, 1900);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+    } else { fallbackCopy(text, done); }
+  });
+}
+
+function fallbackCopy(text, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    done();
+  } catch(e){ showToast('Copy unavailable — read it into the void'); }
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+askBtn.addEventListener('click', consult);
+questionInput.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); consult(); } });
+ball.addEventListener('click', consult);
+ball.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); consult(); } });
+</script>
+</body>
+</html>

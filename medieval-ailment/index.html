@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Medieval Ailment Diagnoser · Prízrak</title>
+<style>
+  :root {
+    --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+    --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+    --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+    --gold:#e3b341; --gold-dim:#7a6a2a; --lapis:#6f8fd6; --wine:#b45a5a; --wine-dim:#5c2e2e;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua','URW Palladio L',Georgia,serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(125% 80% at 50% -12%, rgba(227,179,65,.07), transparent 55%),
+      radial-gradient(100% 60% at 50% 120%, rgba(92,46,46,.10), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:40px 20px 56px; }
+  @media (min-width:640px) { .wrap { padding:56px 32px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--gold); font-style:italic; font-weight:600; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(227,179,65,.24); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1b1b22; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:34px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2.1rem,7.5vw,3.5rem); font-weight:800;
+    line-height:.98; letter-spacing:-.02em; margin:12px 0 0;
+  }
+  .sub {
+    margin:15px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:33rem; line-height:1.6;
+  }
+
+  /* input */
+  .console { margin-bottom:8px; }
+  .console .kicker { margin-bottom:12px; display:block; text-align:center; }
+  .field-wrap { position:relative; }
+  #symptom {
+    width:100%; font-family:var(--serif); font-size:16px; color:var(--bone);
+    background:var(--ink-1); border:1px solid var(--rule-2); border-radius:6px;
+    padding:15px 16px; line-height:1.5; resize:none; min-height:58px;
+    transition:border-color .2s, box-shadow .2s; font-style:italic;
+  }
+  #symptom::placeholder { color:var(--ash-3); font-style:italic; }
+  #symptom:focus { outline:none; border-color:var(--gold-dim); box-shadow:0 0 0 3px rgba(227,179,65,.08); }
+
+  .quicks { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; justify-content:center; }
+  .quick {
+    font-family:var(--mono); font-size:11px; padding:7px 11px; background:var(--ink-1);
+    border:1px solid var(--rule); border-radius:20px; color:var(--ash-2); cursor:pointer;
+    transition:border-color .2s, color .2s, background .2s; line-height:1;
+  }
+  .quick:hover { border-color:var(--gold-dim); color:var(--parch); background:var(--ink-2); }
+
+  .gen-row { text-align:center; margin:26px 0 8px; }
+  .gen-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.15em; font-size:12px;
+    padding:15px 32px; background:linear-gradient(135deg,var(--gold-dim),var(--gold));
+    border:none; border-radius:5px; color:var(--ink); cursor:pointer; font-weight:700;
+    transition:transform .15s, box-shadow .2s, opacity .2s;
+  }
+  .gen-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 24px -8px rgba(227,179,65,.55); }
+  .gen-btn:active:not(:disabled) { transform:translateY(0); }
+  .gen-btn:disabled { opacity:.4; cursor:not-allowed; filter:grayscale(.4); }
+  .hint { font-family:var(--mono); font-size:10px; color:var(--ash-3); margin-top:12px; letter-spacing:.08em; min-height:12px; }
+
+  /* the scroll / diagnosis card */
+  .scroll {
+    position:relative; margin-top:30px; padding:30px 26px 28px;
+    border:1px solid var(--rule-2); border-radius:6px;
+    background:
+      linear-gradient(180deg, rgba(227,179,65,.03), transparent 30%),
+      linear-gradient(180deg,var(--ink-1),var(--ink));
+    box-shadow:0 30px 70px -34px rgba(0,0,0,.85);
+    overflow:hidden;
+  }
+  .scroll::before {
+    content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),var(--wine),var(--gold),transparent);
+  }
+  /* illuminated corner flourishes */
+  .scroll::after {
+    content:""; position:absolute; inset:8px; pointer-events:none; border:1px solid rgba(227,179,65,.10);
+    border-radius:4px;
+    -webkit-mask:linear-gradient(#000,#000) content-box, linear-gradient(#000,#000);
+  }
+  .scroll > * { position:relative; }
+
+  .scroll-top {
+    font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ash-3); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    border-bottom:1px solid var(--rule); padding-bottom:12px; margin-bottom:20px;
+  }
+  .scroll-top .doc { color:var(--gold); }
+
+  .presenting { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-2); margin-bottom:6px; }
+  .presenting-txt { font-family:var(--serif); font-style:italic; font-size:14px; color:var(--parch); line-height:1.5; margin-bottom:22px; padding-left:14px; border-left:2px solid var(--rule-2); }
+
+  .verdict-label { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-2); margin-bottom:6px; }
+  .drop { display:flex; align-items:flex-start; gap:2px; }
+  .dropcap {
+    font-family:var(--serif); font-weight:800; font-size:clamp(52px,13vw,72px); line-height:.82;
+    color:var(--gold); text-shadow:0 0 26px rgba(227,179,65,.4); float:left; margin:2px 12px 0 0;
+    padding:2px 8px; border:1px solid rgba(227,179,65,.25); border-radius:4px;
+    background:radial-gradient(120% 120% at 30% 20%, rgba(227,179,65,.12), transparent 70%);
+  }
+  .ailment {
+    font-family:var(--serif); font-weight:800; font-size:clamp(21px,5.2vw,30px); color:var(--gold);
+    text-shadow:0 0 22px rgba(227,179,65,.3); font-style:italic; line-height:1.12; margin:0;
+    padding-top:6px;
+  }
+  .latin { font-family:var(--serif); font-style:italic; font-size:13px; color:var(--ash); margin:8px 0 2px; letter-spacing:.02em; }
+  .severity-row { display:flex; align-items:center; gap:10px; margin:16px 0 22px; flex-wrap:wrap; }
+  .humour-tag {
+    display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10.5px;
+    padding:6px 11px; border-radius:4px; letter-spacing:.03em; line-height:1.2;
+  }
+  .humour-tag .sw { width:9px; height:9px; border-radius:50%; }
+  .sev-pill {
+    font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+    padding:6px 11px; border-radius:4px; line-height:1.2;
+  }
+  .sev-mild    { background:rgba(111,143,214,.12); color:var(--lapis); border:1px solid rgba(111,143,214,.3); }
+  .sev-grave   { background:rgba(227,179,65,.13);  color:var(--gold);  border:1px solid rgba(227,179,65,.32); }
+  .sev-mortal  { background:rgba(180,90,90,.13);   color:var(--wine);  border:1px solid rgba(180,90,90,.34); animation:pulseWine 2.4s ease-in-out infinite; }
+  @keyframes pulseWine { 0%,100%{box-shadow:0 0 0 0 rgba(180,90,90,0)} 50%{box-shadow:0 0 14px -2px rgba(180,90,90,.55)} }
+
+  .sect { margin-bottom:22px; }
+  .sect-label {
+    font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.16em; color:var(--gold);
+    margin-bottom:10px; display:flex; align-items:center; gap:10px;
+  }
+  .sect-label::after { content:""; flex:1; height:1px; background:var(--rule); }
+
+  .body-text { font-size:14px; line-height:1.7; color:var(--parch); }
+
+  .sym-list { list-style:none; margin:0; padding:0; }
+  .sym-list li {
+    display:grid; grid-template-columns:20px 1fr; gap:0 8px; padding:8px 0; align-items:baseline;
+    border-bottom:1px solid var(--rule); font-size:13.5px; line-height:1.6; color:var(--parch);
+  }
+  .sym-list li:last-child { border-bottom:none; }
+  .sym-list .bullet { font-family:var(--serif); color:var(--wine); font-size:14px; }
+
+  .cure-box {
+    background:radial-gradient(130% 120% at 50% 0, rgba(227,179,65,.05), transparent 70%), var(--ink-2);
+    border:1px solid var(--rule); border-radius:6px; padding:16px 18px;
+  }
+  .cure-line { font-size:14px; line-height:1.7; color:var(--parch); }
+  .cure-line + .cure-line { margin-top:10px; padding-top:10px; border-top:1px dashed var(--rule); }
+  .cure-line b { color:var(--bone); font-weight:600; }
+
+  .prognosis { font-family:var(--serif); font-style:italic; font-size:14px; color:var(--parch); line-height:1.65; }
+
+  /* wax seal + signature */
+  .verdict-foot {
+    margin-top:26px; padding-top:20px; border-top:1px solid var(--rule);
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  }
+  .seal { flex:0 0 auto; }
+  .seal svg { display:block; filter:drop-shadow(0 6px 14px rgba(0,0,0,.6)); }
+  .sig-block { flex:1 1 200px; min-width:180px; }
+  .sig-name { font-family:var(--serif); font-style:italic; font-size:16px; color:var(--bone); }
+  .sig-title { font-family:var(--mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash-3); margin-top:5px; line-height:1.5; }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:24px; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:11px 17px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .1s; display:inline-flex; align-items:center; gap:7px;
+  }
+  .mini:hover { border-color:var(--gold-dim); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.primary { border-color:rgba(227,179,65,.4); color:var(--gold); }
+  .mini.primary:hover { border-color:var(--gold); background:rgba(227,179,65,.06); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:48px; padding-top:24px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.8; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .animate-in { animation:fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes sealIn {
+    0% { opacity:0; transform:rotate(-16deg) scale(1.7); }
+    68% { opacity:1; transform:rotate(-9deg) scale(.9); }
+    100% { opacity:1; transform:rotate(-8deg) scale(1); }
+  }
+  .seal svg { transform:rotate(-8deg); animation:sealIn .5s cubic-bezier(.2,1.3,.4,1) .35s both; }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { display:none; }
+    .seal svg { opacity:1 !important; transform:rotate(-8deg) !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — a most physickal offering</div>
+      <h1>The <span class="specter">Medieval</span> Ailment Diagnoser</h1>
+      <p class="sub">Describe some small modern woe — cold feet, an inbox refreshed too oft, a group chat gone silent — and the plague-doctor shall name your true affliction, list its dread symptoms, and prescribe a cure of unimpeachable quackery.</p>
+    </header>
+
+    <div class="console">
+      <span class="kicker">Confess thy complaint</span>
+      <div class="field-wrap">
+        <textarea id="symptom" rows="2" maxlength="240" placeholder="e.g. my feet are cold and I keep refreshing my email…" autocomplete="off"></textarea>
+      </div>
+      <div class="quicks" id="quicks"></div>
+    </div>
+
+    <div class="gen-row">
+      <button id="gen-btn" class="gen-btn">Consult the Physician</button>
+      <div class="hint" id="hint">The doctor accepts any grievance, however trifling.</div>
+    </div>
+
+    <div id="output" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">This is not medical advice · it is medieval advice · which is worse</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ CONTENT POOLS ============================ */
+
+const QUICK_COMPLAINTS = [
+  "my feet are cold",
+  "I keep refreshing my email",
+  "the group chat went quiet",
+  "I read the same sentence four times",
+  "my phone is at 3 percent",
+  "I opened the fridge for no reason",
+  "someone left me on read",
+  "I can't stop yawning",
+  "my back hurts from sitting",
+  "the wifi is slow today",
+];
+
+// The four humours, with colours for the swatch and flavour
+const HUMOURS = [
+  { name:"Black Bile",       adj:"Melancholic", color:"#7a6a8a", org:"the spleen",   elem:"Earth" },
+  { name:"Yellow Bile",      adj:"Choleric",    color:"#e3b341", org:"the liver",    elem:"Fire"  },
+  { name:"Phlegm",           adj:"Phlegmatic",  color:"#6f8fd6", org:"the brain",    elem:"Water" },
+  { name:"Sanguine Blood",   adj:"Sanguine",    color:"#b45a5a", org:"the heart",    elem:"Air"   },
+];
+
+// Ailment name builders — combinatorial
+const AIL_ADJ = [
+  "Surfeit","Grievous Excess","Creeping","Wandering","Damp","Curdling","Tremulous","Ill-Humoured",
+  "Sluggish","Fevered","Cankerous","Wilting","Vaporous","Congealing","Melancholic","Untimely",
+  "Petrified","Overwrought","Stagnant","Bilious","Rheumy","Frostbitten","Slothful","Discordant",
+  " Signifying","Middling","Peevish","Woeful","Distempered","Errant","Clammy","Insufferable",
+];
+const AIL_NOUN = [
+  "Humours","Vapours","Melancholy","Ague","Palsy","Miasma","Choler","Flux","Torpor","Bile",
+  "Rheum","Grippe","Consumption","Dropsy","Distemper","Malaise","Lethargy","Fret","Wanhope",
+  "Wamble","Collywobbles","Fatigue of the Spleen","Idleness","Disquiet","Fidget","Ennui","Spleen",
+  "Quaverings","Dampness","Blight","Susurrus","Fainting-Fit","Stagnation","Wonderment","Vexation",
+];
+const AIL_OFWHAT = [
+  "the Spleen","the Bowel","the Left Ventricle","the Idle Hand","the Wandering Eye","the Restless Foot",
+  "the Fourth Rib","the Inner Ear","the Sedentary Loin","the Clammy Palm","the Sluggard's Liver",
+  "the Overtaxed Thumb","the Chattering Jaw","the Distracted Mind","the Weary Sinew","the Damp Toe",
+  "the Anxious Gut","the Twitching Lid","the Fasting Stomach","the Screen-Struck Retina","the Slouching Spine",
+  "the Unquiet Blood","the Curdled Marrow","the Stiffened Neck","the Forgetful Cortex","the Melancholic Kidney",
+];
+const AIL_MODIFIER = [
+  "Common","Untimely","Nocturnal","Domestic","Seasonal","Contagious","Hereditary","Modern","Vulgar",
+  "Chronic","Recurring","Sedentary","Winter's","Monday's","the Sluggard's","the Scholar's","the Idler's",
+  "the Merchant's","a Peasant's","the Courtier's","the Clerk's","Ill-Starred","Bewitched","Slow-Creeping",
+];
+
+// Latin-ish flavour binomials (fabricated, deliberately silly)
+const LATIN_A = [
+  "Morbus","Fluxus","Torpor","Vapor","Distemperantia","Melancholia","Gravedo","Lassitudo","Tremor",
+  "Frigus","Humor","Pruritus","Somnolentia","Inquietudo","Fastidium","Languor","Palpitatio","Rheuma",
+];
+const LATIN_B = [
+  "vulgaris","nocturnus","domesticus","sedentarius","hibernalis","chronicus","modernus","ridiculus",
+  "gravis","molestus","perpetuus","insidiosus","lugubris","incurabilis","dubius","frivolus","tediosus",
+  "spontaneus","recidivus","obscurus","clandestinus","provincialis","importunus","insufferabilis",
+];
+
+// Presenting-cause interpretations — how the doctor "reads" a modern woe (generic, always fits)
+const READINGS = [
+  "The doctor peers at your tongue, sniffs your complaint, and nods gravely.",
+  "The physician consults a chart of the stars, then a chart of the moon, then his lunch.",
+  "The doctor holds a vial of your grievance to the candlelight and grimaces.",
+  "The plague-doctor taps the afflicted region with a long silver spoon and listens.",
+  "The physician weighs your woe upon a small brass scale reserved for exactly this.",
+  "The doctor reads your palm, your pulse, and — briefly, alarmingly — your entrails.",
+  "The physician cross-references your symptoms against a book bound in questionable leather.",
+  "The doctor sniffs the air about your head and declares the humours plainly disordered.",
+  "The plague-doctor examines you through a monocle he has forgotten is only for show.",
+  "The physician mutters an incantation, spits thrice, and consults an unsettling diagram.",
+];
+
+// symptom fragments — the dread list (combinatorial)
+const SYM_ONSET = [
+  "A creeping","A sudden","A most vexing","An unaccountable","A slow-blooming","A wintry",
+  "A damp","A tremulous","A gnawing","A rebellious","A theatrical","A faint but persistent",
+  "A low, humming","An intermittent","A treacherous","A quietly spreading","A brooding",
+];
+const SYM_QUALITY = [
+  "heaviness","restlessness","itch","chill","flush","twitch","ache","dampness","droop","flutter",
+  "torpor","quivering","numbness","weariness","clamminess","fidget","tightness","fogginess","hollowness",
+  "prickling","sourness","tingling","brittleness","dolefulness",
+];
+const SYM_LOCATION = [
+  "behind the knees","about the temples","in the region of the fourth rib","along the left shin",
+  "in the soles of the feet","within the inner ear","across the shoulder-blades","in the tips of the thumbs",
+  "beneath the tongue","about the collarbone","in the pit of the stomach","along the jaw",
+  "in the crook of the elbow","behind the eyes","in the marrow of the little toe","across the brow",
+  "in the great toe","about the wrists","in the hollow of the throat","along the spine",
+];
+const SYM_TRIGGER = [
+  "chiefly at dusk","upon the sound of a distant bell","whenever coin is mentioned","most acutely on the Sabbath",
+  "when the moon is gibbous","after the second meal","at the approach of any obligation","upon waking",
+  "when others are watching","in the presence of cheese","when idle","during conversation with in-laws",
+  "on the day the rent falls due","when reminded of one's mortality","after a nap of ill judgement",
+  "when the candle gutters","upon reading bad news","whenever a task is proposed","at the crowing of the cock",
+];
+const SYM_STANDALONE = [
+  "An overwhelming and entirely reasonable desire to lie down.",
+  "The tongue turns faintly the colour of regret.",
+  "One's shadow lags a half-step behind at all hours.",
+  "A ringing in the ears that spells out one's own name, poorly.",
+  "The sudden conviction that a door has been left unlocked in another county.",
+  "An urge to sigh audibly in the presence of strangers.",
+  "The humours slosh perceptibly when one turns too quickly.",
+  "A dream, thrice repeated, of a goose in a waistcoat.",
+  "One weeps mildly at the sight of a well-organised drawer.",
+  "The knees announce the weather three days in advance, incorrectly.",
+  "An involuntary flinch at the word 'schedule.'",
+  "The blood is said to run 'sideways' — the doctor declines to elaborate.",
+  "A persistent taste of copper and Tuesday.",
+  "One's own reflection appears faintly disappointed.",
+  "The stomach growls in Latin.",
+  "A great reluctance to be anywhere one currently is.",
+  "The fingernails grow 'thoughtful.'",
+  "An inexplicable loyalty to a mug that is not one's favourite.",
+];
+
+// Cures — grouped so we can assemble a varied prescription
+const CURE_PRIMARY = [
+  "Apply {n} leech{es} to {loc} and await their honest opinion.",
+  "Bleed the patient a modest {amt}, no more than is polite.",
+  "Administer a poultice of {poultice}, bound tightly with {binding}.",
+  "Ingest a tincture of {tincture}, taken {timing}.",
+  "Suspend a {charm} about the neck by a thread of {thread}.",
+  "Cup the {loc} with a warmed vessel until it sulks.",
+  "Swallow {n} {pill}{s}, each blessed by a {blesser}.",
+  "Burn a small quantity of {herb} and inhale the resulting opinion.",
+  "Bathe {timing} in water steeped with {tincture} and {herb}.",
+  "Purge the offending humour with a broth of {poultice}.",
+];
+const CURE_RITUAL = [
+  "Walk backwards past a goat and do not explain yourself.",
+  "Whisper your grievance into a well and cork it.",
+  "Sleep with your boots on the wrong feet for {nights} nights.",
+  "Face north at dawn and apologise to the weather.",
+  "Carry a {charm} in the left pocket only. The right pocket is forbidden.",
+  "Circle a churchyard {n} times widdershins, humming.",
+  "Refuse to acknowledge Wednesdays until the swelling subsides.",
+  "Bury a coin beneath an oak and forget which oak.",
+  "Address the afflicted limb by a formal title for a fortnight.",
+  "Spit thrice, but courteously, before each meal.",
+  "Trade your sorrows with a passing peddler; do not check the receipt.",
+  "Sit very still and let the humours believe you have left.",
+  "Recite the alphabet backwards to a hen of good character.",
+  "Wear a hat indoors as a show of resolve.",
+];
+const CURE_DIETARY = [
+  "Abstain from {abstain} until the next full moon.",
+  "Eat only foods that are beige, and only whilst standing.",
+  "Consume a great deal of {food}, for the humours favour it.",
+  "Drink {drink} at temperatures the physician calls 'philosophically warm.'",
+  "Take no {abstain} after dark, for that way lies dampness.",
+  "Break bread with someone you mildly dislike; it thins the choler.",
+  "Season all meals with {herb} and a firm sense of denial.",
+  "Fast from {abstain}, but reward yourself with {food} for trying.",
+];
+
+const CURE_N = ["three","seven","a dozen","two","a modest number of","five","nine","eleven","a great many","forty (fewer if squeamish)"];
+const CURE_LOC = ["the temples","the soles of the feet","the small of the back","the earlobes","the inner wrists","the nape of the neck","the afflicted shin","the space behind the knees","the sternum","the great toe"];
+const CURE_AMT = ["thimbleful","gill","half-pint","teaspoon","cupful","reasonable measure","dram","splash of undisclosed size"];
+const CURE_POULTICE = [
+  "regret and warm bread","boiled onions and stern words","mustard and old letters","crushed juniper and gossip",
+  "mashed turnip and moonlight","clay, comfrey, and a little shame","nettles steeped in yesterday","goose-fat and firm opinions",
+  "wet ash and a single tear","bran, honey, and hearsay","cabbage leaves and low expectations",
+];
+const CURE_BINDING = ["clean linen","a length of good wool","strips of an old shirt","twine of no particular loyalty","a bandage blessed on a Thursday","whatever cloth is nearest"];
+const CURE_TINCTURE = [
+  "wormwood and vinegar","dandelion and doubt","valerian and midnight rain","elderflower and self-pity",
+  "willow-bark and stubbornness","nettle and quiet fury","chamomile and a pinch of dread","mugwort and old debts",
+  "feverfew and forgiveness","comfrey and cold tea",
+];
+const CURE_TIMING = ["at cockcrow","thrice daily","only under moonlight","before you can think better of it","at the toll of vespers","upon each hour that annoys you","fasting","after any disappointment"];
+const CURE_CHARM = ["dried toad","polished pebble","small brass bell","knot of red thread","tooth of a peaceable dog","sprig of rosemary","cold copper coin","tiny sack of salt","hazelnut of good reputation","button from a lucky coat"];
+const CURE_THREAD = ["red wool","spider-silk","unblessed flax","hair from a patient horse","gut of no fixed origin","plain grey string"];
+const CURE_PILL = ["bread-pill","clay pellet","liquorice bolus","peppercorn","waxy lozenge","dried pea of authority"];
+const CURE_BLESSER = ["passing friar","confused bishop","reluctant cat","travelling apothecary","goat of the parish","sensible aunt"];
+const CURE_HERB = ["rosemary","rue","sage","wormwood","juniper","lavender","tansy","hyssop","betony","vervain"];
+const CURE_NIGHTS = ["three","seven","nine","five","forty","a fortnight of"];
+const CURE_ABSTAIN = ["eels","strong cheese","conversation before noon","onions","the colour purple","news of any kind","other people's business","warm milk","gossip","root vegetables"];
+const CURE_FOOD = ["barley porridge","boiled fowl","quince","stewed prunes","dry toast","turnip broth","honeyed oats","plain fish"];
+const CURE_DRINK = ["small beer","nettle tea","warmed cider","goat's milk","willow-water","broth of leek","weak posset"];
+
+// Prognoses
+const PROGNOSES = [
+  "Recovery is likely within a fortnight, or a lifetime, depending on the cheese.",
+  "The prognosis is fair, provided the patient does absolutely nothing differently.",
+  "Full recovery expected the very moment the patient stops thinking about it.",
+  "The condition is not fatal, though it will occasionally wish to be.",
+  "Left untreated, the ailment resolves on its own out of sheer boredom.",
+  "The humours should settle by spring, or by the next distraction, whichever comes first.",
+  "Grave, but no graver than usual. The patient will endure, as patients do.",
+  "The physician gives it three days. He does not say three days until what.",
+  "Complete cure guaranteed, terms and celestial conditions permitting.",
+  "The ailment is chronic but companionable. Many learn to love it.",
+  "Prognosis: survivable. The patient is stronger than the grievance, if only barely.",
+  "It shall pass. Most things do. That is the whole of medicine, really.",
+  "The doctor is optimistic, which is itself a symptom of something.",
+  "Recovery hinges entirely on a good night's sleep, which the doctor cannot prescribe.",
+];
+
+// Severity tiers
+const SEVERITIES = [
+  { key:"mild",   cls:"sev-mild",   label:"Trifling · Humour I" },
+  { key:"grave",  cls:"sev-grave",  label:"Grievous · Humour III" },
+  { key:"mortal", cls:"sev-mortal", label:"Mortal (probably not) · Humour IV" },
+];
+
+// Doctor names — combinatorial
+const DOC_TITLE = ["Doktor","Magister","Master","Barber-Surgeon","Physician","Leech-Master","Apothecary","The Learned"];
+const DOC_FIRST = ["Ambrosius","Cornelius","Hildegard","Bartholomew","Winifred","Osric","Gunther","Mathilde","Percival","Griselda","Aldous","Brunhilde","Eustace","Petronella","Gerard","Aveline"];
+const DOC_LAST = ["von Grimmelshausen","de la Mancha (no relation)","of Little Wallop","Blackspoon","Grüntoad","Wormwood","Fetterly","the Elder","Quackenbush","of Dampshire","Marrowby","Snickelfritz","Pöx","the Uncertain","of the Fens","Grubb"];
+const DOC_CRED = [
+  "Faculty of Dubious Physick","College of Applied Leechcraft","Guild of Uncertain Cures",
+  "Academy of the Four Humours","Bureau of Medieval Wellness","Order of the Silver Spoon",
+  "Society for the Study of What Ails Ye","Hospital of Saint Grievance the Minor",
+  "Chair of Speculative Anatomy","Fellowship of the Warm Poultice",
+];
+
+/* ============================ RNG / PRIMITIVES ============================ */
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickFresh(arr, last){
+  if(arr.length < 2) return arr[0];
+  let v, guard = 0;
+  do { v = pick(arr); } while(v === last && ++guard < 14);
+  return v;
+}
+function rint(lo, hi){ return lo + Math.floor(Math.random()*(hi-lo+1)); }
+function chance(p){ return Math.random() < p; }
+
+function esc(s){
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// Fill {token} templates using a resolver map. Unknown tokens left inert.
+function fill(str, map){
+  return str.replace(/\{(\w+)\}/g, (m, key) => {
+    if(key === "es") return ""; // handled by pluralisation below
+    if(key === "s") return "";
+    const v = map[key];
+    return (v !== undefined) ? v : m;
+  });
+}
+
+/* ============================ CURE ASSEMBLY ============================ */
+
+function buildCureLine(template){
+  const n = pick(CURE_N);
+  // rough pluralisation for {es}/{s} based on whether n is singular-ish
+  const singular = (n === "two" ) ? false : /^(one|a )/.test(n) ? true : false;
+  const map = {
+    n: n,
+    loc: pick(CURE_LOC),
+    amt: pick(CURE_AMT),
+    poultice: pick(CURE_POULTICE),
+    binding: pick(CURE_BINDING),
+    tincture: pick(CURE_TINCTURE),
+    timing: pick(CURE_TIMING),
+    charm: pick(CURE_CHARM),
+    thread: pick(CURE_THREAD),
+    pill: pick(CURE_PILL),
+    blesser: pick(CURE_BLESSER),
+    herb: pick(CURE_HERB),
+    nights: pick(CURE_NIGHTS),
+    abstain: pick(CURE_ABSTAIN),
+    food: pick(CURE_FOOD),
+    drink: pick(CURE_DRINK),
+  };
+  let out = fill(template, map);
+  // handle {es} (leech -> leeches) and {s} pluralisation contextually
+  out = out.replace(/\{es\}/g, "es").replace(/\{s\}/g, "s");
+  return out;
+}
+
+function generateCure(){
+  // Always one primary remedy, one ritual, and (usually) one dietary edict.
+  const lines = [];
+  lines.push(buildCureLine(pick(CURE_PRIMARY)));
+  lines.push(pickFresh(CURE_RITUAL, lastRitual));
+  lastRitual = lines[1];
+  if(chance(0.85)) lines.push(buildCureLine(pick(CURE_DIETARY)));
+  return lines;
+}
+
+/* ============================ AILMENT NAME ============================ */
+
+function buildAilmentName(){
+  const roll = Math.random();
+  let name;
+  if(roll < 0.4){
+    // "A Surfeit of the Melancholic Humours"
+    name = "A " + pick(AIL_ADJ) + " of " + pick(AIL_OFWHAT);
+  } else if(roll < 0.7){
+    // "The Sluggard's Ague of the Fourth Rib"
+    name = "The " + pick(AIL_MODIFIER) + " " + pick(AIL_NOUN) + " of " + pick(AIL_OFWHAT);
+  } else if(roll < 0.88){
+    // "Creeping Vapours"
+    name = pick(AIL_ADJ) + " " + pick(AIL_NOUN);
+  } else {
+    // "The Modern Collywobbles"
+    name = "The " + pick(AIL_MODIFIER) + " " + pick(AIL_NOUN);
+  }
+  return name;
+}
+function buildLatin(){
+  return pick(LATIN_A) + " " + pick(LATIN_B);
+}
+
+/* ============================ DREAD SYMPTOMS ============================ */
+
+function buildSymptom(){
+  if(chance(0.42)){
+    return pick(SYM_STANDALONE);
+  }
+  let s = pick(SYM_ONSET) + " " + pick(SYM_QUALITY) + " " + pick(SYM_LOCATION);
+  if(chance(0.7)) s += ", " + pick(SYM_TRIGGER);
+  return s + ".";
+}
+function generateSymptoms(){
+  const n = rint(3, 4);
+  const out = [];
+  const seen = new Set();
+  let guard = 0;
+  while(out.length < n && guard < 40){
+    guard++;
+    const s = buildSymptom();
+    const keyStart = s.slice(0, 26);
+    if(seen.has(keyStart)) continue;
+    seen.add(keyStart);
+    out.push(s);
+  }
+  return out;
+}
+
+/* ============================ WAX SEAL SVG ============================ */
+
+function waxSealSVG(humour, severity){
+  // colour of wax keyed to severity
+  const wax = severity === "mortal" ? "#7a2e2e" : severity === "grave" ? "#8a4a1e" : "#5a3a6a";
+  const waxLit = severity === "mortal" ? "#b45a5a" : severity === "grave" ? "#c98a3a" : "#8a6aa0";
+  const emblem = "#f0e6c8";
+  const S = 92, c = S/2;
+  // wobbly wax blob path
+  const rim = [];
+  const pts = 16;
+  for(let i=0;i<pts;i++){
+    const a = (i/pts)*Math.PI*2;
+    const r = 40 + Math.sin(i*2.3)*3 + Math.cos(i*1.7)*2;
+    rim.push((c+Math.cos(a)*r).toFixed(1) + "," + (c+Math.sin(a)*r).toFixed(1));
+  }
+  let svg = '<svg width="'+S+'" height="'+S+'" viewBox="0 0 '+S+' '+S+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="wax seal of diagnosis">';
+  svg += '<defs><radialGradient id="wg" cx="38%" cy="32%" r="72%">';
+  svg += '<stop offset="0%" stop-color="'+waxLit+'"/><stop offset="100%" stop-color="'+wax+'"/></radialGradient></defs>';
+  svg += '<polygon points="'+rim.join(" ")+'" fill="url(#wg)" stroke="#000" stroke-opacity="0.35" stroke-width="1"/>';
+  // inner pressed ring
+  svg += '<circle cx="'+c+'" cy="'+c+'" r="30" fill="none" stroke="'+emblem+'" stroke-opacity="0.55" stroke-width="1.4"/>';
+  svg += '<circle cx="'+c+'" cy="'+c+'" r="26" fill="none" stroke="'+emblem+'" stroke-opacity="0.25" stroke-width="0.8"/>';
+  // emblem: a crossed spoon + lancet inside, plus humour dot
+  svg += '<g stroke="'+emblem+'" stroke-opacity="0.7" stroke-width="1.6" stroke-linecap="round" fill="none">';
+  svg += '<line x1="'+(c-11)+'" y1="'+(c+12)+'" x2="'+(c+11)+'" y2="'+(c-12)+'"/>';
+  svg += '<line x1="'+(c+11)+'" y1="'+(c+12)+'" x2="'+(c-11)+'" y2="'+(c-12)+'"/>';
+  svg += '<circle cx="'+(c-11)+'" cy="'+(c-12)+'" r="3"/>';
+  svg += '</g>';
+  // humour colour dot at centre
+  svg += '<circle cx="'+c+'" cy="'+c+'" r="4" fill="'+humour.color+'" stroke="'+emblem+'" stroke-opacity="0.5" stroke-width="0.8"/>';
+  // tiny pressed lettering arc suggestion (dots)
+  for(let i=0;i<12;i++){
+    const a = (i/12)*Math.PI*2 - Math.PI/2;
+    svg += '<circle cx="'+(c+Math.cos(a)*34).toFixed(1)+'" cy="'+(c+Math.sin(a)*34).toFixed(1)+'" r="0.9" fill="'+emblem+'" fill-opacity="0.4"/>';
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+/* ============================ DIAGNOSIS ASSEMBLY ============================ */
+
+let lastAilment = null, lastLatin = null, lastReading = null, lastProg = null, lastRitual = null, lastDoc = null;
+let current = null;
+
+function generateDiagnosis(complaintRaw){
+  const complaint = complaintRaw.trim();
+
+  // severity weighted: mostly mild/grave, rarely mortal
+  const r = Math.random();
+  const sev = r < 0.5 ? SEVERITIES[0] : r < 0.85 ? SEVERITIES[1] : SEVERITIES[2];
+  const humour = pick(HUMOURS);
+
+  let ailment, guard = 0;
+  do { ailment = buildAilmentName(); guard++; } while(ailment === lastAilment && guard < 8);
+  lastAilment = ailment;
+
+  const latin = pickFreshLatin();
+  const reading = pickFresh(READINGS, lastReading); lastReading = reading;
+  const prognosis = pickFresh(PROGNOSES, lastProg); lastProg = prognosis;
+
+  let doc, dguard = 0;
+  do { doc = pick(DOC_TITLE) + " " + pick(DOC_FIRST) + " " + pick(DOC_LAST); dguard++; } while(doc === lastDoc && dguard < 6);
+  lastDoc = doc;
+
+  return {
+    complaint,
+    humour, sev,
+    ailment, latin,
+    reading,
+    symptoms: generateSymptoms(),
+    cure: generateCure(),
+    prognosis,
+    doc,
+    cred: pick(DOC_CRED),
+    caseNo: rint(1000, 9999),
+    year: "Anno " + rint(1187, 1493),
+  };
+}
+function pickFreshLatin(){
+  let v, guard = 0;
+  do { v = buildLatin(); } while(v === lastLatin && ++guard < 8);
+  lastLatin = v; return v;
+}
+
+/* ============================ RENDER ============================ */
+
+function renderDiagnosis(d){
+  const dropcap = esc(d.ailment.charAt(0));
+  const ailRest = esc(d.ailment.slice(1));
+
+  const presenting = d.complaint
+    ? '<div class="presenting">Presenting complaint</div><div class="presenting-txt">&ldquo;' + esc(d.complaint) + '&rdquo;</div>'
+    : '';
+
+  const symsHTML = d.symptoms.map(s =>
+    '<li><span class="bullet">&#10013;</span><span>' + esc(s) + '</span></li>'
+  ).join('');
+
+  const cureHTML = d.cure.map((line, i) =>
+    '<div class="cure-line"><b>' + roman(i+1) + '.</b> ' + esc(line) + '</div>'
+  ).join('');
+
+  const seal = waxSealSVG(d.humour, d.sev.key);
+
+  return '' +
+  '<div class="scroll animate-in">' +
+    '<div class="scroll-top">' +
+      '<span class="doc">Consultation №&nbsp;' + d.caseNo + '</span>' +
+      '<span>' + esc(d.year) + ' &middot; by candlelight</span>' +
+    '</div>' +
+
+    presenting +
+
+    '<div class="sect" style="margin-bottom:14px">' +
+      '<div class="body-text" style="font-style:italic;color:var(--ash)">' + esc(d.reading) + '</div>' +
+    '</div>' +
+
+    '<div class="verdict-label">The physician’s verdict</div>' +
+    '<div class="drop">' +
+      '<span class="dropcap">' + dropcap + '</span>' +
+      '<h2 class="ailment">' + ailRest + '</h2>' +
+    '</div>' +
+    '<div class="latin">&ldquo;' + esc(d.latin) + '&rdquo; &mdash; a disorder of ' + esc(d.humour.name.toLowerCase()) + ', seated in ' + esc(d.humour.org) + '.</div>' +
+
+    '<div class="severity-row">' +
+      '<span class="humour-tag" style="background:' + hexA(d.humour.color,0.12) + ';border:1px solid ' + hexA(d.humour.color,0.32) + ';color:' + d.humour.color + '">' +
+        '<span class="sw" style="background:' + d.humour.color + '"></span>' + esc(d.humour.adj) + ' &middot; ' + esc(d.humour.elem) +
+      '</span>' +
+      '<span class="sev-pill ' + d.sev.cls + '">' + esc(d.sev.label) + '</span>' +
+    '</div>' +
+
+    '<div class="sect">' +
+      '<div class="sect-label">Dread Symptoms</div>' +
+      '<ul class="sym-list">' + symsHTML + '</ul>' +
+    '</div>' +
+
+    '<div class="sect">' +
+      '<div class="sect-label">Prescribed Remedy</div>' +
+      '<div class="cure-box">' + cureHTML + '</div>' +
+    '</div>' +
+
+    '<div class="sect">' +
+      '<div class="sect-label">Prognosis</div>' +
+      '<div class="prognosis">' + esc(d.prognosis) + '</div>' +
+    '</div>' +
+
+    '<div class="verdict-foot">' +
+      '<div class="seal">' + seal + '</div>' +
+      '<div class="sig-block">' +
+        '<div class="sig-name">&mdash; ' + esc(d.doc) + '</div>' +
+        '<div class="sig-title">' + esc(d.cred) + '<br>Sealed in wax &middot; do not open the humours' + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="actions">' +
+      '<button class="mini primary" id="reroll-btn">&#10227; Seek another opinion</button>' +
+      '<button class="mini" id="copy-btn">&#9106; Copy the prescription</button>' +
+      '<button class="mini" id="edit-btn">&#9998; Amend complaint</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function roman(n){ return ["I","II","III","IV","V"][n-1] || String(n); }
+
+// hex + alpha helper -> rgba()
+function hexA(hex, a){
+  const h = hex.replace('#','');
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+/* ============================ COPY / SHARE ============================ */
+
+function diagnosisToText(d){
+  const L = [];
+  L.push("THE MEDIEVAL AILMENT DIAGNOSER");
+  L.push("Consultation No. " + d.caseNo + " · " + d.year);
+  L.push("");
+  if(d.complaint){ L.push("Presenting complaint: “" + d.complaint + "”"); L.push(""); }
+  L.push("DIAGNOSIS: " + d.ailment);
+  L.push("(" + d.latin + ") — a disorder of " + d.humour.name.toLowerCase() + ", seated in " + d.humour.org + ".");
+  L.push("Humour: " + d.humour.adj + " · " + d.humour.elem + "  |  Severity: " + d.sev.label);
+  L.push("");
+  L.push("DREAD SYMPTOMS");
+  d.symptoms.forEach(s => L.push("  † " + s));
+  L.push("");
+  L.push("PRESCRIBED REMEDY");
+  d.cure.forEach((c,i) => L.push("  " + roman(i+1) + ". " + c));
+  L.push("");
+  L.push("PROGNOSIS: " + d.prognosis);
+  L.push("");
+  L.push("— " + d.doc + ", " + d.cred);
+  L.push("(This is not medical advice. It is medieval advice. Which is worse.)");
+  return L.join("\n");
+}
+
+/* ============================ WIRING ============================ */
+
+const symptomEl = document.getElementById('symptom');
+const genBtn = document.getElementById('gen-btn');
+const hintEl = document.getElementById('hint');
+const outputEl = document.getElementById('output');
+const quicksEl = document.getElementById('quicks');
+
+// quick-complaint chips
+QUICK_COMPLAINTS.forEach(q => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'quick';
+  b.textContent = q;
+  b.addEventListener('click', () => {
+    symptomEl.value = q;
+    symptomEl.focus();
+    hintEl.textContent = 'Complaint noted. Now consult the physician.';
+  });
+  quicksEl.appendChild(b);
+});
+
+function diagnose(){
+  const complaint = symptomEl.value;
+  let d, guard = 0;
+  do { d = generateDiagnosis(complaint); guard++; } while(d.ailment === (current && current.ailment) && guard < 6);
+  current = d;
+  outputEl.innerHTML = renderDiagnosis(d);
+  wireResultButtons();
+  outputEl.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function wireResultButtons(){
+  const reroll = document.getElementById('reroll-btn');
+  const copy = document.getElementById('copy-btn');
+  const edit = document.getElementById('edit-btn');
+  if(reroll) reroll.addEventListener('click', diagnose);
+  if(edit) edit.addEventListener('click', () => {
+    symptomEl.focus();
+    symptomEl.scrollIntoView({ behavior:'smooth', block:'center' });
+  });
+  if(copy) copy.addEventListener('click', () => {
+    const txt = diagnosisToText(current);
+    const done = () => showToast('Prescription copied — present it to any apothecary');
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+    } else { fallbackCopy(txt, done); }
+  });
+}
+
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){ showToast('Copy unavailable — commit it to memory'); }
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+genBtn.addEventListener('click', diagnose);
+symptomEl.addEventListener('keydown', (e) => {
+  if((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); diagnose(); }
+});
+symptomEl.addEventListener('input', () => {
+  hintEl.textContent = symptomEl.value.trim()
+    ? 'The doctor is intrigued. Ctrl/⌘+Enter to consult.'
+    : 'The doctor accepts any grievance, however trifling.';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Passive-Aggressive Note Generator · Prizrak</title>
+<style>
+  :root {
+    --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+    --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+    --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+    --fox:#86e0c0; --fox-dim:#3f6b5f; --amber:#e3b341; --red:#e08a8a; --red-dim:#6b3f3f;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+    --hand:'Bradley Hand','Segoe Print','Comic Sans MS','Chalkboard SE','Marker Felt',cursive;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(125% 80% at 50% -12%, rgba(227,179,65,.055), transparent 55%),
+      radial-gradient(100% 60% at 50% 120%, rgba(92,58,58,.10), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:700px; margin:0 auto; padding:40px 20px 56px; }
+  @media (min-width:640px) { .wrap { padding:56px 32px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--amber); font-style:italic; font-weight:600; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(227,179,65,.22); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1b1b22; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:34px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2rem,7.5vw,3.4rem); font-weight:800;
+    line-height:.98; letter-spacing:-.02em; margin:12px 0 0;
+  }
+  .sub {
+    margin:14px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:32rem; line-height:1.55;
+  }
+
+  .section { margin-bottom:26px; }
+  .section .kicker { margin-bottom:13px; }
+  .grid-btns { display:flex; flex-wrap:wrap; gap:9px; }
+
+  .chip {
+    font-family:var(--mono); font-size:12px; padding:9px 13px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s, color .2s, background .2s, box-shadow .2s, transform .1s;
+    display:inline-flex; align-items:center; gap:7px; line-height:1; user-select:none;
+  }
+  .chip:hover { border-color:var(--amber); color:var(--bone); background:var(--ink-2); }
+  .chip:active { transform:translateY(1px); }
+  .chip .ic { font-size:17px; line-height:1; }
+  .chip.active { border-color:var(--amber); color:var(--amber); background:rgba(227,179,65,.08); box-shadow:0 0 12px -4px rgba(227,179,65,.4); }
+
+  /* pettiness dial */
+  .dial-wrap { background:var(--ink-1); border:1px solid var(--rule-2); border-radius:8px; padding:18px 20px 16px; }
+  .dial-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; gap:12px; flex-wrap:wrap; }
+  .dial-level { font-family:var(--serif); font-weight:800; font-size:19px; letter-spacing:-.01em; transition:color .25s; }
+  .dial-caption { font-family:var(--mono); font-size:10px; letter-spacing:.06em; color:var(--ash-2); font-style:normal; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:5px; margin:6px 0 12px;
+    background:linear-gradient(90deg,var(--fox-dim),var(--amber) 55%,var(--red)); outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--bone); border:3px solid var(--ink-3); cursor:pointer;
+    box-shadow:0 0 0 1px var(--rule-2), 0 3px 10px -2px rgba(0,0,0,.7); transition:transform .1s;
+  }
+  input[type=range]::-webkit-slider-thumb:active { transform:scale(1.15); }
+  input[type=range]::-moz-range-thumb {
+    width:22px; height:22px; border-radius:50%; background:var(--bone); border:3px solid var(--ink-3);
+    cursor:pointer; box-shadow:0 0 0 1px var(--rule-2), 0 3px 10px -2px rgba(0,0,0,.7);
+  }
+  .dial-ticks { display:flex; justify-content:space-between; font-family:var(--mono); font-size:9px; letter-spacing:.1em; color:var(--ash-3); }
+  .dial-ticks span { flex:1; text-align:center; }
+  .dial-ticks span:first-child { text-align:left; }
+  .dial-ticks span:last-child { text-align:right; }
+  .dial-ticks span.on { color:var(--amber); }
+
+  .signer-row { margin-top:20px; }
+  .signer-row label { display:block; font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:var(--ash-2); margin-bottom:8px; }
+  .signer-input {
+    width:100%; font-family:var(--mono); font-size:13px; padding:11px 13px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--bone); outline:none;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .signer-input:focus { border-color:var(--amber); box-shadow:0 0 12px -4px rgba(227,179,65,.4); }
+  .signer-input::placeholder { color:var(--ash-3); }
+
+  .gen-row { text-align:center; margin:30px 0 6px; }
+  .gen-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.15em; font-size:12px;
+    padding:14px 32px; background:linear-gradient(135deg,#a37b1f,var(--amber));
+    border:none; border-radius:5px; color:var(--ink); cursor:pointer; font-weight:700;
+    transition:transform .15s, box-shadow .2s, opacity .2s;
+  }
+  .gen-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 24px -8px rgba(227,179,65,.6); }
+  .gen-btn:active:not(:disabled) { transform:translateY(0); }
+  .gen-btn:disabled { opacity:.4; cursor:not-allowed; filter:grayscale(.4); }
+  .hint { font-family:var(--mono); font-size:10px; color:var(--ash-3); margin-top:12px; letter-spacing:.08em; min-height:12px; }
+
+  #note-area { margin-top:30px; }
+
+  /* the sticky note itself */
+  .note-stage { display:flex; justify-content:center; perspective:1200px; }
+  .sticky {
+    --paper:#f4e9a8; --paper-2:#efdf8c; --tape:rgba(220,210,180,.55);
+    position:relative; width:100%; max-width:380px; padding:34px 30px 30px;
+    background:linear-gradient(160deg,var(--paper),var(--paper-2));
+    color:#26211a; font-family:var(--hand); border-radius:2px 2px 3px 3px;
+    box-shadow:0 1px 1px rgba(0,0,0,.2), 0 16px 40px -14px rgba(0,0,0,.75), inset 0 -22px 40px -30px rgba(120,100,40,.6);
+    transform:rotate(-1.6deg);
+  }
+  .sticky::before {
+    content:""; position:absolute; left:50%; top:-12px; transform:translateX(-50%) rotate(1.6deg);
+    width:96px; height:26px; background:var(--tape);
+    box-shadow:inset 0 0 8px rgba(255,255,255,.4); border-left:1px dashed rgba(0,0,0,.06); border-right:1px dashed rgba(0,0,0,.06);
+    opacity:.9;
+  }
+  .sticky::after {
+    content:""; position:absolute; inset:0; pointer-events:none; border-radius:2px;
+    background:radial-gradient(120% 90% at 90% 100%, rgba(90,70,20,.16), transparent 60%);
+  }
+  .sticky.tier-2 { --paper:#f6e79a; --paper-2:#f0dd82; }
+  .sticky.tier-3 { --paper:#f7dd8a; --paper-2:#f2cf6e; }
+  .sticky.tier-4 { --paper:#f6cf7c; --paper-2:#f0bd5a; }
+  .sticky.tier-5 { --paper:#f3b98f; --paper-2:#ec9d63; color:#2a1a12; }
+
+  .sticky .n-head { font-family:var(--hand); font-size:20px; font-weight:700; line-height:1.15; margin:0 0 14px; letter-spacing:.2px; }
+  .sticky .n-body { font-family:var(--hand); font-size:16.5px; line-height:1.6; }
+  .sticky .n-body p { margin:0 0 11px; }
+  .sticky .n-body p:last-child { margin-bottom:0; }
+  .sticky .n-sign { font-family:var(--hand); font-size:16px; margin-top:20px; line-height:1.35; }
+  .sticky .n-sign .dash { color:#4a3d22; }
+  .sticky u { text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:2px; }
+  .sticky .u-wobble { text-decoration:underline; text-decoration-style:wavy; text-decoration-thickness:1.5px; }
+  .sticky .smiley { font-family:var(--hand); font-style:normal; }
+  .sticky .n-ps { margin-top:16px; padding-top:12px; border-top:1px dashed rgba(80,60,20,.35); font-size:15px; line-height:1.5; }
+  .sticky .n-ps .lbl { font-weight:700; }
+  .sticky .scrawl-5 { transform:rotate(-.4deg); }
+
+  /* reveal drop animation */
+  @keyframes note-drop {
+    0% { opacity:0; transform:translateY(-38px) rotate(-1.6deg) scale(.94); }
+    60% { opacity:1; transform:translateY(6px) rotate(-1.6deg) scale(1.01); }
+    100% { opacity:1; transform:translateY(0) rotate(-1.6deg) scale(1); }
+  }
+  .sticky.drop { animation:note-drop .5s cubic-bezier(.2,.9,.25,1.05) both; }
+
+  .meta-bar {
+    display:flex; justify-content:center; gap:16px; flex-wrap:wrap; margin-top:20px;
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--ash-3);
+    text-transform:uppercase;
+  }
+  .meta-bar b { color:var(--ash); font-weight:500; }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; justify-content:center; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:10px 16px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s; display:inline-flex; align-items:center; gap:7px;
+  }
+  .mini:hover { border-color:var(--amber); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.done { border-color:var(--amber); color:var(--amber); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em; text-align:center;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:48px; padding-top:24px; border-top:1px solid var(--rule); }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+  .footer .kicker { line-height:1.7; }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+    body::after { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prizrak — random offering</div>
+      <h1>The <span class="specter">Passive-Aggressive</span><br>Note Generator</h1>
+      <p class="sub">For the shared kitchen. For the communal fridge. For that one roommate. Select the crime and set the pettiness dial — we'll print you a note that smiles while it seethes.</p>
+    </header>
+
+    <div class="section">
+      <div class="kicker">The offense</div>
+      <div id="offense-grid" class="grid-btns"></div>
+    </div>
+
+    <div class="section">
+      <div class="kicker">Pettiness</div>
+      <div class="dial-wrap">
+        <div class="dial-top">
+          <span id="dial-level" class="dial-level">3 · Firmly Disappointed</span>
+          <span id="dial-caption" class="dial-caption">the tone tightens as you climb</span>
+        </div>
+        <input id="dial" type="range" min="1" max="5" step="1" value="3" aria-label="Pettiness level">
+        <div class="dial-ticks" id="dial-ticks">
+          <span>1 chipper</span><span>2</span><span>3</span><span>4</span><span>5 unhinged</span>
+        </div>
+      </div>
+
+      <div class="signer-row">
+        <label for="signer">Sign it as (optional)</label>
+        <input id="signer" class="signer-input" type="text" maxlength="40" placeholder="e.g. Someone, Apt 4B, or leave blank for anonymous menace" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="gen-row">
+      <button id="gen-btn" class="gen-btn">Post the Note</button>
+      <div class="hint" id="hint">Pick an offense, or just hit post — we'll assume the worst.</div>
+    </div>
+
+    <div id="note-area" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">No passive aggression was resolved in the making of this note</p>
+      <p class="kicker" style="margin-top:8px"><a href="/index.html">all offerings</a></p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ OFFENSES ============================ */
+const OFFENSES = [
+  { id:'dishes',      icon:'🍽️', label:'The Dishes',        noun:'dishes',            it:'this dish' },
+  { id:'fridge',      icon:'🧊', label:'The Fridge',         noun:'the fridge',        it:'this' },
+  { id:'thermostat',  icon:'🌡️', label:'The Thermostat',     noun:'the thermostat',    it:'the thermostat' },
+  { id:'borrowing',   icon:'🖊️', label:'"Borrowing"',        noun:'my things',         it:'my stapler' },
+  { id:'microwave',   icon:'💥', label:'The Microwave',      noun:'the microwave',     it:'the microwave' },
+  { id:'coffee',      icon:'☕', label:'The Coffee Pot',     noun:'the coffee pot',    it:'the pot' },
+  { id:'noise',       icon:'🔊', label:'The Noise',          noun:'the noise',         it:'the noise' },
+  { id:'trash',       icon:'🗑️', label:'The Trash',          noun:'the trash',         it:'the bin' },
+  { id:'parking',     icon:'🅿️', label:'The Parking Spot',   noun:'my spot',           it:'my spot' },
+  { id:'bathroom',    icon:'🧻', label:'The Bathroom',       noun:'the bathroom',      it:'the roll' },
+  { id:'meetings',    icon:'📅', label:'"Per My Email"',     noun:'my email',          it:'the thread' },
+  { id:'printer',     icon:'🖨️', label:'The Printer',        noun:'the printer',       it:'the printer' },
+];
+
+/* ============================ PETTINESS TIERS ============================ */
+const TIER_NAMES = {
+  1: '1 · Aggressively Chipper',
+  2: '2 · Politely Wounded',
+  3: '3 · Firmly Disappointed',
+  4: '4 · Losing Composure',
+  5: '5 · Fully Unhinged',
+};
+const TIER_COLOR = { 1:'var(--fox)', 2:'#bcd08a', 3:'var(--amber)', 4:'#e0a35a', 5:'var(--red)' };
+const TIER_CAPTION = {
+  1: 'smiling with the whole face, none of the eyes',
+  2: 'more sad than mad, and wants you to know it',
+  3: 'has typed and deleted this three times',
+  4: 'the underlines are multiplying',
+  5: 'do not remove this note. do not test them.',
+};
+
+/* smiley faces that read as threats, scaled by tier */
+const SMILEYS = {
+  1: [':)', ':-)', '☺', '(:', ':D'],
+  2: [':)', ':)', ':|', '☺', ':-)'],
+  3: [':)', ':|', ':)', '.', ':/'],
+  4: [':)', ':)', ':)', ':)))', ':|'],
+  5: [':)', ':))))', ':)', ':)', 'X('],
+};
+
+/* ============================ HEADLINES ============================ */
+const HEADLINES = {
+  1: [
+    'Hi friend! 😊 Quick little thing —',
+    'Heyyy! Just a teeny reminder 💕',
+    'Good morning, sunshine! One small note:',
+    'Hi there!! Hope you\'re having a lovely day —',
+    'Hellooo! Not a big deal at all, buuut',
+    'Hi hi! 🌸 Gentle nudge incoming:',
+  ],
+  2: [
+    'Hi. So. About {NOUN}.',
+    'Hey — I wasn\'t going to say anything, but',
+    'Morning. Small thing, and it\'s honestly fine, but',
+    'Hi all. Just flagging something, no worries:',
+    'Hello. I hope this note finds you well. It won\'t.',
+    'Hi. Not trying to make it weird, but',
+  ],
+  3: [
+    'A GENTLE REMINDER regarding {NOUN}.',
+    'To Whom It May Concern (you know who you are):',
+    'Okay. We need to talk about {NOUN}.',
+    'FRIENDLY notice re: {NOUN}. Emphasis on friendly.',
+    'This is the second note. There will not be a fourth.',
+    'Attention, valued housemate. RE: {NOUN}.',
+  ],
+  4: [
+    'I HAVE HAD IT with {NOUN}. 🙂',
+    'ATTENTION EVERYONE. Yes, everyone. Especially you.',
+    'THIS IS NOT PASSIVE AGGRESSIVE. This is aggressive.',
+    'We are WAY past a "gentle reminder" now.',
+    'NOTICE. FINAL. (I say that every time. Not this time.)',
+    'I don\'t want to name names. So I\'ll describe you instead.',
+  ],
+  5: [
+    '🚨 I KNOW IT WAS YOU. 🚨',
+    'DO NOT REMOVE THIS NOTE. I WILL KNOW.',
+    'THE {NOUNUP} SITUATION HAS REACHED me PERSONALLY.',
+    'THIS IS BETWEEN ME, YOU, AND WHATEVER GOD ALLOWED THIS.',
+    'I have set up a camera. I have not, but I have. 🙂',
+    'CEASE. DESIST. REFLECT. In that order.',
+  ],
+};
+
+/* ============================ SIGN-OFFS ============================ */
+const SIGNOFFS = {
+  1: [
+    'Thanks so much!! You\'re the best 💛',
+    'Teamwork makes the dream work! 🙌',
+    'No worries at all, just us being a fun little household!',
+    'Sending good vibes and gentle reminders 🌷',
+    'You\'ve got this!! Thanks a million ✨',
+    'Kisses! And also, you know. Fix it.',
+  ],
+  2: [
+    'Thanks for understanding. I really do mean that.',
+    'No rush. (There is a rush.) Thanks!',
+    'Appreciate you. Genuinely. Mostly.',
+    'It\'s fine. It\'s totally fine. Thanks so much.',
+    'I\'m sure it was an honest mistake. I\'m sure.',
+    'Anyway! Have a great one 🙂',
+  ],
+  3: [
+    'Thank you for your cooperation. It is not optional.',
+    'Let\'s make this the LAST note about it, shall we? :)',
+    'I trust this resolves the matter. I really do trust that.',
+    'With warm regards and a rapidly cooling patience,',
+    'Consider this your friendly heads-up. The next one won\'t be.',
+    'Thanks in advance. "In advance" is doing a lot of work there.',
+  ],
+  4: [
+    'I am choosing peace. This note is what peace looks like now.',
+    'That\'s all. For now. I\'m watching. Warmly.',
+    'Do better. I believe in you. Barely, but I do.',
+    'Regards, if that\'s even the right word anymore,',
+    'This is your final gentle reminder before it stops being gentle.',
+    'I hope this note ruins your afternoon a tolerable amount.',
+  ],
+  5: [
+    'I am at peace. This is what peace looks like. LOOK AT IT.',
+    'You know what you did. The note knows. The wall knows. WE ALL KNOW.',
+    'Fix it, or don\'t, and see what happens. (Something will happen.)',
+    'With love, with fury, with a printed timeline of events,',
+    'This note self-destructs never. It stays until YOU change. 🙂',
+    'Signed, someone who has stopped labeling their food and started labeling YOU.',
+  ],
+};
+
+/* ============================ SIGNER LINES ============================ */
+const ANON_SIGNERS = {
+  1: ['— Your favorite housemate 💛', '— A friend :)', '— Someone who cares (a lot)', '— The vibes committee'],
+  2: ['— A concerned party', '— Someone who noticed', '— (you know who)', '— A tired but polite tenant'],
+  3: ['— Management (it\'s me, it\'s just me)', '— The one who cleans', '— A witness', '— Apt. of the Righteous'],
+  4: ['— The last reasonable person here', '— NOT signing this, but you know', '— The Reckoning Committee', '— Me. Obviously me.'],
+  5: ['— YOU KNOW WHO THIS IS', '— The Ghost of Chores Present', '— Someone at the END of their rope', '— God\'s loneliest roommate'],
+};
+
+/* ============================ THE COMPLAINT BODY ============================ */
+/* Per-offense observation + demand + jab pools, keyed nothing to tier so
+   they combine freely; tone is carried by headline/signoff/formatting. */
+const OFFENSE_COPY = {
+  dishes: {
+    obs: [
+      'these dishes have been "soaking" since {DAY}',
+      'the sink has achieved a level of geologic layering usually reserved for canyons',
+      'there is a plate in there developing its own weather system',
+      'I counted. Seven mugs. SEVEN. We are three people',
+      'the pan from taco night has become a permanent installation',
+      'something in the sink blinked at me',
+    ],
+    ask: [
+      'the dishwasher is the large humming box directly beneath the sink',
+      'washing a dish takes roughly the length of one (1) song',
+      'you are allowed to use soap. It is included',
+      'dishes do not, in fact, clean themselves overnight. I checked. Repeatedly',
+      'the mugs would love to see the inside of a cupboard again',
+    ],
+    jab: [
+      'A fun fact: I know which mug is yours.',
+      'The crusty fork and I have grown close.',
+      'I\'m not your mother. Your mother would also be upset.',
+      'This is a shared sink, not a personal aquarium.',
+    ],
+  },
+  fridge: {
+    obs: [
+      'there is a container in the back of the fridge from a previous administration',
+      'whatever is in the green tupperware is now sentient and paying rent',
+      'my labeled leftovers are, once again, mysteriously smaller',
+      'the leftover fumes have their own dedicated shelf',
+      'someone finished the oat milk and put the EMPTY carton back',
+      'the mystery smell has a family now',
+    ],
+    ask: [
+      'the trash can is a wonderful place for expired yogurt',
+      '"labeled" means it is not a community resource. It means MINE',
+      'if you finish something, the correct move is to not put it back empty',
+      'the fridge would appreciate being closed all the way. It beeps for a reason',
+    ],
+    jab: [
+      'I don\'t label my food for fun. I label it because of YOU.',
+      'That was going to be my lunch. Was.',
+      'We share a fridge, not a food budget.',
+      'The oldest item in there predates my lease.',
+    ],
+  },
+  thermostat: {
+    obs: [
+      'the thermostat has been set to "surface of the sun" again',
+      'I woke up to a tropical rainforest and a $340 heating bill',
+      'someone cranked it to 78 and then LEFT the apartment',
+      'the AC and the heat were BOTH running. Simultaneously. On purpose',
+      'it is currently colder inside than the actual outdoors',
+    ],
+    ask: [
+      'a sweater is a garment you can wear to be warm for free',
+      '68 is a perfectly civilized temperature and you know it',
+      'the thermostat is not a fidget toy',
+      'the bill is split. So is my patience',
+    ],
+    jab: [
+      'I have started sleeping in a coat. In my own home.',
+      'You are not paying this bill alone, and it shows.',
+      'This is a home, not a kiln.',
+      'I can see my breath. Indoors. In summer.',
+    ],
+  },
+  borrowing: {
+    obs: [
+      'my stapler has embarked on another unannounced journey',
+      'the good scissors have vanished into the same void as last time',
+      'I lent you a pen in 2022 and I am still, in my heart, waiting',
+      'my charger keeps migrating to your desk of its own free will, apparently',
+      'the phone charger, the umbrella, AND the good mug are all "borrowed"',
+    ],
+    ask: [
+      '"borrowing" implies an intention to return. Let\'s revisit that word',
+      'the stapler lives HERE. It has a home. It would like to go back',
+      'returning things is a personality trait I recommend cultivating',
+      'you can absolutely buy your own. They sell them. Everywhere',
+    ],
+    jab: [
+      'I\'m starting to think "borrow" is your word for "keep."',
+      'I have a list. It is long. It is itemized.',
+      'Nothing I own is "communal." I checked the deed.',
+      'The pen. I would just like the pen. Baseline.',
+    ],
+  },
+  microwave: {
+    obs: [
+      'someone reheated fish in the shared microwave. FISH',
+      'there is an explosion of marinara welded to the inside of the microwave',
+      'the microwave now smells like a crime and looks like the aftermath',
+      'whatever detonated in there took no survivors',
+      'the "clean me" residue has fossilized onto the turntable',
+    ],
+    ask: [
+      'a paper towel over the plate prevents 100% of interior warfare',
+      'wiping it out takes ten seconds. I have timed this',
+      'fish is a "take it home and suffer alone" food',
+      'the microwave is not a pottery kiln for your leftovers',
+    ],
+    jab: [
+      'The whole floor knows what you had for lunch.',
+      'I opened it and a small ghost of salmon greeted me.',
+      'Nobody wants to microwave their tea in your crime scene.',
+      'I am not scrubbing your explosion. Again.',
+    ],
+  },
+  coffee: {
+    obs: [
+      'the last person left exactly one atom of coffee in the pot',
+      'the pot has been sitting on the hot plate since dawn, slowly becoming tar',
+      'someone took the last cup and did NOT start a new one',
+      'the coffee is now a thick, ambitious sludge',
+      'the filter from yesterday is still in there, marinating',
+    ],
+    ask: [
+      'if you take the last cup, you make the next pot. This is ancient law',
+      'the little scoop is right there. It is not decorative',
+      'turning OFF the hot plate prevents the tar phase',
+      'rinsing the pot is not, technically, optional',
+    ],
+    jab: [
+      'I don\'t ask for much. I ask for coffee that exists.',
+      'That "last cup" energy is telling on you.',
+      'Whoever made this pot owes the entire office an apology.',
+      'It tastes like the inside of a battery. Congrats.',
+    ],
+  },
+  noise: {
+    obs: [
+      'the 2 a.m. bass has become a load-bearing part of my nightmares',
+      'someone was vacuuming. At midnight. On a Tuesday',
+      'the wall and I have both memorized your entire playlist',
+      'the video calls at full volume, speaker mode, no headphones — bold choice',
+      'I now know every plot beat of the show you binge through the wall',
+    ],
+    ask: [
+      'headphones exist. They are a marvel of modern peace',
+      'there is a volume knob and it turns in BOTH directions',
+      'after 10 p.m. we enter what I call "indoor voices" hours',
+      'the floor is not soundproof. Neither, apparently, is your restraint',
+    ],
+    jab: [
+      'I don\'t need to hear your business calls. But I do. All of them.',
+      'The bass is coming from inside the house. Please.',
+      'I could transcribe your entire evening. Want me to?',
+      'Sleep is a human right. So I\'ve read.',
+    ],
+  },
+  trash: {
+    obs: [
+      'the bin is a perfect, teetering Jenga tower and nobody will take it out',
+      'the trash has been "full" for three days and is now a lifestyle',
+      'someone balanced a pizza box on the summit rather than empty it',
+      'the recycling has escaped its container and is exploring the kitchen',
+      'the bag is overflowing but technically "still has room," per whoever',
+    ],
+    ask: [
+      'the bin, when full, must be carried to the dumpster. By hands. Human ones',
+      'a new bag goes IN after the old one comes out. Wild concept, I know',
+      'if it does not fit, it is full. That is the whole test',
+      'taking it out once will not kill you. I have researched this',
+    ],
+    jab: [
+      'I take out the trash so often I\'m considering charging rent to it.',
+      'The tower fell. I know it was going to. It fell on me.',
+      'Stacking is not disposing. These are different verbs.',
+      'We all live here. We all smell it.',
+    ],
+  },
+  parking: {
+    obs: [
+      'someone is in my spot AGAIN. The spot with the number. My number',
+      'a car I have never seen has taken up residency in space #14',
+      'the visitor parking has three cars and none of them are visitors',
+      'you parked so close I entered my car through the trunk',
+      'my assigned spot is being treated as a suggestion',
+    ],
+    ask: [
+      'assigned means assigned. The little number is not a raffle',
+      'there is a whole street. A whole one. Right there',
+      'parking within your OWN lines is a skill worth acquiring',
+      'the visitor spots are for, and I cannot stress this enough, visitors',
+    ],
+    jab: [
+      'I pay for that spot. In money. Real money.',
+      'The number on the ground is not decorative art.',
+      'I\'ve started photographing the license plate. For fun. Mostly.',
+      'One day the tow truck and I will have our moment.',
+    ],
+  },
+  bathroom: {
+    obs: [
+      'the toilet paper roll has been "empty but present" for two days',
+      'someone used the last of it and left the sad cardboard tube as a monument',
+      'the shower drain is auditioning for a hair museum',
+      'the fresh rolls are RIGHT there, in the cabinet, four feet away',
+      'the toothpaste has been squeezed from the middle like a monster',
+    ],
+    ask: [
+      'replacing the roll is a two-second act of basic humanity',
+      'the empty tube goes in the bin, not on the holder as decor',
+      'the extra rolls are in the cabinet. I will draw you a map',
+      'a quick rinse of the sink after shaving works wonders',
+    ],
+    jab: [
+      'The cardboard tube taunts me daily.',
+      'I have started carrying my own supply. In my own home.',
+      'Whoever you are, the drain remembers you.',
+      'It\'s a two-step process and you keep doing step one.',
+    ],
+  },
+  meetings: {
+    obs: [
+      'as noted in my email, the one you did not read, this was covered',
+      'this exact question was answered in the thread. The whole thread',
+      'per my last message (and the three before it), the deadline stands',
+      'circling back, as promised, to the thing you circled away from',
+      'looping in the group again, since looping in once didn\'t take',
+    ],
+    ask: [
+      '"per my email" is corporate for "I already told you this"',
+      'reading the thread before replying saves us all a meeting',
+      'the answer is in paragraph two. It has always been in paragraph two',
+      'a quick scroll up would answer 90% of what you\'re asking',
+    ],
+    jab: [
+      'This could have been an email. It WAS an email. My email.',
+      'I\'m attaching the thread. Again. For posterity.',
+      'Kindly advise, gently, that I already advised.',
+      'Just flagging that I flagged this. Previously. In writing.',
+    ],
+  },
+  printer: {
+    obs: [
+      'the printer is out of paper and someone walked away like a legend',
+      'there\'s a paper jam so ancient it has archaeological value',
+      'the print queue has 47 jobs and none of them are alive anymore',
+      'someone printed 300 pages and left them to rot in the tray',
+      'the "toner low" light has been on since the last presidential administration',
+    ],
+    ask: [
+      'refilling the paper tray is a rite of passage. Do it. Grow',
+      'clearing a jam is not summoning a demon. Just open the flap',
+      'grabbing your printout is part of the printing experience',
+      'if it says "add toner," the move is to add toner',
+    ],
+    jab: [
+      'The printer has trust issues now. Because of us. Mostly you.',
+      'I clear the jam every time. Every. Time.',
+      'Whose 300-page manifesto is this? Be honest.',
+      'It works. It just doesn\'t want to work for you.',
+    ],
+  },
+};
+
+const DAYS = ['Monday','Tuesday','Wednesday','a week ago Thursday','the equinox','before I moved in','some time ago','a date lost to history'];
+
+/* ============================ RNG / PICKERS ============================ */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickFresh(arr, last){
+  if (arr.length < 2) return arr[0];
+  let v, guard = 0;
+  do { v = pick(arr); } while (v === last && ++guard < 16);
+  return v;
+}
+function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============================ STATE ============================ */
+let selectedOffense = null;
+let lastHeadline = null, lastSignoff = null, lastObs = null, lastAsk = null, lastJab = null, lastAnon = null;
+let currentNote = null;
+
+/* ============================ FORMATTING BY TIER ============================ */
+/* wrap a demand fragment in tier-appropriate emphasis */
+function emphasize(text, tier){
+  if (tier <= 1) return text;
+  if (tier === 2){
+    // one soft underline of a key word
+    return text.replace(/\b(soap|labeled|MINE|sweater|68|return|empty|full|thread|visitor|visitors|toner)\b/i, m => '<u>'+m+'</u>');
+  }
+  if (tier === 3){
+    return '<u>'+text+'</u>';
+  }
+  if (tier === 4){
+    return '<u class="u-wobble">'+text.replace(/\bnot\b/gi,'<b>NOT</b>')+'</u>';
+  }
+  // tier 5: shout the whole thing
+  return '<u class="u-wobble"><b>'+text.toUpperCase()+'</b></u>';
+}
+
+/* apply the weaponized "just" and other tier flourishes to prose */
+function toneShift(text, tier){
+  let t = text;
+  if (tier >= 4){
+    // capitalize the ALWAYS/NEVER/AGAIN energy
+    t = t.replace(/\bAGAIN\b/g, '<u>AGAIN</u>');
+  }
+  return t;
+}
+
+function smiley(tier){ return pick(SMILEYS[tier]); }
+
+/* ============================ GENERATE ============================ */
+function generate(){
+  const tier = parseInt(document.getElementById('dial').value, 10);
+  const off = selectedOffense !== null ? OFFENSES[selectedOffense] : pick(OFFENSES);
+  const copy = OFFENSE_COPY[off.id];
+
+  // pick fresh fragments
+  const headRaw = pickFresh(HEADLINES[tier], lastHeadline); lastHeadline = headRaw;
+  const signRaw = pickFresh(SIGNOFFS[tier], lastSignoff);   lastSignoff = signRaw;
+  const obs = pickFresh(copy.obs, lastObs); lastObs = obs;
+  const ask = pickFresh(copy.ask, lastAsk); lastAsk = ask;
+  const jab = pickFresh(copy.jab, lastJab); lastJab = jab;
+  const day = pick(DAYS);
+
+  // token substitution for headline
+  let head = headRaw
+    .replace(/\{NOUN\}/g, off.noun)
+    .replace(/\{NOUNUP\}/g, off.noun.replace(/^the /,'').toUpperCase());
+  // fill obs {DAY}
+  let obsFilled = obs.replace(/\{DAY\}/g, day);
+
+  // the smiley that reads as a threat — sprinkle by tier
+  const sm = smiley(tier);
+
+  // build body paragraphs
+  const paras = [];
+
+  // opening observation
+  let openLine = cap(obsFilled) + '.';
+  if (tier === 1){
+    openLine = 'Just noticed ' + obsFilled + '! ' + esc(sm);
+  } else if (tier === 2){
+    openLine = 'I couldn\'t help but notice ' + obsFilled + '. ' + esc(sm);
+  } else if (tier === 3){
+    openLine = 'It has come to my attention that ' + obsFilled + '. ' + esc(sm);
+  } else if (tier === 4){
+    openLine = 'Once <u>AGAIN</u>, ' + obsFilled + '. ' + esc(sm);
+  } else {
+    openLine = 'FOR THE RECORD: ' + obsFilled.toUpperCase() + '. ' + esc(sm);
+  }
+  paras.push(toneShift(openLine, tier));
+
+  // the "just" demand line — weaponized "just"
+  const justOpeners = {
+    1: ['If you could just', 'Would you mind just', 'Maybe we could just', 'Just a thought — could we'],
+    2: ['I\'m just going to say it:', 'It would be great if we could just', 'Can we just', 'I\'d just ask that we'],
+    3: ['Kindly note that', 'For everyone\'s benefit:', 'A reminder that', 'Going forward:'],
+    4: ['Let me be clear:', 'I\'ll say this once:', 'To spell it out:', 'Understand that'],
+    5: ['HEAR ME:', 'BURN THIS INTO MEMORY:', 'REPEAT AFTER ME:', 'THE RULE, WHICH IS SACRED:'],
+  };
+  const justOpen = pick(justOpeners[tier]);
+  let demand = justOpen + ' ' + esc(ask) + '.';
+  // wrap the ask with emphasis
+  demand = justOpen + ' ' + emphasize(esc(ask), tier) + '.';
+  paras.push(demand);
+
+  // the jab — only appears tier 3+, gets nastier
+  if (tier >= 3){
+    let jabLine = esc(jab);
+    if (tier === 4) jabLine = jabLine + ' ' + esc(smiley(4));
+    if (tier === 5) jabLine = '<b>' + jabLine.toUpperCase() + '</b> ' + esc(smiley(5));
+    paras.push(jabLine);
+  } else if (tier === 2){
+    // tier 2 gets a softened, sadder jab
+    paras.push('I\'m sure it\'s just been a busy week. For everyone. ' + esc(smiley(2)));
+  }
+
+  // build sign-off block
+  let sign = esc(signRaw);
+  // signer name (escaped) or anonymous
+  const signerRaw = document.getElementById('signer').value.trim();
+  let signerLine;
+  if (signerRaw){
+    let name = esc(signerRaw);
+    if (tier === 5) name = '<b>' + name.toUpperCase() + '</b>';
+    else if (tier === 4) name = '<u>' + name + '</u>';
+    signerLine = '<span class="dash">—</span> ' + name;
+  } else {
+    const anon = pickFresh(ANON_SIGNERS[tier], lastAnon); lastAnon = anon;
+    signerLine = esc(anon);
+  }
+
+  // P.S. — a bonus petty flourish, more likely at higher tiers
+  let ps = '';
+  const PS_POOL = {
+    1: ['P.S. You\'re doing great! 🌈', 'P.S. This note comes with love and a lil\' sticker energy.'],
+    2: ['P.S. I really don\'t want to be the note person.', 'P.S. This isn\'t about you specifically. (It\'s a little about you.)'],
+    3: ['P.S. I\'ve moved this note to eye level. On purpose.', 'P.S. There are now three of these around the apartment.'],
+    4: ['P.S. I have laminated this note. It is here to stay.', 'P.S. I know it was between 4 and 6 p.m. I have my theories.'],
+    5: ['P.S. I have started a spreadsheet. You are on it. In red.', 'P.S. The security footage does not exist. But it does. But it doesn\'t. 🙂', 'P.S. I have named the fridge mold after you. It\'s thriving.'],
+  };
+  const psChance = { 1:0.35, 2:0.4, 3:0.55, 4:0.7, 5:0.9 };
+  if (Math.random() < psChance[tier]){
+    ps = pick(PS_POOL[tier]);
+  }
+
+  currentNote = {
+    tier,
+    offenseLabel: off.label,
+    head, paras, sign, signerLine, ps,
+  };
+  currentNote.plain = assemblePlain(currentNote);
+
+  render(currentNote);
+}
+
+function stripTags(s){ return String(s).replace(/<[^>]+>/g,''); }
+
+/* ============================ RENDER ============================ */
+function render(n){
+  const bodyParas = n.paras.map(p => '<p>' + p + '</p>').join('');
+  const psHTML = n.ps ? '<div class="n-ps">' + esc(n.ps).replace(/^P\.S\./,'<span class="lbl">P.S.</span>') + '</div>' : '';
+
+  const html =
+    '<div class="note-stage">' +
+      '<div class="sticky tier-' + n.tier + ' drop' + (n.tier === 5 ? ' scrawl-5' : '') + '">' +
+        '<div class="n-head">' + n.head + '</div>' +
+        '<div class="n-body">' + bodyParas + '</div>' +
+        '<div class="n-sign">' + n.sign + '<br>' + n.signerLine + '</div>' +
+        psHTML +
+      '</div>' +
+    '</div>' +
+    '<div class="meta-bar">' +
+      '<span>RE: <b>' + esc(n.offenseLabel) + '</b></span>' +
+      '<span>Pettiness: <b>' + n.tier + ' / 5</b></span>' +
+      '<span>Passive-aggression: <b>' + ['trace','mild','notable','severe','weaponized'][n.tier-1] + '</b></span>' +
+    '</div>' +
+    '<div class="actions">' +
+      '<button class="mini" id="reroll-btn">↻ Draft another</button>' +
+      '<button class="mini" id="petty-up-btn">▲ Pettier</button>' +
+      '<button class="mini" id="copy-btn">⎘ Copy note</button>' +
+    '</div>';
+
+  const area = document.getElementById('note-area');
+  area.innerHTML = html;
+
+  document.getElementById('reroll-btn').addEventListener('click', () => { generate(); scrollToNote(); });
+  document.getElementById('copy-btn').addEventListener('click', copyNote);
+  document.getElementById('petty-up-btn').addEventListener('click', pettierAndReroll);
+
+  scrollToNote();
+}
+
+function assemblePlain(n){
+  const L = [];
+  L.push('[ ' + n.offenseLabel.toUpperCase() + ' · pettiness ' + n.tier + '/5 ]');
+  L.push('');
+  L.push(stripTags(n.head));
+  L.push('');
+  n.paras.forEach(p => L.push(stripTags(p)));
+  L.push('');
+  L.push(stripTags(n.sign));
+  L.push(stripTags(n.signerLine));
+  if (n.ps){ L.push(''); L.push(stripTags(n.ps)); }
+  L.push('');
+  L.push('— printed by The Passive-Aggressive Note Generator');
+  return L.join('\n');
+}
+
+function scrollToNote(){
+  const el = document.querySelector('.sticky');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function pettierAndReroll(){
+  const dial = document.getElementById('dial');
+  let v = parseInt(dial.value,10);
+  if (v < 5){ v += 1; dial.value = v; updateDial(); }
+  generate();
+}
+
+/* ============================ COPY ============================ */
+function copyNote(){
+  if (!currentNote) return;
+  const txt = currentNote.plain;
+  const btn = document.getElementById('copy-btn');
+  const done = () => {
+    showToast('Note copied. Stick it wherever it\'ll do the most damage.');
+    if (btn){ btn.classList.add('done'); btn.textContent = '✓ Copied'; setTimeout(() => { btn.classList.remove('done'); btn.textContent = '⎘ Copy note'; }, 1800); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){
+    showToast('Copy unavailable — just glare at the screen and remember it.');
+  }
+}
+
+/* ============================ TOAST ============================ */
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ============================ DIAL + OFFENSE UI ============================ */
+function updateDial(){
+  const tier = parseInt(document.getElementById('dial').value, 10);
+  const lvl = document.getElementById('dial-level');
+  lvl.textContent = TIER_NAMES[tier];
+  lvl.style.color = TIER_COLOR[tier];
+  document.getElementById('dial-caption').textContent = TIER_CAPTION[tier];
+  const ticks = document.getElementById('dial-ticks').children;
+  for (let i=0;i<ticks.length;i++) ticks[i].classList.toggle('on', i === tier-1);
+}
+
+function init(){
+  const grid = document.getElementById('offense-grid');
+  OFFENSES.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip';
+    b.innerHTML = '<span class="ic">' + o.icon + '</span>' + esc(o.label);
+    b.addEventListener('click', () => {
+      selectedOffense = (selectedOffense === i) ? null : i;
+      document.querySelectorAll('#offense-grid .chip').forEach((btn, j) => btn.classList.toggle('active', j === selectedOffense));
+      const hint = document.getElementById('hint');
+      hint.textContent = selectedOffense === null
+        ? 'Nothing selected — we\'ll pick a grievance for you.'
+        : 'Ready. Adjust the pettiness dial to taste.';
+    });
+    grid.appendChild(b);
+  });
+
+  const dial = document.getElementById('dial');
+  dial.addEventListener('input', updateDial);
+  updateDial();
+
+  document.getElementById('gen-btn').addEventListener('click', generate);
+  document.getElementById('signer').addEventListener('keydown', (e) => { if (e.key === 'Enter') generate(); });
+}
+
+init();
+</script>
+</body>
+</html>
