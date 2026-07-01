@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Overthinking Engine · Prízrak</title>
+<style>
+  :root {
+    --ink:#08080b; --ink-1:#0c0c11; --ink-2:#101017; --ink-3:#15151d;
+    --bone:#e7e2d4; --parch:#d3cdbd; --ash:#948e83; --ash-2:#6c675e; --ash-3:#46433c;
+    --rule:rgba(231,226,212,.08); --rule-2:rgba(231,226,212,.15);
+    --wire:#3a5566;
+    --amber:#e3b341; --amber-dim:#7a6432;
+    --spark:#7fd3e0; --spark-dim:#3a6470;
+    --red:#e0776a; --red-dim:#6b3f39;
+    --verdict:#8fe0b0; --verdict-dim:#3f6b57;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(130% 82% at 50% -12%, rgba(127,211,224,.06), transparent 55%),
+      radial-gradient(100% 60% at 50% 116%, rgba(227,179,65,.045), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:44px 20px 60px; }
+  @media (min-width:640px) { .wrap { padding:58px 32px 72px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--spark); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(127,211,224,.24); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1a1a22; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:26px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2rem,7.5vw,3.4rem); font-weight:700;
+    line-height:1.0; letter-spacing:-.015em; margin:12px 0 0;
+  }
+  .sub {
+    margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:33rem; line-height:1.62;
+  }
+
+  .divider {
+    height:1px; max-width:38rem; margin:24px auto 26px;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+
+  /* ---- input console ---- */
+  .console { max-width:34rem; margin:0 auto; }
+  .field-label {
+    font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ash-2); margin-bottom:10px; text-align:center;
+  }
+  .input-shell {
+    position:relative; display:flex; align-items:center;
+    border:1px solid var(--rule-2); border-radius:6px; background:var(--ink-1);
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .input-shell:focus-within { border-color:var(--spark-dim); box-shadow:0 0 26px -10px rgba(127,211,224,.5); }
+  .prompt-glyph { font-family:var(--mono); color:var(--spark); padding:0 4px 0 16px; font-size:15px; user-select:none; }
+  #decision {
+    flex:1; background:transparent; border:none; outline:none; color:var(--bone);
+    font-family:var(--serif); font-size:16px; padding:15px 14px 15px 6px; line-height:1.4;
+  }
+  #decision::placeholder { color:var(--ash-3); font-style:italic; }
+
+  .presets { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin:16px 0 4px; }
+  .preset {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.02em; color:var(--ash);
+    background:var(--ink-1); border:1px solid var(--rule); border-radius:20px;
+    padding:6px 13px; cursor:pointer; transition:border-color .18s, color .18s, background .18s;
+  }
+  .preset:hover { border-color:var(--spark-dim); color:var(--bone); background:var(--ink-2); }
+
+  .controls { text-align:center; margin:24px 0 6px; }
+  .run-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.2em; font-size:12px;
+    padding:14px 34px; background:linear-gradient(135deg,var(--amber-dim),var(--amber));
+    border:none; border-radius:5px; color:#161009; cursor:pointer; font-weight:600;
+    transition:transform .15s, box-shadow .25s, opacity .2s;
+    box-shadow:0 0 24px -6px rgba(227,179,65,.5);
+  }
+  .run-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 30px -8px rgba(227,179,65,.6); }
+  .run-btn:active:not(:disabled) { transform:translateY(0); }
+  .run-btn:disabled { opacity:.4; cursor:not-allowed; box-shadow:none; }
+  .hint { font-family:var(--mono); font-size:10px; color:var(--ash-3); margin-top:13px; letter-spacing:.13em; min-height:12px; }
+
+  /* ---- the machine ---- */
+  #machine { margin-top:30px; }
+  .machine-frame {
+    border:1px solid var(--rule-2); border-radius:8px;
+    background:
+      radial-gradient(120% 70% at 50% 0%, rgba(127,211,224,.05), transparent 55%),
+      linear-gradient(180deg,var(--ink-1),var(--ink));
+    box-shadow:0 30px 70px -40px rgba(0,0,0,.9); overflow:hidden;
+  }
+  .machine-head {
+    display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+    padding:14px 18px; border-bottom:1px solid var(--rule);
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-3);
+  }
+  .machine-head .seed { color:var(--spark); }
+  .machine-head .status { color:var(--amber); }
+
+  .seed-line {
+    padding:20px 20px 6px; text-align:center;
+  }
+  .seed-line .q {
+    font-family:var(--serif); font-size:clamp(17px,4.4vw,21px); font-weight:700; line-height:1.3;
+    color:var(--bone);
+  }
+  .seed-line .q::before { content:"\201C"; color:var(--spark); }
+  .seed-line .q::after { content:"\201D"; color:var(--spark); }
+  .seed-line .tag {
+    font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ash-3); margin-top:8px;
+  }
+
+  /* the chain of consequences */
+  .chain { padding:10px 18px 6px; position:relative; }
+  @media (min-width:640px){ .chain { padding:10px 30px 6px; } }
+
+  .node {
+    position:relative; padding:11px 0 11px 34px; opacity:0;
+  }
+  .node.in { animation:nodeIn .5s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes nodeIn { from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+
+  /* connective wire down the left */
+  .node::before {
+    content:""; position:absolute; left:9px; top:-6px; bottom:-6px; width:1px;
+    background:linear-gradient(180deg, var(--wire), rgba(58,85,102,.35));
+  }
+  .node:first-child::before { top:14px; }
+  .node:last-of-type::before { bottom:auto; height:20px; }
+  /* the joint dot */
+  .node .joint {
+    position:absolute; left:5px; top:14px; width:9px; height:9px; border-radius:50%;
+    background:var(--ink); border:1.5px solid var(--wire); box-shadow:0 0 0 3px var(--ink);
+  }
+  .node.spark .joint { border-color:var(--spark); box-shadow:0 0 10px -1px var(--spark), 0 0 0 3px var(--ink); }
+  .node.dread .joint { border-color:var(--red); box-shadow:0 0 10px -1px var(--red), 0 0 0 3px var(--ink); }
+
+  .node .connector {
+    font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ash-3); margin-bottom:3px; display:inline-block;
+  }
+  .node.dread .connector { color:var(--red-dim); }
+  .node .text { font-size:14.5px; line-height:1.6; color:var(--parch); }
+  .node.dread .text { color:#e8c9c2; }
+  .node .prob {
+    font-family:var(--mono); font-size:9px; color:var(--ash-3); margin-top:4px; letter-spacing:.06em;
+  }
+  .node .em { color:var(--spark); font-style:italic; }
+  .node.dread .em { color:var(--red); }
+
+  .caret { display:inline-block; width:7px; margin-left:1px; color:var(--spark);
+    animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  /* the collapse / verdict */
+  .verdict-wrap {
+    margin:10px 18px 22px; padding:22px 20px 20px; border-radius:6px;
+    border:1px solid var(--rule); background:
+      radial-gradient(120% 90% at 50% 0%, rgba(143,224,176,.07), transparent 60%), var(--ink-2);
+    text-align:center; opacity:0;
+  }
+  .verdict-wrap.in { animation:verdictIn .8s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes verdictIn { from{ opacity:0; transform:translateY(12px) scale(.985); } to{ opacity:1; transform:none; } }
+  .verdict-kick {
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--verdict-dim); margin-bottom:12px;
+    display:flex; align-items:center; gap:12px; justify-content:center;
+  }
+  .verdict-kick::before, .verdict-kick::after { content:""; height:1px; flex:1; max-width:70px; background:var(--rule); }
+  .verdict-text {
+    font-family:var(--serif); font-size:clamp(18px,5vw,24px); font-weight:700; line-height:1.28;
+    color:var(--verdict); letter-spacing:-.01em;
+  }
+  .verdict-note {
+    margin-top:12px; font-size:13px; font-style:italic; color:var(--ash); line-height:1.6;
+  }
+  .verdict-stats {
+    margin-top:16px; padding-top:14px; border-top:1px solid var(--rule);
+    display:flex; gap:10px 22px; flex-wrap:wrap; justify-content:center;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; color:var(--ash-3);
+  }
+  .verdict-stats b { color:var(--amber); font-weight:400; }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .1s;
+    display:inline-flex; align-items:center; gap:8px; letter-spacing:.06em;
+  }
+  .mini:hover { border-color:var(--spark); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.primary { border-color:var(--amber-dim); color:var(--amber); }
+  .mini.primary:hover { border-color:var(--amber); color:var(--bone); background:rgba(227,179,65,.06); }
+  .mini.done { border-color:var(--verdict); color:var(--verdict); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:11px 17px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.85); letter-spacing:.04em; max-width:88vw; text-align:center;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:52px; padding-top:26px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.9; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { opacity:.04; }
+    .node { opacity:1 !important; }
+    .verdict-wrap { opacity:1 !important; }
+    .caret { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — a contingency apparatus</div>
+      <h1>The <span class="specter">Overthinking</span> Engine</h1>
+      <p class="sub">Feed it one small decision. It will construct, in real time, the entire branching catastrophe that decision definitely leads to — then, exhausted, deliver the correct and profoundly boring verdict.</p>
+    </header>
+
+    <div class="divider"></div>
+
+    <div class="console">
+      <div class="field-label">Enter one (1) small decision</div>
+      <div class="input-shell">
+        <span class="prompt-glyph" aria-hidden="true">›</span>
+        <input id="decision" type="text" maxlength="90" autocomplete="off" spellcheck="false"
+          placeholder="should I text back?" aria-label="the decision to overthink">
+      </div>
+      <div class="presets" id="presets"></div>
+    </div>
+
+    <div class="controls">
+      <button id="run-btn" class="run-btn">Overthink It</button>
+      <div class="hint" id="hint">It will find the worst-case scenario. It always does.</div>
+    </div>
+
+    <div id="machine" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">The odds are always against you · the verdict is always fine</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ ESCAPE ============================ */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================ PRESET DECISIONS ============================ */
+const PRESETS = [
+  "should I text back?",
+  "one more episode?",
+  "should I send that email tonight?",
+  "should I reply-all?",
+  "should I go to the party?",
+  "should I get bangs?",
+  "should I speak up in the meeting?",
+  "should I double-text?",
+  "should I quit my job?",
+  "should I say hi to them?",
+  "should I have another coffee?",
+  "should I unsend it?",
+];
+
+/* ============================ CONSEQUENCE POOLS ============================ */
+/* The engine builds a chain: SEED -> first-step reactions -> escalating spirals
+   -> a peak catastrophe -> then collapses to a mundane verdict.
+   Each pool is large + drawn with no-immediate-repeat so re-runs stay fresh.   */
+
+/* STEP 1 — the first plausible ripple. Grounded, still reasonable. */
+const FIRST_STEP = [
+  "they read it but don't reply for {n} hours",
+  "they reply in under four minutes",
+  "they reply with a single lowercase word",
+  "they react with a thumbs-up and nothing else",
+  "nobody responds and the silence starts composting",
+  "someone screenshots it",
+  "it goes exactly fine, which is somehow worse",
+  "you get a reply that just says “hola”",
+  "they leave you on read, but respond to their story",
+  "you notice they were typing, then stopped",
+  "everyone acts normal, which is deeply suspicious",
+  "you get one (1) heart react from the wrong person",
+  "they reply {n} days later like nothing happened",
+  "your phone buzzes and it's a spam call",
+  "they say “haha” with no letters to spare",
+];
+
+/* MID SPIRAL — the escalating "which means" logic. These stack.
+   Written to chain: each is an inference from the previous. */
+const SPIRAL = [
+  "which means they were waiting by their phone",
+  "which means they've been thinking about it too",
+  "which means they've clearly moved on",
+  "which means the group chat has already discussed you",
+  "which means everyone knows and nobody will say",
+  "which means this is now Your Thing at parties",
+  "which means you have to change your entire personality",
+  "which means you'll have to move to a smaller town",
+  "which means your barista will find out",
+  "which means it becomes a story told at your funeral",
+  "which means the algorithm now thinks you're desperate",
+  "which means they've re-read it in a specific tone",
+  "which means the vibe is now permanently off",
+  "which means you owe someone an apology you can't identify",
+  "which means your future self already regrets this",
+  "which means it gets brought up in {n} years, unprompted",
+  "which means there's a version of you handling this better",
+  "which means they're telling their roommate right now",
+  "which means you have to fake your own weather emergency",
+  "which means the whole friend group subtly recalibrates",
+  "which means you're now a cautionary tale in someone's diary",
+  "which means autocorrect was in on it the whole time",
+  "which means you'll rehearse the recovery speech in the shower",
+  "which means your reputation compounds daily like interest",
+];
+
+/* DREAD PEAK — the absurd, catastrophic bottom of the spiral. */
+const CATASTROPHE = [
+  "you die alone, but with excellent grammar",
+  "you legally change your name and start a goat farm",
+  "the incident gets a Wikipedia stub with a “citation needed”",
+  "you are quietly uninvited from a wedding that hasn't been planned",
+  "future historians date the decline of your decade to this exact message",
+  "you have to fake a small, dignified death and relocate",
+  "your descendants inherit the awkwardness as a family heirloom",
+  "a documentary crew shows up asking gentle, devastating questions",
+  "you become the reason the group chat was eventually muted",
+  "you are remembered fondly but for entirely the wrong reasons",
+  "it is discussed, one day, in couples therapy that isn't yours",
+  "you achieve a level of cringe visible from low orbit",
+  "you are asked to leave a country you have never visited",
+  "the ick radiates outward and affects local property values",
+  "you are gently escorted out of your own imagination",
+  "your name becomes a verb meaning ‘to overthink slightly’",
+  "you spend eternity in a waiting room with everyone you've left on read",
+  "the universe issues a formal, sympathetic sigh in your direction",
+];
+
+/* the connectors that introduce each tier */
+const OPEN_CONN = ["if you do it →","suppose you go ahead →","say you commit →","best case, you do it →","let's run it →"];
+const SPIRAL_CONN = ["→","→","→ and so","→ therefore","→ obviously","→ naturally","→ at which point"];
+const DREAD_CONN = ["worst case →","spiraling further →","and finally →","the true bottom →","catastrophically →","and then, inevitably →"];
+
+/* ============================ VERDICTS ============================ */
+/* The anticlimactic collapse. {clock} gets a plausible mundane time/context. */
+const VERDICT = [
+  "just send it. It is {clock}.",
+  "do the thing. Nobody is thinking about you. They're thinking about themselves.",
+  "send it. Everyone forgets everything by {clock}.",
+  "go to sleep. Decide tomorrow. Tomorrow will not care either.",
+  "text back. It's a text, not a hostage negotiation.",
+  "yes. The correct answer was always yes. It's {clock}.",
+  "no. But a small, boring no, not a dramatic one.",
+  "just do it. The worst case is that it's slightly awkward for nine seconds.",
+  "send it. You will not remember this by next Thursday.",
+  "one more episode. You already knew. It's {clock}.",
+  "reply normally. “Normally” is a real, achievable option.",
+  "leave it. Not everything requires a response. This includes this.",
+  "go. You'll be glad in a way you can't currently access.",
+  "close the app. The decision makes itself if you stop watching it.",
+  "say hi. That's the whole plan. Say hi.",
+  "send the boring version. The boring version is correct.",
+];
+
+const VERDICT_NOTE = [
+  "The engine consumed {kwh} kilowatt-hours of anxiety to reach this.",
+  "This conclusion was available at the very beginning. It always is.",
+  "No branch of the tree required your attention. All of them wanted it.",
+  "The catastrophic scenarios have been filed and, per policy, forgotten.",
+  "Confidence: total. Relevance to reality: minimal.",
+  "The machine would like to remind you it is {clock} and you have not eaten.",
+  "Every projected outcome assumed people are watching. They are not.",
+  "The spiral was very convincing. It was also entirely fictional.",
+  "Please note the engine is contractually incapable of saying ‘it's fine.’ It's fine.",
+  "Result computed. Result ignored. Result recomputed. This is normal.",
+];
+
+const CLOCKS = [
+  "8pm","10:47pm","past midnight","a Tuesday","2am, be honest",
+  "still light out","not that late","early, actually","later than you think","almost tomorrow",
+];
+
+/* status-line flavor while it "thinks" */
+const STATUS_WORDS = [
+  "MODELING WORST CASE","ENUMERATING DOOM","CONSULTING THE VOID",
+  "RUNNING 40,000 SIMULATIONS","WEIGHING NON-PROBLEMS","CATASTROPHIZING","AMPLIFYING STAKES",
+];
+
+/* branch-count labels for the machine head */
+function branchCount(rng){ return rint(rng, 3, 9) + "," + String(rint(rng,0,999)).padStart(3,"0"); }
+
+/* ============================ RNG + PICKERS ============================ */
+function makeRng(seed){
+  let s = (seed >>> 0) || 1;
+  return function(){
+    s ^= s << 13; s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5;  s >>>= 0;
+    return (s >>> 0) / 4294967296;
+  };
+}
+function pick(arr, rng){ return arr[Math.floor(rng()*arr.length)]; }
+function rint(rng, lo, hi){ return lo + Math.floor(rng()*(hi-lo+1)); }
+
+/* no-immediate-repeat picker with a rolling memory set */
+function makeFreshPicker(pool){
+  const seen = new Set();
+  const keep = Math.max(1, Math.min(pool.length - 2, Math.floor(pool.length * 0.55)));
+  return function(rng){
+    if(pool.length < 2){ return pool[0]; }
+    let v, guard = 0;
+    do { v = pick(pool, rng); } while(seen.has(v) && ++guard < 60);
+    seen.add(v);
+    if(seen.size > keep){
+      const it = seen.values();
+      while(seen.size > keep){ seen.delete(it.next().value); }
+    }
+    return v;
+  };
+}
+const pickFirst   = makeFreshPicker(FIRST_STEP);
+const pickSpiral  = makeFreshPicker(SPIRAL);
+const pickDread   = makeFreshPicker(CATASTROPHE);
+const pickVerdict = makeFreshPicker(VERDICT);
+const pickNote    = makeFreshPicker(VERDICT_NOTE);
+
+/* fill {tokens} with mundane numbers/clocks */
+function fillTokens(str, rng){
+  return str
+    .replace(/\{n\}/g, () => rint(rng, 2, 9))
+    .replace(/\{clock\}/g, () => pick(CLOCKS, rng))
+    .replace(/\{kwh\}/g, () => (rng()*9 + 1).toFixed(1));
+}
+
+/* a probability that trends downward as the spiral deepens (theatrical stat) */
+function fakeProb(rng, depth, total){
+  const base = 88 - depth * (70 / Math.max(1,total));
+  const jitter = (rng()*10 - 5);
+  let p = Math.max(0.001, base + jitter);
+  if(depth >= total - 1) p = rng()*0.4 + 0.02; // catastrophe: absurdly small
+  return p < 1 ? p.toFixed(depth >= total-1 ? 3 : 2) : p.toFixed(1);
+}
+
+/* ============================ BUILD ONE SPIRAL ============================ */
+function buildSpiral(decision, rng){
+  const depth = rint(rng, 3, 4);            // number of mid-spiral inferences
+  const nodes = [];
+
+  nodes.push({
+    tier: "spark",
+    conn: pick(OPEN_CONN, rng),
+    text: fillTokens(pickFirst(rng), rng)
+  });
+
+  for(let i=0;i<depth;i++){
+    nodes.push({
+      tier: (i === depth-1 ? "spark" : ""),
+      conn: pick(SPIRAL_CONN, rng),
+      text: fillTokens(pickSpiral(rng), rng)
+    });
+  }
+
+  nodes.push({
+    tier: "dread",
+    conn: pick(DREAD_CONN, rng),
+    text: fillTokens(pickDread(rng), rng)
+  });
+
+  const total = nodes.length;
+  nodes.forEach((n, i) => { n.prob = fakeProb(rng, i, total); });
+
+  const verdict = fillTokens(pickVerdict(rng), rng);
+  const note = fillTokens(pickNote(rng), rng);
+
+  return {
+    decision,
+    nodes,
+    verdict,
+    note,
+    branches: branchCount(rng),
+    kwh: (rng()*9 + 1).toFixed(1),
+    seconds: (rng()*0.3 + 0.02).toFixed(2),
+    status: pick(STATUS_WORDS, rng),
+  };
+}
+
+/* ============================ RENDER ============================ */
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function nodeHTML(n, i){
+  const cls = "node" + (n.tier ? " " + n.tier : "");
+  return ''+
+    '<div class="'+cls+'" data-i="'+i+'">'+
+      '<span class="joint"></span>'+
+      '<span class="connector">'+ esc(n.conn) +'</span>'+
+      '<div class="text" id="ntext-'+i+'"></div>'+
+      '<div class="prob">p ≈ '+ esc(n.prob) +'%</div>'+
+    '</div>';
+}
+
+let activeTimers = [];
+function clearTimers(){ activeTimers.forEach(id => clearTimeout(id)); activeTimers = []; }
+function later(fn, ms){ const id = setTimeout(fn, ms); activeTimers.push(id); return id; }
+
+let currentRun = null;
+
+function renderRun(run){
+  clearTimers();
+  currentRun = run;
+
+  const machine = document.getElementById('machine');
+  const chainHTML = run.nodes.map((n,i) => nodeHTML(n,i)).join('');
+
+  machine.innerHTML = ''+
+  '<div class="machine-frame">'+
+    '<div class="machine-head">'+
+      '<span class="seed">CONTINGENCY ENGINE v0.9</span>'+
+      '<span class="status" id="mstatus">'+ esc(run.status) +'…</span>'+
+    '</div>'+
+    '<div class="seed-line">'+
+      '<div class="q">'+ esc(run.decision) +'</div>'+
+      '<div class="tag">seed decision · '+ esc(run.branches) +' branches enumerated</div>'+
+    '</div>'+
+    '<div class="chain" id="chain">'+ chainHTML +'</div>'+
+    '<div class="verdict-wrap" id="verdict">'+
+      '<div class="verdict-kick">Verdict</div>'+
+      '<div class="verdict-text" id="vtext"></div>'+
+      '<div class="verdict-note" id="vnote"></div>'+
+      '<div class="verdict-stats">'+
+        '<span><b>'+ esc(run.branches) +'</b> branches</span>'+
+        '<span><b>'+ esc(run.kwh) +'</b> kWh of dread</span>'+
+        '<span><b>'+ esc(run.seconds) +'s</b> to conclude nothing</span>'+
+      '</div>'+
+      '<div class="actions">'+
+        '<button class="mini primary" id="again-btn" type="button">↻ overthink it again</button>'+
+        '<button class="mini" id="copy-btn" type="button">⎘ copy the spiral</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+
+  wireResultButtons();
+  revealSequence(run);
+
+  if(!prefersReduced){
+    machine.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+}
+
+function typewriter(el, text, done){
+  if(prefersReduced){ el.textContent = text; if(done) done(); return; }
+  el.textContent = '';
+  const caret = document.createElement('span');
+  caret.className = 'caret'; caret.textContent = '▍';
+  el.appendChild(caret);
+  let i = 0;
+  const step = () => {
+    if(i >= text.length){ caret.remove(); if(done) done(); return; }
+    caret.insertAdjacentText('beforebegin', text[i]);
+    i++;
+    let delay = 9 + Math.random()*12;
+    const c = text[i-1];
+    if(c === '.' || c === ',' || c === '—') delay += 60 + Math.random()*70;
+    later(step, delay);
+  };
+  later(step, 60);
+}
+
+function revealSequence(run){
+  const chain = document.getElementById('chain');
+  const nodeEls = chain ? chain.querySelectorAll('.node') : [];
+  const statusEl = document.getElementById('mstatus');
+
+  if(prefersReduced){
+    nodeEls.forEach((el,i) => {
+      el.classList.add('in');
+      const t = document.getElementById('ntext-'+i);
+      if(t) t.textContent = run.nodes[i].text;
+    });
+    if(statusEl) statusEl.textContent = 'RESOLVED';
+    const v = document.getElementById('verdict');
+    if(v) v.classList.add('in');
+    const vt = document.getElementById('vtext'); if(vt) vt.textContent = run.verdict;
+    const vn = document.getElementById('vnote'); if(vn) vn.textContent = run.note;
+    return;
+  }
+
+  let idx = 0;
+  const stepNode = () => {
+    if(idx >= run.nodes.length){ showVerdict(); return; }
+    const el = nodeEls[idx];
+    const textEl = document.getElementById('ntext-'+idx);
+    const text = run.nodes[idx].text;
+    const thisIdx = idx;
+    idx++;
+    if(el) el.classList.add('in');
+    if(textEl){
+      typewriter(textEl, text, () => {
+        // brief pause between rungs; longer before the catastrophe lands
+        const isDread = run.nodes[thisIdx].tier === 'dread';
+        later(stepNode, isDread ? 260 : 150);
+      });
+    } else {
+      later(stepNode, 150);
+    }
+  };
+
+  const showVerdict = () => {
+    if(statusEl) statusEl.textContent = 'RESOLVED';
+    const v = document.getElementById('verdict');
+    later(() => {
+      if(v) v.classList.add('in');
+      const vt = document.getElementById('vtext');
+      const vn = document.getElementById('vnote');
+      if(vt) typewriter(vt, run.verdict, () => {
+        if(vn) later(() => { vn.textContent = run.note; }, 120);
+      });
+    }, 340);
+  };
+
+  later(stepNode, 220);
+}
+
+/* ============================ COPY ============================ */
+function runToText(run){
+  const L = [];
+  L.push('THE OVERTHINKING ENGINE — contingency report');
+  L.push('seed decision: “' + run.decision + '”');
+  L.push(run.branches + ' branches · ' + run.kwh + ' kWh of dread · ' + run.seconds + 's');
+  L.push('');
+  run.nodes.forEach((n,i) => {
+    L.push('  ' + n.conn + ' ' + n.text + '   (p≈' + n.prob + '%)');
+  });
+  L.push('');
+  L.push('VERDICT: ' + run.verdict);
+  L.push(run.note);
+  L.push('');
+  L.push('— the odds are always against you · the verdict is always fine');
+  return L.join('\n');
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+function copyRun(btn){
+  if(!currentRun) return;
+  const txt = runToText(currentRun);
+  const done = () => {
+    showToast('Spiral copied. It looks calmer written down. It is not.');
+    if(btn){ btn.classList.add('done'); const o = btn.textContent; btn.textContent = '✓ copied the spiral';
+      setTimeout(() => { btn.classList.remove('done'); btn.textContent = o; }, 2000); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){
+    showToast('The spiral refuses to be copied. Overthink it from memory.');
+  }
+}
+
+/* ============================ RUN ORCHESTRATION ============================ */
+let lastFingerprint = null;
+let runIndex = 0;
+
+function currentDecision(){
+  const raw = document.getElementById('decision').value.trim();
+  if(raw) return raw.slice(0, 90);
+  const ph = document.getElementById('decision').getAttribute('placeholder');
+  return ph || "should I text back?";
+}
+
+function overthink(){
+  runIndex++;
+  const decision = currentDecision();
+
+  let run, fingerprint, tries = 0;
+  do {
+    const rng = makeRng((Date.now() ^ (Math.random()*1e9|0) ^ (runIndex*2654435761)) >>> 0);
+    run = buildSpiral(decision, rng);
+    fingerprint = run.nodes.map(n => n.text).join('|') + '::' + run.verdict;
+    tries++;
+  } while(fingerprint === lastFingerprint && tries < 8);
+  lastFingerprint = fingerprint;
+
+  renderRun(run);
+
+  const hint = document.getElementById('hint');
+  if(hint) hint.textContent = 'It found the worst case. Run it again for a fresh catastrophe.';
+  const runBtn = document.getElementById('run-btn');
+  if(runBtn) runBtn.textContent = 'Overthink Again';
+}
+
+function wireResultButtons(){
+  const again = document.getElementById('again-btn');
+  const copy = document.getElementById('copy-btn');
+  if(again) again.addEventListener('click', () => overthink());
+  if(copy) copy.addEventListener('click', (e) => copyRun(e.currentTarget));
+}
+
+/* ============================ WIRING ============================ */
+const runBtn = document.getElementById('run-btn');
+const input = document.getElementById('decision');
+const presetsEl = document.getElementById('presets');
+
+/* preset chips: fill input + run */
+PRESETS.slice(0, 6).forEach(p => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'preset'; b.textContent = p;
+  b.addEventListener('click', () => {
+    input.value = p;
+    overthink();
+  });
+  presetsEl.appendChild(b);
+});
+
+runBtn.addEventListener('click', () => overthink());
+input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); overthink(); } });
+
+/* rotate the placeholder gently so first-timers see the range */
+let phIdx = 0;
+const phPool = PRESETS.slice();
+function rotatePlaceholder(){
+  if(document.activeElement === input || input.value) return;
+  phIdx = (phIdx + 1) % phPool.length;
+  input.setAttribute('placeholder', phPool[phIdx]);
+}
+if(!prefersReduced){
+  setInterval(rotatePlaceholder, 3600);
+}
+</script>
+</body>
+</html>

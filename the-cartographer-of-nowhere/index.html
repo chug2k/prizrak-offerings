@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Cartographer of Nowhere · Prízrak</title>
+<style>
+  :root {
+    --ink:#0a0906; --ink-1:#0e0c08; --ink-2:#12100b; --ink-3:#171410;
+    --bone:#e8e0cc; --parch:#d6ceb6; --ash:#9c927c; --ash-2:#726957; --ash-3:#4a4438;
+    --rule:rgba(232,224,204,.08); --rule-2:rgba(232,224,204,.16);
+    --sea:#4d5a4a;          /* muted sage sea */
+    --sea-deep:#2c352c;
+    --land:#171410;
+    --coast:#c9b489;        /* aged ink coastline */
+    --river:#6f8a94;        /* faded teal water */
+    --road:#8a7350;         /* sepia roads */
+    --dot:#d9c79a;
+    --gild:#c9a860; --gild-dim:#7a6538;
+    --rose:#c58a6a; --rose-dim:#6b4a38;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(130% 82% at 50% -14%, rgba(201,168,96,.07), transparent 56%),
+      radial-gradient(100% 60% at 50% 118%, rgba(111,138,148,.045), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:44px 20px 60px; }
+  @media (min-width:640px) { .wrap { padding:60px 32px 72px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--gild); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(201,168,96,.24); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1a1710; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:28px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2rem,7.4vw,3.3rem); font-weight:700;
+    line-height:1.02; letter-spacing:-.015em; margin:12px 0 0;
+  }
+  .sub {
+    margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:34rem; line-height:1.62;
+  }
+
+  .divider {
+    height:1px; max-width:38rem; margin:26px auto 26px;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+
+  .controls { text-align:center; margin:8px 0 6px; }
+  .draw-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.2em; font-size:12px;
+    padding:14px 32px; background:linear-gradient(135deg,var(--gild-dim),var(--gild));
+    border:none; border-radius:4px; color:#181206; cursor:pointer; font-weight:600;
+    transition:transform .15s, box-shadow .25s, opacity .2s;
+    box-shadow:0 0 24px -6px rgba(201,168,96,.5);
+  }
+  .draw-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 30px -8px rgba(201,168,96,.6); }
+  .draw-btn:active:not(:disabled) { transform:translateY(0); }
+  .draw-btn:disabled { opacity:.5; cursor:default; }
+  .hint { font-family:var(--mono); font-size:10px; color:var(--ash-3); margin-top:12px; letter-spacing:.14em; min-height:12px; }
+
+  #atlas { margin-top:14px; }
+
+  /* the map plate — an aged atlas leaf */
+  .plate {
+    border:1px solid var(--rule-2); border-radius:6px;
+    background:
+      radial-gradient(120% 90% at 50% 4%, rgba(201,168,96,.05), transparent 62%),
+      linear-gradient(180deg,var(--ink-1),var(--ink));
+    position:relative; overflow:hidden;
+    box-shadow:0 30px 70px -38px rgba(0,0,0,.9);
+  }
+  .plate-head {
+    display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+    font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ash-3); padding:16px 20px 0;
+  }
+  .plate-head .sheet { color:var(--gild); }
+
+  .map-frame {
+    position:relative; padding:14px 18px 4px;
+  }
+  .map-frame svg { display:block; width:100%; height:auto; }
+
+  /* faint paper stain sweep over the map */
+  .map-frame::after {
+    content:""; position:absolute; inset:14px 18px 4px; pointer-events:none;
+    background:radial-gradient(80% 60% at 22% 88%, rgba(122,101,56,.08), transparent 60%);
+    mix-blend-mode:screen;
+  }
+
+  .caption {
+    padding:6px 22px 22px; position:relative;
+  }
+  .place-name {
+    font-family:var(--serif); font-weight:700; font-size:clamp(20px,5.2vw,27px);
+    line-height:1.16; letter-spacing:-.01em; margin:6px 0 2px; color:var(--bone);
+    min-height:1.16em;
+  }
+  .place-sub {
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--ash-2);
+    margin-bottom:16px;
+  }
+  .place-sub .coord { color:var(--ash); }
+
+  .lore {
+    font-size:14.5px; line-height:1.75; color:var(--parch);
+    border-left:2px solid var(--gild-dim); padding-left:16px; margin:0 0 18px;
+    min-height:1.75em;
+  }
+  .lore .em { color:var(--gild); font-style:italic; }
+
+  .caret { display:inline-block; width:8px; margin-left:1px; color:var(--gild);
+    animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  .facts {
+    display:grid; grid-template-columns:repeat(2,1fr); gap:14px 16px;
+    border-top:1px solid var(--rule); padding-top:16px; margin-top:4px;
+  }
+  @media (min-width:520px) { .facts { grid-template-columns:repeat(3,1fr); } }
+  .fact-k { font-family:var(--mono); font-size:8.5px; text-transform:uppercase; letter-spacing:.16em; color:var(--ash-3); margin-bottom:4px; }
+  .fact-v { font-size:12.5px; color:var(--parch); line-height:1.42; font-style:italic; }
+
+  .known {
+    margin-top:16px; padding-top:14px; border-top:1px solid var(--rule);
+    font-size:13px; font-style:italic; color:var(--ash); line-height:1.66;
+  }
+  .known .tag {
+    font-family:var(--mono); font-style:normal; font-size:9px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--gild); display:block; margin-bottom:5px;
+  }
+
+  /* reveal for the lower text lines */
+  .fade-line { opacity:0; }
+  .fade-line.in { animation:fadeUp .7s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(9px); } to { opacity:1; transform:translateY(0); } }
+
+  .plate-enter { animation:plateIn .8s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes plateIn { from { opacity:0; transform:translateY(16px) scale(.99); } to { opacity:1; transform:none; } }
+
+  /* the map draws itself: strokes trace on, fills bloom in */
+  .draw-path { stroke-dasharray:var(--len); stroke-dashoffset:var(--len);
+    animation:trace 1.5s cubic-bezier(.4,.1,.2,1) forwards; }
+  @keyframes trace { to { stroke-dashoffset:0; } }
+  .bloom { opacity:0; animation:bloom .9s ease forwards; }
+  @keyframes bloom { to { opacity:1; } }
+  .label-in { opacity:0; animation:bloom .6s ease forwards; }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:26px; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .1s;
+    display:inline-flex; align-items:center; gap:8px; letter-spacing:.06em;
+  }
+  .mini:hover { border-color:var(--gild); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.primary { border-color:var(--gild-dim); color:var(--gild); }
+  .mini.primary:hover { border-color:var(--gild); color:var(--bone); background:rgba(201,168,96,.06); }
+  .mini.done { border-color:var(--gild); color:var(--gild); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:11px 17px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.85); letter-spacing:.04em; max-width:88vw; text-align:center;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:52px; padding-top:26px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.9; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { opacity:.04; }
+    .fade-line { opacity:1 !important; }
+    .draw-path { stroke-dashoffset:0 !important; }
+    .bloom, .label-in { opacity:1 !important; }
+    .caret { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — an atlas of the unvisited</div>
+      <h1>The Cartographer of <span class="specter">Nowhere</span></h1>
+      <p class="sub">Every coastline here is a rumour. Give the survey a moment and it will draw you a place that does not exist — its roads, its river, its one sighing strait — and tell you, flatly, what it is chiefly known for.</p>
+    </header>
+
+    <div class="divider"></div>
+
+    <div class="controls">
+      <button id="draw-btn" class="draw-btn">Survey a New Land</button>
+      <div class="hint" id="hint">The ink is still wet. Nothing is out there yet.</div>
+    </div>
+
+    <div id="atlas" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">All bearings approximate · the north arrow is a suggestion · here be no one</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ ESCAPE ============================ */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================ RNG + PICKERS ============================ */
+function makeRng(seed){
+  let s = (seed >>> 0) || 1;
+  return function(){
+    s ^= s << 13; s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5;  s >>>= 0;
+    return (s >>> 0) / 4294967296;
+  };
+}
+function pick(arr, rng){ return arr[Math.floor(rng()*arr.length)]; }
+function pickFresh(arr, rng, seen){
+  if(arr.length < 2) return arr[0];
+  let v, guard=0;
+  do { v = pick(arr, rng); } while(seen.has(v) && ++guard < 60);
+  seen.add(v);
+  return v;
+}
+function rint(rng, lo, hi){ return lo + Math.floor(rng()*(hi-lo+1)); }
+function chance(rng, p){ return rng() < p; }
+function shuffle(arr, rng){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+function trim(set, keep){
+  if(set.size > keep){
+    const it = set.values();
+    while(set.size > keep){ set.delete(it.next().value); }
+  }
+}
+
+/* ============================ NAME GENERATION ============================ */
+/* Place-names built from morphemes so they rarely repeat and always sound
+   plausibly foreign, plausibly forgotten. */
+
+const NAME_PRE = [
+  "Aber","Ald","Ash","Bal","Bel","Bly","Bram","Car","Cald","Cove","Craw","Dun",
+  "Ely","Fen","Glas","Grim","Hal","Hark","Hel","Kil","Lang","Lin","Loch","Marsh",
+  "Mor","Nor","Orl","Oster","Pen","Quel","Raven","Sael","Salt","Sil","Storm","Tarn",
+  "Thorn","Ulle","Vann","Wend","Wold","Yare","Ythe","Zel","Bourn","Drear","Hollow",
+  "Mist","Nether","Under","Winter","Almost","Barely","Seldom","Lesser","Outer"
+];
+const NAME_MID = [
+  "","","","a","e","i","o","u","er","el","in","or","um","an","by","le","wick","mere",
+  "beck","fell","garth","holm","thwaite","carr","dale","combe","stow","gate"
+];
+const NAME_SUF = [
+  " by","ham","ton","wick","mere","fell","garth","holm","thwaite","ness","haven","mouth",
+  "moor","fen","reach","strand","cliffe","port","stead","borough","minster","church",
+  "ford","bridge","dun","kirk","shaw","ley","wold","cross","hithe","end"," side","gate"
+];
+/* the occasional two-word / preposition name */
+const NAME_QUALIFIER = [
+  "Great ","Little ","Old ","Nether ","Upper ","Lower ","North ","South ","Cold ",
+  "Long ","Far ","Last ","Lost ","Middle ","Wet ","Grey ","Saint ","Much ","Steeple ",
+  "Temple ","Black ","White ","Broken ","Empty ","Half "
+];
+const NAME_TAIL = [
+  " Regis"," Parva"," Magna"," on the Marsh"," under Fell"," by the Sea"," Extinct",
+  " Abbots"," Episcopi"," in the Fen"," le Willows"," on the Ooze"," Deceased",
+  " next the Water"," without"," Undivided"," of the Rushes"," Perished"," Forgotten"
+];
+
+function generateName(rng){
+  const roll = rng();
+  let base;
+  if(roll < 0.34){
+    // qualifier + single word
+    base = pick(NAME_QUALIFIER, rng).trim() + " " +
+           cap(pick(NAME_PRE, rng).toLowerCase() + pick(NAME_MID, rng) + pick(NAME_SUF, rng));
+  } else if(roll < 0.60){
+    // single fused word
+    base = cap(pick(NAME_PRE, rng).toLowerCase() + pick(NAME_MID, rng) + pick(NAME_SUF, rng));
+  } else if(roll < 0.80){
+    // single word + latinate/eccentric tail
+    base = cap(pick(NAME_PRE, rng).toLowerCase() + pick(NAME_MID, rng) + pick(NAME_SUF, rng)) +
+           pick(NAME_TAIL, rng);
+  } else {
+    // pre already reads as a word (Almost, Hollow, Seldom...)
+    base = cap(pick(NAME_PRE, rng)) + pick(NAME_TAIL, rng);
+  }
+  return tidyName(base);
+}
+function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+function tidyName(s){
+  // collapse ugly triple letters and awkward doubles
+  return s
+    .replace(/([a-z])\1\1+/gi, "$1$1")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
+/* ============================ FEATURE NAME BANKS ============================ */
+const WATER_ADJ = [
+  "Sighing","Drowned","Whispering","Iron","Cold","Slack","Weeping","Grey","Salt",
+  "Last","Forgotten","Patient","Widow's","Sunken","Brackish","Restless","Quiet",
+  "Bottomless","Silvered","Wandering","Mourning","Idle","Nameless","Reluctant"
+];
+const WATER_NOUN = [
+  "Strait","Sound","Reach","Narrows","Channel","Bight","Firth","Gut","Passage",
+  "Race","Roads","Tide","Estuary","Fleet","Swatchway"
+];
+const RIVER_ADJ = [
+  "Slow","Meandering","Tired","Shallow","Wending","Turning","Doubtful","Lazy",
+  "Sunless","Overgrown","Little","Failing","Long","Muttering","Undecided","Brown"
+];
+const RIVER_NOUN = [
+  "Ouse","Wend","Yare","Tarn","Meander","Sluice","Beck","Drain","Rill","Leat",
+  "Dribble","Trickle","Cut","Water","Lode","Runnel"
+];
+const CAPE_ADJ = [
+  "Last","Lost","Farewell","Doubtful","Contrary","Weary","Widow's","Ferry",
+  "Gallows","Beacon","Wreckers'","Pilgrims'","Cormorant","Grey Seal","Foreland"
+];
+const CAPE_NOUN = [
+  "Ferry Point","Head","Ness","Foreland","Point","Spit","Bill","Nab","Landing",
+  "Jetty","Slipway","Hard","Quay","Mole"
+];
+const VILLAGE_NAMES = [
+  "Almost","Barely","Nearly","Hardly","Once","Seldom","Perhaps","Meanwhile",
+  "Elsewhere","Regret","Anyway","Whatnot","Doubtful","Latterly","Thereabouts",
+  "Notwithstanding","Somewhere","Mostly","Eventually","Presently","Yonder",
+  "Hitherto","Withersoever","Nonesuch","Wishful","Enough","Sundry","Hence"
+];
+const HILL_ADJ = [
+  "Windy","Bald","Old","Beacon","Gibbet","Lonely","Broken","Watcher's","Weathered",
+  "Grey","Hunger","Whistling","Blunt","Sheep's","Cloud"
+];
+const HILL_NOUN = [
+  "Tor","Fell","Rise","Down","Barrow","Knoll","Mound","Brae","Pike","Crag",
+  "Beacon","Cairn","Height","Bluff"
+];
+const INLAND_NOUN = [
+  "Moor","Marsh","Common","Heath","Waste","Levels","Flats","Bog","Fen","Mire",
+  "Warren","Chase","Ings","Carr","Holt"
+];
+const INLAND_ADJ = [
+  "Rushing","Bleak","Whispering","Endless","Sodden","Great","Adder","Curlew",
+  "Sedge","Blackthorn","Withy","Sallow","Bittern","Salt","Foundered"
+];
+
+function featName(adjPool, nounPool, rng, seen){
+  const adj = pickFresh(adjPool, rng, seen);
+  const noun = pickFresh(nounPool, rng, seen);
+  // sometimes "The X Y", sometimes with definite article dropped
+  return { the: chance(rng, 0.72), adj, noun, text:(adj + " " + noun) };
+}
+
+/* ============================ LORE (deadpan gazetteer) ============================ */
+/* Built combinatorially: an opener + one or two clauses. Populations,
+   claims to fame, warnings. Kept dry and specific. */
+
+const POP_LINE = [
+  "Population: seasonal.",
+  "Population: 41, and falling politely.",
+  "Population: disputed.",
+  "Population: one lighthouse keeper, retired, still there.",
+  "Population: fewer than the map suggests.",
+  "Population: 200 in summer, 3 the rest of the year, all related.",
+  "Population: recorded once, in error, and never revisited.",
+  "Population: nine households and a great many gulls.",
+  "Population: unknown; the census taker did not come back.",
+  "Population: sufficient for a quorum, insufficient for a football team.",
+  "Population: it depends on the tide.",
+  "Population: 17, plus whoever is passing through and regrets it.",
+  "Population: declined to answer.",
+  "Population: mostly the dead, who outvote the living by a wide margin.",
+  "Population: two families who have not spoken since 1911.",
+  "Population: rounds down to none.",
+  "Population: enough to keep the pub open on Fridays, barely.",
+  "Population: a matter of some local embarrassment."
+];
+
+const KNOWN_FOR = [
+  "a bridge that was never finished and a festival no one attends",
+  "the second-largest collection of maritime disappointments in the region",
+  "a lighthouse that faces inland, for reasons lost to committee",
+  "a war memorial listing names of people who are, as far as anyone knows, still alive",
+  "an annual fog of considerable local pride",
+  "a museum dedicated entirely to a shipwreck that happened somewhere else",
+  "the exact spot where nothing of note has ever occurred",
+  "a church with a clock that is right, briefly, twice a year",
+  "eels, formerly; now chiefly the memory of eels",
+  "a ferry service that was discontinued before it began",
+  "a stone that locals insist is a saint and geologists insist is a stone",
+  "the last surviving example of a road that leads nowhere in particular",
+  "a well that grants wishes, none of which have been confirmed",
+  "a beach that is technically indoors at high tide",
+  "the invention of a knot no one has managed to untie or use",
+  "one very good hedge",
+  "a tradition whose origin, purpose, and current practitioners are all unknown",
+  "having been mistaken, on three separate occasions, for somewhere better",
+  "a market that sells only what the sea returns",
+  "a saint who is patron of nothing in particular and takes the work seriously",
+  "the smallest cathedral in the country, closed",
+  "a tunnel begun from both ends that failed, movingly, to meet in the middle",
+  "the only monument in the isles erected to commemorate an apology",
+  "a bell that is rung when nothing has happened, which is most days",
+  "producing a cheese that is banned in the next parish over",
+  "an unusually determined tide",
+  "a hill that is, on all official records, seventeen feet shorter than it looks",
+  "the reluctance of its weather to make up its mind"
+];
+
+const ASIDE = [
+  "The council maintains that this is a distinction.",
+  "Visitors are advised to bring their own reason for coming.",
+  "The signpost was taken down during the war and never quite reinstated.",
+  "Nobody is entirely sure it is still inhabited, including its inhabitants.",
+  "It does not appear on newer maps, which the residents consider a mercy.",
+  "The tourist board has quietly given up.",
+  "It is best reached by accident.",
+  "There is a plaque. It is wrong about the date, the event, and the person.",
+  "The last bus left in 1974 and has not, technically, arrived anywhere since.",
+  "Historians agree it existed; they agree on little else.",
+  "The pub has a name but no sign, and a sign but no name, on different walls.",
+  "Directions from the locals are correct but not, in any useful sense, helpful.",
+  "It rains here in a way that feels personal.",
+  "The parish records were lost to damp, and the damp remains.",
+  "It is twinned with a town that also does not exist, in France.",
+  "Low cloud is not so much weather here as an address.",
+  "The one hotel is always full and has never had a guest.",
+  "Migrating birds pass over without landing, out of what can only be described as tact.",
+  "It is proud, in the way that only somewhere overlooked can afford to be.",
+  "You have almost certainly driven past the turning."
+];
+
+const OPENER = [
+  "A {size} {kind} on the {compass} coast, {name} is chiefly known for {known}.",
+  "{name}: a {kind} of {mood} character, notable chiefly for {known}.",
+  "Set where the {water} meets the {inland}, {name} is remembered, if at all, for {known}.",
+  "{name} is a {size} {kind} whose sole distinction is {known}.",
+  "They come to {name} — the {size} {kind} beyond the {inland} — for {known}, and for little else.",
+  "Little is recorded of {name}, a {kind} on the {compass} shore, save its {known}.",
+  "A {mood} {kind} of {size} extent, {name} is chiefly known for {known}."
+];
+
+const KIND = ["parish","hamlet","township","settlement","port","landing","village","borough","cove-town","fishing station"];
+const SIZE = ["small","modest","dwindling","scattered","overlooked","tidy","reluctant","forgotten","half-drowned","windswept"];
+const MOOD = ["damp","fog-bound","stubborn","salt-worn","wistful","becalmed","weather-beaten","quietly disappointed","tide-locked","grey-hearted"];
+const COMPASS_WORD = ["northern","eastern","western","southern","far northern","lee","windward","seaward"];
+
+/* facts block */
+const CLIMATE = [
+  "chiefly weather","fog, with intervals of fog","damp, tending to damper",
+  "grey, then greyer","wind from an unhelpful quarter","overcast, out of habit",
+  "mild, and unforgiving about it","four seasons, all of them October",
+  "a light drizzle that has been going on for some time","brisk, and disapproving"
+];
+const INDUSTRY = [
+  "declining","formerly eels","a single pub","memory","tourism (aspirational)",
+  "salt, ceremonially","boat repair, no boats","the tide","one hedge, professionally maintained",
+  "waiting","exporting its young","a museum and its regrets","rope, historically","none, and proud"
+];
+const BEST_SEASON = [
+  "never","briefly, in May","the third week of nothing","low tide","between the fogs",
+  "whenever the bus runs","just after you leave","a fortnight, unspecified",
+  "the off-season, which is all of it","before it was renamed"
+];
+const ELEVATION = [
+  "at or below sea level","seventeen feet, disputed","a matter of opinion",
+  "sinking, gently","above the flood, most years","level with the horizon and the mood",
+  "high enough to see the next disappointment","two feet, and falling","tidal","reclaimed, provisionally"
+];
+const FOUNDED = [
+  "before records, and regretted since","by a saint, allegedly, on his way elsewhere",
+  "when the sea was somewhere else","by fishermen who have since left",
+  "on a misunderstanding","later than it looks","during a storm no one recorded",
+  "by a family that has since died out, twice","never officially","in a year that has been mislaid"
+];
+const PATRON = [
+  "a saint of lost causes, overworked","no one in particular","the tide",
+  "a martyr who declined the honour","St. Eltha of the Fog","the ferryman, retired",
+  "a whale, briefly","the parish council, in the absence of alternatives",
+  "an unnamed grief","the last person to leave"
+];
+
+const FACT_KEYS = {
+  Climate: CLIMATE,
+  Industry: INDUSTRY,
+  "Best visited": BEST_SEASON,
+  Elevation: ELEVATION,
+  Founded: FOUNDED,
+  Patron: PATRON
+};
+
+/* ============================ PROCEDURAL MAP ============================ */
+/* Draws an aged-atlas map into an SVG string:
+   sea fill, an irregular coastline dividing land from sea, a river,
+   a couple of roads, settlement dots, feature labels, compass rose, scale bar,
+   graticule ticks. Deterministic from the rng. */
+
+const MAP_W = 640, MAP_H = 440;
+
+function catmullSpline(pts, closed){
+  // returns an SVG path 'd' through pts using catmull-rom -> bezier
+  if(pts.length < 2) return "";
+  const p = pts.slice();
+  let d = "";
+  const n = p.length;
+  const get = (i) => {
+    if(closed) return p[(i%n+n)%n];
+    return p[Math.max(0, Math.min(n-1, i))];
+  };
+  d = "M " + p[0].x.toFixed(1) + " " + p[0].y.toFixed(1) + " ";
+  const last = closed ? n : n-1;
+  for(let i=0;i<last;i++){
+    const p0=get(i-1), p1=get(i), p2=get(i+1), p3=get(i+2);
+    const c1x = p1.x + (p2.x - p0.x)/6;
+    const c1y = p1.y + (p2.y - p0.y)/6;
+    const c2x = p2.x - (p3.x - p1.x)/6;
+    const c2y = p2.y - (p3.y - p1.y)/6;
+    d += "C " + c1x.toFixed(1) + " " + c1y.toFixed(1) + " " +
+                c2x.toFixed(1) + " " + c2y.toFixed(1) + " " +
+                p2.x.toFixed(1) + " " + p2.y.toFixed(1) + " ";
+  }
+  if(closed) d += "Z";
+  return d;
+}
+
+function pathLen(pts, closed){
+  let L=0;
+  for(let i=0;i<pts.length-1;i++){ L += Math.hypot(pts[i+1].x-pts[i].x, pts[i+1].y-pts[i].y); }
+  if(closed && pts.length>1){ L += Math.hypot(pts[0].x-pts[pts.length-1].x, pts[0].y-pts[pts.length-1].y); }
+  return L * 1.25; // splines are a bit longer than the polyline
+}
+
+function buildMap(rng, names){
+  // Decide which side is sea. Coast runs roughly along one edge with a wandering border.
+  const orient = pick(["W","E","S","N"], rng); // which edge is open sea
+  const margin = 8;
+
+  // Build a coastline as a wandering line across the map, then close it into a land polygon.
+  // We param along the "long" axis and vary the "depth" of the coast.
+  let coastPts = [];
+  const wob = () => (rng()*2-1);
+  const steps = rint(rng, 7, 10);
+
+  // baseDepth = how far the land intrudes from the land-edge toward the sea-edge
+  const baseDepth = 0.34 + rng()*0.22; // fraction of the short axis
+  const amp = 0.10 + rng()*0.12;
+
+  function toXY(t, depth){
+    // t in [0,1] along the coast; depth in [0,1] from sea edge
+    if(orient==="W"){ return { x: margin + depth*(MAP_W-2*margin), y: margin + t*(MAP_H-2*margin) }; }
+    if(orient==="E"){ return { x: MAP_W - margin - depth*(MAP_W-2*margin), y: margin + t*(MAP_H-2*margin) }; }
+    if(orient==="N"){ return { x: margin + t*(MAP_W-2*margin), y: margin + depth*(MAP_H-2*margin) }; }
+    return { x: margin + t*(MAP_W-2*margin), y: MAP_H - margin - depth*(MAP_H-2*margin) }; // S
+  }
+
+  let bays = []; // remember bay centres for the strait/water label
+  for(let i=0;i<=steps;i++){
+    const t = i/steps;
+    let depth = baseDepth + Math.sin(t*Math.PI*(1.5+rng()*2)) * amp + wob()*0.05;
+    depth = Math.max(0.12, Math.min(0.72, depth));
+    const pt = toXY(t, depth);
+    coastPts.push(pt);
+    if(i>0 && i<steps) bays.push({ t, depth, pt });
+  }
+
+  // close the polygon along the land edges (so fill covers the land side)
+  const landPoly = coastPts.slice();
+  // append the two far corners on the land side
+  function landCorner(end){
+    // end: 0 -> t=1 side, 1 -> t=0 side ; depth=1 means deep land
+    const t = end===0 ? 1 : 0;
+    return toXY(t, 1.02);
+  }
+  landPoly.push(landCorner(0));
+  landPoly.push(landCorner(1));
+
+  // ---- SVG assembly ----
+  const S = [];
+  S.push(`<svg viewBox="0 0 ${MAP_W} ${MAP_H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A procedural map of ${esc(names.place)}, a place that does not exist.">`);
+
+  // defs: subtle paper + hatch for the sea
+  S.push(`<defs>`);
+  S.push(`<pattern id="sea-hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">`+
+         `<line x1="0" y1="0" x2="0" y2="7" stroke="${'#6f8a94'}" stroke-width="0.5" opacity="0.14"/></pattern>`);
+  S.push(`<radialGradient id="vign" cx="50%" cy="46%" r="65%">`+
+         `<stop offset="60%" stop-color="#000" stop-opacity="0"/>`+
+         `<stop offset="100%" stop-color="#000" stop-opacity="0.34"/></radialGradient>`);
+  S.push(`</defs>`);
+
+  // sea background
+  S.push(`<rect x="0" y="0" width="${MAP_W}" height="${MAP_H}" fill="#141b19"/>`);
+  S.push(`<rect x="0" y="0" width="${MAP_W}" height="${MAP_H}" fill="url(#sea-hatch)"/>`);
+
+  // land fill (blooms in)
+  const landD = catmullSpline(landPoly, true);
+  S.push(`<path class="bloom" style="animation-delay:.15s" d="${landD}" fill="#171410" stroke="none"/>`);
+
+  // faint contour echoes just inside the coast (parallel offset-ish, cheap)
+  const coastSplineOpen = catmullSpline(coastPts, false);
+  for(let k=1;k<=2;k++){
+    const off = (orient==="W"||orient==="E") ? (orient==="W"? k*6 : -k*6) : 0;
+    const offy = (orient==="N"||orient==="S") ? (orient==="N"? k*6 : -k*6) : 0;
+    const shifted = coastPts.map(p=>({x:p.x+off, y:p.y+offy}));
+    S.push(`<path class="bloom" style="animation-delay:${.5+k*.1}s" d="${catmullSpline(shifted,false)}" fill="none" stroke="#c9b489" stroke-width="0.5" opacity="0.12"/>`);
+  }
+
+  // the coastline itself, traced on
+  const cLen = pathLen(coastPts, false).toFixed(0);
+  S.push(`<path class="draw-path" style="--len:${cLen}; animation-delay:.1s" d="${coastSplineOpen}" fill="none" stroke="#c9b489" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`);
+
+  // ---- graticule ticks along the frame ----
+  for(let gx=80; gx<MAP_W; gx+=80){
+    S.push(`<line x1="${gx}" y1="0" x2="${gx}" y2="6" stroke="#c9b489" stroke-width="0.6" opacity="0.3"/>`);
+    S.push(`<line x1="${gx}" y1="${MAP_H}" x2="${gx}" y2="${MAP_H-6}" stroke="#c9b489" stroke-width="0.6" opacity="0.3"/>`);
+  }
+  for(let gy=80; gy<MAP_H; gy+=80){
+    S.push(`<line x1="0" y1="${gy}" x2="6" y2="${gy}" stroke="#c9b489" stroke-width="0.6" opacity="0.3"/>`);
+    S.push(`<line x1="${MAP_W}" y1="${gy}" x2="${MAP_W-6}" y2="${gy}" stroke="#c9b489" stroke-width="0.6" opacity="0.3"/>`);
+  }
+
+  // ---- a river: starts inland, wanders to a coast point ----
+  // pick a coast point near the middle as the river mouth
+  const mouthIdx = rint(rng, 2, coastPts.length-3);
+  const mouth = coastPts[mouthIdx];
+  // inland direction = away from sea edge
+  const inlandVec = (() => {
+    if(orient==="W") return {x:1,y:0};
+    if(orient==="E") return {x:-1,y:0};
+    if(orient==="N") return {x:0,y:1};
+    return {x:0,y:-1};
+  })();
+  let riverPts = [mouth];
+  let rp = {x:mouth.x, y:mouth.y};
+  const rsteps = rint(rng, 5, 8);
+  for(let i=0;i<rsteps;i++){
+    const stepLen = 34 + rng()*30;
+    const perp = {x:-inlandVec.y, y:inlandVec.x};
+    rp = {
+      x: rp.x + inlandVec.x*stepLen + perp.x*(rng()*2-1)*34,
+      y: rp.y + inlandVec.y*stepLen + perp.y*(rng()*2-1)*34
+    };
+    rp.x = Math.max(margin+6, Math.min(MAP_W-margin-6, rp.x));
+    rp.y = Math.max(margin+6, Math.min(MAP_H-margin-6, rp.y));
+    riverPts.push({x:rp.x, y:rp.y});
+  }
+  const riverD = catmullSpline(riverPts, false);
+  const rLen = pathLen(riverPts,false).toFixed(0);
+  S.push(`<path class="draw-path" style="--len:${rLen}; animation-delay:.9s" d="${riverD}" fill="none" stroke="#6f8a94" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`);
+  // river source tributary (short)
+  const src = riverPts[riverPts.length-1];
+  const trib = [src, {x:src.x+inlandVec.x*28+(rng()*30-15), y:src.y+inlandVec.y*28+(rng()*30-15)}];
+  S.push(`<path class="draw-path" style="--len:60; animation-delay:1.25s" d="${catmullSpline(trib,false)}" fill="none" stroke="#6f8a94" stroke-width="1" stroke-linecap="round" opacity="0.6"/>`);
+
+  // ---- settlements: place dots on land ----
+  // helper: is a point on the land side of the coast? approx by depth test
+  function onLand(x,y){
+    // convert to (t, depth) inverse-ish; just test against nearest coast sample
+    // find nearest coast point, compare position relative to sea edge
+    let best=1e9, bp=coastPts[0];
+    for(const c of coastPts){ const d=(c.x-x)*(c.x-x)+(c.y-y)*(c.y-y); if(d<best){best=d;bp=c;} }
+    if(orient==="W") return x > bp.x + 6;
+    if(orient==="E") return x < bp.x - 6;
+    if(orient==="N") return y > bp.y + 6;
+    return y < bp.y - 6;
+  }
+
+  const settlements = [];
+  const wantDots = rint(rng, 4, 6);
+  let guard = 0;
+  while(settlements.length < wantDots && guard < 200){
+    guard++;
+    const x = margin+20 + rng()*(MAP_W-2*margin-40);
+    const y = margin+20 + rng()*(MAP_H-2*margin-40);
+    if(!onLand(x,y)) continue;
+    // spacing
+    let ok = true;
+    for(const s of settlements){ if(Math.hypot(s.x-x, s.y-y) < 72){ ok=false; break; } }
+    if(!ok) continue;
+    settlements.push({x, y});
+  }
+  // ensure at least the river-mouth village and a capital
+  const capital = settlements.length ? settlements[0] : {x:mouth.x, y:mouth.y};
+
+  // ---- roads: connect settlements via a simple nearest-neighbour tour ----
+  if(settlements.length >= 2){
+    const visited = [0];
+    const remaining = settlements.map((_,i)=>i).slice(1);
+    while(remaining.length){
+      const cur = settlements[visited[visited.length-1]];
+      let bi=0, bd=1e9;
+      for(let i=0;i<remaining.length;i++){
+        const s=settlements[remaining[i]];
+        const d=Math.hypot(s.x-cur.x, s.y-cur.y);
+        if(d<bd){bd=d;bi=i;}
+      }
+      visited.push(remaining[bi]);
+      remaining.splice(bi,1);
+    }
+    for(let i=0;i<visited.length-1;i++){
+      const a=settlements[visited[i]], b=settlements[visited[i+1]];
+      // a slightly wandering road
+      const midx=(a.x+b.x)/2 + (rng()*30-15);
+      const midy=(a.y+b.y)/2 + (rng()*30-15);
+      const rd = catmullSpline([a,{x:midx,y:midy},b], false);
+      const rdLen = (Math.hypot(midx-a.x,midy-a.y)+Math.hypot(b.x-midx,b.y-midy))*1.2;
+      S.push(`<path class="draw-path" style="--len:${rdLen.toFixed(0)}; animation-delay:${(1.1+i*0.18).toFixed(2)}s" d="${rd}" fill="none" stroke="#8a7350" stroke-width="1.1" stroke-dasharray="${cLen>0?'':''}" stroke-linecap="round" opacity="0.75"/>`);
+    }
+  }
+
+  // ---- draw settlement dots on top ----
+  settlements.forEach((s,i)=>{
+    const isCap = (i===0);
+    const delay = (1.6 + i*0.12).toFixed(2);
+    if(isCap){
+      // capital: small double ring
+      S.push(`<g class="bloom" style="animation-delay:${delay}s">`+
+        `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="4.4" fill="none" stroke="#d9c79a" stroke-width="1.2"/>`+
+        `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="1.6" fill="#d9c79a"/></g>`);
+    } else {
+      S.push(`<circle class="bloom" style="animation-delay:${delay}s" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="2.4" fill="#d9c79a"/>`);
+    }
+  });
+
+  // ---- LABELS ----
+  // Choose label anchors and keep them roughly inside bounds.
+  const labelDelayBase = 2.0;
+  let ld = 0;
+  function label(x, y, text, opts){
+    opts = opts||{};
+    const size = opts.size || 12;
+    const style = opts.italic ? 'italic' : 'normal';
+    const fill = opts.fill || "#e8e0cc";
+    const anchor = opts.anchor || "middle";
+    const ls = opts.spacing!=null ? opts.spacing : 0.5;
+    const dy = ld++;
+    // clamp
+    x = Math.max(40, Math.min(MAP_W-40, x));
+    y = Math.max(18, Math.min(MAP_H-14, y));
+    return `<text class="label-in" style="animation-delay:${(labelDelayBase+dy*0.14).toFixed(2)}s" `+
+      `x="${x.toFixed(0)}" y="${y.toFixed(0)}" text-anchor="${anchor}" `+
+      `font-family="${'Iowan Old Style, Palatino, Georgia, serif'}" font-size="${size}" `+
+      `font-style="${style}" fill="${fill}" letter-spacing="${ls}" `+
+      `paint-order="stroke" stroke="#0e0c08" stroke-width="${opts.halo!=null?opts.halo:2.4}" `+
+      `stroke-linejoin="round">${esc(text)}</text>`;
+  }
+
+  // capital label near capital dot
+  S.push(label(capital.x, capital.y - 9, names.place, { size:14, fill:"#f0e8d0", spacing:0.8 }));
+
+  // river label along the river (mid point), italic teal
+  const rmid = riverPts[Math.floor(riverPts.length/2)];
+  S.push(label(rmid.x + 6, rmid.y - 4, names.river, { size:10.5, italic:true, fill:"#9bb2ba", anchor:"start", spacing:0.6 }));
+
+  // strait/water label out in the sea
+  const seaAnchor = (() => {
+    if(orient==="W") return {x: margin+34, y: MAP_H*0.30};
+    if(orient==="E") return {x: MAP_W-margin-34, y: MAP_H*0.30};
+    if(orient==="N") return {x: MAP_W*0.5, y: margin+22};
+    return {x: MAP_W*0.5, y: MAP_H-margin-16};
+  })();
+  S.push(label(seaAnchor.x, seaAnchor.y, names.water, { size:11.5, italic:true, fill:"#9bb2ba", spacing:1.4, anchor: (orient==="W"?"start":(orient==="E"?"end":"middle")) }));
+
+  // cape label near an outer coast extreme
+  // find coast point closest to a corner
+  let capePt = coastPts[coastPts.length-2];
+  S.push(label(capePt.x + (orient==="W"?14:-14), capePt.y + 12, names.cape, { size:10, italic:true, fill:"#d6ceb6", anchor:(orient==="W"?"start":"end"), spacing:0.5 }));
+
+  // a village label near a non-capital settlement (the amusing one-word village)
+  if(settlements.length > 1){
+    const v = settlements[settlements.length-1];
+    S.push(`<text class="label-in" style="animation-delay:${(labelDelayBase+ (ld++) *0.14).toFixed(2)}s" x="${(v.x).toFixed(0)}" y="${(v.y+13).toFixed(0)}" text-anchor="middle" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="10" fill="#e8e0cc" letter-spacing="0.5" paint-order="stroke" stroke="#0e0c08" stroke-width="2.4">${esc(names.village)}</text>`);
+  }
+
+  // an inland feature label (moor/hill) on empty land
+  const inlandAnchor = (() => {
+    if(orient==="W") return {x: MAP_W*0.68, y: MAP_H*0.72};
+    if(orient==="E") return {x: MAP_W*0.32, y: MAP_H*0.72};
+    if(orient==="N") return {x: MAP_W*0.5, y: MAP_H*0.74};
+    return {x: MAP_W*0.5, y: MAP_H*0.28};
+  })();
+  S.push(label(inlandAnchor.x, inlandAnchor.y, names.inland, { size:10.5, italic:true, fill:"#c4b489", spacing:2, halo:2.4 }));
+  // a tiny hill glyph beside it
+  S.push(`<path class="bloom" style="animation-delay:2.3s" d="M ${(inlandAnchor.x-18).toFixed(0)} ${(inlandAnchor.y-14).toFixed(0)} l 5 -8 l 5 8 Z" fill="none" stroke="#c4b489" stroke-width="1" opacity="0.7"/>`);
+
+  // ---- compass rose ----
+  const compassOrient = (orient==="W"||orient==="N") ? "far" : "near";
+  const crx = (orient==="W") ? MAP_W-58 : 58;
+  const cry = (orient==="N") ? MAP_H-58 : 60;
+  S.push(compassRose(crx, cry, rng));
+
+  // ---- scale bar ----
+  const sbx = (orient==="E") ? 40 : MAP_W-160;
+  const sby = MAP_H - 28;
+  S.push(scaleBar(sbx, sby, names.unit, rng));
+
+  // ---- vignette + frame ----
+  S.push(`<rect x="0" y="0" width="${MAP_W}" height="${MAP_H}" fill="url(#vign)" pointer-events="none"/>`);
+  S.push(`<rect x="3" y="3" width="${MAP_W-6}" height="${MAP_H-6}" fill="none" stroke="#c9b489" stroke-width="1" opacity="0.35"/>`);
+  S.push(`<rect x="7" y="7" width="${MAP_W-14}" height="${MAP_H-14}" fill="none" stroke="#c9b489" stroke-width="0.5" opacity="0.22"/>`);
+
+  S.push(`</svg>`);
+
+  return { svg: S.join(""), orient, settlements: settlements.length };
+}
+
+function compassRose(cx, cy, rng){
+  const r = 22;
+  const g = [];
+  g.push(`<g class="bloom" style="animation-delay:2.5s" opacity="0.9">`);
+  g.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#c9b489" stroke-width="0.7" opacity="0.5"/>`);
+  g.push(`<circle cx="${cx}" cy="${cy}" r="${r-5}" fill="none" stroke="#c9b489" stroke-width="0.4" opacity="0.3"/>`);
+  // eight points, N emphasised
+  const pts = 8;
+  for(let i=0;i<pts;i++){
+    const ang = (i/pts)*Math.PI*2 - Math.PI/2;
+    const long = (i%2===0);
+    const rr = long ? r : r*0.5;
+    const x2 = cx + Math.cos(ang)*rr;
+    const y2 = cy + Math.sin(ang)*rr;
+    // diamond spikes
+    const wa = ang + Math.PI/2;
+    const wr = long ? 3.4 : 2.2;
+    const bx = cx + Math.cos(wa)*wr, by = cy + Math.sin(wa)*wr;
+    const cx2 = cx - Math.cos(wa)*wr, cy2 = cy - Math.sin(wa)*wr;
+    const fill = (i===0) ? "#d9c79a" : "rgba(217,199,154,0.35)";
+    g.push(`<path d="M ${cx.toFixed(1)} ${cy.toFixed(1)} L ${bx.toFixed(1)} ${by.toFixed(1)} L ${x2.toFixed(1)} ${y2.toFixed(1)} L ${cx2.toFixed(1)} ${cy2.toFixed(1)} Z" fill="${fill}" stroke="#c9b489" stroke-width="0.3"/>`);
+  }
+  g.push(`<circle cx="${cx}" cy="${cy}" r="2" fill="#0e0c08" stroke="#c9b489" stroke-width="0.6"/>`);
+  g.push(`<text x="${cx}" y="${cy-r-3}" text-anchor="middle" font-family="Iowan Old Style, Georgia, serif" font-size="9" fill="#d9c79a" font-style="italic">N</text>`);
+  g.push(`</g>`);
+  return g.join("");
+}
+
+function scaleBar(x, y, unit, rng){
+  const seg = 24; const n = 4;
+  const g = [];
+  g.push(`<g class="bloom" style="animation-delay:2.6s" opacity="0.85">`);
+  for(let i=0;i<n;i++){
+    const fill = (i%2===0) ? "#c9b489" : "#0e0c08";
+    g.push(`<rect x="${x+i*seg}" y="${y}" width="${seg}" height="5" fill="${fill}" stroke="#c9b489" stroke-width="0.5"/>`);
+  }
+  g.push(`<text x="${x}" y="${y-4}" font-family="ui-monospace, monospace" font-size="8" fill="#c4b489" letter-spacing="0.5">0</text>`);
+  const total = rint(rng, 4, 40);
+  g.push(`<text x="${x+n*seg}" y="${y-4}" text-anchor="end" font-family="ui-monospace, monospace" font-size="8" fill="#c4b489" letter-spacing="0.5">${total} ${esc(unit)}</text>`);
+  g.push(`</g>`);
+  return g.join("");
+}
+
+const MAP_UNIT = ["leagues","versts","miles","furlongs","chains","cables","stadia","leagues (old)"];
+
+/* ============================ ATLAS SHEET (coordinates / sheet no.) ============================ */
+function sheetNo(rng){
+  const roman = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"];
+  const s = pick(roman, rng);
+  const q = rint(rng, 1, 4);
+  return "Sheet " + s + " · quadrant " + q + " of nowhere in particular";
+}
+function fakeCoord(rng){
+  // deliberately impossible / vague coordinates
+  const styles = [
+    () => {
+      const lat = rint(rng, 40, 79) + "°" + String(rint(rng,0,59)).padStart(2,"0") + "′ " + pick(["N","N"],rng);
+      const lon = rint(rng, 0, 40) + "°" + String(rint(rng,0,59)).padStart(2,"0") + "′ " + pick(["W","E"],rng);
+      return lat + ", " + lon;
+    },
+    () => "somewhere off the edge of sheet " + rint(rng,7,88),
+    () => rint(rng,50,60) + "° N, and a longitude nobody agreed on",
+    () => "between the last map and the next",
+    () => rint(rng,48,71) + "°" + String(rint(rng,0,59)).padStart(2,"0") + "′ N, approx.",
+    () => "unsurveyed; here by inference"
+  ];
+  return pick(styles, rng)();
+}
+
+/* ============================ COMPOSE A LAND ============================ */
+/* anti-repeat state */
+const seenPlace = new Set();
+const seenLore = new Set();
+const seenKnown = new Set();
+const seenAside = new Set();
+const seenPop = new Set();
+const seenWater = new Set();
+const seenVillage = new Set();
+const seenInland = new Set();
+let lastFingerprint = null;
+let counter = 0;
+
+function withArticle(feat){
+  return (feat.the ? "The " : "") + feat.text;
+}
+
+function makeLand(){
+  counter++;
+  const seed = (Date.now() ^ (Math.random()*1e9|0) ^ (counter*2654435761)) >>> 0;
+  const rng = makeRng(seed);
+
+  // ---- names ----
+  const place = (() => {
+    let v, guard=0;
+    do { v = generateName(rng); guard++; } while(seenPlace.has(v) && guard < 40);
+    seenPlace.add(v); trim(seenPlace, 40);
+    return v;
+  })();
+
+  const localSeen = new Set(); // avoid two features sharing a word within one map
+  const water = featName(WATER_ADJ, WATER_NOUN, rng, localSeen);
+  const river = featName(RIVER_ADJ, RIVER_NOUN, rng, localSeen);
+  const cape  = { the:false, text: pick(CAPE_ADJ, rng) + " " + pick(CAPE_NOUN, rng) };
+  const inlandF = featName(chance(rng,0.5)?HILL_ADJ:INLAND_ADJ, chance(rng,0.5)?HILL_NOUN:INLAND_NOUN, rng, localSeen);
+  const village = pickFresh(VILLAGE_NAMES, rng, seenVillage); trim(seenVillage, 16);
+
+  const waterText = withArticle(water);
+  const riverText = withArticle({the:river.the, text:"River " + river.noun}); // "the River Wend"
+  const inlandText = withArticle(inlandF);
+
+  trim(seenWater, 16); seenWater.add(waterText);
+  trim(seenInland, 12); seenInland.add(inlandText);
+
+  const unit = pick(MAP_UNIT, rng);
+
+  const names = {
+    place,
+    water: waterText,
+    river: riverText,
+    cape: (chance(rng,0.5)?"":"") + cape.text,
+    inland: inlandText,
+    village: "the village of " + village,
+    unit
+  };
+  // village on-map should be short label
+  names.village = village;
+
+  // ---- map ----
+  const map = buildMap(rng, names);
+
+  // ---- lore ----
+  const kind = pick(KIND, rng);
+  const size = pick(SIZE, rng);
+  const mood = pick(MOOD, rng);
+  const compassWord = pick(COMPASS_WORD, rng);
+  const known = pickFresh(KNOWN_FOR, rng, seenKnown); trim(seenKnown, 16);
+
+  const opener = pick(OPENER, rng)
+    .replace(/\{name\}/g, place)
+    .replace("{size}", size)
+    .replace("{kind}", kind)
+    .replace("{mood}", mood)
+    .replace("{compass}", compassWord)
+    .replace("{water}", waterText)
+    .replace("{inland}", inlandText)
+    .replace("{known}", known);
+
+  const pop = pickFresh(POP_LINE, rng, seenPop); trim(seenPop, 12);
+  const aside = pickFresh(ASIDE, rng, seenAside); trim(seenAside, 14);
+
+  // gazetteer paragraph: pop + opener + aside, order varied
+  let lore;
+  if(chance(rng, 0.5)){
+    lore = pop + " " + cap1(opener) + " " + aside;
+  } else {
+    lore = cap1(opener) + " " + pop + " " + aside;
+  }
+
+  // ---- facts ----
+  const factKeys = shuffle(Object.keys(FACT_KEYS), rng).slice(0, 3);
+  const facts = factKeys.map(k => ({ k, v: pick(FACT_KEYS[k], rng) }));
+
+  // ---- "chiefly known for" pull-quote (distinct from lore's known) ----
+  let known2, g=0;
+  do { known2 = pick(KNOWN_FOR, rng); g++; } while(known2 === known && g < 10);
+  const knownLine = "Chiefly known for " + known2 + ".";
+
+  const sheet = sheetNo(rng);
+  const coord = fakeCoord(rng);
+
+  return {
+    place, names, map, lore, facts, knownLine, sheet, coord,
+    fingerprint: place + "|" + lore
+  };
+}
+function cap1(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+/* ============================ RENDER ============================ */
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let current = null;
+let activeTimers = [];
+function clearTimers(){ activeTimers.forEach(id => clearTimeout(id)); activeTimers = []; }
+
+function factHTML(f){
+  return '<div><div class="fact-k">'+ esc(f.k) +'</div><div class="fact-v">'+ esc(f.v) +'</div></div>';
+}
+
+function landHTML(land){
+  return ''+
+  '<div class="plate plate-enter">' +
+    '<div class="plate-head"><span class="sheet">'+ esc(land.sheet) +'</span><span>from the survey of nowhere</span></div>' +
+    '<div class="map-frame">'+ land.map.svg +'</div>' +
+    '<div class="caption">' +
+      '<h2 class="place-name" id="place-name"></h2>' +
+      '<div class="place-sub">latitude <span class="coord">'+ esc(land.coord) +'</span></div>' +
+      '<p class="lore" data-full="'+ esc(land.lore) +'" id="lore"></p>' +
+      '<div class="facts fade-line" data-order="2">' +
+        land.facts.map(factHTML).join('') +
+      '</div>' +
+      '<div class="known fade-line" data-order="3"><span class="tag">Gazetteer note</span>'+ esc(land.knownLine) +'</div>' +
+      '<div class="actions fade-line" data-order="4">' +
+        '<button class="mini primary" id="copy-btn" type="button">⎘ copy this land</button>' +
+        '<button class="mini" id="again-btn" type="button">↻ survey another</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+/* typewriter for the place-name then the lore */
+function typewriter(el, text, speed, done){
+  if(prefersReduced){ el.textContent = text; if(done) done(); return; }
+  el.textContent = '';
+  const caret = document.createElement('span');
+  caret.className = 'caret'; caret.textContent = '▍';
+  el.appendChild(caret);
+  let i = 0;
+  const step = () => {
+    if(i >= text.length){ caret.remove(); if(done) done(); return; }
+    caret.insertAdjacentText('beforebegin', text[i]); i++;
+    let delay = speed + Math.random()*speed*0.7;
+    const c = text[i-1];
+    if(c === '.' || c === ',' || c === ';') delay += 80 + Math.random()*70;
+    const id = setTimeout(step, delay); activeTimers.push(id);
+  };
+  const id = setTimeout(step, 80); activeTimers.push(id);
+}
+
+function reveal(land){
+  // fade the lower lines
+  document.querySelectorAll('.fade-line').forEach(l => {
+    const order = parseInt(l.getAttribute('data-order'),10) || 0;
+    const delay = prefersReduced ? 0 : 2600 + order*260;
+    const id = setTimeout(() => l.classList.add('in'), delay);
+    activeTimers.push(id);
+  });
+  // name types first (after the map has begun drawing), then the lore
+  const nameEl = document.getElementById('place-name');
+  const loreEl = document.getElementById('lore');
+  const startName = () => typewriter(nameEl, land.place, 34, () => {
+    const id = setTimeout(() => typewriter(loreEl, land.lore, 12), prefersReduced?0:220);
+    activeTimers.push(id);
+  });
+  const id = setTimeout(startName, prefersReduced ? 0 : 700);
+  activeTimers.push(id);
+}
+
+function drawLand(){
+  clearTimers();
+  let land, tries = 0;
+  do { land = makeLand(); tries++; } while(land.fingerprint === lastFingerprint && tries < 6);
+  lastFingerprint = land.fingerprint;
+  current = land;
+
+  const atlas = document.getElementById('atlas');
+  atlas.innerHTML = landHTML(land);
+  reveal(land);
+  wireResultButtons();
+
+  if(!prefersReduced){
+    atlas.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+}
+
+/* ============================ COPY ============================ */
+function landToText(land){
+  const L = [];
+  L.push("THE CARTOGRAPHER OF NOWHERE");
+  L.push(land.sheet);
+  L.push("");
+  L.push(land.place.toUpperCase());
+  L.push("Lat. " + land.coord);
+  L.push("");
+  L.push(land.lore);
+  L.push("");
+  L.push("Notable features:");
+  L.push("  · " + land.names.water);
+  L.push("  · " + land.names.river);
+  L.push("  · " + land.names.cape);
+  L.push("  · " + land.names.inland);
+  L.push("  · the village of " + land.names.village);
+  L.push("");
+  land.facts.forEach(f => L.push(f.k + ": " + f.v));
+  L.push("");
+  L.push(land.knownLine);
+  L.push("");
+  L.push("— surveyed from nowhere · all bearings approximate · here be no one");
+  return L.join("\n");
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){
+    showToast('The map declines to be copied. Commit it to memory instead.');
+  }
+}
+function copyLand(btn){
+  if(!current) return;
+  const txt = landToText(current);
+  const done = () => {
+    showToast('Copied. It will be gone from the map by the time you paste it.');
+    if(btn){ btn.classList.add('done'); const o = btn.textContent; btn.textContent = '✓ committed to the record';
+      setTimeout(() => { btn.classList.remove('done'); btn.textContent = o; }, 2000); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+
+function wireResultButtons(){
+  const copyBtn = document.getElementById('copy-btn');
+  const againBtn = document.getElementById('again-btn');
+  if(copyBtn) copyBtn.addEventListener('click', (e) => copyLand(e.currentTarget));
+  if(againBtn) againBtn.addEventListener('click', drawLand);
+}
+
+/* ============================ WIRING ============================ */
+const drawBtn = document.getElementById('draw-btn');
+drawBtn.addEventListener('click', () => {
+  drawLand();
+  drawBtn.textContent = 'Survey Again';
+  document.getElementById('hint').textContent = 'The ink dries as you watch. Survey again for another nowhere.';
+});
+</script>
+</body>
+</html>

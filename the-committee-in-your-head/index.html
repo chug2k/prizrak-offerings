@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Committee In Your Head · Prízrak</title>
+<style>
+  :root {
+    --ink:#08080b; --ink-1:#0c0c11; --ink-2:#101017; --ink-3:#16161e;
+    --bone:#e7e2d6; --parch:#d1cbbc; --ash:#928c81; --ash-2:#6a655c; --ash-3:#464339;
+    --rule:rgba(231,226,214,.08); --rule-2:rgba(231,226,214,.15);
+    --brass:#c6a15a; --brass-dim:#7a6338; --felt:#3c5a4c;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(130% 82% at 50% -14%, rgba(198,161,90,.07), transparent 56%),
+      radial-gradient(100% 60% at 50% 120%, rgba(60,90,76,.10), transparent 62%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:44px 20px 60px; }
+  @media (min-width:640px) { .wrap { padding:60px 32px 72px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--brass); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(198,161,90,.24); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1a1a22; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:26px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2rem,7.2vw,3.3rem); font-weight:700;
+    line-height:1.0; letter-spacing:-.015em; margin:12px 0 0;
+  }
+  .sub {
+    margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:33rem; line-height:1.62;
+  }
+
+  .divider {
+    height:1px; max-width:38rem; margin:26px auto 26px;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+
+  /* ---- the agenda / question intake ---- */
+  .intake { text-align:center; }
+  .intake-label {
+    font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--ash-2); margin-bottom:12px;
+    display:flex; align-items:center; gap:14px; justify-content:center;
+  }
+  .intake-label::before, .intake-label::after {
+    content:""; height:1px; flex:1; max-width:70px; background:var(--rule);
+  }
+  .q-field {
+    width:100%; max-width:34rem; margin:0 auto; display:block;
+    background:var(--ink-2); border:1px solid var(--rule-2); border-radius:6px;
+    color:var(--bone); font-family:var(--serif); font-size:16px; font-style:italic;
+    padding:15px 18px; line-height:1.5; resize:none; outline:none;
+    transition:border-color .2s, box-shadow .2s; text-align:center;
+  }
+  .q-field::placeholder { color:var(--ash-3); font-style:italic; }
+  .q-field:focus { border-color:var(--brass-dim); box-shadow:0 0 26px -10px rgba(198,161,90,.5); }
+
+  .controls { text-align:center; margin:20px 0 6px; }
+  .convene-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.2em; font-size:12px;
+    padding:14px 32px; background:linear-gradient(135deg,var(--brass-dim),var(--brass));
+    border:none; border-radius:4px; color:#161009; cursor:pointer; font-weight:600;
+    transition:transform .15s, box-shadow .25s, opacity .2s;
+    box-shadow:0 0 24px -6px rgba(198,161,90,.5);
+  }
+  .convene-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 30px -8px rgba(198,161,90,.6); }
+  .convene-btn:active:not(:disabled) { transform:translateY(0); }
+  .convene-btn:disabled { opacity:.4; cursor:not-allowed; box-shadow:none; }
+  .hint { font-family:var(--mono); font-size:10px; color:var(--ash-3); margin-top:12px; letter-spacing:.14em; min-height:12px; }
+
+  /* ---- the transcript ---- */
+  #session { margin-top:10px; }
+
+  .session-head {
+    text-align:center; margin:34px 0 22px;
+  }
+  .session-head .roomtag {
+    font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--ash-2); display:flex; align-items:center; gap:14px; justify-content:center;
+  }
+  .session-head .roomtag::before, .session-head .roomtag::after {
+    content:""; height:1px; flex:1; max-width:70px; background:var(--rule);
+  }
+  .motion-on-floor {
+    font-family:var(--serif); font-style:italic; font-size:15px; color:var(--parch);
+    margin-top:14px; line-height:1.5; max-width:34rem; margin-left:auto; margin-right:auto;
+  }
+  .motion-on-floor .q { color:var(--brass); }
+
+  .minutes {
+    border:1px solid var(--rule-2); border-radius:8px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    box-shadow:0 30px 70px -40px rgba(0,0,0,.9);
+    padding:22px 20px 24px;
+  }
+  @media (min-width:560px) { .minutes { padding:26px 26px 28px; } }
+
+  /* each line of dialogue */
+  .turn {
+    display:grid; grid-template-columns:34px 1fr; gap:0 14px;
+    padding:11px 0; align-items:start;
+    border-bottom:1px solid var(--rule);
+  }
+  .turn:last-of-type { border-bottom:none; }
+  .turn.pending { opacity:0; }
+  .turn.in { animation:turnIn .5s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes turnIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+  .avatar {
+    width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:18px; line-height:1; background:var(--ink-3); border:1px solid var(--rule-2);
+    box-shadow:inset 0 0 12px -6px rgba(0,0,0,.8); position:relative;
+  }
+  .bubble { min-width:0; }
+  .who {
+    font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    margin-bottom:3px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;
+  }
+  .who .name { color:var(--parch); font-weight:600; }
+  .who .role { color:var(--ash-3); font-size:9px; letter-spacing:.08em; font-style:normal; }
+  .says {
+    font-size:15px; line-height:1.62; color:var(--bone); min-height:1.5em;
+  }
+  .says .stage {
+    color:var(--ash-2); font-style:italic; font-size:13px;
+  }
+
+  .caret { display:inline-block; width:7px; margin-left:1px; color:var(--brass);
+    animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  /* interjection / crosstalk */
+  .turn.interject .avatar { opacity:.85; }
+  .turn.interject .says { color:var(--parch); }
+  .turn.interject .says .crosstalk { color:var(--ash-2); }
+
+  /* the chair's gavel motion */
+  .gavel-turn {
+    margin-top:20px; padding:20px 18px; border-radius:8px;
+    border:1px solid var(--brass-dim);
+    background:
+      radial-gradient(120% 100% at 50% 0%, rgba(198,161,90,.10), transparent 60%),
+      var(--ink-2);
+    text-align:center; position:relative; overflow:hidden;
+  }
+  .gavel-turn.pending { opacity:0; }
+  .gavel-turn.in { animation:gavelIn .6s cubic-bezier(.2,1.3,.4,1) forwards; }
+  @keyframes gavelIn { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:none; } }
+  .gavel-strike { animation:strike .4s ease-out; }
+  @keyframes strike { 0%{transform:rotate(0)} 25%{transform:rotate(-2deg)} 50%{transform:rotate(1.5deg)} 100%{transform:rotate(0)} }
+
+  .gavel-icon { font-size:26px; line-height:1; margin-bottom:8px; display:inline-block; }
+  .gavel-label {
+    font-family:var(--mono); font-size:9px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--brass); margin-bottom:10px;
+  }
+  .motion-text {
+    font-family:var(--serif); font-size:16px; line-height:1.6; color:var(--bone);
+    font-style:italic; max-width:32rem; margin:0 auto;
+  }
+  .motion-sig {
+    font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ash-3); margin-top:14px;
+  }
+  .vote-line {
+    font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+    color:var(--ash-2); margin-top:8px;
+  }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:26px; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .1s;
+    display:inline-flex; align-items:center; gap:8px; letter-spacing:.06em;
+  }
+  .mini:hover:not(:disabled) { border-color:var(--brass); color:var(--bone); background:var(--ink-2); }
+  .mini:active:not(:disabled) { transform:translateY(1px); }
+  .mini:disabled { opacity:.4; cursor:not-allowed; }
+  .mini.primary { border-color:var(--brass-dim); color:var(--brass); }
+  .mini.primary:hover:not(:disabled) { border-color:var(--brass); color:var(--bone); background:rgba(198,161,90,.06); }
+  .mini.done { color:#89c7a6; border-color:#4c7a63; }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:11px 17px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.85); letter-spacing:.04em; max-width:88vw; text-align:center;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:52px; padding-top:26px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.9; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { opacity:.04; }
+    .turn.pending, .gavel-turn.pending { opacity:1 !important; }
+    .caret { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — internal affairs</div>
+      <h1>The Committee <span class="specter">In Your Head</span></h1>
+      <p class="sub">Table any question and the standing committee will convene to deliberate it. Eight members, each with a portfolio and a grievance, will talk over one another until the Chair bangs the gavel and issues a motion that resolves nothing. Quorum is always met. Consensus is never reached.</p>
+    </header>
+
+    <div class="divider"></div>
+
+    <div class="intake">
+      <div class="intake-label">Item one · new business</div>
+      <textarea id="q-field" class="q-field" rows="2" maxlength="240"
+        placeholder="Should I text them back? · Is it too late to start over? · Do we order the pad thai again?"></textarea>
+      <div class="controls">
+        <button id="convene-btn" class="convene-btn">Convene the Committee</button>
+        <div class="hint" id="hint">Chair recommends you keep it to one decision.</div>
+      </div>
+    </div>
+
+    <div id="session" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">The meeting is called to order · the meeting will never adjourn</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ ESCAPE ============================ */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================ THE MEMBERS ============================ */
+/* Each member: glyph, name, role (portfolio), and large pools of lines.
+   Lines are keyed to persona — pull one, occasionally two, per turn.
+   {q} injects a short echo of the user's question when it fits. */
+
+const MEMBERS = {
+  critic: {
+    g:'🧐', name:'The Critic', role:'Standards & Practices',
+    open:[
+      "Let the minutes reflect that I have concerns.",
+      "Before anyone gets excited — a note.",
+      "I've read the item. I have notes. I always have notes.",
+      "May I be the first to lower expectations.",
+      "I want it on the record that I saw this coming.",
+      "Point of order: this is a bad idea presented confidently.",
+      "I'm not against it. I'm against how it'll turn out.",
+    ],
+    body:[
+      "You've done this before. It went the way it went. We were all there.",
+      "The plan is fine. The execution will be you, which is the problem.",
+      "Have we considered that everyone will notice, and remember, forever?",
+      "It's not that it won't work. It's that you'll do it slightly wrong and know it.",
+      "There's a version of this that's impressive. This isn't near it.",
+      "I've drafted a list of everything that could go wrong. It's alphabetical.",
+      "We should proceed as if being watched by someone we respect and disappointed.",
+      "I'd like to enter into evidence every previous time you 'just went for it.'",
+      "The confidence in this room is not supported by the historical data.",
+    ],
+    re:[
+      "That's optimism talking. Optimism doesn't have to clean up after itself.",
+      "With respect to the previous speaker, no.",
+      "Naps do not appear in the risk assessment. Add them.",
+      "I'd love to share that certainty. I've read the file.",
+      "Someone had to say it, so I'll say it again, slower.",
+    ]
+  },
+  optimist: {
+    g:'🌤️', name:'The Optimist', role:'Vision & Morale',
+    open:[
+      "Okay but hear me out — this could be great.",
+      "I love this for us, genuinely.",
+      "New agenda item, new me. Let's go.",
+      "First of all, everyone here looks fantastic.",
+      "I move that we assume it goes well.",
+      "See, I think this is the good one.",
+      "What if — and stay with me — it works out?",
+    ],
+    body:[
+      "Best case, this is the story we tell at a party someday.",
+      "Every great thing started as an item someone almost tabled.",
+      "The worst that happens is a great anecdote and mild growth.",
+      "You're one small brave thing away from a much better week.",
+      "I've cleared the whole afternoon for it to go beautifully.",
+      "Failure is just data, and data is basically a hug from the universe.",
+      "We're not stuck, we're between good things. That's my whole platform.",
+      "I say we do it and blame the details on Future Us, who I trust.",
+      "The universe rewards a person who texts first. I read that somewhere. I think.",
+    ],
+    re:[
+      "The Critic makes points. I choose not to be moved by them.",
+      "See, that's fear wearing a little tie. We can love it and ignore it.",
+      "3AM, buddy, you're not wrong, you're just early. Go back to bed.",
+      "Even the catastrophe sounds kind of exciting when you say it out loud.",
+      "That's the spirit! Sort of! We'll workshop it!",
+    ]
+  },
+  threeam: {
+    g:'🌙', name:'The 3AM Voice', role:'Long-Range Planning',
+    open:[
+      "As long as we're up. Do you remember that thing from 2011?",
+      "Quick tangent while everyone's here and vulnerable.",
+      "I wasn't going to bring it up, but it's dark, so.",
+      "Related, unrelated, who's to say — but that voicemail, though.",
+      "Motion to revisit every conversation you've ever ended awkwardly.",
+      "It's late. Let's do the whole life instead of the one question.",
+      "Speaking as the department that never sleeps —",
+    ],
+    body:[
+      "Everyone you've ever met is doing fine and thinking about you never.",
+      "Do you think the person from the thing remembers the thing? They do. It's worse.",
+      "We could solve this tonight, or we could relitigate seventh grade. I have slides.",
+      "What if the real question is under this question, and it's shaped like your childhood?",
+      "You said one weird sentence in 2019 and I've kept it warm for you.",
+      "Statistically you will one day be a memory in someone's committee. Sit with that.",
+      "The house is quiet enough now to hear the big stuff. Want the big stuff?",
+      "I'm not saying you ruined it. I'm saying let's carefully check whether you ruined it.",
+      "Time is a flat circle and we are on the part of it where you can't sleep.",
+    ],
+    re:[
+      "The Optimist means well. The Optimist has clearly never been awake at 3:47.",
+      "The Chair wants to adjourn. The Chair has never met me.",
+      "The Nap thinks rest fixes this. Rest just gives me a bigger stage.",
+      "Sure, order the pad thai. Order it. See who you become.",
+      "You can bang that gavel but I live in the walls of this place.",
+    ]
+  },
+  snack: {
+    g:'🍕', name:'The Snack Advocate', role:'Provisions & Supply',
+    open:[
+      "Motion to table this until after a snack.",
+      "Point of information: are we near any food.",
+      "I move we recess for a small savory something.",
+      "I have prepared no remarks but I have prepared a craving.",
+      "Before we vote — quick — is there cheese in the building.",
+      "I'd like to yield my time to a sandwich.",
+      "Chair, I formally request the good chips.",
+    ],
+    body:[
+      "Every problem is smaller after toast. This is settled science.",
+      "I propose we resolve nothing until someone opens the fridge and reports back.",
+      "The committee thinks better fed. The committee is, admittedly, always hungry.",
+      "Whatever we decide, we'll decide it more warmly with a snack in hand.",
+      "I don't have a stance on the question. I have a stance on quesadillas. Yes.",
+      "Let's not make big choices on an empty stomach. Or any choices. Just snack.",
+      "I've been quiet because I was thinking about a specific pastry. I'm back now.",
+      "Real talk, half of what The 3AM Voice calls dread is just low blood sugar.",
+      "Second the motion, whatever it was, if there's food adjacent to voting.",
+    ],
+    re:[
+      "The Critic raises concerns. The Critic could raise fewer with a cracker.",
+      "3AM, none of that survives contact with a warm cookie. Trust me.",
+      "The Exhausted CEO wants a decision. I want mozzarella. We're both tired.",
+      "Add 'snacks' to the motion and I'll vote for literally anything.",
+      "Nap and I are aligned, actually. Eat, then lie down. That's a platform.",
+    ]
+  },
+  child: {
+    g:'🎈', name:'The Inner Child', role:'Wonder & Complaints',
+    open:[
+      "Wait wait wait — can we do the FUN one?",
+      "I don't get it but I have a feeling about it.",
+      "Why can't we just DO it. Why is everyone like this.",
+      "I raised my hand SO long ago.",
+      "Are we there yet. Is this the part where we decide.",
+      "I already know the answer and it's YES or a nap.",
+      "Can the answer be ice cream. Is that on the table.",
+    ],
+    body:[
+      "It's simple: do you WANT to? Then. That's the whole meeting. That's it.",
+      "Grown-ups made this hard. It was never hard. It was just scary and that's different.",
+      "I liked it better when we just did stuff and found out what happens.",
+      "If it makes your tummy go excited-nervous instead of just nervous, that means yes.",
+      "Everyone's using big words to avoid saying they're a little bit afraid. I said it. There.",
+      "Can we please stop having a meeting and go outside. Any outside.",
+      "What would we do if we weren't allowed to be embarrassed? Let's do THAT.",
+      "I don't want to be careful. I've been careful for like a thousand years.",
+      "The answer is the thing you thought of first, before The Critic got here.",
+    ],
+    re:[
+      "The Critic is using their disappointed voice again. I hate the disappointed voice.",
+      "The CEO is SO boring. No offense. Full offense.",
+      "See? The Optimist gets it! Optimist and me should run the whole head.",
+      "3AM is being scary again. Somebody hold my hand.",
+      "Snacks person! You and me! Best committee members! Objectively!",
+    ]
+  },
+  ceo: {
+    g:'💼', name:'The Exhausted CEO', role:'Operations & Fatigue',
+    open:[
+      "Team. Let's timebox this. We've got a lot of self on the docket.",
+      "I've read the deck. Not this deck. A deck. Let's move.",
+      "Circling back to the ONE thing we're actually here to decide.",
+      "Let's park the feelings in the lot and drive the decision home.",
+      "I'm going to need a decision, a snack budget, and for 3AM to sit down.",
+      "Bandwidth check: I have none. Let's be efficient about that.",
+      "What's the ask. Give me the ask. In one sentence.",
+    ],
+    body:[
+      "I don't need it perfect. I need it decided so I can stop hosting this meeting.",
+      "Every option costs energy we do not, at this juncture, have. So: cheapest yes.",
+      "Let's define success as 'stopped thinking about it' and reverse-engineer from there.",
+      "Honestly? Ship it, learn, iterate. That's not wisdom, that's exhaustion, but it scales.",
+      "The opportunity cost of this meeting is a nap I will now never take.",
+      "I move we make the smallest possible version of the decision and go lie down.",
+      "Delegate it to Tomorrow Us. Tomorrow Us has a fresh allocation of caring.",
+      "I'm approving a pilot. One text. One. We measure sentiment and reconvene never.",
+      "Can we align on the fact that not deciding is also a decision, and a worse one?",
+    ],
+    re:[
+      "The Critic's risk memo is noted, filed, and load-bearing for my ulcer.",
+      "The Optimist's energy is a resource. It is not, however, a plan.",
+      "Inner Child, I hear you, and also we are at work, which is my whole personality now.",
+      "3AM, you are not on the agenda. You are never on the agenda. Please.",
+      "Snacks: approved. It's the only motion today with a clear ROI.",
+    ]
+  },
+  catastrophist: {
+    g:'🌪️', name:'The Catastrophist', role:'Risk & Worst-Case Scenarios',
+    open:[
+      "Okay so worst case, and I've done the math —",
+      "I've run the scenarios. All of them. They're bad. Some are very bad.",
+      "Point of information: has anyone considered that it all goes wrong.",
+      "Let me walk you through the collapse, step by step, calmly.",
+      "I'd like to present the doom slide. I always bring the doom slide.",
+      "Not to alarm the committee, but I am, personally, already alarmed.",
+      "I move that we imagine the very bad ending first, out of respect.",
+    ],
+    body:[
+      "You send it, they read it, they say nothing, and that silence lasts the rest of your life.",
+      "Best case it's fine, but the tail risk is that everyone finds out you're like this.",
+      "One wrong move and it cascades: the text, the reply, the reply to the reply, ruin.",
+      "I've prepared for the meteor, the layoff, and the awkward wave. We're covered on dread.",
+      "What if you succeed and then have to KEEP succeeding, forever, until you die.",
+      "The plan has a single point of failure and it's the entire plan.",
+      "Statistically something goes wrong eventually, so why not schedule it for now, on purpose.",
+      "I'm not saying don't. I'm saying picture the funeral for the version of you that did.",
+      "If we do nothing, nothing bad happens, and nothing is the safest of all the things.",
+    ],
+    re:[
+      "The Optimist calls it 'a great anecdote.' I call it 'the incident.'",
+      "3AM and I should really co-chair. We have such synergy on the abyss.",
+      "The CEO wants to 'ship it.' Bold word, ship, given the icebergs.",
+      "Inner Child, sweetie, the fun ones are how it starts. That's how it always starts.",
+      "The Chair can gavel all they like. The scenarios remain undefeated.",
+    ]
+  },
+  nap: {
+    g:'😴', name:'The One Who Just Wants A Nap', role:'Rest & Adjournment',
+    open:[
+      "Counter-proposal: we lie down and this handles itself.",
+      "I move to adjourn. I've been moving to adjourn since we started.",
+      "Or. And hear me out. Bed.",
+      "Do we have to decide it awake. That seems like a lot.",
+      "Seconding whatever gets us to the horizontal position fastest.",
+      "I yield my time to a small, restorative nap.",
+      "Can this be a tomorrow problem. Most things are tomorrow problems.",
+    ],
+    body:[
+      "Every question is easier from under a blanket. This one especially.",
+      "Sleep on it. Not as a metaphor. As a plan. My whole plan is a nap.",
+      "The committee will feel differently after twenty minutes of not existing.",
+      "I don't disagree with anyone. I'm just so tired of the room disagreeing.",
+      "Whatever we decide, we'll be too sleepy to enjoy it, so let's rest first.",
+      "The clearest thinking happens right before sleep, then vanishes. Let's chase it anyway.",
+      "I motion that the answer is 'later,' and later is a soft, warm place.",
+      "You could solve this, or you could close your eyes and let it become someone else's turn.",
+      "Consciousness is optional and, frankly, overbooked. Let's cancel some of it.",
+    ],
+    re:[
+      "The CEO wants efficiency. Nothing is more efficient than being asleep.",
+      "The Catastrophist is scared. The Catastrophist should nap through the disaster.",
+      "3AM, if you'd just let us sleep, you wouldn't even exist. Think about that. Later.",
+      "Snacks first, then me. Snacks and I have a coalition. It's very cozy.",
+      "The Critic's notes will still be there after a nap. Sadly. But so will the nap.",
+    ]
+  }
+};
+
+/* member order to draw a "panel" from */
+const MEMBER_KEYS = Object.keys(MEMBERS);
+
+/* ============================ THE CHAIR ============================ */
+/* The Chair delivers the gavel + a motion that resolves nothing. */
+
+const CHAIR = {
+  g:'🔨', name:'The Chair', role:'Presiding, Reluctantly'
+};
+
+const GAVEL_PRE = [
+  "The Chair bangs the gavel.",
+  "The Chair, sensing no consensus and no hope of it, bangs the gavel.",
+  "The Chair pinches the bridge of their nose and bangs the gavel.",
+  "The Chair overrules everyone equally and bangs the gavel.",
+  "The Chair, out of time and patience, bangs the gavel.",
+  "The Chair declares the crosstalk 'productive' and bangs the gavel.",
+];
+
+/* motions that resolve nothing helpfully — combinatorial */
+const MOTION_TEMPLATES = [
+  "The motion carries: we will {verb} the matter {qualifier}, revisit it {when}, and feel roughly the same about it then.",
+  "It is hereby resolved to {verb} the question {qualifier} and to strike all feelings from the record, where they will continue to exist off the record.",
+  "The Chair moves that we {verb} it {qualifier}, delegate the rest to a future self who has not consented, and adjourn to a nap.",
+  "Motion passed by a vote of nobody to nobody: {verb} it {qualifier}, {when}, pending further avoidance.",
+  "Resolved: the committee will {verb} the item {qualifier}, form a subcommittee to worry about it, and never convene the subcommittee.",
+  "By the power vested in exhaustion, the Chair rules that we {verb} it {qualifier} and call that 'growth.'",
+  "The floor agrees to {verb} the question {qualifier}, table the underlying feeling {when}, and order a snack in the meantime.",
+  "The Chair, finding merit in every position and courage in none, moves to {verb} it {qualifier} and let time decide, as time always does, unhelpfully.",
+];
+const MOTION_VERB = [
+  "table","postpone","half-consider","provisionally shelve","overthink","under-think",
+  "outsource to Future You","reframe as a growth opportunity and avoid","split the difference on",
+  "sleep on","re-agenda","quietly not decide","aggressively neither commit to nor abandon",
+];
+const MOTION_QUALIFIER = [
+  "indefinitely","with great feeling","until it decides itself","in a way that changes nothing",
+  "for reasons the minutes will not clarify","subject to a vibe check that never occurs",
+  "pending a snack","with strong opinions and no plan","in the spirit of the season",
+  "on a probationary basis that never ends","conditional on you texting them first, which you won't",
+];
+const MOTION_WHEN = [
+  "next quarter","the moment you're falling asleep","never, ideally","at 3AM without warning",
+  "after lunch, spiritually","in a meeting that will also resolve nothing","when you least expect it",
+  "the next time you're in the shower","once everyone's forgotten the question",
+];
+
+/* the vote tally line — always absurd, never a real quorum */
+const VOTE_LINES = [
+  "Ayes: several. Nays: the same members, moments later. Abstentions: everyone, on principle.",
+  "Motion carried unanimously, then contested unanimously, then carried again out of fatigue.",
+  "Vote: 3 for, 3 against, 2 asleep. The 2 asleep are declared the swing vote.",
+  "The Chair counts the hands, loses count, and rules in favor of stopping.",
+  "Passed on a voice vote, mostly the voices you didn't want to hear.",
+  "Ayes have it, on the condition that the nays get a snack and a nap.",
+  "Quorum confirmed. Consensus denied. The gap between them is where you live.",
+  "Motion approved pending your approval, which the committee notes you will withhold.",
+];
+
+/* the crosstalk stage directions sprinkled between turns */
+const STAGE = [
+  "(talking over the last speaker)",
+  "(not waiting to be recognized)",
+  "(before anyone can respond)",
+  "(raising a hand and not waiting)",
+  "(interrupting)",
+  "(over objections)",
+  "(loudly, then quietly)",
+  "(while someone else is still speaking)",
+  "(pointing at the previous speaker)",
+];
+
+/* ============================ RNG + PICKERS ============================ */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickFresh(arr, seen){
+  if(arr.length < 2) return arr[0];
+  let v, guard=0;
+  do { v = pick(arr); } while(seen.has(v) && ++guard < 60);
+  seen.add(v);
+  return v;
+}
+function trim(set, keep){
+  if(set.size > keep){
+    const it = set.values();
+    while(set.size > keep){ set.delete(it.next().value); }
+  }
+}
+function chance(p){ return Math.random() < p; }
+function shuffle(a){
+  const arr = a.slice();
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+
+/* ============================ NO-REPEAT TRACKERS ============================ */
+const seenOpen = {};      // per-member "open" line memory
+const seenBody = {};
+const seenRe = {};
+MEMBER_KEYS.forEach(k => { seenOpen[k]=new Set(); seenBody[k]=new Set(); seenRe[k]=new Set(); });
+const seenGavelPre = new Set();
+const seenVote = new Set();
+const seenStage = new Set();
+let lastMotion = null;
+let lastPanelKey = null;
+let sessionIndex = 0;
+
+/* ============================ QUESTION ECHO ============================ */
+/* Make a short, safe echo of the user's question for the motion line. */
+function questionEcho(raw){
+  let q = String(raw || "").trim();
+  if(!q) return "the matter before us";
+  // strip trailing punctuation, collapse whitespace
+  q = q.replace(/\s+/g, " ").replace(/[?.!]+$/,"").trim();
+  if(q.length > 68) q = q.slice(0, 65).replace(/\s+\S*$/,"") + "…";
+  return "“" + q + "”";
+}
+
+/* ============================ BUILD A SESSION ============================ */
+function buildSession(question){
+  sessionIndex++;
+
+  // choose 5–6 members for this panel; the Chair always closes.
+  // ensure the panel differs from the previous one, and always vary speaking order.
+  let panel, panelKey, tries=0;
+  do {
+    const count = chance(0.5) ? 5 : 6;
+    panel = shuffle(MEMBER_KEYS).slice(0, count);
+    panelKey = panel.join(",");
+    tries++;
+  } while(panelKey === lastPanelKey && tries < 8);
+  lastPanelKey = panelKey;
+
+  const turns = [];
+  panel.forEach((key, idx) => {
+    const m = MEMBERS[key];
+    // first speaker "opens"; later speakers may respond to prior crosstalk
+    let text;
+    const interject = idx > 0 && chance(0.62);
+    if(idx === 0){
+      text = pickFresh(m.open, seenOpen[key]); trim(seenOpen[key], Math.max(2, m.open.length-2));
+    } else if(interject){
+      // a reaction line, occasionally chained with a body line
+      text = pickFresh(m.re, seenRe[key]); trim(seenRe[key], Math.max(2, m.re.length-2));
+      if(chance(0.4)){
+        const extra = pickFresh(m.body, seenBody[key]); trim(seenBody[key], Math.max(3, m.body.length-3));
+        text = text + " " + extra;
+      }
+    } else {
+      // open-ish or body
+      if(chance(0.35)){
+        text = pickFresh(m.open, seenOpen[key]); trim(seenOpen[key], Math.max(2, m.open.length-2));
+      } else {
+        text = pickFresh(m.body, seenBody[key]); trim(seenBody[key], Math.max(3, m.body.length-3));
+      }
+      if(chance(0.3)){
+        const extra = pickFresh(m.body, seenBody[key]); trim(seenBody[key], Math.max(3, m.body.length-3));
+        text = text + " " + extra;
+      }
+    }
+    const stage = interject ? pickFresh(STAGE, seenStage) : null;
+    if(interject) trim(seenStage, 5);
+    turns.push({ key, glyph:m.g, name:m.name, role:m.role, text, stage, interject });
+  });
+
+  // the Chair's gavel motion — resolves nothing
+  let motion, mtries=0;
+  do {
+    motion = pick(MOTION_TEMPLATES)
+      .replace("{verb}", pick(MOTION_VERB))
+      .replace("{qualifier}", pick(MOTION_QUALIFIER))
+      .replace("{when}", pick(MOTION_WHEN));
+    mtries++;
+  } while(motion === lastMotion && mtries < 8);
+  lastMotion = motion;
+
+  const gavelPre = pickFresh(GAVEL_PRE, seenGavelPre); trim(seenGavelPre, 3);
+  const vote = pickFresh(VOTE_LINES, seenVote); trim(seenVote, 4);
+  const echo = questionEcho(question);
+
+  return { question, echo, turns, gavelPre, motion, vote };
+}
+
+/* ============================ RENDER ============================ */
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let activeTimers = [];
+function clearTimers(){ activeTimers.forEach(id => clearTimeout(id)); activeTimers = []; }
+
+let currentSession = null;
+
+function renderSession(sess){
+  currentSession = sess;
+  clearTimers();
+  const session = document.getElementById('session');
+
+  const turnsHTML = sess.turns.map((t,i) => turnHTML(t,i)).join('');
+
+  session.innerHTML =
+    '<div class="session-head">' +
+      '<div class="roomtag">Committee in session · deliberation ' + toRoman(sessionIndex).toLowerCase() + '</div>' +
+      '<div class="motion-on-floor">On the floor: <span class="q">' + esc(sess.echo) + '</span></div>' +
+    '</div>' +
+    '<div class="minutes">' +
+      turnsHTML +
+      '<div class="gavel-turn pending" id="gavel">' +
+        '<div class="gavel-icon" id="gavel-icon">' + CHAIR.g + '</div>' +
+        '<div class="gavel-label">The Chair issues a motion</div>' +
+        '<div class="motion-text" id="motion-text"></div>' +
+        '<div class="vote-line" id="vote-line"></div>' +
+        '<div class="motion-sig">— ' + esc(CHAIR.name) + ', ' + esc(CHAIR.role) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="actions">' +
+      '<button class="mini" id="reconvene-btn" type="button">↻ reconvene</button>' +
+      '<button class="mini primary" id="copy-btn" type="button">⎘ copy the minutes</button>' +
+    '</div>';
+
+  wireSessionButtons();
+  disableActions(true);
+  playSequence(sess);
+}
+
+function turnHTML(t, i){
+  const cls = 'turn pending' + (t.interject ? ' interject' : '');
+  const stage = t.stage ? '<span class="stage">' + esc(t.stage) + '</span> ' : '';
+  return ''+
+    '<div class="'+cls+'" id="turn-'+i+'">' +
+      '<div class="avatar" aria-hidden="true">'+ t.glyph +'</div>' +
+      '<div class="bubble">' +
+        '<div class="who"><span class="name">'+ esc(t.name) +'</span><span class="role">'+ esc(t.role) +'</span></div>' +
+        '<div class="says" id="says-'+i+'" data-stage="'+ (t.stage ? esc(t.stage) : '') +'"></div>' +
+      '</div>' +
+    '</div>';
+}
+
+/* typewriter within a "says" element, preserving an optional italic stage prefix */
+function typewriter(el, stage, text, done){
+  const stagePrefix = stage ? '<span class="stage">'+ esc(stage) +'</span> ' : '';
+  if(prefersReduced){
+    el.innerHTML = stagePrefix + esc(text);
+    if(done) done();
+    return;
+  }
+  el.innerHTML = stagePrefix;
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  caret.textContent = '▍';
+  el.appendChild(caret);
+  let i = 0;
+  const step = () => {
+    if(i >= text.length){
+      caret.remove();
+      if(done) done();
+      return;
+    }
+    caret.insertAdjacentText('beforebegin', text[i]);
+    i++;
+    let delay = 11 + Math.random()*15;
+    const c = text[i-1];
+    if(c === '.' || c === '!' || c === '?') delay += 130 + Math.random()*90;
+    else if(c === ',' || c === '—' || c === ';') delay += 70 + Math.random()*60;
+    const id = setTimeout(step, delay);
+    activeTimers.push(id);
+  };
+  const id = setTimeout(step, 60);
+  activeTimers.push(id);
+}
+
+function playSequence(sess){
+  let idx = 0;
+  const nextTurn = () => {
+    if(idx >= sess.turns.length){
+      // reveal the gavel
+      const gavel = document.getElementById('gavel');
+      const finish = () => {
+        gavel.classList.remove('pending');
+        gavel.classList.add('in');
+        const icon = document.getElementById('gavel-icon');
+        if(!prefersReduced && icon){
+          const gid = setTimeout(() => icon.classList.add('gavel-strike'), 220);
+          activeTimers.push(gid);
+        }
+        const mt = document.getElementById('motion-text');
+        const vote = document.getElementById('vote-line');
+        // small pre-motion, then the motion types, then the vote fades in
+        typewriter(mt, null, sess.gavelPre + " " + sess.motion, () => {
+          if(vote){
+            if(prefersReduced){ vote.textContent = sess.vote; }
+            else {
+              vote.style.opacity = '0';
+              vote.textContent = sess.vote;
+              vote.style.transition = 'opacity .6s';
+              const vid = setTimeout(() => { vote.style.opacity = '1'; }, 60);
+              activeTimers.push(vid);
+            }
+          }
+          disableActions(false);
+        });
+      };
+      const gid = setTimeout(finish, prefersReduced ? 0 : 260);
+      activeTimers.push(gid);
+      return;
+    }
+
+    const turnEl = document.getElementById('turn-'+idx);
+    const saysEl = document.getElementById('says-'+idx);
+    const t = sess.turns[idx];
+    const thisIdx = idx;
+    idx++;
+
+    if(turnEl){
+      turnEl.classList.remove('pending');
+      turnEl.classList.add('in');
+    }
+    if(!prefersReduced && turnEl){
+      turnEl.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+    if(saysEl){
+      typewriter(saysEl, t.stage, t.text, () => {
+        const gap = prefersReduced ? 0 : 240 + Math.random()*220;
+        const id = setTimeout(nextTurn, gap);
+        activeTimers.push(id);
+      });
+    } else {
+      nextTurn();
+    }
+  };
+  const startId = setTimeout(nextTurn, prefersReduced ? 0 : 200);
+  activeTimers.push(startId);
+}
+
+function disableActions(dis){
+  const r = document.getElementById('reconvene-btn');
+  const c = document.getElementById('copy-btn');
+  if(r) r.disabled = dis;
+  if(c) c.disabled = dis;
+}
+
+function toRoman(n){
+  const map = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let out=''; let x=n;
+  for(const [v,s] of map){ while(x>=v){ out+=s; x-=v; } }
+  return out || 'I';
+}
+
+/* ============================ COPY / SHARE ============================ */
+function sessionToText(){
+  if(!currentSession) return '';
+  const s = currentSession;
+  const L = [];
+  L.push('THE COMMITTEE IN YOUR HEAD');
+  L.push('— minutes of the standing committee · quorum met · consensus not reached');
+  L.push('');
+  L.push('ITEM ON THE FLOOR: ' + s.echo);
+  L.push('');
+  L.push('DELIBERATION');
+  s.turns.forEach(t => {
+    const stage = t.stage ? t.stage + ' ' : '';
+    L.push(t.name.toUpperCase() + ' [' + t.role + ']');
+    L.push('  ' + stage + t.text);
+    L.push('');
+  });
+  L.push('MOTION');
+  L.push('  ' + s.gavelPre + ' ' + s.motion);
+  L.push('  ' + s.vote);
+  L.push('  — ' + CHAIR.name + ', ' + CHAIR.role);
+  L.push('');
+  L.push('— the meeting is called to order · the meeting will never adjourn');
+  return L.join('\n');
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+function copyMinutes(btn){
+  const txt = sessionToText();
+  if(!txt) return;
+  const done = () => {
+    showToast('Minutes copied — they resolve nothing, faithfully');
+    if(btn){ btn.classList.add('done'); const o = btn.innerHTML; btn.innerHTML = '✓ entered into the record';
+      setTimeout(() => { btn.classList.remove('done'); btn.innerHTML = o; }, 2000); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){
+    showToast('The minutes decline to be copied. The committee is not surprised.');
+  }
+}
+
+/* ============================ WIRING ============================ */
+const conveneBtn = document.getElementById('convene-btn');
+const qField = document.getElementById('q-field');
+const hint = document.getElementById('hint');
+
+function convene(){
+  const q = qField.value;
+  const sess = buildSession(q);
+  renderSession(sess);
+  conveneBtn.textContent = 'Reconvene the Committee';
+  hint.textContent = 'The committee is deliberating. It always is.';
+  if(!prefersReduced){
+    document.getElementById('session').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+}
+
+function wireSessionButtons(){
+  const r = document.getElementById('reconvene-btn');
+  const c = document.getElementById('copy-btn');
+  if(r) r.addEventListener('click', () => renderSession(buildSession(qField.value)));
+  if(c) c.addEventListener('click', (e) => copyMinutes(e.currentTarget));
+}
+
+conveneBtn.addEventListener('click', convene);
+qField.addEventListener('keydown', (e) => {
+  // Ctrl/Cmd+Enter convenes; plain Enter allowed for multi-line but we convene on it too for ease
+  if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)){
+    e.preventDefault();
+    convene();
+  }
+});
+</script>
+</body>
+</html>

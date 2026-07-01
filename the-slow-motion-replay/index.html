@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Slow-Motion Replay · Prízrak</title>
+<style>
+  :root {
+    --ink:#07070a; --ink-1:#0b0b10; --ink-2:#0f0f16; --ink-3:#14141d;
+    --bone:#e8e3d6; --parch:#d2ccbc; --ash:#948e83; --ash-2:#6c675e; --ash-3:#46433c;
+    --rule:rgba(232,227,214,.08); --rule-2:rgba(232,227,214,.15);
+    --broadcast:#e2483d; --broadcast-dim:#6e2b26;
+    --field:#7fd6a0; --field-dim:#3c6650;
+    --amber:#e6b64a; --amber-dim:#7a6128;
+    --chalk:#cfe6e2; --chalk-line:rgba(207,230,226,.5);
+    --slate-bg:#12332e;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(130% 80% at 50% -14%, rgba(226,72,61,.07), transparent 55%),
+      radial-gradient(100% 60% at 50% 118%, rgba(127,214,160,.05), transparent 60%),
+      var(--ink);
+  }
+  /* film grain */
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:740px; margin:0 auto; padding:44px 20px 60px; }
+  @media (min-width:640px) { .wrap { padding:56px 32px 72px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--broadcast); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(226,72,61,.26); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1a1a22; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:28px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2rem,7.5vw,3.5rem); font-weight:700;
+    line-height:1.0; letter-spacing:-.015em; margin:12px 0 0;
+  }
+  .sub {
+    margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:34rem; line-height:1.62;
+  }
+
+  .divider {
+    height:1px; max-width:38rem; margin:24px auto 24px;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+
+  /* input */
+  .input-block { max-width:36rem; margin:0 auto; }
+  .input-label {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.2em; font-size:10px;
+    color:var(--ash-2); text-align:center; margin-bottom:12px; display:block;
+  }
+  .field-wrap { position:relative; }
+  textarea#play {
+    width:100%; min-height:74px; resize:vertical; font-family:var(--serif); font-size:15px;
+    line-height:1.55; color:var(--bone); background:var(--ink-2);
+    border:1px solid var(--rule-2); border-radius:6px; padding:15px 16px;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  textarea#play:focus {
+    outline:none; border-color:var(--broadcast-dim);
+    box-shadow:0 0 0 3px rgba(226,72,61,.09);
+  }
+  textarea#play::placeholder { color:var(--ash-3); font-style:italic; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin:14px 0 4px; }
+  .chip {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.02em; color:var(--ash);
+    background:var(--ink-1); border:1px solid var(--rule); border-radius:20px;
+    padding:6px 12px; cursor:pointer; transition:border-color .18s,color .18s,background .18s;
+  }
+  .chip:hover { border-color:var(--broadcast-dim); color:var(--bone); background:var(--ink-2); }
+  .chip .die { color:var(--amber); }
+
+  .controls { text-align:center; margin:20px 0 4px; }
+  .go-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.2em; font-size:12px;
+    padding:14px 32px; background:linear-gradient(135deg,var(--broadcast-dim),var(--broadcast));
+    border:none; border-radius:4px; color:#160b0a; cursor:pointer; font-weight:700;
+    transition:transform .15s, box-shadow .25s, opacity .2s;
+    box-shadow:0 0 26px -6px rgba(226,72,61,.55);
+  }
+  .go-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 32px -8px rgba(226,72,61,.65); }
+  .go-btn:active:not(:disabled) { transform:translateY(0); }
+  .go-btn:disabled { opacity:.4; cursor:not-allowed; box-shadow:none; }
+  .hint { font-family:var(--mono); font-size:10px; color:var(--ash-3); margin-top:12px; letter-spacing:.14em; min-height:12px; }
+
+  /* ============ THE BROADCAST ============ */
+  #broadcast { margin-top:34px; }
+
+  .telecast {
+    border:1px solid var(--rule-2); border-radius:8px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    position:relative; overflow:hidden;
+    box-shadow:0 30px 70px -38px rgba(0,0,0,.9);
+  }
+  /* CRT scanlines over the whole telecast */
+  .telecast::after {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:6; opacity:.5;
+    background:repeating-linear-gradient(180deg, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,.18) 3px, rgba(0,0,0,0) 4px);
+    mix-blend-mode:multiply;
+  }
+  /* faint vignette / CRT curve */
+  .telecast::before {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:5;
+    box-shadow:inset 0 0 90px rgba(0,0,0,.55);
+    border-radius:8px;
+  }
+
+  /* the "screen" - the field graphic area */
+  .screen {
+    position:relative; z-index:1;
+    background:
+      radial-gradient(120% 90% at 50% 4%, rgba(127,214,160,.10), transparent 60%),
+      linear-gradient(180deg, var(--slate-bg) 0%, #0c1c19 100%);
+    border-bottom:1px solid var(--rule);
+    padding:0; overflow:hidden; min-height:150px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .screen svg { display:block; width:100%; height:auto; }
+  .screen.freeze { animation:freezeFlash .5s steps(2) 1; }
+  @keyframes freezeFlash { 0%{filter:none} 50%{filter:brightness(1.7) contrast(1.2)} 100%{filter:none} }
+
+  /* score bug / lower-third bar */
+  .scorebug {
+    position:relative; z-index:2;
+    display:flex; align-items:stretch; font-family:var(--mono);
+    background:linear-gradient(90deg, rgba(226,72,61,.92), rgba(180,52,44,.92));
+    border-top:1px solid rgba(0,0,0,.35);
+    color:#160b0a; font-size:11px; letter-spacing:.08em;
+  }
+  .scorebug .net { padding:8px 12px; font-weight:700; text-transform:uppercase; background:rgba(0,0,0,.22); color:var(--bone); display:flex; align-items:center; gap:7px; }
+  .scorebug .live { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--broadcast); box-shadow:0 0 6px var(--broadcast); animation:pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .scorebug .matchup { flex:1; padding:8px 12px; text-transform:uppercase; font-weight:700; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .scorebug .clock { padding:8px 12px; background:rgba(0,0,0,.22); color:var(--amber); font-weight:700; }
+
+  /* body of the telecast: commentary */
+  .booth { position:relative; z-index:2; padding:24px 22px 22px; }
+
+  .stage-label {
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--field); margin:2px 0 16px; display:flex; align-items:center; gap:12px;
+  }
+  .stage-label::before, .stage-label::after { content:""; height:1px; flex:1; background:var(--rule); }
+  .stage-label.replay { color:var(--amber); }
+  .stage-label.chalk { color:var(--chalk); }
+  .stage-label.ruling { color:var(--broadcast); }
+
+  /* commentary lines */
+  .line { display:flex; gap:12px; margin:0 0 15px; opacity:0; }
+  .line.in { animation:lineIn .5s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes lineIn { from{opacity:0; transform:translateY(7px);} to{opacity:1; transform:none;} }
+  .who {
+    flex:0 0 auto; width:64px; text-align:right; font-family:var(--mono);
+    font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; padding-top:4px;
+    line-height:1.4;
+  }
+  .who.pbp { color:var(--broadcast); }
+  .who.color { color:var(--field); }
+  .who .role { display:block; color:var(--ash-3); font-size:7.5px; letter-spacing:.14em; margin-top:2px; }
+  .says {
+    flex:1; font-size:15px; line-height:1.62; color:var(--parch);
+    border-left:2px solid var(--rule-2); padding-left:14px; min-height:1.5em;
+  }
+  .line.pbp-line .says { border-left-color:var(--broadcast-dim); }
+  .line.color-line .says { border-left-color:var(--field-dim); color:var(--bone); font-style:italic; }
+  .says .em { color:var(--amber); font-style:normal; }
+
+  .caret { display:inline-block; width:7px; color:var(--broadcast); animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  /* freeze-frame beat */
+  .freeze-beat {
+    margin:4px 0 18px; padding:13px 16px; border:1px dashed var(--rule-2); border-radius:6px;
+    background:rgba(230,182,74,.04); font-family:var(--mono); font-size:12px; color:var(--amber);
+    letter-spacing:.03em; line-height:1.6; opacity:0;
+  }
+  .freeze-beat.in { animation:lineIn .5s cubic-bezier(.2,.7,.2,1) forwards; }
+  .freeze-beat .tag { color:var(--ash-2); text-transform:uppercase; letter-spacing:.16em; font-size:9px; display:block; margin-bottom:5px; }
+
+  /* chalkboard tactical breakdown */
+  .chalkboard {
+    margin:4px 0 8px; border-radius:6px; overflow:hidden;
+    background:#0d211d;
+    border:1px solid rgba(207,230,226,.14);
+    box-shadow:inset 0 0 40px rgba(0,0,0,.5);
+    opacity:0;
+  }
+  .chalkboard.in { animation:lineIn .55s cubic-bezier(.2,.7,.2,1) forwards; }
+  .chalkboard .cb-diagram { position:relative; background:#0d211d; border-bottom:1px solid rgba(207,230,226,.1); }
+  .chalkboard svg { display:block; width:100%; height:auto; }
+  .cb-notes { padding:14px 16px; }
+  .cb-item {
+    font-family:var(--mono); font-size:12px; color:var(--chalk); line-height:1.6;
+    display:flex; gap:9px; margin-bottom:9px; opacity:.94;
+  }
+  .cb-item:last-child { margin-bottom:0; }
+  .cb-item .mark { color:var(--broadcast); flex:0 0 auto; font-weight:700; }
+  .cb-item .arrow { color:var(--amber); }
+
+  /* the booth ruling */
+  .ruling-card {
+    margin:6px 0 4px; padding:18px 18px 16px; border-radius:6px;
+    background:linear-gradient(180deg, rgba(226,72,61,.06), transparent);
+    border:1px solid var(--broadcast-dim);
+    opacity:0;
+  }
+  .ruling-card.in { animation:rulingIn .7s cubic-bezier(.2,.9,.25,1) forwards; }
+  @keyframes rulingIn { from{opacity:0; transform:scale(.985) translateY(8px);} to{opacity:1; transform:none;} }
+  .ruling-verdict {
+    font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--broadcast); margin-bottom:9px; display:flex; align-items:center; gap:9px;
+  }
+  .ruling-verdict .stamp {
+    border:2px solid var(--broadcast); color:var(--broadcast); padding:2px 9px; border-radius:3px;
+    font-weight:700; transform:rotate(-2deg);
+  }
+  .ruling-text { font-size:15px; line-height:1.66; color:var(--bone); font-style:italic; }
+  .ruling-sig { font-family:var(--mono); font-size:9.5px; letter-spacing:.1em; color:var(--ash-3); margin-top:12px; text-transform:uppercase; }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:26px; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .1s;
+    display:inline-flex; align-items:center; gap:8px; letter-spacing:.06em;
+  }
+  .mini:hover { border-color:var(--broadcast); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.primary { border-color:var(--amber-dim); color:var(--amber); }
+  .mini.primary:hover { border-color:var(--amber); color:var(--bone); background:rgba(230,182,74,.06); }
+  .mini.done { border-color:var(--field); color:var(--field); }
+  .mini:disabled { opacity:.4; cursor:not-allowed; }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:11px 17px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.85); letter-spacing:.04em; max-width:88vw; text-align:center;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:52px; padding-top:26px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.9; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { opacity:.04; }
+    .line, .freeze-beat, .chalkboard, .ruling-card { opacity:1 !important; }
+    .caret { display:none; }
+    .telecast::after { opacity:.28; }
+    .scorebug .live { opacity:1; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — sports desk · unofficial broadcast</div>
+      <h1>The Slow-Motion <span class="specter">Replay</span></h1>
+      <p class="sub">Feed us the smallest thing you did — the wave, the wrong name, the door you pushed that said pull — and we roll the tape. Two announcers. Freeze-frames. A chalkboard breakdown of where it all went wrong. A final ruling from the booth. Gravitas, applied catastrophically to nothing at all.</p>
+    </header>
+
+    <div class="divider"></div>
+
+    <div class="input-block">
+      <label class="input-label" for="play">Describe the incident, in your own words</label>
+      <div class="field-wrap">
+        <textarea id="play" maxlength="220" placeholder="e.g. I waved back at someone who wasn't waving at me"></textarea>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="controls">
+      <button id="go-btn" class="go-btn">Roll the Tape</button>
+      <div class="hint" id="hint">The booth is warming up. The tape is queued.</div>
+    </div>
+
+    <div id="broadcast" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">No athletes were involved · the stakes were always this low</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ ESCAPE ============================ */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================ SEED INCIDENTS (the die button) ============================ */
+const SEED_PLAYS = [
+  "I waved back at someone who wasn't waving at me",
+  "I called my teacher mom",
+  "I said 'you too' when the waiter told me to enjoy my meal",
+  "I pushed a door that clearly said pull",
+  "I laughed at a joke I didn't hear and it was actually bad news",
+  "I went in for a handshake and they went in for a hug",
+  "I said 'happy birthday' back to someone who wished me happy birthday",
+  "I waved at my own reflection thinking it was someone I knew",
+  "I held the door for someone who was much too far away",
+  "I clapped when nobody else was clapping",
+  "I said 'good, you?' before they asked how I was",
+  "I tripped on a flat sidewalk and turned around to blame it",
+  "I left a voicemail and forgot to say who I was",
+  "I called the cashier 'babe' by accident",
+  "I raised my hand to answer and forgot the answer",
+  "I said 'nice to meet you' to someone I've met four times",
+  "I texted 'on my way' from bed",
+  "I got off the elevator on the wrong floor and pretended I meant to",
+  "I replied-all to the entire company",
+  "I walked confidently into the wrong meeting and sat down",
+];
+
+/* ============================ ANALYSIS OF THE PLAY ============================ */
+/* We derive a lightweight "read" of the incident to color the commentary. */
+function analyze(raw){
+  const t = raw.toLowerCase();
+  const has = (...ws) => ws.some(w => t.includes(w));
+  const tags = new Set();
+  if(has('wave','waving','waved')) tags.add('wave');
+  if(has('mom','dad','teacher','sir','miss','babe','honey','name')) tags.add('name');
+  if(has('you too','same to you','back')) tags.add('mirror');
+  if(has('door','push','pull')) tags.add('door');
+  if(has('hand','handshake','hug','high five','fist bump')) tags.add('greeting');
+  if(has('laugh','clap','clapp','cheer')) tags.add('applause');
+  if(has('trip','fell','fall','stumbl','slip')) tags.add('fall');
+  if(has('text','email','voicemail','call','reply','message','sent')) tags.add('comms');
+  if(has('meeting','zoom','call','elevator','floor')) tags.add('office');
+  if(has('wrong','forgot','forget','mistake','accident')) tags.add('error');
+  const words = raw.trim().split(/\s+/).filter(Boolean);
+  return { tags, wordCount: words.length, firstWord: (words[0]||'you') };
+}
+
+/* ============================ COMMENTATORS ============================ */
+const PBP_NAMES = ["Bricker","Delacroix","Ojanpää","Vasquez","Thornbury","Kwan","Radcliffe","Sørensen","Okafor","Mancuso"];
+const COLOR_NAMES = ["Coach Pell","Big Dan Ruiz","The Professor","Marnie Voss","Ol' Gus","Doc Hensley","Tam Nightingale","Sully","Coach Beaumont","Rocket Ferraro"];
+const NETWORKS = ["PZRK Sports","The Ache Network","Channel 9 Overnight","Slow-Mo Central","GhostFeed Live","Regret TV","The Instant-Replay Booth","PBS-Adjacent"];
+const BROADCASTS = ["THE INCIDENT","LIVE FROM THE MOMENT","REPLAY BOOTH","SUNDAY NIGHT MORTIFICATION","THE SITUATION ROOM","OVERTIME","GAME OF INCHES"];
+
+/* ============================ PLAY-BY-PLAY POOLS ============================ */
+/* {you} {act} tokens are filled from the incident. */
+
+const PBP_OPENERS = [
+  "And here we go — {you} steps up, the crowd doesn't know yet, but they're about to.",
+  "We're LIVE, and something is developing on the floor. {you_cap} is in motion.",
+  "Here's the snap. {you_cap} has committed. There is no calling this back.",
+  "You can feel the tension in the building. {you_cap} is loading up for it.",
+  "Coming out of the timeout, {you} takes the field with what can only be described as confidence.",
+  "The whistle blows and immediately — IMMEDIATELY — {you} is doing the thing.",
+  "Watch the footwork here. {you_cap} sets, plants, and — oh, we're going for it.",
+  "The building goes quiet. All eyes on {you}. This is the moment they'll talk about.",
+];
+const PBP_ACTION = [
+  "It's happening. {The_act}. Full commitment, zero hesitation.",
+  "And there it is — {the_act} — right in the open field.",
+  "{The_act_cap}! No takebacks, no timeout left, nothing but follow-through.",
+  "You've got to see it to believe it: {the_act}, executed at full speed.",
+  "The whole stadium sees it at once. {The_act}. It's out there now.",
+  "{The_act_cap} — and the commitment on it is, honestly, world-class.",
+];
+const PBP_REALIZE = [
+  "OH. Oh no. The realization is hitting in real time. You can see it cross the face.",
+  "And there's the flinch. That's the moment it all comes crashing in.",
+  "The eyes go wide. Somewhere in the mind, a small alarm has begun to sound.",
+  "That's the recoil. Textbook recoil. The body knew before the brain did.",
+  "The half-second delay, and then — impact. The full weight of it lands.",
+  "You see the shoulders drop. That's a competitor understanding the situation.",
+  "And now the smile. The terrible, involuntary 'I meant to do that' smile.",
+];
+const PBP_AFTERMATH = [
+  "Now the recovery attempt. {you_cap} is going to try to walk it off. It will not walk off.",
+  "The scramble begins. {you_cap} is looking for an exit that geometrically does not exist.",
+  "And now the pivot — a heroic attempt to pretend that was the plan all along.",
+  "{you_cap} is reaching for a save. There is no save. There was never a save.",
+  "Watch the cleanup here. {you_cap} tries to fold it into a normal human gesture. Bold. Doomed.",
+  "The follow-through continues out of sheer momentum. You cannot stop a thing like this mid-air.",
+];
+
+/* ============================ COLOR COMMENTARY POOLS ============================ */
+const COLOR_SETUP = [
+  "See, this is what I love about the game. Nobody made {you} do that. That was a choice.",
+  "You train your whole life for the big moments. Nobody trains you for THIS moment.",
+  "That's instinct, right there. Bad instinct. But instinct.",
+  "I've watched a lot of tape, and the confidence-to-outcome ratio here is genuinely historic.",
+  "This is a fundamentals breakdown. We drill against this in practice. We drill and we drill.",
+  "You love to see the effort. You hate to see the result. That's this play in a nutshell.",
+];
+const COLOR_ANALYSIS = [
+  "The mechanics were fine. The read was the problem. It's always the read.",
+  "What kills you is the commitment. If you go halfway you can bail. {You_cap} went all the way.",
+  "It's a decision-making thing. The body did exactly what the brain, tragically, asked it to.",
+  "Ninety percent of this is confidence, and {you} had a hundred and ten. That's the issue.",
+  "You can't coach hesitation out of somebody and then be surprised when they don't hesitate.",
+  "Small margins. Whole life is small margins. And here, the margin was zero.",
+  "The tape doesn't lie. The tape has never once lied. I wish, for {you}, that it would.",
+];
+const COLOR_SYMPATHY = [
+  "And you know what? It happens to everybody. Just usually not on camera.",
+  "Somewhere, a version of {you} played this perfectly. We just didn't get that timeline.",
+  "I'll say this — I've done worse. I won't say when. But I've done worse.",
+  "This is the kind of thing that builds character, or at minimum a lasting memory at 3 a.m.",
+  "Give the kid credit. Wrong, yes. But committed. And in this booth, we respect a full swing.",
+  "Nobody remembers the plays that went right. This one? This one's immortal now.",
+];
+
+/* ============================ FREEZE-FRAME BEATS ============================ */
+const FREEZE_BEATS = [
+  "Let's freeze it right — THERE. See the hand? Fully extended. Point of no return, frame 118.",
+  "Roll it back, roll it back. Watch the eyes at the top of the frame. That's optimism. That's about to die.",
+  "Freeze it. Look at the posture. That is a person who believes, with their whole chest, that this is going great.",
+  "Let's isolate the moment. Right here — this frame — this is the last frame before everything changed.",
+  "Pause it. You see that little lean? That's the body already trying to leave the scene.",
+  "Slow it down eight times. Watch the confidence drain out. It's like watching a tide go out, but sadder.",
+  "Hold on that. Zoom in. That expression is what we in the booth call 'the dawning.'",
+  "Freeze-frame here and — chef's kiss — you can see the exact pixel where the plan fell apart.",
+];
+
+/* ============================ CHALKBOARD TACTICAL NOTES ============================ */
+const CHALK_INTRO = [
+  "Let's get to the board and break down where the wheels came off.",
+  "Grab the chalk. I want to walk you through the geometry of this thing.",
+  "Bring up the tactical view. This was a coverage breakdown from the jump.",
+  "Let's diagram it. Because this? This was schematically fascinating.",
+];
+const CHALK_NOTES = [
+  "The Read: subject processes ambiguous social signal → assumes best case. Fatal optimism.",
+  "The Commit: no exit lane identified before launch. Textbook error, we drill against this.",
+  "The Point of No Return: {marker}. Once you're past here, physics owns you.",
+  "The Overcorrection: attempt to reframe as intentional. Adds 40% to total mortification.",
+  "The Witness Variable: at least one bystander confirmed. Multiplies everything.",
+  "The Recovery: heroic. Ill-advised. The scramble drew a second set of eyes.",
+  "The Follow-Through: momentum carried the gesture two beats past its usefulness.",
+  "The Aftershock: replays in the mind at random intervals for the next 6–40 years.",
+  "The Save Attempt: converting the move into 'stretching' / 'fixing hair.' Nobody bought it.",
+  "The Blind Spot: subject assumed no coverage. Coverage was, in fact, total.",
+];
+const CHALK_MARKERS = ["approximately here","right at the hash mark","dead center","at the top of the arc","just inside the line","frame 118","the exact worst spot"];
+
+/* ============================ BOOTH RULINGS ============================ */
+const RULING_VERDICTS = ["THE PLAY STANDS","RULED: MORTIFYING","UPHELD ON REVIEW","NO FLAG, JUST SHAME","CONFIRMED CRINGE","THE CALL ON THE FIELD","OVERTURNED (SOMEHOW WORSE)","GAME BALL AWARDED"];
+const RULING_TEXT = [
+  "After review, the booth confirms: yes, that happened, yes, they saw, and no, you cannot have it back. The play stands as called.",
+  "Officials have conferred. The gesture was completed, the witness was present, the recovery failed. This one goes in the book.",
+  "Upon further review, there is clear and convincing evidence that everyone noticed and pretended not to, which is worse. Ruling upheld.",
+  "The booth finds no penalty, only a lifetime of remembering this at inconvenient moments. Enjoy the highlight. It's yours forever.",
+  "We've looked at it from every angle. Every angle is bad. The call stands, and honestly, it stands with distinction.",
+  "Final ruling: catastrophic execution of a non-event. Historic in its smallness. Retire the tape to the vault of things we don't discuss.",
+  "The committee rules that this was, in fact, fine. Completely fine. Nobody remembers. You will remember. But nobody else does. Case closed.",
+  "After extensive replay, the booth awards full marks for commitment and zero marks for outcome. A perfect, terrible, unforgettable play.",
+];
+const RULING_SIG = [
+  "— ruling from the booth · replay official #4",
+  "— per the head official, under protest",
+  "— the review committee, unanimously, sadly",
+  "— filed with the league office of small disasters",
+  "— booth review, final and binding, alas",
+  "— the officials, who have seen much worse and much better",
+];
+
+/* ============================ RNG + PICKERS (no-immediate-repeat) ============================ */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+/* rolling-window fresh picker keyed per pool */
+const seenMap = new Map();
+function freshPick(arr, key, keep){
+  if(!seenMap.has(key)) seenMap.set(key, []);
+  const seen = seenMap.get(key);
+  if(arr.length <= 1) return arr[0];
+  const window = Math.min(keep === undefined ? Math.max(1, Math.floor(arr.length/2)) : keep, arr.length - 1);
+  let v, guard = 0;
+  do { v = pick(arr); } while(seen.includes(v) && ++guard < 40);
+  seen.push(v);
+  while(seen.length > window) seen.shift();
+  return v;
+}
+
+/* ============================ TOKEN FILL ============================ */
+function cap(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+/* Build the referent for "the act" from the raw incident.
+   We keep the player's own words but weave them in grammatically. */
+function buildActPhrases(raw){
+  let a = raw.trim().replace(/\s+/g,' ');
+  // strip a trailing period so we can re-punctuate
+  a = a.replace(/[.!?]+$/,'');
+  // If it starts with "I ", convert to a described action: "waving back at..."
+  let described = a;
+  const mI = a.match(/^I\s+(.*)$/i);
+  if(mI){
+    described = mI[1];
+  }
+  // lowercase first char of the described action for mid-sentence use
+  const actLower = described.charAt(0).toLowerCase() + described.slice(1);
+  return {
+    // "the act" as a noun-ish clause: what they did
+    act: actLower,
+    act_cap: cap(actLower),
+  };
+}
+
+function fillTokens(str, ctx){
+  return str
+    .replace(/\{you_cap\}/g, ctx.you_cap)
+    .replace(/\{You_cap\}/g, ctx.you_cap)
+    .replace(/\{you\}/g, ctx.you)
+    .replace(/\{the_act_cap\}/g, "they were " + ctx.act)          // fallback (unused directly)
+    .replace(/\{The_act_cap\}/g, cap(ctx.act))
+    .replace(/\{the_act\}/g, ctx.act)
+    .replace(/\{The_act\}/g, cap(ctx.act))
+    .replace(/\{marker\}/g, ctx.marker);
+}
+
+/* ============================ BUILD THE BROADCAST DATA ============================ */
+function buildBroadcast(raw){
+  const info = analyze(raw);
+  const actP = buildActPhrases(raw);
+  const ctx = {
+    you: "our subject",
+    you_cap: "The subject",
+    act: actP.act,
+    marker: freshPick(CHALK_MARKERS, 'marker', 4),
+  };
+
+  // Assemble a play-by-play sequence: opener -> action -> realize -> aftermath,
+  // alternating with color commentary, punctuated with a freeze-frame.
+  const pbpName = freshPick(PBP_NAMES, 'pbpName', 5);
+  const colorName = freshPick(COLOR_NAMES, 'colorName', 5);
+  const network = freshPick(NETWORKS, 'net', 4);
+  const broadcastTitle = freshPick(BROADCASTS, 'btitle', 4);
+
+  const beats = [];
+  beats.push({ who:'pbp', text: fillTokens(freshPick(PBP_OPENERS,'pbpOpen',4), ctx) });
+  beats.push({ who:'color', text: fillTokens(freshPick(COLOR_SETUP,'colSetup',3), ctx) });
+  beats.push({ who:'pbp', text: fillTokens(freshPick(PBP_ACTION,'pbpAct',3), ctx) });
+  beats.push({ who:'freeze', text: freshPick(FREEZE_BEATS,'freeze',4) });
+  beats.push({ who:'pbp', text: fillTokens(freshPick(PBP_REALIZE,'pbpReal',4), ctx) });
+  beats.push({ who:'color', text: fillTokens(freshPick(COLOR_ANALYSIS,'colAna',4), ctx) });
+  beats.push({ who:'pbp', text: fillTokens(freshPick(PBP_AFTERMATH,'pbpAft',3), ctx) });
+  beats.push({ who:'color', text: fillTokens(freshPick(COLOR_SYMPATHY,'colSym',3), ctx) });
+
+  // chalkboard: intro + 3-4 tactical notes (no repeats within the board)
+  const chalkIntro = fillTokens(freshPick(CHALK_INTRO,'chalkIntro',2), ctx);
+  const noteCount = 3 + Math.floor(Math.random()*2);
+  const usedNotes = [];
+  const notes = [];
+  let g = 0;
+  while(notes.length < noteCount && g < 60){
+    g++;
+    const n = pick(CHALK_NOTES);
+    if(usedNotes.includes(n)) continue;
+    usedNotes.push(n);
+    notes.push(fillTokens(n, ctx));
+  }
+
+  const ruling = {
+    verdict: freshPick(RULING_VERDICTS,'rulV',4),
+    text: fillTokens(freshPick(RULING_TEXT,'rulT',4), ctx),
+    sig: freshPick(RULING_SIG,'rulS',3),
+  };
+
+  return {
+    raw, info,
+    pbpName, colorName, network, broadcastTitle,
+    beats, chalkIntro, notes, ruling,
+    clock: makeClock(),
+    diagram: makeFieldSVG(),
+    chalk: makeChalkSVG(),
+  };
+}
+
+function makeClock(){
+  const m = Math.floor(Math.random()*12);
+  const s = Math.floor(Math.random()*60);
+  return "0.0" + Math.floor(Math.random()*9) + "x  ·  " + String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
+}
+
+/* ============================ FIELD GRAPHIC (inline SVG) ============================ */
+function makeFieldSVG(){
+  const W = 640, H = 200;
+  const field = '#7fd6a0', line = 'rgba(207,230,226,.55)', ball = '#e6b64a', red = '#e2483d';
+  // trajectory of the "play" — a dramatic arc with a marked point of no return
+  const startX = 70, startY = 150;
+  const peakX = 320, peakY = 44;
+  const endX = 560, endY = 150;
+  // sample the quadratic bezier for the dotted trail + PONR marker
+  const bez = (t) => {
+    const mt = 1-t;
+    const x = mt*mt*startX + 2*mt*t*peakX + t*t*endX;
+    const y = mt*mt*startY + 2*mt*t*peakY + t*t*endY;
+    return [x,y];
+  };
+  const ponr = 0.46 + Math.random()*0.18;
+  const [px,py] = bez(ponr);
+  let dots = '';
+  for(let t=0.04; t<0.99; t+=0.055){
+    const [x,y] = bez(t);
+    dots += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="2.1" fill="'+line+'"/>';
+  }
+  let s = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Broadcast field graphic with the trajectory of the play">';
+  // yard lines
+  for(let i=1;i<=7;i++){
+    const x = i*(W/8);
+    s += '<line x1="'+x+'" y1="18" x2="'+x+'" y2="'+(H-18)+'" stroke="'+line+'" stroke-width="1" opacity="0.28"/>';
+  }
+  // touchdown-ish end zones
+  s += '<rect x="10" y="18" width="46" height="'+(H-36)+'" fill="rgba(226,72,61,.10)" stroke="'+line+'" stroke-width="1" opacity="0.5"/>';
+  s += '<rect x="'+(W-56)+'" y="18" width="46" height="'+(H-36)+'" fill="rgba(127,214,160,.10)" stroke="'+line+'" stroke-width="1" opacity="0.5"/>';
+  // trajectory dotted
+  s += dots;
+  // start marker (X = the launch)
+  s += '<g stroke="'+field+'" stroke-width="3" stroke-linecap="round">';
+  s += '<line x1="'+(startX-7)+'" y1="'+(startY-7)+'" x2="'+(startX+7)+'" y2="'+(startY+7)+'"/>';
+  s += '<line x1="'+(startX-7)+'" y1="'+(startY+7)+'" x2="'+(startX+7)+'" y2="'+(startY-7)+'"/>';
+  s += '</g>';
+  // point of no return (pulsing red ring, drawn statically)
+  s += '<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="12" fill="none" stroke="'+red+'" stroke-width="2.4"/>';
+  s += '<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="3.5" fill="'+red+'"/>';
+  s += '<text x="'+px.toFixed(1)+'" y="'+(py-20).toFixed(1)+'" font-family="ui-monospace,monospace" font-size="10" fill="'+red+'" text-anchor="middle" letter-spacing="1">POINT OF NO RETURN</text>';
+  // the ball at the end
+  s += '<circle cx="'+endX+'" cy="'+endY+'" r="6.5" fill="'+ball+'"/>';
+  s += '<text x="'+endX+'" y="'+(endY+24)+'" font-family="ui-monospace,monospace" font-size="9" fill="'+ball+'" text-anchor="middle" letter-spacing="1">OUTCOME</text>';
+  s += '<text x="'+startX+'" y="'+(startY+24)+'" font-family="ui-monospace,monospace" font-size="9" fill="'+field+'" text-anchor="middle" letter-spacing="1">SNAP</text>';
+  s += '</svg>';
+  return s;
+}
+
+/* ============================ CHALKBOARD DIAGRAM (inline SVG) ============================ */
+function makeChalkSVG(){
+  const W = 640, H = 150;
+  const chalk = '#cfe6e2', red = '#e2483d', amber = '#e6b64a';
+  let s = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chalkboard tactical breakdown">';
+  // O's (the subject and bystanders), X's (the coverage/reality), and an arrow of the doomed route
+  // subject O
+  const sx = 90, sy = 105;
+  s += '<circle cx="'+sx+'" cy="'+sy+'" r="13" fill="none" stroke="'+chalk+'" stroke-width="2.4"/>';
+  s += '<text x="'+sx+'" y="'+(sy+28)+'" font-family="ui-monospace,monospace" font-size="10" fill="'+chalk+'" text-anchor="middle" opacity="0.85">YOU</text>';
+  // doomed route: a hand-drawn-ish path with an arrowhead
+  const rx = 360, ry = 55;
+  s += '<path d="M '+(sx+14)+' '+(sy-4)+' Q 200 30, '+rx+' '+ry+'" fill="none" stroke="'+amber+'" stroke-width="2.4" stroke-dasharray="1 0"/>';
+  // arrowhead
+  s += '<path d="M '+rx+' '+ry+' l -13 -3 l 6 10 z" fill="'+amber+'"/>';
+  s += '<text x="220" y="30" font-family="ui-monospace,monospace" font-size="10" fill="'+amber+'" text-anchor="middle" opacity="0.9">the route</text>';
+  // coverage X (reality / witnesses)
+  const xs = [[430,60],[500,110],[560,55]];
+  xs.forEach((p,i) => {
+    s += '<g stroke="'+red+'" stroke-width="2.6" stroke-linecap="round">';
+    s += '<line x1="'+(p[0]-9)+'" y1="'+(p[1]-9)+'" x2="'+(p[0]+9)+'" y2="'+(p[1]+9)+'"/>';
+    s += '<line x1="'+(p[0]-9)+'" y1="'+(p[1]+9)+'" x2="'+(p[0]+9)+'" y2="'+(p[1]-9)+'"/>';
+    s += '</g>';
+  });
+  s += '<text x="500" y="135" font-family="ui-monospace,monospace" font-size="10" fill="'+red+'" text-anchor="middle" opacity="0.85">the witnesses</text>';
+  // a squiggly "X marks the blunder" near the route end
+  s += '<circle cx="'+rx+'" cy="'+ry+'" r="16" fill="none" stroke="'+red+'" stroke-width="1.6" stroke-dasharray="4 4"/>';
+  s += '</svg>';
+  return s;
+}
+
+/* ============================ RENDER ============================ */
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const WHO_META = {
+  pbp:   (b) => ({ cls:'pbp',   name: b.pbpName,   role:'play-by-play' }),
+  color: (b) => ({ cls:'color', name: b.colorName, role:'color' }),
+};
+
+function broadcastHTML(b){
+  // score bug matchup: "YOU vs. THE SITUATION"
+  const matchup = "YOU &nbsp;vs&nbsp; THE SITUATION";
+  let h = '';
+  h += '<div class="telecast">';
+  // the screen with the field graphic
+  h += '<div class="screen" id="screen">'+ b.diagram +'</div>';
+  // scorebug lower third
+  h += '<div class="scorebug">';
+  h +=   '<span class="net"><span class="live"></span>'+ esc(b.network) +'</span>';
+  h +=   '<span class="matchup">'+ matchup +'</span>';
+  h +=   '<span class="clock">'+ esc(b.clock) +'</span>';
+  h += '</div>';
+
+  // the booth
+  h += '<div class="booth">';
+
+  // stage 1: the call
+  h += '<div class="stage-label">On the call &middot; '+ esc(b.broadcastTitle) +'</div>';
+  h += '<div id="calls"></div>';
+
+  // stage 2: chalkboard (built after calls in reveal)
+  h += '<div class="stage-label chalk" id="chalk-label" style="display:none">The board &middot; where it went wrong</div>';
+  h += '<div id="chalk-slot"></div>';
+
+  // stage 3: ruling
+  h += '<div class="stage-label ruling" id="ruling-label" style="display:none">From the booth &middot; final ruling</div>';
+  h += '<div id="ruling-slot"></div>';
+
+  h += '</div>'; // booth
+  h += '</div>'; // telecast
+
+  // actions
+  h += '<div class="actions">';
+  h += '<button class="mini" id="again-btn" type="button" disabled>↺ run it again</button>';
+  h += '<button class="mini primary" id="copy-btn" type="button" disabled>⎘ copy the transcript</button>';
+  h += '</div>';
+  return h;
+}
+
+function lineHTML(b, beat, idx){
+  if(beat.who === 'freeze'){
+    return '<div class="freeze-beat" id="beat-'+idx+'"><span class="tag">▓ freeze frame &middot; let\'s look at that again</span><span class="ftxt"></span></div>';
+  }
+  const m = WHO_META[beat.who](b);
+  return ''+
+    '<div class="line '+ m.cls +'-line" id="beat-'+idx+'">'+
+      '<div class="who '+ m.cls +'">'+ esc(m.name) +'<span class="role">'+ esc(m.role) +'</span></div>'+
+      '<div class="says"></div>'+
+    '</div>';
+}
+
+/* typewriter with caret; respects reduced motion */
+let timers = [];
+function clearTimers(){ timers.forEach(id => clearTimeout(id)); timers = []; }
+
+function typewriter(target, text, done){
+  if(prefersReduced){
+    target.textContent = text;
+    if(done) done();
+    return;
+  }
+  target.textContent = '';
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  caret.textContent = '▍';
+  target.appendChild(caret);
+  let i = 0;
+  const step = () => {
+    if(i >= text.length){ caret.remove(); if(done) done(); return; }
+    caret.insertAdjacentText('beforebegin', text[i]);
+    i++;
+    let delay = 10 + Math.random()*12;
+    const c = text[i-1];
+    if(c === '.' || c === ',' || c === '!' || c === '?' || c === '—') delay += 70 + Math.random()*70;
+    const id = setTimeout(step, delay);
+    timers.push(id);
+  };
+  const id = setTimeout(step, 60);
+  timers.push(id);
+}
+
+let current = null;
+
+function render(b){
+  clearTimers();
+  const stage = document.getElementById('broadcast');
+  stage.innerHTML = broadcastHTML(b);
+  current = b;
+
+  // fill call lines placeholders
+  const calls = document.getElementById('calls');
+  calls.innerHTML = b.beats.map((beat,i) => lineHTML(b, beat, i)).join('');
+
+  // reveal sequence: type each beat in order, then chalkboard, then ruling
+  revealBroadcast(b);
+
+  if(!prefersReduced){
+    document.getElementById('broadcast').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+}
+
+function enableActions(){
+  const a = document.getElementById('again-btn');
+  const c = document.getElementById('copy-btn');
+  if(a){ a.disabled = false; a.addEventListener('click', runAgain); }
+  if(c){ c.disabled = false; c.addEventListener('click', (e) => copyTranscript(e.currentTarget)); }
+}
+
+function revealBroadcast(b){
+  let idx = 0;
+  const screen = document.getElementById('screen');
+
+  const doChalk = () => {
+    // reveal chalkboard label + card
+    const cl = document.getElementById('chalk-label');
+    if(cl) cl.style.display = '';
+    const slot = document.getElementById('chalk-slot');
+    if(!slot){ doRuling(); return; }
+    let ch = '<div class="chalkboard" id="chalkboard">';
+    ch += '<div class="cb-diagram">'+ b.chalk +'</div>';
+    ch += '<div class="cb-notes">';
+    ch += '<div class="cb-item"><span class="mark">►</span><span>'+ esc(b.chalkIntro) +'</span></div>';
+    b.notes.forEach(n => {
+      ch += '<div class="cb-item"><span class="arrow">↳</span><span>'+ esc(n) +'</span></div>';
+    });
+    ch += '</div></div>';
+    slot.innerHTML = ch;
+    const board = document.getElementById('chalkboard');
+    const showBoard = () => { if(board) board.classList.add('in'); };
+    if(prefersReduced){ showBoard(); doRuling(); }
+    else {
+      const id = setTimeout(() => { showBoard();
+        const id2 = setTimeout(doRuling, 900); timers.push(id2);
+      }, 260);
+      timers.push(id);
+    }
+  };
+
+  const doRuling = () => {
+    const rl = document.getElementById('ruling-label');
+    if(rl) rl.style.display = '';
+    const slot = document.getElementById('ruling-slot');
+    if(!slot){ enableActions(); return; }
+    let r = '<div class="ruling-card" id="ruling-card">';
+    r += '<div class="ruling-verdict"><span class="stamp">'+ esc(b.ruling.verdict) +'</span></div>';
+    r += '<div class="ruling-text">&ldquo;'+ esc(b.ruling.text) +'&rdquo;</div>';
+    r += '<div class="ruling-sig">'+ esc(b.ruling.sig) +'</div>';
+    r += '</div>';
+    slot.innerHTML = r;
+    const card = document.getElementById('ruling-card');
+    const show = () => { if(card) card.classList.add('in'); enableActions(); };
+    if(prefersReduced){ show(); }
+    else { const id = setTimeout(show, 240); timers.push(id); }
+  };
+
+  const typeNext = () => {
+    if(idx >= b.beats.length){
+      // move to chalkboard
+      if(prefersReduced) doChalk();
+      else { const id = setTimeout(doChalk, 340); timers.push(id); }
+      return;
+    }
+    const beat = b.beats[idx];
+    const el = document.getElementById('beat-'+idx);
+    const thisIdx = idx;
+    idx++;
+    if(!el){ typeNext(); return; }
+    el.classList.add('in');
+
+    // freeze-frame flash on the screen when a freeze beat arrives
+    if(beat.who === 'freeze' && screen && !prefersReduced){
+      screen.classList.remove('freeze');
+      void screen.offsetWidth; // reflow to restart animation
+      screen.classList.add('freeze');
+    }
+
+    const target = beat.who === 'freeze'
+      ? el.querySelector('.ftxt')
+      : el.querySelector('.says');
+
+    const advance = () => {
+      const gap = prefersReduced ? 0 : (beat.who === 'freeze' ? 320 : 200);
+      const id = setTimeout(typeNext, gap);
+      timers.push(id);
+    };
+    if(target){ typewriter(target, beat.text, advance); }
+    else advance();
+  };
+
+  // small settle before first line
+  const startId = setTimeout(typeNext, prefersReduced ? 0 : 220);
+  timers.push(startId);
+}
+
+/* ============================ COPY / SHARE ============================ */
+function transcriptText(b){
+  const L = [];
+  L.push('THE SLOW-MOTION REPLAY — ' + b.network);
+  L.push('BROADCAST: ' + b.broadcastTitle + '  ·  YOU vs THE SITUATION  ·  ' + b.clock);
+  L.push('');
+  L.push('THE INCIDENT: ' + b.raw.trim());
+  L.push('');
+  L.push('— ON THE CALL —');
+  b.beats.forEach(beat => {
+    if(beat.who === 'freeze'){
+      L.push('[FREEZE FRAME] ' + beat.text);
+    } else {
+      const nm = beat.who === 'pbp' ? b.pbpName : b.colorName;
+      L.push(nm.toUpperCase() + ': ' + beat.text);
+    }
+  });
+  L.push('');
+  L.push('— THE BOARD: WHERE IT WENT WRONG —');
+  L.push('* ' + b.chalkIntro);
+  b.notes.forEach(n => L.push('  - ' + n));
+  L.push('');
+  L.push('— FROM THE BOOTH: FINAL RULING —');
+  L.push('[' + b.ruling.verdict + ']');
+  L.push('"' + b.ruling.text + '"');
+  L.push(b.ruling.sig);
+  return L.join('\n');
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+function copyTranscript(btn){
+  if(!current) return;
+  const txt = transcriptText(current);
+  const done = () => {
+    showToast('Transcript copied — the tape lives on');
+    if(btn){ btn.classList.add('done'); const o = btn.textContent; btn.textContent = '✓ transcript copied';
+      setTimeout(() => { btn.classList.remove('done'); btn.textContent = o; }, 2000); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){
+    showToast('The tape refuses to be copied. You had to be there.');
+  }
+}
+
+/* ============================ WIRING ============================ */
+const playInput = document.getElementById('play');
+const goBtn = document.getElementById('go-btn');
+const hintEl = document.getElementById('hint');
+const chipsEl = document.getElementById('chips');
+
+let lastRaw = null;
+
+function roll(rawInput){
+  const raw = (rawInput !== undefined ? rawInput : playInput.value).trim();
+  if(!raw){
+    hintEl.textContent = 'Give us something to work with — even a small one.';
+    playInput.focus();
+    return;
+  }
+  lastRaw = raw;
+  const b = buildBroadcast(raw);
+  render(b);
+  goBtn.textContent = 'Roll a New Take';
+  hintEl.textContent = 'The tape is rolling. Adjust the incident or run it back below.';
+}
+
+function runAgain(){
+  // re-generate commentary for the SAME incident; freshPick guarantees variation
+  if(!lastRaw) return;
+  const b = buildBroadcast(lastRaw);
+  render(b);
+}
+
+goBtn.addEventListener('click', () => roll());
+
+playInput.addEventListener('keydown', (e) => {
+  if((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); roll(); }
+});
+
+/* seed chips: a random die + a few example incidents */
+function buildChips(){
+  chipsEl.innerHTML = '';
+  // the die chip: fills the textarea with a random seed incident
+  const die = document.createElement('button');
+  die.className = 'chip';
+  die.type = 'button';
+  die.innerHTML = '<span class="die">⚂</span> surprise me';
+  die.addEventListener('click', () => {
+    let s, guard = 0;
+    do { s = pick(SEED_PLAYS); } while(s === playInput.value && ++guard < 12);
+    playInput.value = s;
+    hintEl.textContent = 'Loaded. Roll the tape when ready.';
+    playInput.focus();
+  });
+  chipsEl.appendChild(die);
+
+  // three rotating example chips
+  const examples = [];
+  const seen = [];
+  while(examples.length < 3){
+    let s = pick(SEED_PLAYS);
+    if(seen.includes(s)) continue;
+    seen.push(s); examples.push(s);
+  }
+  examples.forEach(ex => {
+    const c = document.createElement('button');
+    c.className = 'chip';
+    c.type = 'button';
+    // shorten long examples for the chip label
+    c.textContent = ex.length > 42 ? ex.slice(0,40).trim() + '…' : ex;
+    c.title = ex;
+    c.addEventListener('click', () => {
+      playInput.value = ex;
+      hintEl.textContent = 'Loaded. Roll the tape when ready.';
+      playInput.focus();
+    });
+    chipsEl.appendChild(c);
+  });
+}
+buildChips();
+</script>
+</body>
+</html>
