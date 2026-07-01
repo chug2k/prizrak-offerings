@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Harmonograph · Prízrak</title>
+<style>
+  :root{
+    --ink:#07070a; --ink-1:#0a0a0f; --ink-2:#0e0e15; --ink-3:#14141d;
+    --bone:#e6e4ee; --parch:#c9c6d6; --ash:#8b879c; --ash-2:#63607a; --ash-3:#403e52;
+    --rule:rgba(200,196,220,.08); --rule-2:rgba(200,196,220,.15);
+    --glow:#7c6bd6;      /* violet — the pendulum's lead */
+    --glow-2:#4dd6c6;    /* teal counter-swing */
+    --gild:#c9a860; --gild-dim:#7a6538;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; line-height:1.5; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(120% 78% at 50% -12%, rgba(124,107,214,.10), transparent 56%),
+      radial-gradient(100% 60% at 50% 116%, rgba(77,214,198,.05), transparent 60%),
+      var(--ink);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{ max-width:760px; margin:0 auto; padding:40px 18px 56px; }
+  @media (min-width:640px){ .wrap{ padding:54px 28px 68px; } }
+
+  .kicker{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .specter{ color:var(--glow); font-style:italic; font-weight:500; text-shadow:0 0 20px rgba(124,107,214,.5); }
+  ::selection{ background:rgba(124,107,214,.28); color:#fff; }
+
+  header{ text-align:center; margin-bottom:22px; }
+  h1{
+    font-family:var(--serif); font-size:clamp(2rem,7vw,3.2rem); font-weight:700;
+    line-height:1.02; letter-spacing:-.015em; margin:12px 0 0;
+  }
+  .sub{
+    margin:15px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:36rem; line-height:1.62;
+  }
+  .divider{ height:1px; max-width:38rem; margin:22px auto; background:linear-gradient(90deg,transparent,var(--rule-2),transparent); }
+
+  /* ---- the plate ---- */
+  .plate{
+    border:1px solid var(--rule-2); border-radius:8px;
+    background:
+      radial-gradient(120% 90% at 50% 4%, rgba(124,107,214,.05), transparent 62%),
+      linear-gradient(180deg,var(--ink-1),var(--ink));
+    position:relative; overflow:hidden;
+    box-shadow:0 30px 70px -38px rgba(0,0,0,.92), inset 0 0 60px -30px rgba(124,107,214,.25);
+  }
+  .plate-head{
+    display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+    font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ash-3); padding:14px 18px 0;
+  }
+  .plate-head .lit{ color:var(--glow); }
+
+  .stage{ position:relative; padding:12px 14px 4px; }
+  #board{ display:block; width:100%; height:auto; border-radius:5px; cursor:crosshair; touch-action:none; }
+  .stage-note{
+    position:absolute; left:24px; bottom:16px; pointer-events:none;
+    font-family:var(--mono); font-size:10px; letter-spacing:.05em; color:var(--glow);
+    text-shadow:0 0 14px rgba(124,107,214,.6); opacity:.9;
+  }
+  .stage-age{
+    position:absolute; right:24px; top:22px; pointer-events:none;
+    font-family:var(--mono); font-size:9px; letter-spacing:.16em; color:var(--ash-3);
+  }
+
+  .hint{ font-family:var(--mono); font-size:10px; color:var(--ash-3); margin:12px 4px 0; letter-spacing:.1em; text-align:center; }
+
+  /* ---- controls ---- */
+  .controls{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:16px 22px;
+    margin-top:20px; padding:18px 20px; border:1px solid var(--rule);
+    border-radius:8px; background:var(--ink-1);
+  }
+  @media (min-width:560px){ .controls{ grid-template-columns:repeat(3,1fr); } }
+  .ctl .row{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .ctl label{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.16em; font-size:9px; color:var(--ash-2); }
+  .ctl .val{ font-family:var(--mono); font-size:10px; color:var(--glow); }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%;
+    height:2px; background:var(--rule-2); border-radius:2px; cursor:pointer; margin:0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:13px; height:13px; border-radius:50%;
+    background:var(--glow); box-shadow:0 0 9px rgba(124,107,214,.7);
+    transition:transform .12s, box-shadow .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.2); box-shadow:0 0 15px rgba(124,107,214,.9); }
+  input[type=range]::-moz-range-thumb{
+    width:13px; height:13px; border:none; border-radius:50%;
+    background:var(--glow); box-shadow:0 0 9px rgba(124,107,214,.7); cursor:pointer;
+  }
+  input[type=range]:focus-visible{ outline:none; }
+  input[type=range]:focus-visible::-webkit-slider-thumb{ box-shadow:0 0 0 3px rgba(124,107,214,.4); }
+
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+  .mini{
+    font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:6px; color:var(--ash); cursor:pointer;
+    transition:border-color .18s,color .18s,background .18s,transform .1s,box-shadow .18s;
+    display:inline-flex; align-items:center; gap:8px; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .mini:hover{ border-color:var(--glow); color:var(--bone); background:var(--ink-2); box-shadow:0 0 20px -8px rgba(124,107,214,.8); }
+  .mini:active{ transform:translateY(1px); }
+  .mini.primary{ border-color:var(--glow); color:var(--glow); }
+  .mini.primary:hover{ color:var(--bone); background:rgba(124,107,214,.08); }
+  .mini:focus-visible{ outline:none; border-color:var(--glow); box-shadow:0 0 0 2px rgba(124,107,214,.4); }
+
+  .footer{ text-align:center; margin-top:44px; padding-top:22px; border-top:1px solid var(--rule); }
+  .footer .kicker{ line-height:1.9; }
+  .footer a{ font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); text-decoration:none; }
+  .footer a:hover{ color:var(--ash); }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:11px 17px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.85); letter-spacing:.04em; max-width:88vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion:reduce){
+    body::after{ opacity:.035; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — instrument no. 31 — the drawing machine</div>
+      <h1>The <span class="specter">Harmonograph</span></h1>
+      <p class="sub">A Victorian machine of swinging pendulums, rebuilt in light. Set the swing loose and watch a single luminous thread loop itself into a knot that tightens, and tightens, until the motion dies. No two figures are ever drawn twice.</p>
+    </header>
+
+    <div class="divider"></div>
+
+    <div class="plate">
+      <div class="plate-head"><span class="lit" id="fig-label">figure —</span><span>traced from a dying swing</span></div>
+      <div class="stage">
+        <canvas id="board" width="900" height="640" aria-label="A generative harmonograph tracing a luminous Lissajous figure from decaying pendulums."></canvas>
+        <div class="stage-note" id="note">the pendulums are still</div>
+        <div class="stage-age" id="age">swing 0%</div>
+      </div>
+    </div>
+
+    <p class="hint">drag on the plate to nudge the pendulums · release for a new swing</p>
+
+    <div class="controls" id="controls">
+      <div class="ctl">
+        <div class="row"><label for="freq">frequency spread</label><span class="val" id="freq-val">—</span></div>
+        <input id="freq" type="range" min="0" max="100" value="42">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="phase">phase drift</label><span class="val" id="phase-val">—</span></div>
+        <input id="phase" type="range" min="0" max="100" value="30">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="damp">damping</label><span class="val" id="damp-val">—</span></div>
+        <input id="damp" type="range" min="0" max="100" value="46">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="speed">swing speed</label><span class="val" id="speed-val">—</span></div>
+        <input id="speed" type="range" min="0" max="100" value="55">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="glowc">bloom</label><span class="val" id="glowc-val">—</span></div>
+        <input id="glowc" type="range" min="0" max="100" value="58">
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="hue">ink</label><span class="val" id="hue-val">—</span></div>
+        <input id="hue" type="range" min="0" max="100" value="30">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="mini primary" id="new-btn" type="button">✦ new figure</button>
+      <button class="mini" id="restart-btn" type="button">↻ swing again</button>
+      <button class="mini" id="save-btn" type="button">⤓ keep this frame</button>
+    </div>
+
+    <div class="footer">
+      <p class="kicker">every figure is a rumour of motion · the swing always dies · keep the ones that haunt you</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+(function(){
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const W = canvas.width, H = canvas.height;   // logical drawing space
+  const CX = W/2, CY = H/2;
+
+  /* ---------- seeded PRNG (mulberry32) ---------- */
+  function makeRng(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function newSeed(){ return (Math.random()*4294967296) >>> 0; }
+
+  /* ---------- parameters from sliders ---------- */
+  const params = { freq:42, phase:30, damp:46, speed:55, glowc:58, hue:30 };
+
+  /* ---------- the pendulum system ---------- */
+  // A harmonograph sums a few damped sinusoids on x and y.
+  // Each "pendulum" contributes: amp * sin(freq*t + phase) * exp(-decay*t)
+  let seed = newSeed();
+  let figNo = 1;
+  let pends = [];       // {axis:'x'|'y', f, p, a, d}
+  let baseHue = 262;
+  let bgGrad = null;
+
+  // integer-ish frequency ratios give the classic knots; the spread slider
+  // perturbs them slightly off-integer so the figure precesses and never closes.
+  function buildPendulums(){
+    const rng = makeRng(seed);
+    const spread = params.freq/100;      // 0..1 how far frequencies wander from small integers
+    const phaseDrift = params.phase/100; // spread of starting phases
+    const dampAmt = params.damp/100;     // overall decay strength
+
+    // choose 2 or 3 base integer frequencies per axis
+    const bases = [1,2,3,4,5];
+    function pickBase(){ return bases[Math.floor(rng()*bases.length)]; }
+
+    pends = [];
+    const perAxis = rng() < 0.55 ? 2 : 3;   // richer knots when 3
+
+    for(const axis of ['x','y']){
+      let ampBudget = 1;
+      for(let i=0;i<perAxis;i++){
+        const b = pickBase();
+        // detune: small integer + a little irrational wander
+        const detune = (rng()*2-1) * (0.006 + spread*0.05);
+        const f = b + detune;
+        const p = rng()*Math.PI*2 * (0.35 + phaseDrift*0.65) + (i*Math.PI*0.5);
+        const a = ampBudget * (0.45 + rng()*0.55);
+        ampBudget *= 0.55 + rng()*0.2;      // later terms softer
+        // each pendulum decays at its own rate; base scaled by damp slider
+        const d = (0.06 + rng()*0.10) * (0.35 + dampAmt*1.4);
+        pends.push({ axis, f, p, a, d });
+      }
+    }
+    // normalise per-axis amplitude so figure fills the plate
+    for(const axis of ['x','y']){
+      const grp = pends.filter(q=>q.axis===axis);
+      const tot = grp.reduce((s,q)=>s+q.a,0) || 1;
+      grp.forEach(q=> q.a = q.a/tot);
+    }
+    baseHue = (params.hue/100)*300 + 200;   // 200..500 -> violet/teal/amber sweep (mod 360)
+  }
+
+  // evaluate the machine at time t -> {x,y} in canvas coords
+  const R = Math.min(W,H) * 0.40;   // drawing radius
+  function evalAt(t){
+    let x=0, y=0;
+    for(const q of pends){
+      const v = q.a * Math.sin(q.f*t + q.p) * Math.exp(-q.d*t);
+      if(q.axis==='x') x += v; else y += v;
+    }
+    return { x: CX + x*R, y: CY + y*R };
+  }
+
+  // when is the swing effectively dead? use slowest decay
+  function swingLife(){
+    let slowest = 1e9;
+    for(const q of pends) slowest = Math.min(slowest, q.d);
+    // exp(-d*t)=0.012 -> t = ln(1/0.012)/d ≈ 4.42/d
+    return 4.42 / slowest;
+  }
+
+  /* ---------- animation state ---------- */
+  let t = 0;                 // machine time
+  let life = 40;             // total time to draw
+  const DT = 0.016;          // time step per unit (scaled by speed)
+  let done = false;
+  let running = false;
+  let raf = 0;
+
+  // trail buffer for the leading glow head
+  let lastPt = null;
+
+  function speedScale(){ return 0.6 + (params.speed/100)*2.2; }
+
+  function clearBoard(){
+    // draw background gradient once onto the persistent canvas
+    bgGrad = ctx.createRadialGradient(CX, CY*0.86, R*0.15, CX, CY, R*1.9);
+    const h = baseHue % 360;
+    bgGrad.addColorStop(0, `hsl(${(h+8)%360} 40% 6%)`);
+    bgGrad.addColorStop(0.55, `hsl(${(h-20+360)%360} 30% 4%)`);
+    bgGrad.addColorStop(1, '#050508');
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0,0,W,H);
+
+    // faint machine armature: two crossed axes + a ghost circle
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.strokeStyle = `hsl(${h} 30% 60%)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CX - R*1.15, CY); ctx.lineTo(CX + R*1.15, CY);
+    ctx.moveTo(CX, CY - R*1.15); ctx.lineTo(CX, CY + R*1.15);
+    ctx.stroke();
+    ctx.globalAlpha = 0.06;
+    ctx.beginPath(); ctx.arc(CX, CY, R*1.02, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(CX, CY, R*0.5, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function inkColor(alpha, t){
+    // colour drifts along the trace: hue shifts a little with time, brightness with envelope
+    const env = Math.exp(-slowestD()*t);
+    const h = (baseHue + Math.sin(t*0.35)*26 + t*3) % 360;
+    const l = 52 + env*20;
+    const s = 72 + Math.sin(t*0.2)*10;
+    return `hsla(${(h+360)%360} ${s}% ${l}% / ${alpha})`;
+  }
+  let _slowestD = 0.08;
+  function slowestD(){ return _slowestD; }
+
+  function drawSegment(a, b, tNow){
+    const bloom = params.glowc/100;
+    const env = Math.exp(-slowestD()*tNow);
+    // As the swing dies the curve spirals tightly through the same region;
+    // damping the glow by the envelope keeps the convergence from blowing white.
+    const gk = 0.35 + env*0.65;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+    if(bloom > 0.05){
+      ctx.strokeStyle = inkColor((0.03 + bloom*0.06)*gk, tNow);
+      ctx.lineWidth = 6 + bloom*9;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+
+      ctx.strokeStyle = inkColor((0.05 + bloom*0.09)*gk, tNow);
+      ctx.lineWidth = 2.5 + bloom*3.5;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    }
+    // bright core thread — sharpens as the swing dies (tightening knot)
+    ctx.strokeStyle = inkColor(0.28 + env*0.30, tNow);
+    ctx.lineWidth = 0.8 + env*0.8;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+
+  function restart(rebuild){
+    if(rebuild){ buildPendulums(); }
+    // cache slowest decay for envelope colouring
+    _slowestD = pends.reduce((m,q)=>Math.min(m,q.d), 1e9);
+    life = swingLife();
+    t = 0; done = false; lastPt = null;
+    clearBoard();
+    updateFigLabel();
+    running = true;
+    if(!reduce){ if(!raf) raf = requestAnimationFrame(frame); }
+    else { renderStill(); }
+  }
+
+  function updateFigLabel(){
+    document.getElementById('fig-label').textContent =
+      'figure ' + figNo.toString().padStart(3,'0');
+  }
+
+  /* ---------- the frame loop ---------- */
+  const noteEl = document.getElementById('note');
+  const ageEl = document.getElementById('age');
+  let noteState = -1;
+
+  function setNote(prog){
+    let s;
+    if(prog < 0.02) s = 0;
+    else if(prog < 0.35) s = 1;
+    else if(prog < 0.75) s = 2;
+    else if(prog < 0.995) s = 3;
+    else s = 4;
+    if(s === noteState) return;
+    noteState = s;
+    noteEl.textContent = [
+      'the pendulums are set',
+      'the swing is wide, the line is loose',
+      'the knot begins to tighten',
+      'the motion is nearly spent',
+      'still now — the figure is drawn'
+    ][s];
+  }
+
+  function frame(){
+    raf = 0;
+    if(!running){ return; }
+    if(!done){
+      const perFrame = 3 + Math.floor(speedScale()*6);   // segments per frame
+      const step = DT * speedScale();
+      for(let i=0;i<perFrame;i++){
+        const pt = evalAt(t);
+        if(lastPt) drawSegment(lastPt, pt, t);
+        lastPt = pt;
+        t += step;
+        if(t >= life){ done = true; break; }
+      }
+      const prog = Math.min(1, t/life);
+      ageEl.textContent = 'swing ' + Math.round(prog*100) + '%';
+      setNote(prog);
+    }
+
+    if(done){
+      running = false;
+      ageEl.textContent = 'swing 100%';
+      setNote(1);      // "still now — the figure is drawn"
+      return;
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  /* ---------- reduced-motion: compose a full static figure ---------- */
+  function renderStill(){
+    clearBoard();
+    _slowestD = pends.reduce((m,q)=>Math.min(m,q.d), 1e9);
+    life = swingLife();
+    let prev = null;
+    const step = life / 9000;
+    for(let tt=0; tt<=life; tt+=step){
+      const pt = evalAt(tt);
+      if(prev) drawSegment(prev, pt, tt);
+      prev = pt;
+    }
+    ageEl.textContent = 'swing 100%';
+    noteEl.textContent = 'the figure is drawn';
+    updateFigLabel();
+    running = false; done = true;
+  }
+
+  /* ---------- pointer interaction: nudge the pendulums ---------- */
+  function canvasPos(ev){
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (ev.clientX-rect.left) * (W/rect.width),
+      y: (ev.clientY-rect.top) * (H/rect.height)
+    };
+  }
+  let dragging = false, dragStart = null, moved = false;
+
+  function nudgeFrom(p){
+    // translate the pointer offset into phase/amplitude perturbation, live.
+    const dx = (p.x - CX)/R;   // -1..1-ish
+    const dy = (p.y - CY)/R;
+    for(const q of pends){
+      const off = (q.axis==='x') ? dx : dy;
+      q.p += off * 0.05;
+    }
+  }
+
+  canvas.addEventListener('pointerdown', (ev)=>{
+    ev.preventDefault();
+    dragging = true; moved = false; dragStart = canvasPos(ev);
+    canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId);
+  });
+  canvas.addEventListener('pointermove', (ev)=>{
+    if(!dragging) return;
+    const p = canvasPos(ev);
+    if(Math.hypot(p.x-dragStart.x, p.y-dragStart.y) > 4) moved = true;
+    nudgeFrom(p);
+    if(reduce) renderStill();
+  });
+  function endDrag(ev){
+    if(!dragging) return;
+    dragging = false;
+    if(moved){
+      // a nudge earns a fresh swing of the (perturbed) machine
+      _slowestD = pends.reduce((m,q)=>Math.min(m,q.d), 1e9);
+      restart(false);
+    } else {
+      // a clean tap draws a brand-new figure
+      figNo++;
+      seed = newSeed();
+      restart(true);
+    }
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', ()=>{ dragging=false; });
+
+  /* ---------- sliders ---------- */
+  function bindSlider(id, key, fmt){
+    const el = document.getElementById(id);
+    const out = document.getElementById(id+'-val');
+    el.value = params[key];
+    const show = ()=>{ out.textContent = fmt(params[key]); };
+    show();
+    el.addEventListener('input', ()=>{
+      params[key] = parseInt(el.value,10);
+      show();
+      // colour/bloom apply live; structural sliders rebuild on next swing.
+      if(reduce) renderStill();
+    });
+  }
+  const pct = v=> v+'%';
+  const dampFmt = v=> v<20?'faint':v<45?'slow':v<72?'firm':'sharp';
+  const hueFmt = v=> v<28?'violet':v<52?'indigo':v<74?'teal':v<88?'gold':'rose';
+  const spdFmt = v=> v<25?'languid':v<55?'even':v<80?'brisk':'racing';
+  bindSlider('freq','freq',pct);
+  bindSlider('phase','phase',pct);
+  bindSlider('damp','damp',dampFmt);
+  bindSlider('speed','speed',spdFmt);
+  bindSlider('glowc','glowc',pct);
+  bindSlider('hue','hue',hueFmt);
+
+  /* ---------- buttons ---------- */
+  document.getElementById('new-btn').addEventListener('click', ()=>{
+    figNo++; seed = newSeed(); restart(true);
+  });
+  document.getElementById('restart-btn').addEventListener('click', ()=>{
+    restart(false);
+  });
+
+  let toastTimer = null;
+  function showToast(msg){
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> el.classList.remove('show'), 2600);
+  }
+  document.getElementById('save-btn').addEventListener('click', ()=>{
+    try{
+      // bake head layer in for the snapshot
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'harmonograph-figure-' + figNo.toString().padStart(3,'0') + '.png';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast('kept. the figure is yours, the swing is gone.');
+    }catch(e){
+      showToast('the plate declines to be copied.');
+    }
+  });
+
+  /* ---------- pause when hidden ---------- */
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){
+      if(raf){ cancelAnimationFrame(raf); raf = 0; }
+    } else {
+      if(running && !done && !reduce && !raf){ raf = requestAnimationFrame(frame); }
+    }
+  });
+
+  /* ---------- boot ---------- */
+  buildPendulums();
+  restart(false);
+
+})();
+</script>
+</body>
+</html>

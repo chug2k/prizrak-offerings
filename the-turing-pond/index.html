@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Turing Pond · Prízrak</title>
+<style>
+  :root{
+    --bg:#06070a;
+    --bg-raised:#0d0f14;
+    --bg-sunk:#080a0d;
+    --line:rgba(200,220,230,.09);
+    --line-2:rgba(200,220,230,.16);
+    --ink:#c7d2d8;
+    --ink-dim:#6b7680;
+    --ink-ghost:#333c44;
+    --accent:#39d6c6;
+    --glow:rgba(57,214,198,.5);
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+    font-family:var(--serif); line-height:1.5; -webkit-font-smoothing:antialiased;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    position:relative; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(120% 80% at 50% -12%, rgba(57,214,198,.06), transparent 58%),
+      radial-gradient(90% 60% at 50% 116%, rgba(120,90,200,.05), transparent 60%),
+      var(--bg);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.04; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  ::selection{ background:rgba(57,214,198,.24); color:#fff; }
+
+  .frame{
+    width:100%; max-width:760px; background:color-mix(in srgb,var(--bg-raised) 88%,transparent);
+    border:1px solid var(--line-2); border-radius:16px; padding:22px 22px 20px;
+    box-shadow:0 40px 90px -50px #000, 0 0 0 1px var(--line);
+    position:relative; z-index:2;
+  }
+  @media(min-width:640px){ .frame{ padding:28px 30px 24px; } }
+
+  .kicker{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:9.5px; color:var(--ink-dim); }
+  h1{
+    font-family:var(--serif); font-weight:700; font-size:clamp(1.7rem,5.4vw,2.5rem);
+    line-height:1.04; letter-spacing:-.015em; margin:9px 0 0;
+    text-shadow:0 0 22px rgba(57,214,198,.18);
+  }
+  .spec{ color:var(--accent); font-style:italic; font-weight:500; }
+  .sub{ margin:11px 0 0; font-style:italic; font-size:13.5px; color:var(--ink-dim); max-width:40rem; line-height:1.6; }
+
+  .stage{
+    position:relative; margin-top:18px; border-radius:12px; overflow:hidden;
+    border:1px solid var(--line-2);
+    box-shadow:inset 0 0 70px -22px #000, 0 0 60px -34px var(--glow);
+    background:var(--bg-sunk);
+  }
+  #pond{ display:block; width:100%; height:auto; cursor:crosshair; touch-action:none; }
+
+  .stage-cap{
+    position:absolute; left:12px; bottom:10px; pointer-events:none;
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.05em;
+    color:var(--accent); text-shadow:0 0 12px var(--glow); opacity:.9;
+    transition:opacity .5s ease;
+  }
+  .stage-tag{
+    position:absolute; right:12px; top:10px; pointer-events:none;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; color:var(--ink-ghost);
+    text-transform:uppercase;
+  }
+
+  .hint{ font-family:var(--mono); font-size:10px; letter-spacing:.09em; color:var(--ink-ghost); margin-top:11px; }
+
+  .presets{ display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+  .chip{
+    font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.14em;
+    padding:8px 13px; border-radius:999px; background:transparent; border:1px solid var(--line-2);
+    color:var(--ink-dim); cursor:pointer;
+    transition:border-color .15s,color .15s,background .15s,box-shadow .18s,transform .1s;
+  }
+  .chip:hover{ border-color:var(--accent); color:var(--ink); box-shadow:0 0 18px -8px var(--glow); }
+  .chip:active{ transform:translateY(1px); }
+  .chip.on{ border-color:var(--accent); color:#04110f; background:var(--accent); box-shadow:0 0 20px -6px var(--glow); }
+
+  .rows{ display:grid; grid-template-columns:1fr; gap:15px; margin-top:18px; }
+  @media(min-width:560px){ .rows{ grid-template-columns:1fr 1fr; gap:16px 26px; } }
+  .row .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
+  .row label{ font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.16em; color:var(--ink-dim); }
+  .row .val{ font-family:var(--mono); font-size:10px; color:var(--accent); }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%;
+    height:2px; background:var(--line-2); border-radius:2px; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 9px var(--glow); transition:transform .12s,box-shadow .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.2); box-shadow:0 0 16px var(--glow); }
+  input[type=range]::-moz-range-thumb{ width:14px; height:14px; border:none; border-radius:50%; background:var(--accent); box-shadow:0 0 9px var(--glow); cursor:pointer; }
+  input[type=range]:focus-visible{ outline:none; }
+  input[type=range]:focus-visible::-webkit-slider-thumb{ box-shadow:0 0 0 3px var(--glow); }
+
+  .actions{ display:flex; flex-wrap:wrap; gap:9px; margin-top:20px; align-items:center; }
+  .btn{
+    font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em;
+    padding:9px 15px; border-radius:8px; background:transparent; border:1px solid var(--line-2);
+    color:var(--ink-dim); cursor:pointer;
+    transition:border-color .15s,color .15s,background .15s,box-shadow .18s,transform .1s;
+  }
+  .btn:hover{ border-color:var(--accent); color:var(--ink); box-shadow:0 0 18px -9px var(--glow); }
+  .btn:active{ transform:translateY(1px); }
+  .btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+  .seed-read{ font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; color:var(--ink-ghost); margin-left:auto; }
+
+  footer{ margin-top:22px; padding-top:15px; border-top:1px solid var(--line); }
+  footer .kicker{ line-height:1.85; }
+  footer a{ font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-ghost); text-decoration:none; }
+  footer a:hover{ color:var(--ink-dim); }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(18px);
+    background:var(--bg-raised); border:1px solid var(--line-2); color:var(--ink);
+    font-family:var(--mono); font-size:10.5px; padding:10px 16px; border-radius:7px;
+    opacity:0; pointer-events:none; transition:opacity .25s,transform .25s; z-index:50;
+    box-shadow:0 12px 34px -12px #000; letter-spacing:.04em;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media(prefers-reduced-motion:reduce){
+    .stage-cap{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <main class="frame">
+    <div class="kicker">Prízrak — instrument 31 — morphogenesis</div>
+    <h1>The Turing <span class="spec">Pond</span></h1>
+    <p class="sub">Two reagents, one surface. Left alone they would stay still forever — but the field is unstable, and pattern comes anyway: spots, mazes, cells that divide and crawl. Paint into it. Nudge the chemistry. Watch it breathe.</p>
+
+    <div class="stage">
+      <canvas id="pond" width="512" height="288" aria-label="A reaction-diffusion field that breeds spots, mazes, and dividing cells."></canvas>
+      <span id="cap" class="stage-cap">the surface is still</span>
+      <span id="tag" class="stage-tag">coral</span>
+    </div>
+
+    <p class="hint">drag across the pond to seed reagent · touch works too · pick a regime below or turn the chemistry by hand</p>
+
+    <div class="presets" id="presets"></div>
+
+    <div class="rows">
+      <div class="row">
+        <div class="top"><label for="feed">feed</label><span class="val" id="feed-val">—</span></div>
+        <input id="feed" type="range" min="8" max="110" value="55">
+      </div>
+      <div class="row">
+        <div class="top"><label for="kill">kill</label><span class="val" id="kill-val">—</span></div>
+        <input id="kill" type="range" min="40" max="72" value="62">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="seed-btn">seed anew</button>
+      <button class="btn" id="clear-btn">still the pond</button>
+      <button class="btn" id="pause-btn">pause</button>
+      <button class="btn" id="save-btn">save frame</button>
+      <span class="seed-read" id="seed-read"></span>
+    </div>
+
+    <footer>
+      <p class="kicker">the same arithmetic that mottles a leopard and veins a shell · it never settles the same way twice</p>
+      <a href="/index.html">all offerings</a>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+(function(){
+  const canvas = document.getElementById('pond');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const GW = canvas.width, GH = canvas.height;   // simulation grid = pixel grid
+  const N = GW * GH;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- PRNG ---------- */
+  function makeRng(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  let seed = (Math.random()*4294967296)>>>0;
+  let rng = makeRng(seed);
+
+  /* ---------- fields: double-buffered A & B (Float32) ---------- */
+  let A  = new Float32Array(N);
+  let B  = new Float32Array(N);
+  let A2 = new Float32Array(N);
+  let B2 = new Float32Array(N);
+
+  const Da = 1.0, Db = 0.5;
+  // feed/kill set from sliders (mapped)
+  let feed = 0.055, kill = 0.062;
+
+  /* ---------- palette ---------- */
+  // a ramp from deep ink -> teal -> violet-lit ridges, indexed by B concentration.
+  // built once into a Uint8 lookup (256 * 3).
+  const RAMP = new Uint8Array(256*3);
+  function buildRamp(hueShift){
+    // stops: [pos, r,g,b]
+    const stops = [
+      [0.00,  4,  6, 11],
+      [0.18,  7, 20, 26],
+      [0.36, 12, 52, 62],
+      [0.52, 30,120,120],
+      [0.66, 74,196,178],
+      [0.78,160,232,208],
+      [0.88,196,214,246],
+      [1.00,236,240,255]
+    ];
+    for(let i=0;i<256;i++){
+      const t = i/255;
+      let s0=stops[0], s1=stops[stops.length-1];
+      for(let k=0;k<stops.length-1;k++){
+        if(t>=stops[k][0] && t<=stops[k+1][0]){ s0=stops[k]; s1=stops[k+1]; break; }
+      }
+      const span = (s1[0]-s0[0])||1;
+      const f = (t - s0[0])/span;
+      let r = s0[1]+(s1[1]-s0[1])*f;
+      let g = s0[2]+(s1[2]-s0[2])*f;
+      let b = s0[3]+(s1[3]-s0[3])*f;
+      // gentle hue drift toward violet at the high end
+      if(hueShift){
+        const hi = Math.max(0,(t-0.5)*2);
+        r += hueShift*22*hi;
+        b += hueShift*30*hi;
+        g -= hueShift*10*hi;
+      }
+      RAMP[i*3]   = Math.max(0,Math.min(255,r))|0;
+      RAMP[i*3+1] = Math.max(0,Math.min(255,g))|0;
+      RAMP[i*3+2] = Math.max(0,Math.min(255,b))|0;
+    }
+  }
+  let hueShift = 0;
+  buildRamp(hueShift);
+
+  /* ---------- image backing ---------- */
+  const img = ctx.createImageData(GW, GH);
+  const pix = img.data;
+  for(let i=0;i<N;i++){ pix[i*4+3]=255; }
+
+  /* ---------- seeding ---------- */
+  function fillStill(){
+    A.fill(1.0); B.fill(0.0);
+  }
+  function splat(cx, cy, r, amt){
+    const r2 = r*r;
+    const x0 = Math.max(0, (cx-r)|0), x1 = Math.min(GW-1,(cx+r)|0);
+    const y0 = Math.max(0, (cy-r)|0), y1 = Math.min(GH-1,(cy+r)|0);
+    for(let y=y0;y<=y1;y++){
+      for(let x=x0;x<=x1;x++){
+        const dx=x-cx, dy=y-cy, d2=dx*dx+dy*dy;
+        if(d2>r2) continue;
+        const fall = 1 - d2/r2;
+        const idx = y*GW+x;
+        B[idx] = Math.min(1, B[idx] + amt*fall);
+      }
+    }
+  }
+  function seedRandom(){
+    fillStill();
+    const blobs = 5 + (rng()*7|0);
+    for(let i=0;i<blobs;i++){
+      splat(rng()*GW, rng()*GH, 5+rng()*14, 0.85);
+    }
+    // a scatter of specks so pattern nucleates everywhere
+    const specks = 260 + (rng()*300|0);
+    for(let i=0;i<specks;i++){
+      const x=rng()*GW|0, y=rng()*GH|0;
+      B[y*GW+x] = Math.min(1, B[y*GW+x]+0.6);
+    }
+    resetHistory();
+  }
+
+  /* ---------- reaction-diffusion step (5-point + diagonal laplacian) ---------- */
+  function step(){
+    const f = feed, k = kill;
+    for(let y=0;y<GH;y++){
+      const yn = (y-1+GH)%GH, yp = (y+1)%GH;
+      const rowY  = y*GW, rowN = yn*GW, rowP = yp*GW;
+      for(let x=0;x<GW;x++){
+        const xn = (x-1+GW)%GW, xp = (x+1)%GW;
+        const i = rowY+x;
+        const a = A[i], b = B[i];
+
+        // laplacian with center -1, orthogonal .2, diagonal .05
+        const lA =
+          A[rowN+x]*0.2 + A[rowP+x]*0.2 + A[rowY+xn]*0.2 + A[rowY+xp]*0.2 +
+          A[rowN+xn]*0.05 + A[rowN+xp]*0.05 + A[rowP+xn]*0.05 + A[rowP+xp]*0.05 - a;
+        const lB =
+          B[rowN+x]*0.2 + B[rowP+x]*0.2 + B[rowY+xn]*0.2 + B[rowY+xp]*0.2 +
+          B[rowN+xn]*0.05 + B[rowN+xp]*0.05 + B[rowP+xn]*0.05 + B[rowP+xp]*0.05 - b;
+
+        const abb = a*b*b;
+        let na = a + (Da*lA - abb + f*(1-a));
+        let nb = b + (Db*lB + abb - (k+f)*b);
+        if(na<0)na=0; else if(na>1)na=1;
+        if(nb<0)nb=0; else if(nb>1)nb=1;
+        A2[i]=na; B2[i]=nb;
+      }
+    }
+    let t;
+    t=A; A=A2; A2=t;
+    t=B; B=B2; B2=t;
+  }
+
+  /* ---------- render B into the ramp ---------- */
+  function render(){
+    // stretch contrast: B typically in ~[0,0.4]; scale so texture pops.
+    for(let i=0;i<N;i++){
+      let v = B[i]*2.6;
+      if(v>1)v=1;
+      // subtle gamma for glow in the mids
+      v = v*v*(3-2*v); // smoothstep-ish
+      const idx = (v*255)|0;
+      const r3 = idx*3;
+      const o = i*4;
+      pix[o]   = RAMP[r3];
+      pix[o+1] = RAMP[r3+1];
+      pix[o+2] = RAMP[r3+2];
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  /* ---------- presets: named feed/kill regimes ---------- */
+  const PRESETS = [
+    { name:'coral',    f:0.0545, k:0.0620, hue:0.15 },
+    { name:'mitosis',  f:0.0367, k:0.0649, hue:0.05 },
+    { name:'maze',     f:0.0290, k:0.0570, hue:0.55 },
+    { name:'spots',    f:0.0620, k:0.0610, hue:0.20 },
+    { name:'worms',    f:0.0580, k:0.0630, hue:0.35 },
+    { name:'pulse',    f:0.0250, k:0.0600, hue:0.65 }
+  ];
+  let activePreset = 0;
+
+  // slider maps: feed 0.008..0.110 via /1000 ; kill 0.040..0.072 via /1000
+  const feedEl = document.getElementById('feed');
+  const killEl = document.getElementById('kill');
+  const feedValEl = document.getElementById('feed-val');
+  const killValEl = document.getElementById('kill-val');
+
+  function syncFromSliders(){
+    feed = parseInt(feedEl.value,10)/1000;
+    kill = parseInt(killEl.value,10)/1000;
+    feedValEl.textContent = feed.toFixed(4);
+    killValEl.textContent = kill.toFixed(4);
+  }
+  function setSlidersFromFK(){
+    feedEl.value = Math.round(feed*1000);
+    killEl.value = Math.round(kill*1000);
+    feedValEl.textContent = feed.toFixed(4);
+    killValEl.textContent = kill.toFixed(4);
+  }
+
+  function applyPreset(i, reseed){
+    activePreset = i;
+    const p = PRESETS[i];
+    feed = p.f; kill = p.k;
+    hueShift = p.hue; buildRamp(hueShift);
+    setSlidersFromFK();
+    document.getElementById('tag').textContent = p.name;
+    // reflect chip state
+    [...presetsEl.children].forEach((c,ci)=>c.classList.toggle('on', ci===i));
+    if(reseed) seedRandom();
+    if(reduce) renderStill();
+  }
+
+  const presetsEl = document.getElementById('presets');
+  PRESETS.forEach((p,i)=>{
+    const b = document.createElement('button');
+    b.className='chip'; b.textContent=p.name; b.type='button';
+    b.addEventListener('click', ()=>applyPreset(i, true));
+    presetsEl.appendChild(b);
+  });
+
+  /* ---------- caption ---------- */
+  const capEl = document.getElementById('cap');
+  let lastCap = '';
+  function updateCaption(){
+    // measure activity: mean B and its variance-ish (coverage)
+    let sum=0, cov=0;
+    for(let i=0;i<N;i+=17){ const v=B[i]; sum+=v; if(v>0.15)cov++; }
+    const mean = sum/(N/17);
+    let c;
+    if(mean < 0.001) c='the surface is still';
+    else if(cov < (N/17)*0.04) c='the first spots take hold';
+    else if(activePreset===1) c='it divides, and divides again';
+    else if(activePreset===2) c='the maze folds into itself';
+    else if(activePreset===5) c='a slow pulse, like breathing';
+    else if(mean > 0.14) c='the whole field is alive';
+    else c='pattern out of nothing';
+    if(c!==lastCap){
+      lastCap=c;
+      capEl.style.opacity='0';
+      setTimeout(()=>{ capEl.textContent=c; capEl.style.opacity='.9'; }, reduce?0:280);
+    }
+  }
+
+  /* ---------- pointer painting ---------- */
+  let painting=false, lastPx=null;
+  function toGrid(ev){
+    const rect = canvas.getBoundingClientRect();
+    const x = (ev.clientX-rect.left)*(GW/rect.width);
+    const y = (ev.clientY-rect.top)*(GH/rect.height);
+    return { x, y };
+  }
+  function paintAt(x,y){
+    splat(x,y, 7, 0.9);
+    // interpolate a line from the last point for smooth strokes
+    if(lastPx){
+      const dx=x-lastPx.x, dy=y-lastPx.y;
+      const dist=Math.hypot(dx,dy);
+      const steps=Math.min(24, dist/4|0);
+      for(let s=1;s<steps;s++){
+        const t=s/steps;
+        splat(lastPx.x+dx*t, lastPx.y+dy*t, 6, 0.85);
+      }
+    }
+    lastPx={x,y};
+  }
+  canvas.addEventListener('pointerdown', ev=>{
+    ev.preventDefault();
+    painting=true; lastPx=null;
+    canvas.setPointerCapture?.(ev.pointerId);
+    const g=toGrid(ev); paintAt(g.x,g.y);
+    if(reduce) renderStill();
+  });
+  canvas.addEventListener('pointermove', ev=>{
+    if(!painting) return;
+    const g=toGrid(ev); paintAt(g.x,g.y);
+    if(reduce) renderStill();
+  });
+  function endPaint(){ painting=false; lastPx=null; }
+  canvas.addEventListener('pointerup', endPaint);
+  canvas.addEventListener('pointercancel', endPaint);
+  canvas.addEventListener('pointerleave', ()=>{ if(painting){ lastPx=null; } });
+
+  /* ---------- sliders ---------- */
+  feedEl.addEventListener('input', ()=>{ syncFromSliders(); markCustom(); if(reduce) renderStill(); });
+  killEl.addEventListener('input', ()=>{ syncFromSliders(); markCustom(); if(reduce) renderStill(); });
+  function markCustom(){
+    document.getElementById('tag').textContent='custom';
+    [...presetsEl.children].forEach(c=>c.classList.remove('on'));
+  }
+
+  /* ---------- buttons ---------- */
+  function updateSeedRead(){ document.getElementById('seed-read').textContent = 'seed '+seed.toString(16).padStart(8,'0'); }
+
+  document.getElementById('seed-btn').addEventListener('click', ()=>{
+    seed=(Math.random()*4294967296)>>>0; rng=makeRng(seed); updateSeedRead();
+    seedRandom();
+    if(reduce) renderStill();
+  });
+  document.getElementById('clear-btn').addEventListener('click', ()=>{
+    fillStill(); resetHistory();
+    if(reduce) renderStill();
+  });
+  const pauseBtn = document.getElementById('pause-btn');
+  let paused=false;
+  pauseBtn.addEventListener('click', ()=>{
+    paused=!paused; pauseBtn.textContent=paused?'resume':'pause';
+  });
+  document.getElementById('save-btn').addEventListener('click', ()=>{
+    try{
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href=url; a.download='turing-pond-'+seed.toString(16)+'.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      showToast('a frame, kept. it has already moved on.');
+    }catch(e){ showToast('the pond declines to be captured.'); }
+  });
+
+  let toastTimer=null;
+  function showToast(msg){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.classList.add('show');
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>t.classList.remove('show'), 2600);
+  }
+
+  /* ---------- history reset (nudge sim to converge faster after reseed) ---------- */
+  function resetHistory(){ /* placeholder for potential warmup hooks */ }
+
+  /* ---------- main loop ---------- */
+  let running=true;
+  let capTimer=0;
+  const STEPS_PER_FRAME = 8;   // sim substeps per animation frame
+
+  function frame(){
+    if(running) requestAnimationFrame(frame);
+    if(!paused){
+      for(let s=0;s<STEPS_PER_FRAME;s++) step();
+      render();
+      capTimer++;
+      if(capTimer>=20){ capTimer=0; updateCaption(); }
+    }
+  }
+
+  /* ---------- reduced-motion still: run many steps once, then draw ---------- */
+  function renderStill(){
+    // run a batch to develop pattern, then a single composed draw
+    const iters = 900;
+    for(let s=0;s<iters;s++) step();
+    render();
+    updateCaption();
+  }
+
+  /* ---------- visibility: pause the loop when hidden ---------- */
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){
+      running=false;
+    } else if(!reduce){
+      if(!running){ running=true; requestAnimationFrame(frame); }
+    }
+  });
+
+  /* ---------- boot ---------- */
+  fillStill();
+  syncFromSliders();
+  applyPreset(0, false);   // sets coral f/k, hue, tag, chip
+  seedRandom();
+  updateSeedRead();
+
+  if(reduce){
+    // develop the coral pattern into a single composed frame
+    renderStill();
+  } else {
+    // a short warmup so the first visible frame already shows emerging pattern
+    for(let s=0;s<120;s++) step();
+    render();
+    requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>

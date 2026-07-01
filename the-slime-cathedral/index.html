@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Slime Cathedral · Prízrak</title>
+<style>
+  :root{
+    --bg:#05060a;
+    --bg-raised:#0b0e14;
+    --bg-sunk:#070810;
+    --line:#171d27;
+    --line-soft:#11151d;
+    --ink:#c4cdd6;
+    --ink-dim:#6a7581;
+    --ink-ghost:#2b333d;
+    --accent:#38e0d0;
+    --glow:rgba(56,224,208,.5);
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--serif); min-height:100vh;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(120% 80% at 50% -12%, rgba(56,224,208,.06), transparent 56%),
+      radial-gradient(100% 70% at 50% 116%, rgba(126,92,224,.05), transparent 60%),
+      var(--bg);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    opacity:.035; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  main{ width:100%; max-width:860px; }
+
+  header{ margin-bottom:16px; }
+  .kicker{
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em;
+    font-size:9.5px; color:var(--ink-dim); margin-bottom:9px;
+  }
+  h1{
+    font-family:var(--serif); font-weight:700; margin:0;
+    font-size:clamp(1.7rem,5.4vw,2.5rem); line-height:1.04; letter-spacing:-.015em;
+    color:#eef3f6; text-shadow:0 0 22px var(--glow);
+  }
+  h1 .em{ color:var(--accent); font-style:italic; font-weight:600; }
+  .sub{
+    margin:11px 0 0; font-style:italic; font-size:13.5px; color:var(--ink-dim);
+    max-width:40rem; line-height:1.6;
+  }
+
+  .stage{
+    position:relative; border:1px solid var(--line); border-radius:12px;
+    overflow:hidden; background:var(--bg-sunk);
+    box-shadow:0 0 0 1px var(--line-soft), inset 0 0 80px -30px #000,
+               0 40px 90px -50px #000, 0 0 70px -34px var(--glow);
+  }
+  #field{ display:block; width:100%; height:auto; cursor:crosshair; touch-action:none; }
+
+  .overlay{ position:absolute; pointer-events:none; }
+  .caption{
+    left:14px; bottom:12px; font-family:var(--mono);
+    font-size:10.5px; letter-spacing:.04em; color:var(--accent);
+    text-shadow:0 0 12px var(--glow); transition:opacity .6s ease; opacity:.85;
+  }
+  .readout{
+    right:14px; top:12px; font-family:var(--mono);
+    font-size:9.5px; letter-spacing:.16em; color:var(--ink-ghost); text-align:right;
+  }
+  .readout b{ color:var(--ink-dim); font-weight:400; }
+
+  .hint{
+    font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    color:var(--ink-ghost); margin:11px 2px 0;
+  }
+
+  .controls{
+    display:flex; flex-wrap:wrap; align-items:center; gap:18px 22px; margin-top:16px;
+  }
+  .ctl{ display:flex; flex-direction:column; gap:7px; min-width:132px; flex:1 1 132px; }
+  .ctl-head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .ctl label{
+    font-family:var(--mono); font-size:8.5px; text-transform:uppercase;
+    letter-spacing:.17em; color:var(--ink-dim);
+  }
+  .ctl-val{ font-family:var(--mono); font-size:9.5px; color:var(--accent); }
+
+  input[type="range"]{
+    -webkit-appearance:none; appearance:none; width:100%;
+    height:2px; background:var(--line); border-radius:2px; cursor:pointer; margin:0;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:13px; height:13px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 9px var(--glow); transition:transform .12s,box-shadow .15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover{ transform:scale(1.16); box-shadow:0 0 15px var(--glow); }
+  input[type="range"]::-moz-range-thumb{
+    width:13px; height:13px; border:none; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 9px var(--glow); cursor:pointer;
+  }
+  input[type="range"]:focus-visible{ outline:none; }
+  input[type="range"]:focus-visible::-webkit-slider-thumb{ box-shadow:0 0 0 3px var(--glow); }
+
+  .buttons{ display:flex; flex-wrap:wrap; gap:9px; margin-top:18px; align-items:center; }
+  .btn{
+    font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.19em;
+    background:transparent; border:1px solid var(--line); color:var(--ink-dim);
+    border-radius:7px; padding:9px 15px; cursor:pointer;
+    transition:border-color .16s,color .16s,transform .1s,box-shadow .18s;
+  }
+  .btn:hover{ border-color:var(--accent); color:var(--ink); box-shadow:0 0 20px -9px var(--glow); }
+  .btn:active{ transform:translateY(1px); }
+  .btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+  .seedout{ font-family:var(--mono); font-size:9px; letter-spacing:.12em; color:var(--ink-ghost); margin-left:auto; }
+
+  footer{
+    margin-top:22px; padding-top:14px; border-top:1px solid var(--line-soft);
+    font-family:var(--mono); font-size:9px; letter-spacing:.16em; color:var(--ink-ghost);
+    text-transform:uppercase; line-height:1.9;
+  }
+  footer a{ color:var(--ink-ghost); text-decoration:none; }
+  footer a:hover{ color:var(--ink-dim); }
+  ::selection{ background:rgba(56,224,208,.24); color:#fff; }
+
+  @media (prefers-reduced-motion:reduce){
+    h1{ text-shadow:0 0 12px var(--glow); }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="kicker">Prízrak / offerings — instrument 31 — a living circuitry of light</div>
+      <h1>The Slime <span class="em">Cathedral</span></h1>
+      <p class="sub">Thousands of blind cells crawl a dark nave, laying luminous trails and following each other's ghosts. Left to itself it braids transport lines between the lamps you set — thickening, pruning, forever rebuilding an architecture no one designed.</p>
+    </header>
+
+    <div class="stage">
+      <canvas id="field" width="860" height="560" aria-label="A generative slime-mold simulation forming glowing branching networks."></canvas>
+      <div class="overlay caption" id="caption">the colony is waking</div>
+      <div class="overlay readout"><b>agents</b> <span id="agentCount">—</span> · <b>lamps</b> <span id="nodeCount">0</span></div>
+    </div>
+
+    <p class="hint">click to set a glowing lamp the colony will reach toward · drag to draw a food trail · the web does the rest</p>
+
+    <div class="controls">
+      <div class="ctl">
+        <div class="ctl-head"><label for="sense">wander · sense angle</label><span class="ctl-val" id="sense-val">—</span></div>
+        <input id="sense" type="range" min="8" max="55" value="26">
+      </div>
+      <div class="ctl">
+        <div class="ctl-head"><label for="decay">decay · memory</label><span class="ctl-val" id="decay-val">—</span></div>
+        <input id="decay" type="range" min="2" max="40" value="12">
+      </div>
+      <div class="ctl">
+        <div class="ctl-head"><label for="hue">spectrum</label><span class="ctl-val" id="hue-val">—</span></div>
+        <input id="hue" type="range" min="0" max="100" value="30">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn" id="reseed-btn" type="button">new colony</button>
+      <button class="btn" id="clear-btn" type="button">clear lamps</button>
+      <button class="btn" id="pause-btn" type="button">pause</button>
+      <button class="btn" id="save-btn" type="button">save frame</button>
+      <span class="seedout" id="seedout"></span>
+    </div>
+
+    <footer>
+      the colony has no plan · it only knows the light in front of it · <a href="/index.html">all offerings</a>
+    </footer>
+  </main>
+
+<script>
+"use strict";
+(function(){
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- PRNG (mulberry32) ---------- */
+  function makeRng(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function newSeed(){ return (Math.random() * 4294967296) >>> 0; }
+  let seed = newSeed();
+  let rng = makeRng(seed);
+
+  /* ---------- simulation grid ----------
+     The pheromone field is a low-res grid (independent of display size) so
+     performance stays constant regardless of devicePixelRatio / screen size. */
+  const GW = 300, GH = 196;          // trail-field resolution
+  let field = new Float32Array(GW * GH);
+  let fieldNext = new Float32Array(GW * GH);
+
+  // display sizing
+  let CSSW = 860, CSSH = 560;        // css pixels of canvas
+  let dpr = 1;
+
+  /* ---------- params ---------- */
+  const params = {
+    senseAngle: 26 * Math.PI/180,  // radians
+    decay: 0.12,                    // fraction removed per step (0..1-ish)
+    hue: 30                         // 0..100 spectrum position
+  };
+
+  const SENSE_DIST = 9.0;          // grid cells ahead the agent looks
+  const TURN = 0.55;               // steering strength (radians toward best)
+  const SPEED = 1.0;               // grid cells per step
+  const DEPOSIT = 0.85;            // trail laid per step
+
+  /* ---------- agents ---------- */
+  let AGENTS = 9000;
+  let ax, ay, ah;                  // x, y (grid space), heading
+
+  function agentCountFor(){
+    // scale with area but capped for performance
+    return AGENTS;
+  }
+
+  function seedAgents(){
+    const n = AGENTS;
+    ax = new Float32Array(n);
+    ay = new Float32Array(n);
+    ah = new Float32Array(n);
+    // start clustered in a soft disk near centre so a structure emerges outward
+    const cx = GW/2, cy = GH/2;
+    const R = Math.min(GW, GH) * 0.34;
+    for (let i=0;i<n;i++){
+      const ang = rng() * Math.PI*2;
+      const rr = Math.sqrt(rng()) * R;
+      ax[i] = cx + Math.cos(ang)*rr;
+      ay[i] = cy + Math.sin(ang)*rr;
+      ah[i] = rng() * Math.PI*2;
+    }
+  }
+
+  /* ---------- attractant lamps (user placed) ---------- */
+  // each lamp continuously injects trail into the field -> agents braid toward them
+  let lamps = [];                  // {gx, gy, r, strength, born}
+  const MAX_LAMPS = 40;
+
+  function addLamp(gx, gy){
+    lamps.push({ gx, gy, r: 5 + rng()*2, strength: 1.0, born: tick });
+    if (lamps.length > MAX_LAMPS) lamps.shift();
+    updateReadout();
+  }
+
+  /* ---------- coords ---------- */
+  function idx(x,y){ return y*GW + x; }
+  function wrap(v, m){ v %= m; return v < 0 ? v + m : v; }
+
+  // sample field with wrap
+  function sampleField(gx, gy){
+    let x = wrap(gx|0, GW), y = wrap(gy|0, GH);
+    return field[y*GW + x];
+  }
+
+  /* ---------- one simulation step ---------- */
+  let tick = 0;
+  function step(){
+    tick++;
+    const sa = params.senseAngle;
+    const n = AGENTS;
+
+    // 1) inject lamp attractant
+    for (let li=0; li<lamps.length; li++){
+      const L = lamps[li];
+      const r = L.r, r2 = r*r;
+      const x0 = Math.max(0, (L.gx-r)|0), x1 = Math.min(GW-1, (L.gx+r)|0);
+      const y0 = Math.max(0, (L.gy-r)|0), y1 = Math.min(GH-1, (L.gy+r)|0);
+      for (let y=y0; y<=y1; y++){
+        for (let x=x0; x<=x1; x++){
+          const dx = x-L.gx, dy = y-L.gy;
+          const d2 = dx*dx+dy*dy;
+          if (d2 > r2) continue;
+          const f = 1 - d2/r2;
+          const k = idx(x,y);
+          field[k] += f*f * 3.2 * L.strength;
+          if (field[k] > 60) field[k] = 60;
+        }
+      }
+    }
+
+    // 2) agents: sense -> rotate -> move -> deposit
+    for (let i=0; i<n; i++){
+      const x = ax[i], y = ay[i], h = ah[i];
+
+      // three sensors
+      const fx = Math.cos(h), fy = Math.sin(h);
+      const cF = sampleField(x + fx*SENSE_DIST, y + fy*SENSE_DIST);
+      const hl = h - sa, hr = h + sa;
+      const cL = sampleField(x + Math.cos(hl)*SENSE_DIST, y + Math.sin(hl)*SENSE_DIST);
+      const cR = sampleField(x + Math.cos(hr)*SENSE_DIST, y + Math.sin(hr)*SENSE_DIST);
+
+      let nh = h;
+      if (cF >= cL && cF >= cR){
+        // keep heading (small jitter)
+        nh += (rng()-0.5) * 0.10;
+      } else if (cL > cR){
+        nh -= TURN * (0.6 + rng()*0.5);
+      } else if (cR > cL){
+        nh += TURN * (0.6 + rng()*0.5);
+      } else {
+        nh += (rng()-0.5) * TURN;
+      }
+
+      // move
+      let nx = x + Math.cos(nh)*SPEED;
+      let ny = y + Math.sin(nh)*SPEED;
+
+      // wrap toroidal
+      if (nx < 0) nx += GW; else if (nx >= GW) nx -= GW;
+      if (ny < 0) ny += GH; else if (ny >= GH) ny -= GH;
+
+      ax[i] = nx; ay[i] = ny; ah[i] = nh;
+
+      // deposit
+      const k = idx(nx|0, ny|0);
+      field[k] += DEPOSIT;
+      if (field[k] > 60) field[k] = 60;
+    }
+
+    // 3) diffuse (3x3 blur) + decay -> fieldNext, then swap
+    const keep = 1 - params.decay;
+    const nxt = fieldNext, cur = field;
+    for (let y=0; y<GH; y++){
+      const ym = (y===0? GH-1 : y-1)*GW;
+      const yp = (y===GH-1? 0 : y+1)*GW;
+      const yc = y*GW;
+      for (let x=0; x<GW; x++){
+        const xm = x===0? GW-1 : x-1;
+        const xp = x===GW-1? 0 : x+1;
+        const sum =
+          cur[ym+xm] + cur[ym+x] + cur[ym+xp] +
+          cur[yc+xm] + cur[yc+x] + cur[yc+xp] +
+          cur[yp+xm] + cur[yp+x] + cur[yp+xp];
+        nxt[yc+x] = (sum * 0.11111111) * keep;
+      }
+    }
+    // swap
+    const tmp = field; field = fieldNext; fieldNext = tmp;
+
+    // lamps fade very slowly (so old lamps eventually lose pull if abandoned)
+    for (let li=lamps.length-1; li>=0; li--){
+      lamps[li].strength *= 0.9998;
+    }
+  }
+
+  /* ---------- colouring ---------- */
+  // build an off-screen buffer at grid resolution, then scale up with glow.
+  const buf = document.createElement('canvas');
+  buf.width = GW; buf.height = GH;
+  const bctx = buf.getContext('2d');
+  let imgData = bctx.createImageData(GW, GH);
+  const pix = imgData.data;
+
+  // palette: three-stop gradient driven by hue slider. Values -> low (deep) to
+  // high (bright bloom). Cool bioluminescent by default; slider drifts toward
+  // violet / amber-teal.
+  let ramp = new Uint8Array(256*3);
+  function buildRamp(){
+    const h = params.hue/100;               // 0..1
+    // anchor hues (in a loose hsl sense) chosen to stay in Prízrak palette
+    // low, mid, high hue degrees
+    const loH = 205 + h*40;                  // deep blue -> indigo
+    const midH = 175 - h*20 + h*120;         // teal -> violet-ish
+    const hiH = 165 - h*10 + h*70;           // cyan-white bloom
+    for (let i=0;i<256;i++){
+      const t = i/255;
+      let hue, sat, lum;
+      if (t < 0.55){
+        const u = t/0.55;
+        hue = loH + (midH-loH)*u;
+        sat = 0.60 + 0.22*u;
+        lum = 0.02 + 0.40*u;
+      } else {
+        const u = (t-0.55)/0.45;
+        hue = midH + (hiH-midH)*u;
+        // keep some saturation at the top so bright veins glow tinted, not flat white
+        sat = 0.82 - 0.34*u;
+        lum = 0.42 + 0.46*u;   // tops out ~0.88, not blown to pure white
+      }
+      const [r,g,b] = hsl2rgb(hue/360, Math.min(1,sat), Math.min(1,lum));
+      ramp[i*3]=r; ramp[i*3+1]=g; ramp[i*3+2]=b;
+    }
+  }
+  function hsl2rgb(h,s,l){
+    let r,g,b;
+    if (s===0){ r=g=b=l; }
+    else {
+      const q = l < 0.5 ? l*(1+s) : l+s-l*s;
+      const p = 2*l-q;
+      r = hue2(p,q,h+1/3); g = hue2(p,q,h); b = hue2(p,q,h-1/3);
+    }
+    return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+  }
+  function hue2(p,q,t){
+    if (t<0) t+=1; if (t>1) t-=1;
+    if (t<1/6) return p+(q-p)*6*t;
+    if (t<1/2) return q;
+    if (t<2/3) return p+(q-p)*(2/3-t)*6;
+    return p;
+  }
+
+  function renderField(){
+    const cur = field;
+    for (let i=0, p=0; i<cur.length; i++, p+=4){
+      // map value to ramp index (soft knee so faint trails still glow a little)
+      let v = cur[i];
+      // tone curve: log-ish for wide dynamic range; gentle knee so dense
+      // veins hold their tint instead of clipping straight to white
+      let t = v <= 0 ? 0 : Math.log(1 + v*1.15) * 0.44;
+      if (t > 1) t = 1;
+      const ri = (t*255)|0;
+      const r3 = ri*3;
+      pix[p]   = ramp[r3];
+      pix[p+1] = ramp[r3+1];
+      pix[p+2] = ramp[r3+2];
+      pix[p+3] = 255;
+    }
+    bctx.putImageData(imgData, 0, 0);
+  }
+
+  /* ---------- compose to visible canvas (with bloom) ---------- */
+  function compose(){
+    renderField();
+
+    // base: dark vignette background
+    ctx.fillStyle = '#04050a';
+    ctx.fillRect(0,0,CSSW,CSSH);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // main crisp-ish layer
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 1;
+    ctx.drawImage(buf, 0, 0, CSSW, CSSH);
+
+    // bloom: draw the same buffer scaled/blurred and additively blended
+    ctx.globalAlpha = 0.42;
+    ctx.filter = 'blur(6px)';
+    ctx.drawImage(buf, 0, 0, CSSW, CSSH);
+    ctx.globalAlpha = 0.30;
+    ctx.filter = 'blur(15px)';
+    ctx.drawImage(buf, 0, 0, CSSW, CSSH);
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    // lamp cores — small bright halos where the user placed light
+    ctx.globalCompositeOperation = 'lighter';
+    for (let li=0; li<lamps.length; li++){
+      const L = lamps[li];
+      const px = (L.gx/GW)*CSSW, py = (L.gy/GH)*CSSH;
+      const rad = 26 + 10*Math.sin(tick*0.03 + li);
+      const g = ctx.createRadialGradient(px, py, 0, px, py, rad);
+      const a = 0.28 * Math.min(1, L.strength);
+      g.addColorStop(0, `rgba(210,255,246,${a})`);
+      g.addColorStop(0.4, `rgba(120,236,220,${a*0.5})`);
+      g.addColorStop(1, 'rgba(120,236,220,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(px, py, rad, 0, 6.283); ctx.fill();
+      // bright pip
+      ctx.fillStyle = `rgba(235,255,250,${0.5*Math.min(1,L.strength)})`;
+      ctx.beginPath(); ctx.arc(px, py, 1.6, 0, 6.283); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // vignette
+    const vig = ctx.createRadialGradient(CSSW/2, CSSH/2, CSSH*0.3, CSSW/2, CSSH/2, CSSW*0.72);
+    vig.addColorStop(0, 'transparent');
+    vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0,0,CSSW,CSSH);
+  }
+
+  /* ---------- sizing (guard against huge buffers) ---------- */
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    CSSW = Math.max(320, Math.round(rect.width));
+    CSSH = Math.round(CSSW * (560/860));
+    dpr = Math.min(window.devicePixelRatio || 1, 2);   // cap dpr
+    canvas.width = Math.round(CSSW * dpr);
+    canvas.height = Math.round(CSSH * dpr);
+    canvas.style.height = CSSH + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /* ---------- caption ---------- */
+  const captionEl = document.getElementById('caption');
+  let lastCaption = '';
+  const CAP_CALM = [
+    'the colony is dreaming its own map',
+    'blind cells, patient light',
+    'it braids what it cannot see',
+    'a cathedral with no architect',
+    'the web thickens and prunes',
+    'ghost-trails, followed and forgotten'
+  ];
+  function pickCaption(){
+    if (lamps.length === 0){
+      return tick < 400 ? 'the colony is waking' : 'nothing calls to them yet';
+    }
+    if (lamps.length === 1) return 'one lamp — the web reaches for it';
+    if (lamps.length >= 6) return 'a nave of many lamps, all connected';
+    if (params.decay > 0.28) return 'short memory — the web forgets quickly';
+    if (params.decay < 0.05) return 'long memory — the trails will not fade';
+    return CAP_CALM[(tick>>8) % CAP_CALM.length];
+  }
+  function refreshCaption(){
+    const c = pickCaption();
+    if (c !== lastCaption){
+      lastCaption = c;
+      captionEl.style.opacity = '0';
+      setTimeout(()=>{ captionEl.textContent = c; captionEl.style.opacity = '0.85'; }, reduce?0:280);
+    }
+  }
+  function updateReadout(){
+    document.getElementById('agentCount').textContent = AGENTS.toLocaleString();
+    document.getElementById('nodeCount').textContent = lamps.length;
+  }
+
+  /* ---------- input ---------- */
+  function gridPos(ev){
+    const rect = canvas.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) / rect.width;
+    const py = (ev.clientY - rect.top) / rect.height;
+    return { gx: Math.max(0, Math.min(GW-1, px*GW)), gy: Math.max(0, Math.min(GH-1, py*GH)) };
+  }
+  let dragging = false, movedWhileDown = false;
+  function paintFood(gx, gy){
+    // drag deposits a soft food splash directly into the field (draws a trail)
+    const r = 4;
+    const x0=Math.max(0,(gx-r)|0), x1=Math.min(GW-1,(gx+r)|0);
+    const y0=Math.max(0,(gy-r)|0), y1=Math.min(GH-1,(gy+r)|0);
+    for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++){
+      const dx=x-gx, dy=y-gy, d2=dx*dx+dy*dy;
+      if (d2>r*r) continue;
+      field[idx(x,y)] += (1-d2/(r*r))*8;
+    }
+  }
+  canvas.addEventListener('pointerdown', (ev)=>{
+    ev.preventDefault();
+    dragging = true; movedWhileDown = false;
+    canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId);
+    if (reduce){ const p=gridPos(ev); addLamp(p.gx,p.gy); renderStill(); }
+  });
+  canvas.addEventListener('pointermove', (ev)=>{
+    if (!dragging) return;
+    movedWhileDown = true;
+    const p = gridPos(ev);
+    paintFood(p.gx, p.gy);
+    if (reduce) renderStill();
+  });
+  canvas.addEventListener('pointerup', (ev)=>{
+    const p = gridPos(ev);
+    if (!movedWhileDown && !reduce) addLamp(p.gx, p.gy);
+    dragging = false;
+    refreshCaption();
+  });
+  canvas.addEventListener('pointercancel', ()=>{ dragging=false; });
+
+  /* ---------- sliders ---------- */
+  function bindSlider(id, apply, fmt){
+    const el = document.getElementById(id);
+    const out = document.getElementById(id+'-val');
+    const render = ()=>{ out.textContent = fmt(parseFloat(el.value)); };
+    el.addEventListener('input', ()=>{
+      apply(parseFloat(el.value));
+      render();
+      if (id === 'hue') buildRamp();
+      if (reduce) renderStill();
+    });
+    render();
+  }
+  bindSlider('sense', v=>{ params.senseAngle = v*Math.PI/180; }, v=>Math.round(v)+'°');
+  bindSlider('decay', v=>{ params.decay = v/100; }, v=>Math.round(v)+'%');
+  bindSlider('hue', v=>{ params.hue = v; }, v=> v<33?'cold current': v<66?'deep violet':'ember-teal');
+
+  /* ---------- buttons ---------- */
+  function updateSeedOut(){ document.getElementById('seedout').textContent = 'seed ' + seed.toString(16).padStart(8,'0'); }
+  function reseed(){
+    seed = newSeed(); rng = makeRng(seed);
+    field.fill(0); fieldNext.fill(0);
+    lamps = [];
+    tick = 0;
+    seedAgents();
+    updateSeedOut(); updateReadout(); refreshCaption();
+  }
+  document.getElementById('reseed-btn').addEventListener('click', ()=>{ reseed(); if (reduce) renderStill(); });
+  document.getElementById('clear-btn').addEventListener('click', ()=>{
+    lamps = []; updateReadout(); refreshCaption(); if (reduce) renderStill();
+  });
+  const pauseBtn = document.getElementById('pause-btn');
+  let paused = false;
+  pauseBtn.addEventListener('click', ()=>{
+    paused = !paused; pauseBtn.textContent = paused ? 'resume' : 'pause';
+  });
+  document.getElementById('save-btn').addEventListener('click', ()=>{
+    try{
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url; a.download = 'slime-cathedral-' + seed.toString(16) + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    }catch(e){}
+  });
+
+  /* ---------- main loop ---------- */
+  let rafId = 0;
+  let hidden = false;
+  let uiTimer = 0;
+  function frame(){
+    rafId = requestAnimationFrame(frame);
+    if (hidden || paused){ return; }
+    // a couple of sim steps per frame for a lively web, but capped
+    step();
+    step();
+    compose();
+    uiTimer++;
+    if (uiTimer % 45 === 0) refreshCaption();
+  }
+
+  document.addEventListener('visibilitychange', ()=>{
+    hidden = document.hidden;
+    if (!hidden && !reduce && !rafId){ rafId = requestAnimationFrame(frame); }
+  });
+
+  window.addEventListener('resize', ()=>{ resize(); if (reduce) renderStill(); }, { passive:true });
+
+  /* ---------- reduced-motion still ---------- */
+  function renderStill(){
+    // run a chunk of steps once to grow a composed structure, then draw once.
+    // seed a few lamps if none, so the still frame shows a network.
+    if (lamps.length === 0){
+      const pts = 3 + (rng()*3|0);
+      for (let i=0;i<pts;i++){
+        addLamp(GW*(0.2+rng()*0.6), GH*(0.2+rng()*0.6));
+      }
+    }
+    const iters = 520;
+    for (let i=0;i<iters;i++) step();
+    compose();
+    refreshCaption();
+  }
+
+  /* ---------- boot ---------- */
+  resize();
+  buildRamp();
+  seedAgents();
+  updateSeedOut();
+  updateReadout();
+  refreshCaption();
+
+  // give it a couple of starter lamps so first paint already has structure
+  addLamp(GW*0.36, GH*0.42);
+  addLamp(GW*0.64, GH*0.58);
+  addLamp(GW*0.50, GH*0.30);
+
+  if (reduce){
+    renderStill();
+  } else {
+    rafId = requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>
