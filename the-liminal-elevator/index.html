@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Liminal Elevator · Prízrak</title>
+<style>
+  :root {
+    --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+    --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+    --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+    --glow:#c9b27a; --glow-dim:#5a4e34; --amber:#e3b341; --violet:#a89bd6; --violet-dim:#4a4266;
+    --dead:#3a3a44;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(120% 70% at 50% -10%, rgba(201,178,122,.06), transparent 55%),
+      radial-gradient(100% 60% at 50% 120%, rgba(74,66,102,.10), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.04; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:640px; margin:0 auto; padding:40px 20px 56px; }
+  @media (min-width:640px) { .wrap { padding:52px 32px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--glow); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(201,178,122,.22); color:#fff; }
+
+  header { text-align:center; margin-bottom:30px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2rem,7.5vw,3.3rem); font-weight:800;
+    line-height:.98; letter-spacing:-.02em; margin:12px 0 0;
+  }
+  .sub {
+    margin:14px auto 0; font-style:italic; font-size:13.5px; color:var(--ash);
+    max-width:30rem; line-height:1.6;
+  }
+
+  /* ---- the cab ---- */
+  .cab {
+    border:1px solid var(--rule-2); border-radius:10px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    padding:0; position:relative; overflow:hidden;
+    box-shadow:0 30px 70px -36px rgba(0,0,0,.9);
+  }
+  .cab::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:1px;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+
+  /* floor indicator strip */
+  .indicator {
+    display:flex; align-items:center; justify-content:center; gap:16px;
+    padding:16px 18px; border-bottom:1px solid var(--rule);
+    background:radial-gradient(120% 160% at 50% 0,rgba(201,178,122,.05),transparent 70%);
+  }
+  .dir-arrow {
+    font-family:var(--mono); font-size:20px; color:var(--ash-3); width:22px; text-align:center;
+    transition:color .3s, text-shadow .3s; line-height:1;
+  }
+  .dir-arrow.on { color:var(--glow); text-shadow:0 0 14px rgba(201,178,122,.7); }
+  .readout {
+    font-family:var(--mono); font-weight:600; letter-spacing:.06em;
+    font-size:30px; min-width:118px; text-align:center; color:var(--glow);
+    text-shadow:0 0 18px rgba(201,178,122,.35);
+    padding:4px 8px; border:1px solid var(--rule); border-radius:4px;
+    background:var(--ink-2); line-height:1.15;
+  }
+  .readout.wrong { color:var(--violet); text-shadow:0 0 18px rgba(168,155,214,.4); }
+
+  /* the doors + reveal */
+  .shaft {
+    position:relative; min-height:210px; overflow:hidden;
+    background:
+      repeating-linear-gradient(180deg, rgba(255,255,255,.012) 0 2px, transparent 2px 22px),
+      var(--ink);
+  }
+  .doors { position:absolute; inset:0; display:flex; z-index:4; pointer-events:none; }
+  .door {
+    width:50%; height:100%;
+    background:linear-gradient(90deg,var(--ink-3),var(--ink-2) 60%,var(--ink-1));
+    position:relative; transition:transform 1.05s cubic-bezier(.5,0,.2,1);
+    box-shadow:inset 0 0 40px rgba(0,0,0,.6);
+  }
+  .door.left { border-right:1px solid rgba(0,0,0,.6); }
+  .door.right { border-left:1px solid rgba(201,178,122,.05); }
+  .door::after {
+    content:""; position:absolute; top:0; bottom:0; width:2px;
+    background:linear-gradient(180deg,transparent,rgba(201,178,122,.10),transparent);
+  }
+  .door.left::after { right:0; }
+  .door.right::after { left:0; }
+  /* seam handle line */
+  .door::before {
+    content:""; position:absolute; top:44%; height:12%; width:2px; background:rgba(233,228,214,.10);
+  }
+  .door.left::before { right:8px; }
+  .door.right::before { left:8px; }
+
+  .cab.open .door.left { transform:translateX(-100%); }
+  .cab.open .door.right { transform:translateX(100%); }
+
+  .reveal {
+    position:absolute; inset:0; z-index:2; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    padding:30px 26px; opacity:0; transition:opacity .8s ease .35s;
+  }
+  .cab.open .reveal { opacity:1; }
+  .floor-tag {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px;
+    color:var(--glow); margin-bottom:14px;
+  }
+  .floor-line {
+    font-family:var(--serif); font-size:clamp(15px,4.2vw,19px); line-height:1.62; color:var(--parch);
+    max-width:30rem; font-style:italic;
+  }
+  .floor-line .cursor {
+    display:inline-block; width:8px; margin-left:1px; color:var(--glow);
+    animation:blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity:0; } }
+
+  /* idle placeholder in shaft when closed */
+  .idle {
+    position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ash-3);
+  }
+
+  /* the panel */
+  .panel-head {
+    font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ash-3); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:14px 18px 10px;
+  }
+  .panel-head .live { color:var(--glow); display:inline-flex; align-items:center; gap:6px; }
+  .blip { width:6px; height:6px; border-radius:50%; background:var(--glow); box-shadow:0 0 8px var(--glow); animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  .panel {
+    display:grid; grid-template-columns:repeat(4,1fr); gap:9px;
+    padding:6px 18px 20px;
+  }
+  @media (max-width:420px) { .panel { grid-template-columns:repeat(3,1fr); gap:8px; } }
+
+  .fbtn {
+    position:relative; font-family:var(--mono); font-size:14px; font-weight:600;
+    color:var(--ash); background:var(--ink-2); border:1px solid var(--rule-2);
+    border-radius:50%; aspect-ratio:1/1; cursor:pointer; user-select:none;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    transition:color .2s, border-color .2s, background .2s, box-shadow .2s, transform .08s;
+    letter-spacing:.02em; line-height:1.05; padding:2px;
+  }
+  .fbtn small { font-size:9px; letter-spacing:.02em; }
+  .fbtn:hover:not(:disabled) { color:var(--bone); border-color:var(--glow-dim); background:var(--ink-3); }
+  .fbtn:active:not(:disabled) { transform:translateY(1px) scale(.97); }
+  .fbtn.lit {
+    color:var(--glow); border-color:var(--glow);
+    background:radial-gradient(circle at 50% 40%, rgba(201,178,122,.22), rgba(201,178,122,.05));
+    box-shadow:0 0 16px -2px rgba(201,178,122,.55), inset 0 0 10px rgba(201,178,122,.15);
+  }
+  .fbtn.wrong { font-family:var(--serif); font-style:italic; }
+  .fbtn.wrong:hover:not(:disabled) { border-color:var(--violet-dim); }
+  .fbtn.wrong.lit {
+    color:var(--violet); border-color:var(--violet);
+    background:radial-gradient(circle at 50% 40%, rgba(168,155,214,.22), rgba(168,155,214,.05));
+    box-shadow:0 0 16px -2px rgba(168,155,214,.5), inset 0 0 10px rgba(168,155,214,.15);
+  }
+  .fbtn:disabled { cursor:progress; opacity:.75; }
+  .fbtn .glyph { font-size:17px; }
+
+  .panel-note {
+    text-align:center; font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    color:var(--ash-3); padding:0 18px 18px; min-height:14px;
+  }
+
+  /* actions */
+  .actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:22px; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:6px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .08s; display:inline-flex; align-items:center; gap:7px;
+    text-transform:uppercase; letter-spacing:.1em;
+  }
+  .mini:hover:not(:disabled) { border-color:var(--glow); color:var(--bone); background:var(--ink-2); }
+  .mini:active:not(:disabled) { transform:translateY(1px); }
+  .mini:disabled { opacity:.35; cursor:not-allowed; }
+  .mini.primary { color:var(--glow); border-color:var(--glow-dim); }
+  .mini.primary:hover:not(:disabled) { color:var(--ink); background:var(--glow); border-color:var(--glow); }
+
+  .log {
+    margin-top:22px; font-family:var(--mono); font-size:10.5px; color:var(--ash-3);
+    letter-spacing:.04em; line-height:1.8; text-align:center; min-height:16px;
+  }
+  .log b { color:var(--ash-2); font-weight:400; }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:44px; padding-top:22px; border-top:1px solid var(--rule); }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+  .footer .kicker { line-height:1.8; }
+
+  /* cab hum shudder while riding */
+  @keyframes hum { 0%,100%{transform:translateY(0)} 25%{transform:translateY(.5px)} 75%{transform:translateY(-.5px)} }
+  .cab.riding { animation:hum .18s linear infinite; }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; }
+    .door { transition:none; }
+    .reveal { transition:opacity .01s; }
+    .cab.riding { animation:none; }
+    body::after { display:none; }
+    .floor-line .cursor { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — random offering</div>
+      <h1>The <span class="specter">Liminal</span> Elevator</h1>
+      <p class="sub">The panel has more buttons than the building has floors. Press one. The cab will hum, the numbers will climb through places that aren't there, and the doors will open on somewhere. There is no top. There is no lobby. Keep riding.</p>
+    </header>
+
+    <div class="cab" id="cab">
+      <div class="indicator">
+        <span class="dir-arrow" id="arrow-up">▲</span>
+        <span class="readout" id="readout">— —</span>
+        <span class="dir-arrow" id="arrow-down">▼</span>
+      </div>
+
+      <div class="shaft">
+        <div class="idle" id="idle">doors closed · select a floor</div>
+        <div class="reveal" id="reveal" aria-live="polite">
+          <div class="floor-tag" id="floor-tag"></div>
+          <div class="floor-line" id="floor-line"></div>
+        </div>
+        <div class="doors">
+          <div class="door left"></div>
+          <div class="door right"></div>
+        </div>
+      </div>
+
+      <div class="panel-head">
+        <span id="panel-id">CAB 13½ · OTIS-VOID SERIES</span>
+        <span class="live"><span class="blip"></span>IN SERVICE</span>
+      </div>
+      <div class="panel" id="panel" role="group" aria-label="floor buttons"></div>
+      <div class="panel-note" id="panel-note">The building does not remember being built.</div>
+    </div>
+
+    <div class="actions">
+      <button class="mini primary" id="again-btn" disabled>↻ Ride again</button>
+      <button class="mini" id="copy-btn" disabled>⎘ Copy floor</button>
+      <button class="mini" id="reshuffle-btn">⇄ New panel</button>
+    </div>
+
+    <div class="log" id="log"><b>Cab idle. Waiting.</b></div>
+
+    <div class="footer">
+      <p class="kicker">No floor is the ground floor · every floor is a mezzanine · mind the gap that was never measured</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* =========================================================================
+   THE LIMINAL ELEVATOR
+   A building with no top and no bottom. Floors that should not exist.
+   Combinatorial floor-writing + huge deadpan pool, anti-repeat throughout.
+   ========================================================================= */
+
+/* ---------- safe HTML escaping ---------- */
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- anti-repeat picker ---------- */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickFresh(arr, last){
+  if(arr.length < 2) return arr[0];
+  let v, guard=0;
+  do { v = pick(arr); } while(v === last && ++guard < 20);
+  return v;
+}
+function rint(lo,hi){ return lo + Math.floor(Math.random()*(hi-lo+1)); }
+function chance(p){ return Math.random() < p; }
+
+/* ---------- floor LABELS for the panel (the wrong buttons) ---------- */
+/* mix of plausible + impossible. Each has a label (button face) and a "spoken"
+   form used in the readout / floor-tag. Type 'wrong' gets the violet styling. */
+const FLOOR_LABELS = [
+  { face:'L',      spoke:'the lobby',        type:'ok'   },
+  { face:'M',      spoke:'the mezzanine',    type:'ok'   },
+  { face:'2',      spoke:'floor 2',          type:'ok'   },
+  { face:'3',      spoke:'floor 3',          type:'ok'   },
+  { face:'7',      spoke:'floor 7',          type:'ok'   },
+  { face:'9',      spoke:'floor 9',          type:'ok'   },
+  { face:'11',     spoke:'floor 11',         type:'ok'   },
+  { face:'13',     spoke:'floor 13',         type:'ok'   },
+  { face:'13½',    spoke:'floor 13½',        type:'wrong'},
+  { face:'B',      spoke:'the basement',     type:'ok'   },
+  { face:'B2',     spoke:'sub-basement 2',   type:'ok'   },
+  { face:'B4',     spoke:'B-sub-4',          type:'wrong'},
+  { face:'B-∞',    spoke:'the last basement',type:'wrong'},
+  { face:'M½',     spoke:'the half-mezzanine',type:'wrong'},
+  { face:'0',      spoke:'floor zero',       type:'wrong'},
+  { face:'-1',     spoke:'floor minus one',  type:'wrong'},
+  { face:'99',     spoke:'floor 99',         type:'ok'   },
+  { face:'100',    spoke:'floor 100',        type:'ok'   },
+  { face:'23¾',    spoke:'floor 23¾',        type:'wrong'},
+  { face:'⌀',      spoke:'the floor marked only with a symbol', type:'wrong', glyph:true },
+  { face:'☍',      spoke:'the opposed floor', type:'wrong', glyph:true },
+  { face:'✦',      spoke:'the floor marked with a small star', type:'wrong', glyph:true },
+  { face:'∞',      spoke:'the top floor',    type:'wrong', glyph:true },
+  { face:'⧖',      spoke:'the waiting floor', type:'wrong', glyph:true },
+  { face:'◐',      spoke:'the half-lit floor', type:'wrong', glyph:true },
+  { face:'☖',      spoke:'the floor shaped like home', type:'wrong', glyph:true },
+  { face:'R',      spoke:'the roof',         type:'ok'   },
+  { face:'PH',     spoke:'the penthouse that is below you', type:'wrong'},
+  { face:'G',      spoke:'the ground floor', type:'ok'   },
+  { face:'Sub',    spoke:'the sub-floor',    type:'ok'   },
+  { face:'A½',     spoke:'the annex half-floor', type:'wrong'},
+  { face:'42',     spoke:'floor 42',         type:'ok'   },
+  { face:'X',      spoke:'the floor they stopped labelling', type:'wrong'},
+  { face:'⟳',      spoke:'the floor you were just on', type:'wrong', glyph:true },
+  { face:'—',      spoke:'the floor between floors', type:'wrong', glyph:true },
+  { face:'V',      spoke:'the vault',        type:'ok'   },
+];
+
+/* =========================================================================
+   THE FLOOR POOL — deadpan one-liners describing impossible places.
+   Two sources: (1) a large hand-written pool, (2) combinatorial generation.
+   The picker weaves both so repeats are rare across a long ride.
+   ========================================================================= */
+
+const WRITTEN = [
+  "identical to the lobby, but everyone here is waiting for you to leave first.",
+  "the office where you almost worked. Your desk is warm. Nobody will say who from.",
+  "a hallway that is only ever the middle of a hallway. It has no ends to reach.",
+  "the waiting room of a dentist who retired before you were born. The magazines are current.",
+  "a parking garage under a building that was never built above it.",
+  "the same floor as the last one, but the plants have been watered and you never did that.",
+  "a corridor of identical doors. Behind each is this corridor. One of them is yours.",
+  "the swimming pool. It is drained. A lifeguard chair faces the deep end, occupied.",
+  "your childhood kitchen at 3am, keeping the light on in case you came back.",
+  "a floor that smells like a school you didn't go to, on a day you almost remember.",
+  "the lost and found. Everything you ever lost is here, labelled, waiting, slightly dusty.",
+  "a food court after closing. One shutter is half up. Steam still rises from something.",
+  "an airport gate for a flight that boards continuously and never departs.",
+  "the meeting room where the meeting has been going on since before the building opened.",
+  "a hotel hallway. The ice machine is running. There is no ice. There has never been ice.",
+  "the exact floor you meant to press. It knows. It has been expecting you to notice.",
+  "a library of books that are all the same book, describing this elevator, describing you here.",
+  "a stairwell landing that goes up and down forever and connects to nothing.",
+  "the break room. Someone made coffee for the whole shift. There is no shift. The coffee is hot.",
+  "a wedding reception at the exact moment everyone has just left the dance floor.",
+  "the floor where the building keeps the sound of its own doors closing, all of them, at once.",
+  "a car park at the sea. There is no sea near this building. You can hear it anyway.",
+  "the returns desk. You are being returned. Please have your receipt for existing ready.",
+  "a classroom mid-exam. The clock has stopped. Every desk but one has been finished and left.",
+  "the corridor from your first apartment, but longer, and the carpet remembers your feet.",
+  "a floor that is entirely a window, looking out at another floor that is entirely a window.",
+  "the storage unit where the building keeps the version of you that took the stairs.",
+  "a laundromat at midnight. One machine is running. It has been running for years. It is nearly done.",
+  "the reception of a company whose name is the sound the doors make when they close.",
+  "a rooftop that is somehow indoors, with a sky painted so carefully you keep checking for weather.",
+  "the floor where all the elevators in the world come to be quiet for a while.",
+  "a hospital corridor at the hour when the machines are the only ones awake.",
+  "an apartment identical to yours, lived in by someone who left the moment the doors opened.",
+  "the floor that is just the smell of rain on hot pavement, held indoors, kept for you.",
+  "a museum of rooms you have stood in and forgotten. This is one of them. You are the exhibit.",
+  "the mezzanine of a building with no mezzanine. It insists, quietly, that it has always been here.",
+  "a movie theater between screenings. The screen is blue. A seat in the middle is still warm.",
+  "the floor where lost time is kept in boxes, sorted by whose it was. A box has your name.",
+  "a corridor that grows one door longer every time you look away from the end of it.",
+  "the exact center of the building, which is also the exact center of every building you've been in.",
+  "an indoor bus shelter. The schedule lists departures for places that were never anywhere.",
+  "the floor that is always the floor you were on before you got in the elevator.",
+  "a chapel for a religion that consists entirely of waiting for an elevator.",
+  "an office party frozen at the moment before someone says the thing they can't take back.",
+  "a beach at the bottom of a stairwell. The tide is out. It is always about to come in.",
+  "the sub-basement where the building stores the years it hasn't used yet.",
+  "a train platform indoors. The announcement is your name, repeated, gently, as an apology.",
+  "the floor with the good light. Everyone here is at peace and none of them will look at you.",
+  "a nursery decorated for a child. The mobile is turning. There is no draft to turn it.",
+  "the corridor where the carpet pattern is the map of everywhere you meant to go and didn't.",
+];
+
+/* --- combinatorial generation for near-infinite freshness --- */
+const PLACES = [
+  "a waiting room","a corridor","an office","a stairwell landing","a car park",
+  "a hotel hallway","a kitchen","a swimming pool","a food court","a lobby",
+  "a classroom","a laundromat","a reception desk","a break room","a chapel",
+  "a rooftop","a hospital ward","a movie theater","a bus shelter","a library",
+  "a nursery","a museum wing","a train platform","a vending alcove","a stockroom",
+];
+const CONDITIONS = [
+  "identical to the one below it",
+  "lit exactly like a memory you can't place",
+  "kept at the temperature of a childhood afternoon",
+  "furnished with things from a home you almost had",
+  "arranged as if someone left seconds before the doors opened",
+  "silent in a way that suggests it was recently very loud",
+  "warm, as though it has been waiting at this temperature for you specifically",
+  "carpeted in a pattern you last saw somewhere you've promised not to think about",
+  "identical to the floor above it, and to the floor above that, forever",
+  "painted the exact color of the inside of your eyelids",
+  "quiet, but you can hear this same elevator arriving, one floor over",
+  "lit only by the glow of vending machines selling nothing you recognize",
+];
+const INHABITANTS = [
+  "and everyone here is waiting for you to leave first.",
+  "and no one turns to look, though the room adjusts to make space for you.",
+  "and it is empty, but every chair is still slightly warm.",
+  "and someone has set out a cup of tea that is, impossibly, still hot.",
+  "and there is a single light left on, in case you came back.",
+  "and the door at the far end is the door you have been meaning to close for years.",
+  "and it smells, faintly and unmistakably, of somewhere you were happy once.",
+  "and a phone is ringing in a language that is the shape of your own name.",
+  "and the clock reads the exact time it was when you first got in.",
+  "and a coat that could be yours hangs by the exit, still holding your shape.",
+  "and you understand, without being told, that you have been here before and left something.",
+  "and none of it is yours, and all of it is waiting for you to claim it anyway.",
+];
+
+function combinatorialLine(){
+  return pick(PLACES) + ", " + pick(CONDITIONS) + ", " + pick(INHABITANTS);
+}
+
+/* the readout mis-counts: numbers that are almost right */
+const WRONG_NUMBERS = [
+  "12","12A","12½","13","13½","13¾","14","-2","0","0½","B1","B4","B-∞",
+  "M","M½","23¾","44","44½","99","100","101½","∞","⌀","—","☍","◐","??",
+  "7","7A","8","8½","2.5","−0","∅","VII½","4444","−1","G½",
+];
+
+/* =========================================================================
+   PANEL BUILDER — pick a random subset of buttons each session/panel
+   ========================================================================= */
+let PANEL = [];
+let lastPanelSig = null;
+
+function buildPanelSet(){
+  // always include a couple recognizable ones + a lot of wrong ones
+  const oks = FLOOR_LABELS.filter(f=>f.type==='ok');
+  const wrongs = FLOOR_LABELS.filter(f=>f.type==='wrong');
+  const chosen = [];
+  const used = new Set();
+  function take(pool, n){
+    let guard=0;
+    while(n>0 && guard<200){
+      guard++;
+      const f = pick(pool);
+      if(used.has(f.face)) continue;
+      used.add(f.face); chosen.push(f); n--;
+    }
+  }
+  take(oks, rint(4,5));
+  take(wrongs, rint(7,9));
+  // shuffle
+  for(let i=chosen.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [chosen[i],chosen[j]]=[chosen[j],chosen[i]]; }
+  return chosen;
+}
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+let lastFloorText = null;
+let lastSpoke = null;
+let currentFloor = null;   // { face, spoke, text, num }
+let riding = false;
+let floorCount = 0;
+let timers = [];
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- DOM ---------- */
+const cab = document.getElementById('cab');
+const panel = document.getElementById('panel');
+const readout = document.getElementById('readout');
+const arrowUp = document.getElementById('arrow-up');
+const arrowDown = document.getElementById('arrow-down');
+const idle = document.getElementById('idle');
+const reveal = document.getElementById('reveal');
+const floorTag = document.getElementById('floor-tag');
+const floorLine = document.getElementById('floor-line');
+const panelNote = document.getElementById('panel-note');
+const againBtn = document.getElementById('again-btn');
+const copyBtn = document.getElementById('copy-btn');
+const reshuffleBtn = document.getElementById('reshuffle-btn');
+const logEl = document.getElementById('log');
+
+const PANEL_NOTES = [
+  "The building does not remember being built.",
+  "Do not hold the doors. The doors are holding you.",
+  "In case of emergency, the emergency will find you.",
+  "Maximum occupancy: everyone who has ever ridden this cab.",
+  "This elevator is inspected by no one and works perfectly.",
+  "The music you hear is the building humming to keep calm.",
+  "Please do not press the floor you came from. It has moved.",
+  "Certificate of operation on file at a floor that no longer exists.",
+  "Weight limit measured in things left unsaid.",
+  "You may exit at any floor. You may not return to the one you left.",
+];
+
+/* =========================================================================
+   RENDER PANEL
+   ========================================================================= */
+function renderPanel(){
+  // avoid an identical panel signature back-to-back
+  let sig, guard=0;
+  do {
+    PANEL = buildPanelSet();
+    sig = PANEL.map(f=>f.face).sort().join('|');
+    guard++;
+  } while(sig === lastPanelSig && guard < 8);
+  lastPanelSig = sig;
+
+  panel.innerHTML = '';
+  PANEL.forEach(f => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fbtn' + (f.type==='wrong' ? ' wrong' : '');
+    b.setAttribute('aria-label', 'Floor ' + f.spoke);
+    if(f.glyph){ b.innerHTML = '<span class="glyph">' + esc(f.face) + '</span>'; }
+    else if(f.face.length > 2){ b.innerHTML = '<small>' + esc(f.face) + '</small>'; }
+    else { b.textContent = f.face; }
+    b.addEventListener('click', () => ride(f, b));
+    panel.appendChild(b);
+  });
+  panelNote.textContent = pickFresh(PANEL_NOTES, panelNote.textContent);
+}
+
+/* =========================================================================
+   COMPOSE A FLOOR (label + description text)
+   ========================================================================= */
+function composeFloor(labelObj){
+  // ~55% hand-written, ~45% combinatorial — anti-repeat on the resulting text
+  let text, guard=0;
+  do {
+    text = chance(0.55) ? pick(WRITTEN) : combinatorialLine();
+    guard++;
+  } while(text === lastFloorText && guard < 20);
+  lastFloorText = text;
+
+  // "spoken" name for the floor: use the button's, but keep fresh vs last
+  let spoke = labelObj.spoke;
+  lastSpoke = spoke;
+
+  return { face:labelObj.face, spoke, text, type:labelObj.type };
+}
+
+/* build the display name e.g. "Floor 7:" or "The mezzanine:" */
+function floorHeadline(f){
+  const s = f.spoke;
+  // capitalize first letter for the tag
+  const cap = s.charAt(0).toUpperCase() + s.slice(1);
+  return cap;
+}
+
+/* =========================================================================
+   THE RIDE — hum, mis-counting readout, DING, doors, typewriter reveal
+   ========================================================================= */
+function clearTimers(){ timers.forEach(t=>clearTimeout(t)); timers=[]; }
+function T(fn,ms){ const t=setTimeout(fn,ms); timers.push(t); return t; }
+
+function setButtonsDisabled(state){
+  panel.querySelectorAll('.fbtn').forEach(b=>{ b.disabled = state; });
+}
+
+function ride(labelObj, btnEl){
+  if(riding) return;
+  riding = true;
+  clearTimers();
+  floorCount++;
+
+  const f = composeFloor(labelObj);
+  currentFloor = f;
+
+  // lit button
+  panel.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('lit'));
+  if(btnEl) btnEl.classList.add('lit');
+  setButtonsDisabled(true);
+  againBtn.disabled = true; copyBtn.disabled = true; reshuffleBtn.disabled = true;
+
+  // close doors first (if open), reset reveal
+  cab.classList.remove('open');
+  reveal.style.opacity = '';
+  floorLine.innerHTML = '';
+  floorTag.textContent = '';
+
+  const dir = chance(0.5) ? 'up' : 'down';
+  arrowUp.classList.toggle('on', dir==='up');
+  arrowDown.classList.toggle('on', dir==='down');
+  idle.style.display = 'none';
+  logEl.innerHTML = '<b>Cab in motion · direction: ' + (dir==='up'?'ascending':'descending') + '</b>';
+
+  const startRide = () => {
+    if(!reduceMotion) cab.classList.add('riding');
+
+    if(reduceMotion){
+      // non-animated fallback: land the readout + reveal quickly
+      readout.textContent = f.face;
+      readout.classList.toggle('wrong', f.type==='wrong');
+      arrowUp.classList.remove('on'); arrowDown.classList.remove('on');
+      openAndReveal(f, true);
+      return;
+    }
+
+    // mis-counting readout — flick through wrong numbers
+    const ticks = rint(9, 15);
+    let i = 0;
+    const step = () => {
+      if(i >= ticks){
+        // settle on the destination label
+        readout.textContent = f.face;
+        readout.classList.toggle('wrong', f.type==='wrong');
+        cab.classList.remove('riding');
+        arrowUp.classList.remove('on'); arrowDown.classList.remove('on');
+        // DING then doors
+        ding();
+        logEl.innerHTML = '<b>Arrived · ' + esc(floorHeadline(f)) + '</b>';
+        T(()=>openAndReveal(f, false), 260);
+        return;
+      }
+      const n = pickFresh(WRONG_NUMBERS, readout.textContent);
+      readout.textContent = n;
+      readout.classList.toggle('wrong', true);
+      i++;
+      const delay = 70 + i*10 + (i>ticks-4 ? (i-(ticks-4))*80 : 0); // decelerate near the end
+      T(step, delay);
+    };
+    step();
+  };
+
+  // small beat before motion
+  T(startRide, cab.classList.contains('open') ? 400 : 120);
+}
+
+/* a soft visual "DING" — no audio dependency */
+function ding(){
+  const d = document.createElement('div');
+  d.textContent = 'ding';
+  d.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--glow);text-shadow:0 0 12px rgba(201,178,122,.8);opacity:0;z-index:6;transition:opacity .2s;pointer-events:none;';
+  cab.querySelector('.shaft').appendChild(d);
+  requestAnimationFrame(()=>{ d.style.opacity='1'; });
+  T(()=>{ d.style.opacity='0'; }, 900);
+  T(()=>{ d.remove(); }, 1300);
+}
+
+function openAndReveal(f, instant){
+  floorTag.textContent = floorHeadline(f) + ' ·';
+  cab.classList.add('open');
+
+  const write = () => {
+    if(instant || reduceMotion){
+      floorLine.textContent = f.text;
+      finishRide();
+      return;
+    }
+    typewriter(f.text, () => finishRide());
+  };
+
+  if(instant){ write(); }
+  else { T(write, 520); }  // let doors part first
+}
+
+function typewriter(text, done){
+  floorLine.innerHTML = '<span class="tw"></span><span class="cursor">▍</span>';
+  const tw = floorLine.querySelector('.tw');
+  const cur = floorLine.querySelector('.cursor');
+  let i = 0;
+  const total = text.length;
+  const stepFn = () => {
+    // reveal a few chars per tick for a steady, calm pace
+    i += 1;
+    tw.textContent = text.slice(0, i);
+    if(i >= total){
+      T(()=>{ if(cur) cur.remove(); }, 700);
+      done();
+      return;
+    }
+    let d = 24;
+    const ch = text[i-1];
+    if(ch === '.' || ch === ',') d = 180;
+    T(stepFn, d);
+  };
+  stepFn();
+}
+
+function finishRide(){
+  riding = false;
+  setButtonsDisabled(false);
+  againBtn.disabled = false; copyBtn.disabled = false; reshuffleBtn.disabled = false;
+  logEl.innerHTML = '<b>Floors visited this ride: ' + floorCount + ' · the building continues</b>';
+}
+
+/* =========================================================================
+   ACTIONS
+   ========================================================================= */
+function rideAgain(){
+  if(riding || !currentFloor) return;
+  // ride to a NEW random floor using a random button from the panel; relight it
+  const btns = Array.from(panel.querySelectorAll('.fbtn'));
+  if(!btns.length) return;
+  // choose a button whose face differs from the current, if possible
+  let idx = Math.floor(Math.random()*PANEL.length);
+  if(PANEL.length > 1){
+    let g=0;
+    while(PANEL[idx].face === currentFloor.face && g<12){ idx=Math.floor(Math.random()*PANEL.length); g++; }
+  }
+  ride(PANEL[idx], btns[idx]);
+}
+
+function copyFloor(){
+  if(!currentFloor) return;
+  const f = currentFloor;
+  const txt = 'THE LIMINAL ELEVATOR\n' +
+    floorHeadline(f) + ':\n' +
+    f.text + '\n\n' +
+    '— there is no top, there is no bottom. keep riding.';
+  const done = () => showToast('Floor copied — tell no one which one');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, ()=>fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){ showToast('Copy unavailable — commit it to memory'); }
+}
+
+function reshuffle(){
+  if(riding) return;
+  renderPanel();
+  showToast('The panel has rearranged itself');
+  logEl.innerHTML = '<b>New panel · the buttons were always these</b>';
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* ---------- wire ---------- */
+againBtn.addEventListener('click', rideAgain);
+copyBtn.addEventListener('click', copyFloor);
+reshuffleBtn.addEventListener('click', reshuffle);
+
+/* ---------- init ---------- */
+renderPanel();
+</script>
+</body>
+</html>

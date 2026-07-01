@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Corner of Your Eye · Prízrak</title>
+<style>
+  :root {
+    --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+    --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+    --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+    --moth:#b6a8e0; --moth-dim:#5a4f7a; --moth-glow:rgba(182,168,224,.5);
+    --amber:#e3b341; --cyan:#86c8e0;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(125% 80% at 50% -12%, rgba(182,168,224,.07), transparent 55%),
+      radial-gradient(100% 60% at 50% 120%, rgba(60,52,92,.10), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* the field the creature lives in */
+  #field {
+    position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
+  }
+  #creature {
+    position:absolute; width:64px; height:64px; left:0; top:0;
+    transform:translate(-50%,-50%);
+    transition:opacity .9s ease, filter .9s ease;
+    will-change:transform, opacity;
+  }
+  #creature svg { display:block; width:100%; height:100%; overflow:visible; }
+  #creature.seen { opacity:0; filter:blur(3px); }
+  #creature .glow { filter:drop-shadow(0 0 6px var(--moth-glow)); }
+  /* faint idle drift + breathing when unobserved */
+  @keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+  #creature .body-g { animation:breathe 5.5s ease-in-out infinite; transform-origin:center; }
+  @keyframes shimmer { 0%,100%{opacity:.9} 50%{opacity:.55} }
+  #creature .wing { animation:shimmer 4.2s ease-in-out infinite; transform-origin:center; }
+
+  .wrap { max-width:640px; margin:0 auto; padding:44px 20px 60px; position:relative; z-index:2; }
+  @media (min-width:640px) { .wrap { padding:60px 32px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--moth); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(182,168,224,.25); color:#fff; }
+
+  header { text-align:center; margin-bottom:30px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2.1rem,8vw,3.4rem); font-weight:800;
+    line-height:1; letter-spacing:-.02em; margin:12px 0 0;
+  }
+  .sub {
+    margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:30rem; line-height:1.6;
+  }
+
+  /* the observation panel */
+  .panel {
+    border:1px solid var(--rule-2); border-radius:10px;
+    background:linear-gradient(180deg,var(--ink-1),rgba(10,10,12,.72));
+    backdrop-filter:blur(2px); padding:22px; margin-top:20px; position:relative; overflow:hidden;
+    box-shadow:0 30px 70px -40px rgba(0,0,0,.9);
+  }
+  .panel::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:1px;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+  .panel-head {
+    font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ash-3); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    border-bottom:1px solid var(--rule); padding-bottom:12px; margin-bottom:16px;
+  }
+  .panel-head .live { color:var(--moth); display:inline-flex; align-items:center; gap:6px; }
+  .blip { width:6px; height:6px; border-radius:50%; background:var(--moth); box-shadow:0 0 8px var(--moth); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  .status-label { font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--ash-2); margin-bottom:8px; }
+  .status {
+    font-family:var(--serif); font-style:italic; font-size:clamp(16px,4.4vw,20px); line-height:1.45;
+    color:var(--parch); min-height:2.6em; position:relative;
+  }
+  .status .cursor { display:inline-block; width:.5ch; color:var(--moth); }
+  .status .cursor.blink { animation:cur 1s step-end infinite; }
+  @keyframes cur { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  .locus {
+    font-family:var(--mono); font-size:10px; letter-spacing:.06em; color:var(--ash-3);
+    margin-top:14px; min-height:1.2em;
+  }
+  .locus b { color:var(--moth-dim); font-weight:400; }
+
+  /* proximity meter — how near your gaze has gotten */
+  .meter-wrap { margin-top:18px; }
+  .meter-label { display:flex; justify-content:space-between; font-family:var(--mono); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-2); margin-bottom:6px; }
+  .meter { height:7px; border-radius:5px; background:var(--ink-2); overflow:hidden; border:1px solid var(--rule); }
+  .meter-fill { height:100%; width:0; border-radius:5px; background:linear-gradient(90deg,var(--moth-dim),var(--moth)); transition:width .5s ease; }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:10px 15px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:6px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .1s; display:inline-flex; align-items:center; gap:7px;
+  }
+  .mini:hover { border-color:var(--moth); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.on { border-color:var(--moth); color:var(--moth); background:rgba(182,168,224,.08); }
+
+  .aside {
+    margin-top:22px; padding-top:16px; border-top:1px solid var(--rule);
+    font-family:var(--serif); font-style:italic; font-size:13px; color:var(--ash-2); line-height:1.6;
+  }
+
+  .footer { text-align:center; margin-top:44px; padding-top:22px; border-top:1px solid var(--rule); }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:60;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* reduced-motion / still mode */
+  .reduced #creature { transition:opacity .01s; }
+  .reduced #creature .body-g,
+  .reduced #creature .wing { animation:none; }
+  @media (prefers-reduced-motion:reduce) {
+    #creature { transition:opacity .01s !important; }
+    #creature .body-g, #creature .wing, .blip, .status .cursor.blink { animation:none !important; }
+    body::after { opacity:.03; }
+  }
+</style>
+</head>
+<body>
+  <div id="field" aria-hidden="true">
+    <div id="creature"></div>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — an offering</div>
+      <h1>The Corner of <span class="specter">Your Eye</span></h1>
+      <p class="sub">Something small lives at the edge of this page. It will not be looked at directly. Move your gaze toward it — the cursor stands in for your attention — and it is already gone, resettling wherever you are not. Sit still, look elsewhere, and it goes quietly about its work.</p>
+    </header>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span>Peripheral Register &middot; unnamed occupant</span>
+        <span class="live"><span class="blip"></span><span id="live-state">present</span></span>
+      </div>
+
+      <div class="status-label">While you were looking away&hellip;</div>
+      <div class="status" id="status" aria-live="polite"></div>
+
+      <div class="locus" id="locus"></div>
+
+      <div class="meter-wrap">
+        <div class="meter-label"><span>how near your gaze has come</span><span id="near-pct">0%</span></div>
+        <div class="meter"><div class="meter-fill" id="near-fill"></div></div>
+      </div>
+
+      <div class="actions">
+        <button class="mini" id="nudge-btn" type="button">↻ look away on purpose</button>
+        <button class="mini" id="still-btn" type="button" aria-pressed="false">◍ still mode</button>
+        <button class="mini" id="copy-btn" type="button">⎘ copy what it did</button>
+      </div>
+
+      <div class="aside" id="aside"></div>
+    </div>
+
+    <div class="footer">
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   THE CORNER OF YOUR EYE
+   A creature that only exists in peripheral vision.
+   The cursor is the proxy for the gaze. Approach it and it flees.
+   Left unobserved, it does small quiet things, narrated below.
+   ============================================================ */
+
+/* ---------- escaping (no XSS from any generated text) ---------- */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- combinatorial narration pools ---------- */
+/* These combine into "while you were looking away, it <did> <to/with something>."
+   Kept large + combinatorial so repeats stay fresh; a no-repeat picker guards it. */
+
+// Full standalone lines (weird, tender, understated). Used ~half the time.
+const WHOLE_LINES = [
+  "it rearranged your shadow so it would fall a little kinder",
+  "it counted the dust in the last shaft of light and found one grain missing",
+  "it breathed on the window from the inside and wrote a name that wasn't yours",
+  "it folded a small corner of the afternoon and kept it",
+  "it moved one book on your shelf half an inch, so a title would line up with a memory",
+  "it practiced your voice, quietly, in a room you've never been in",
+  "it warmed the chair you left an hour ago, in case you came back",
+  "it repaired a sound that had been broken since you were nine",
+  "it took the ache out of a doorway and hid it somewhere soft",
+  "it watched a dream leave your house and held the door for it",
+  "it un-lost a thing you had already grieved",
+  "it stood exactly where you were standing yesterday, to keep the spot warm",
+  "it swept the static from an old photograph so a face would surface, then let it sink",
+  "it learned the shape of your hands from the marks you leave on glass",
+  "it hummed the ending of a song the radio never finished",
+  "it kept a candle lit in a house that no longer exists",
+  "it collected the pauses between your sentences and made a small quiet with them",
+  "it tucked a warmer color into the gray at the edge of the sky",
+  "it followed a smell of rain back to the summer it came from",
+  "it turned the clock a minute slow so the evening would last",
+  "it left the light on in a room you meant to return to",
+  "it caught a word you almost said and set it down gently, unsaid",
+  "it read the last page of a book you'll never finish and approved",
+  "it aged a wine you don't own by exactly one good year",
+  "it kept your side of a conversation going after you had gone quiet",
+  "it moved through the house closing the small distances between things",
+  "it borrowed the weight of an old worry and carried it out to the yard",
+  "it re-hung a picture that had been crooked in a house you left decades ago",
+  "it stood in the hallway and remembered you very carefully",
+  "it smoothed a crease out of tomorrow before it could set",
+  "it walked the perimeter of your attention and found it unguarded, and kind",
+  "it played back the sound of a screen door from a porch that's gone",
+  "it kept the porch light burning for someone who isn't coming, out of habit, out of love",
+  "it wound a music box that stopped before you were born",
+  "it saved the last of the warmth from a hand you used to hold"
+];
+
+// Combinatorial pieces: it <verb-phrase> <object> <coda>
+const VERBS = [
+  "rearranged","softened","rewound","borrowed","memorized","tidied","warmed",
+  "unspooled","re-lit","translated","carried off","practiced","folded","un-lost",
+  "kept watch over","quietly repaired","made smaller","made kinder","remembered","held"
+];
+const OBJECTS_POOL = [
+  "your shadow","the dust in the light","a sound you'd forgotten","the ache in the doorway",
+  "the shape of your absence","a name no one uses anymore","the last of the afternoon",
+  "a draft under the door","the reflection in the dark window","the space where a chair used to be",
+  "a photograph's silence","the gap between two heartbeats","an old argument, gone soft",
+  "the smell of a room from years ago","the cold half of the bed","the corner you never look at",
+  "a promise you'd stopped keeping","the hush after the rain","a lullaby with the words worn off",
+  "the weight you set down and forgot"
+];
+const CODAS = [
+  ", and set it back exactly wrong, on purpose",
+  ", so it would be there when you finally turned",
+  ", the way you would have, if you'd thought of it",
+  ", and left no fingerprints, only a warmth",
+  ", then pretended it hadn't",
+  ", and kept the good part for you",
+  ", though no one asked it to",
+  ", quietly, the way it does everything",
+  ", and moved on before you could be sure",
+  ", as a small kindness it will never mention",
+  "",
+  "",
+  ""
+];
+
+// where it currently is — a place at the edge of things
+const LOCI = [
+  "at the far edge of the ceiling","just past the right margin","behind the light, roughly",
+  "in the lower corner, where the wall gives up","along the seam of the two darkest tiles",
+  "where the hallway becomes a rumor","at the vanishing point of the floorboards",
+  "in the reflection you're not checking","beneath the window, in the part that's already night",
+  "in the blur where the shelf meets the ceiling","at the top of the stairs you can't see from here",
+  "in the doorway's blind half","along the skirting where the dust keeps its diary",
+  "in the corner the lamp forgets","just outside the frame of everything",
+  "where the curtain and the wall agree to be one thing","in the last inch before the mirror ends"
+];
+
+// the acknowledgement lines (rotating), shown in the aside — always just out of frame
+const ASIDES = [
+  "It is always just out of frame. That is not a flaw in the page. That is the whole of it.",
+  "You will never catch it. You are not meant to. It stays because you don't.",
+  "Look at these words and it is somewhere behind them, being careful with your things.",
+  "It has been here longer than the page has. It will be here after you close it.",
+  "The moment you're certain where it is, it isn't. This is the only rule it keeps.",
+  "It does not want to be seen. It only wants the room to be a little less empty while you're in it.",
+  "Everything it does, it does in the second your attention is elsewhere — which is most seconds.",
+  "It is not hiding from you. It is keeping you company from the one place you can't check."
+];
+
+// what happens when you look right at it (near = 100)
+const FLED_LINES = [
+  "gone — resettling where you aren't",
+  "elsewhere already, always already elsewhere",
+  "slipped the frame; try not looking",
+  "not there. it was never quite there",
+  "moved. it is very good at moving",
+  "vanished into the edge you weren't watching"
+];
+
+// live-state labels by proximity
+function liveState(near){
+  if(near >= 92) return "gone";
+  if(near >= 60) return "unsettled";
+  if(near >= 30) return "watchful";
+  return "present";
+}
+
+/* ---------- no-immediate-repeat picker ---------- */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+const _last = new Map();
+function pickFresh(arr, key){
+  if(arr.length < 2){ _last.set(key, arr[0]); return arr[0]; }
+  const prev = _last.get(key);
+  let v, guard = 0;
+  do { v = pick(arr); } while (v === prev && ++guard < 16);
+  _last.set(key, v);
+  return v;
+}
+
+let lastComposed = "";
+function composeDeed(){
+  // decide whole-line vs combinatorial, avoiding immediate textual repeats
+  let out, guard = 0;
+  do {
+    if(Math.random() < 0.5){
+      out = pickFresh(WHOLE_LINES, 'whole');
+    } else {
+      const v = pickFresh(VERBS, 'verb');
+      const o = pickFresh(OBJECTS_POOL, 'obj');
+      const c = pickFresh(CODAS, 'coda');
+      out = v + " " + o + c;
+    }
+    guard++;
+  } while (out === lastComposed && guard < 12);
+  lastComposed = out;
+  return out;
+}
+
+/* ---------- the creature SVG (a moth-ish, eye-ish, uncertain thing) ---------- */
+function creatureSVG(){
+  // a soft luminous mote with trembling wings and a single wary eye
+  return '' +
+  '<svg viewBox="0 0 64 64" role="img" aria-label="something small at the edge of vision">' +
+    '<defs>' +
+      '<radialGradient id="cg" cx="50%" cy="50%" r="50%">' +
+        '<stop offset="0%" stop-color="#efeaff" stop-opacity="0.95"/>' +
+        '<stop offset="45%" stop-color="#b6a8e0" stop-opacity="0.85"/>' +
+        '<stop offset="100%" stop-color="#5a4f7a" stop-opacity="0"/>' +
+      '</radialGradient>' +
+    '</defs>' +
+    '<g class="glow">' +
+      '<g class="body-g">' +
+        // wings
+        '<path class="wing" d="M32 30 C 14 14, 6 30, 20 38 C 8 42, 16 54, 32 40 Z" ' +
+             'fill="url(#cg)" opacity="0.8"/>' +
+        '<path class="wing" d="M32 30 C 50 14, 58 30, 44 38 C 56 42, 48 54, 32 40 Z" ' +
+             'fill="url(#cg)" opacity="0.8"/>' +
+        // core
+        '<ellipse cx="32" cy="34" rx="4.2" ry="9" fill="#e9e4ff" opacity="0.92"/>' +
+        // the single wary eye
+        '<circle cx="32" cy="29" r="3.4" fill="#0a0a0c"/>' +
+        '<circle cx="32" cy="29" r="3.4" fill="none" stroke="#efeaff" stroke-width="0.8" opacity="0.9"/>' +
+        '<circle cx="33.1" cy="27.9" r="0.9" fill="#efeaff"/>' +
+        // antennae
+        '<path d="M31 25 C 28 18, 26 16, 24 15" stroke="#cfc4f0" stroke-width="0.8" fill="none" opacity="0.7"/>' +
+        '<path d="M33 25 C 36 18, 38 16, 40 15" stroke="#cfc4f0" stroke-width="0.8" fill="none" opacity="0.7"/>' +
+      '</g>' +
+    '</g>' +
+  '</svg>';
+}
+
+/* ---------- DOM ---------- */
+const field    = document.getElementById('field');
+const creature = document.getElementById('creature');
+const statusEl = document.getElementById('status');
+const locusEl  = document.getElementById('locus');
+const asideEl  = document.getElementById('aside');
+const nearPct  = document.getElementById('near-pct');
+const nearFill = document.getElementById('near-fill');
+const liveEl   = document.getElementById('live-state');
+const nudgeBtn = document.getElementById('nudge-btn');
+const stillBtn = document.getElementById('still-btn');
+const copyBtn  = document.getElementById('copy-btn');
+const toastEl  = document.getElementById('toast');
+
+creature.innerHTML = creatureSVG();
+
+const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let stillMode = prefersReduced;
+if(stillMode){ document.body.classList.add('reduced'); stillBtn.classList.add('on'); stillBtn.setAttribute('aria-pressed','true'); }
+
+/* ---------- state ---------- */
+let cx = 0, cy = 0;               // creature position (px, viewport)
+let gx = -9999, gy = -9999;      // gaze (cursor) position
+let seen = false;                // currently fleeing/hidden
+let lastDeed = "";               // for copy
+let lastLocus = "";
+const FLEE_RADIUS = 150;          // how close the gaze can get before it bolts
+const MARGIN = 74;                // keep it off the extreme edges a little
+
+/* pick a fresh position far from the gaze and away from the panel-ish center */
+function randomFarSpot(){
+  const W = window.innerWidth, H = window.innerHeight;
+  let best = null, bestD = -1;
+  for(let i=0;i<24;i++){
+    const x = MARGIN + Math.random()*(W - MARGIN*2);
+    const y = MARGIN + Math.random()*(H - MARGIN*2);
+    const dx = x - gx, dy = y - gy;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    // bias toward the edges of the screen — the periphery
+    const edge = Math.min(x, W - x, y, H - y);
+    const score = d - edge*0.35;
+    if(score > bestD){ bestD = score; best = {x,y}; }
+  }
+  return best || { x: W*0.85, y: H*0.2 };
+}
+
+function placeCreature(x, y){
+  cx = x; cy = y;
+  creature.style.left = x + 'px';
+  creature.style.top  = y + 'px';
+}
+
+/* narrate a fresh deed + locus, and reveal the creature somewhere new */
+function resettle(revealNow){
+  const spot = randomFarSpot();
+  placeCreature(spot.x, spot.y);
+  seen = false;
+  creature.classList.remove('seen');
+  const deed = composeDeed();
+  lastDeed = deed;
+  const loc = pickFresh(LOCI, 'locus');
+  lastLocus = loc;
+  typeStatus(deed);
+  locusEl.innerHTML = 'last seen &mdash; <b>' + esc(loc) + '</b>';
+  liveEl.textContent = liveState(currentNear());
+}
+
+/* ---------- typewriter reveal (with reduced-motion fallback) ---------- */
+let typeTimer = null;
+function typeStatus(text){
+  if(typeTimer){ clearInterval(typeTimer); typeTimer = null; }
+  const safe = esc(text);
+  if(stillMode){
+    statusEl.innerHTML = safe + '<span class="cursor blink">▌</span>';
+    return;
+  }
+  let i = 0;
+  const chars = Array.from(text);
+  statusEl.innerHTML = '<span class="cursor">▌</span>';
+  typeTimer = setInterval(() => {
+    i++;
+    if(i > chars.length){
+      clearInterval(typeTimer); typeTimer = null;
+      statusEl.innerHTML = esc(chars.join('')) + '<span class="cursor blink">▌</span>';
+      return;
+    }
+    statusEl.innerHTML = esc(chars.slice(0,i).join('')) + '<span class="cursor">▌</span>';
+  }, 22);
+}
+
+/* ---------- proximity handling ---------- */
+function currentNear(){
+  if(gx < -9000) return 0;
+  const dx = cx - gx, dy = cy - gy;
+  const d = Math.sqrt(dx*dx + dy*dy);
+  const near = Math.max(0, Math.min(100, Math.round((1 - d / (FLEE_RADIUS*2.4)) * 100)));
+  return near;
+}
+
+let fleeCooldown = 0;
+function updateProximity(){
+  const near = currentNear();
+  nearPct.textContent = near + '%';
+  nearFill.style.width = near + '%';
+  if(!seen) liveEl.textContent = liveState(near);
+
+  const dx = cx - gx, dy = cy - gy;
+  const d = Math.sqrt(dx*dx + dy*dy);
+  const now = performance.now();
+  if(!seen && d < FLEE_RADIUS && gx > -9000 && now > fleeCooldown){
+    flee();
+  }
+}
+
+function flee(){
+  seen = true;
+  creature.classList.add('seen');
+  liveEl.textContent = "gone";
+  nearPct.textContent = '100%';
+  nearFill.style.width = '100%';
+  locusEl.innerHTML = 'in the corner of your eye &mdash; <b>' + esc(pick(FLED_LINES)) + '</b>';
+  fleeCooldown = performance.now() + 700;
+  // after it flees, it resettles somewhere you aren't and narrates a new deed
+  const delay = stillMode ? 260 : 620 + Math.random()*500;
+  setTimeout(() => {
+    // only resettle if the gaze isn't currently parked on the new spot loop handles that
+    resettle(true);
+  }, delay);
+}
+
+/* ---------- gaze input ---------- */
+function onGaze(x, y){
+  gx = x; gy = y;
+  updateProximity();
+}
+window.addEventListener('pointermove', (e) => onGaze(e.clientX, e.clientY), { passive:true });
+window.addEventListener('pointerdown', (e) => onGaze(e.clientX, e.clientY), { passive:true });
+window.addEventListener('pointerleave', () => { gx = -9999; gy = -9999; nearPct.textContent='0%'; nearFill.style.width='0%'; });
+
+/* keyboard: move the gaze in steps (arrow keys), space = look away */
+let kx = null, ky = null;
+function keyGaze(dx, dy){
+  const W = window.innerWidth, H = window.innerHeight;
+  if(kx === null){ kx = W/2; ky = H/2; }
+  kx = Math.max(0, Math.min(W, kx + dx));
+  ky = Math.max(0, Math.min(H, ky + dy));
+  onGaze(kx, ky);
+}
+window.addEventListener('keydown', (e) => {
+  const step = e.shiftKey ? 120 : 48;
+  if(e.key === 'ArrowLeft'){ keyGaze(-step,0); e.preventDefault(); }
+  else if(e.key === 'ArrowRight'){ keyGaze(step,0); e.preventDefault(); }
+  else if(e.key === 'ArrowUp'){ keyGaze(0,-step); e.preventDefault(); }
+  else if(e.key === 'ArrowDown'){ keyGaze(0,step); e.preventDefault(); }
+  else if(e.key === ' ' || e.key === 'Enter'){
+    // "look away on purpose" — the creature does something new
+    lookAway(); e.preventDefault();
+  }
+});
+
+/* ---------- the main animation loop: creature drifts when unobserved ---------- */
+let driftPhase = Math.random()*Math.PI*2;
+let baseX = 0, baseY = 0;
+let lastTs = 0;
+function loop(ts){
+  const dt = Math.min(50, ts - lastTs) || 16;
+  lastTs = ts;
+  if(!seen && !stillMode && gx > -9000){
+    // gentle idle drift so it feels alive, but never toward the gaze
+    driftPhase += dt * 0.0011;
+    const dx = Math.cos(driftPhase) * 0.25;
+    const dy = Math.sin(driftPhase*1.3) * 0.2;
+    // don't drift into the gaze
+    const toGx = gx - cx, toGy = gy - cy;
+    const dist = Math.sqrt(toGx*toGx + toGy*toGy) || 1;
+    // small push away from gaze if it's getting close
+    let px = 0, py = 0;
+    if(dist < FLEE_RADIUS*1.6){
+      const push = (FLEE_RADIUS*1.6 - dist) / (FLEE_RADIUS*1.6);
+      px = -(toGx/dist) * push * 0.9;
+      py = -(toGy/dist) * push * 0.9;
+    }
+    let nx = cx + dx + px, ny = cy + dy + py;
+    nx = Math.max(MARGIN*0.5, Math.min(window.innerWidth - MARGIN*0.5, nx));
+    ny = Math.max(MARGIN*0.5, Math.min(window.innerHeight - MARGIN*0.5, ny));
+    placeCreature(nx, ny);
+    updateProximity();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* periodically, if left alone, it does a fresh quiet thing */
+let ambientTimer = null;
+function scheduleAmbient(){
+  if(ambientTimer) clearTimeout(ambientTimer);
+  const wait = 6500 + Math.random()*5000;
+  ambientTimer = setTimeout(() => {
+    if(!seen){
+      const deed = composeDeed();
+      lastDeed = deed;
+      typeStatus(deed);
+      const loc = pickFresh(LOCI, 'locus');
+      lastLocus = loc;
+      locusEl.innerHTML = 'last seen &mdash; <b>' + esc(loc) + '</b>';
+    }
+    scheduleAmbient();
+  }, wait);
+}
+
+/* ---------- actions ---------- */
+function lookAway(){
+  // you deliberately look elsewhere; it takes the chance to do something and move
+  resettle(true);
+  rotateAside();
+}
+function rotateAside(){
+  asideEl.textContent = pickFresh(ASIDES, 'aside');
+}
+
+nudgeBtn.addEventListener('click', lookAway);
+
+stillBtn.addEventListener('click', () => {
+  stillMode = !stillMode;
+  document.body.classList.toggle('reduced', stillMode);
+  stillBtn.classList.toggle('on', stillMode);
+  stillBtn.setAttribute('aria-pressed', String(stillMode));
+  showToast(stillMode ? 'still mode — no motion, it still moves when unseen' : 'motion restored');
+  // re-render current status without the typewriter if entering still mode
+  if(stillMode && lastDeed){ typeStatus(lastDeed); }
+});
+
+copyBtn.addEventListener('click', () => {
+  const txt =
+    'THE CORNER OF YOUR EYE\n' +
+    'While I was looking away, it ' + lastDeed + '.\n' +
+    'Last seen ' + lastLocus + '.\n' +
+    '— it is always just out of frame';
+  const done = () => showToast('copied — it will do it again when you look away');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+});
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    done();
+  } catch(e){ showToast('copy unavailable — remember it instead'); }
+}
+
+let toastTimer = null;
+function showToast(msg){
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+}
+
+/* ---------- init ---------- */
+function init(){
+  const spot = randomFarSpot();
+  placeCreature(spot.x, spot.y);
+  const deed = composeDeed();
+  lastDeed = deed;
+  const loc = pickFresh(LOCI, 'locus');
+  lastLocus = loc;
+  typeStatus(deed);
+  locusEl.innerHTML = 'last seen &mdash; <b>' + esc(loc) + '</b>';
+  rotateAside();
+  scheduleAmbient();
+}
+init();
+</script>
+</body>
+</html>
