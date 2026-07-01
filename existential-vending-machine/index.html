@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Existential Vending Machine · Prizrak</title>
+<style>
+  :root {
+    --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+    --glass:#0b1412; --glass-hi:rgba(134,224,192,.05);
+    --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+    --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+    --fox:#86e0c0; --fox-dim:#3f6b5f; --amber:#e3b341; --amber-dim:#6b5a2a;
+    --red:#e06a6a; --violet:#b7a6e0;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(125% 80% at 50% -12%, rgba(134,224,192,.06), transparent 55%),
+      radial-gradient(90% 55% at 50% 120%, rgba(70,58,92,.10), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:900px; margin:0 auto; padding:40px 20px 56px; }
+  @media (min-width:640px) { .wrap { padding:56px 32px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--fox); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(134,224,192,.22); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1b1b22; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:34px; }
+  h1 { font-family:var(--serif); font-size:clamp(2rem,7vw,3.4rem); font-weight:800; line-height:.95; letter-spacing:-.02em; margin:12px 0 0; }
+  .sub { margin:14px auto 0; font-style:italic; font-size:14px; color:var(--ash); max-width:34rem; line-height:1.55; }
+
+  /* ---------- the machine ---------- */
+  .machine {
+    display:grid; grid-template-columns:1fr; gap:18px;
+    background:linear-gradient(180deg,#131318,#0c0c10);
+    border:1px solid var(--rule-2); border-radius:14px;
+    padding:18px; box-shadow:0 40px 90px -40px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.03);
+    position:relative;
+  }
+  @media (min-width:720px) { .machine { grid-template-columns:1fr 244px; padding:22px; } }
+  .machine::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:1px; border-radius:14px 14px 0 0;
+    background:linear-gradient(90deg,transparent,rgba(134,224,192,.4),transparent);
+  }
+
+  .brandbar {
+    grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ash-3); border-bottom:1px solid var(--rule); padding-bottom:12px;
+  }
+  .brandbar .mk { color:var(--ash); font-weight:600; letter-spacing:.24em; }
+  .brandbar .lit { color:var(--fox); display:inline-flex; align-items:center; gap:6px; }
+  .brandbar .blip { width:6px; height:6px; border-radius:50%; background:var(--fox); box-shadow:0 0 8px var(--fox); animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  /* glass case + slot grid */
+  .glass {
+    position:relative; background:
+      linear-gradient(180deg, rgba(134,224,192,.04), transparent 30%),
+      repeating-linear-gradient(115deg, transparent 0 40px, rgba(255,255,255,.012) 40px 41px),
+      var(--glass);
+    border:1px solid var(--rule-2); border-radius:9px; padding:12px; overflow:hidden;
+  }
+  .glass::after {
+    content:""; position:absolute; inset:0; pointer-events:none; border-radius:9px;
+    background:linear-gradient(120deg, rgba(255,255,255,.06) 0%, transparent 22%, transparent 78%, rgba(255,255,255,.03) 100%);
+    mix-blend-mode:screen;
+  }
+  .rack { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; position:relative; z-index:1; }
+  .slot {
+    position:relative; background:var(--ink-1); border:1px solid var(--rule);
+    border-radius:6px; padding:8px 6px 9px; text-align:center; cursor:pointer;
+    transition:border-color .18s, background .18s, transform .1s, box-shadow .18s;
+    min-height:74px; display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+    overflow:hidden;
+  }
+  .slot:hover { border-color:var(--fox-dim); background:var(--ink-2); }
+  .slot.armed { border-color:var(--fox); background:rgba(134,224,192,.09); box-shadow:0 0 16px -5px rgba(134,224,192,.6); }
+  .slot .code { font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--ash-2); }
+  .slot.armed .code { color:var(--fox); }
+  .slot .glyph { font-size:20px; line-height:1; filter:grayscale(.15) drop-shadow(0 3px 6px rgba(0,0,0,.5)); }
+  .slot .pname { font-family:var(--mono); font-size:8px; letter-spacing:.02em; color:var(--ash-3); text-transform:uppercase; line-height:1.15; }
+  .slot .coil {
+    position:absolute; left:0; right:0; bottom:0; height:9px;
+    background:repeating-linear-gradient(90deg, var(--ash-3) 0 4px, transparent 4px 8px);
+    opacity:.5;
+  }
+  .slot.armed .coil { background:repeating-linear-gradient(90deg, var(--fox-dim) 0 4px, transparent 4px 8px); opacity:.8; }
+  .slot.turning .coil { animation:coilspin .5s linear 3; }
+  @keyframes coilspin { from { background-position:0 0; } to { background-position:8px 0; } }
+  .slot .soldout {
+    position:absolute; inset:0; background:rgba(10,10,12,.72); display:none;
+    align-items:center; justify-content:center; font-family:var(--mono);
+    font-size:8px; letter-spacing:.14em; color:var(--red); text-transform:uppercase; border-radius:6px;
+  }
+
+  /* ---------- keypad column ---------- */
+  .console { display:flex; flex-direction:column; gap:12px; }
+  .display {
+    font-family:var(--mono); background:#04120e; border:1px solid var(--fox-dim); border-radius:7px;
+    padding:11px 13px; color:var(--fox); box-shadow:inset 0 0 22px rgba(134,224,192,.14);
+    min-height:60px; display:flex; flex-direction:column; justify-content:center; gap:4px;
+  }
+  .display .line1 { font-size:11px; letter-spacing:.06em; color:var(--ash); text-transform:uppercase; min-height:14px; }
+  .display .entry { font-size:26px; letter-spacing:.14em; font-weight:600; text-shadow:0 0 12px rgba(134,224,192,.5); min-height:30px; }
+  .display .entry .caret { color:var(--fox-dim); animation:blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+
+  .keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+  .key {
+    font-family:var(--mono); font-size:15px; padding:11px 0; background:var(--ink-2);
+    border:1px solid var(--rule-2); border-radius:6px; color:var(--parch); cursor:pointer;
+    transition:border-color .15s, color .15s, background .15s, transform .08s;
+    user-select:none; text-align:center;
+  }
+  .key:hover { border-color:var(--fox-dim); color:var(--bone); background:var(--ink-3); }
+  .key:active { transform:translateY(1px); }
+  .key.wide { grid-column:span 1; font-size:11px; letter-spacing:.06em; }
+  .key.ok { color:var(--fox); border-color:var(--fox-dim); }
+  .key.ok:hover:not(:disabled) { background:rgba(134,224,192,.1); border-color:var(--fox); }
+  .key.del { color:var(--amber); }
+  .key.del:hover { border-color:var(--amber-dim); }
+  .key:disabled { opacity:.4; cursor:not-allowed; }
+
+  /* ---------- delivery tray ---------- */
+  .tray-shell { grid-column:1/-1; margin-top:2px; }
+  .tray-label { font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash-3); margin-bottom:8px; text-align:center; }
+  .tray {
+    position:relative; border:1px solid var(--rule-2); border-radius:10px;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.5), rgba(0,0,0,.2)),
+      var(--ink-1);
+    min-height:96px; padding:16px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:inset 0 14px 26px -18px #000;
+  }
+  .tray .flap {
+    position:absolute; left:12px; right:12px; top:0; height:9px; border-radius:0 0 6px 6px;
+    background:linear-gradient(180deg,#1d1d24,#0c0c10); border:1px solid var(--rule); border-top:none;
+  }
+  .tray .empty-msg {
+    font-family:var(--mono); font-size:11px; color:var(--ash-3); letter-spacing:.1em;
+    text-transform:uppercase; text-align:center; line-height:1.6;
+  }
+
+  /* ---------- product card (the thought as snack) ---------- */
+  .product {
+    width:100%; max-width:420px; position:relative;
+    background:linear-gradient(160deg,var(--ink-2),var(--ink));
+    border:1px solid var(--rule-2); border-radius:9px; overflow:hidden;
+    box-shadow:0 24px 50px -26px rgba(0,0,0,.85);
+  }
+  .product::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:3px;
+    background:linear-gradient(90deg,var(--accent,var(--fox)),var(--amber),var(--accent,var(--fox)));
+  }
+  .p-top { padding:16px 16px 12px; display:flex; gap:13px; align-items:flex-start; }
+  .p-glyph {
+    font-size:38px; line-height:1; flex:0 0 auto; filter:drop-shadow(0 4px 10px rgba(0,0,0,.55));
+    background:var(--ink-3); border:1px solid var(--rule); border-radius:8px; width:60px; height:60px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .p-brandline { font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent,var(--fox)); margin-bottom:3px; }
+  .p-name { font-family:var(--serif); font-weight:800; font-size:20px; line-height:1.1; letter-spacing:-.01em; margin:0; }
+  .p-tag { font-family:var(--serif); font-style:italic; font-size:12.5px; color:var(--ash); margin-top:5px; line-height:1.4; }
+
+  .p-slogan {
+    margin:0 16px 12px; padding:10px 12px; border:1px dashed var(--rule-2); border-radius:6px;
+    font-family:var(--serif); font-style:italic; font-size:13.5px; color:var(--parch); line-height:1.5;
+    background:rgba(255,255,255,.012);
+  }
+  .p-slogan .qt { color:var(--accent,var(--fox)); font-style:normal; }
+
+  /* nutrition panel */
+  .p-nutri { margin:0 16px 14px; border:1.5px solid var(--rule-2); border-radius:5px; padding:10px 12px; background:var(--ink-1); }
+  .n-title { font-family:var(--mono); font-weight:700; font-size:13px; letter-spacing:.02em; text-transform:none; border-bottom:5px solid var(--rule-2); padding-bottom:3px; margin-bottom:4px; }
+  .n-serv { font-family:var(--mono); font-size:9.5px; color:var(--ash-2); border-bottom:1px solid var(--rule); padding-bottom:5px; margin-bottom:5px; letter-spacing:.02em; }
+  .n-row { display:flex; justify-content:space-between; gap:10px; font-family:var(--mono); font-size:11px; padding:2.5px 0; border-bottom:1px solid var(--rule); }
+  .n-row:last-child { border-bottom:none; }
+  .n-row .nm { color:var(--parch); }
+  .n-row .nm b { color:var(--bone); font-weight:700; }
+  .n-row .dv { color:var(--ash-2); }
+  .n-row.head { color:var(--ash-3); border-bottom:2px solid var(--rule-2); }
+  .n-foot { font-family:var(--mono); font-size:8.5px; color:var(--ash-3); margin-top:7px; line-height:1.5; letter-spacing:.01em; }
+
+  .p-facts { display:grid; grid-template-columns:1fr 1fr; gap:0; margin:0 16px 4px; border-top:1px solid var(--rule); }
+  .fact { padding:9px 4px; border-bottom:1px solid var(--rule); }
+  .fact:nth-child(odd) { border-right:1px solid var(--rule); padding-right:12px; }
+  .fact:nth-child(even) { padding-left:12px; }
+  .f-label { font-family:var(--mono); font-size:8px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-3); margin-bottom:3px; }
+  .f-val { font-family:var(--mono); font-size:12px; color:var(--parch); }
+  .f-val.big { color:var(--accent,var(--fox)); font-size:14px; font-weight:600; }
+
+  .p-barcode { margin:12px 16px 6px; }
+  .p-barcode svg { width:100%; height:34px; display:block; opacity:.85; }
+  .p-sku { font-family:var(--mono); font-size:8.5px; color:var(--ash-3); letter-spacing:.28em; text-align:center; margin-top:2px; }
+
+  .p-actions { display:flex; gap:8px; padding:0 16px 16px; flex-wrap:wrap; }
+  .mini {
+    font-family:var(--mono); font-size:10.5px; padding:9px 13px; background:var(--ink-2);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .18s,color .18s,background .18s,transform .08s; display:inline-flex; align-items:center; gap:6px;
+    text-transform:uppercase; letter-spacing:.08em;
+  }
+  .mini:hover { border-color:var(--fox); color:var(--bone); background:var(--ink-3); }
+  .mini:active { transform:translateY(1px); }
+  .mini.copied { color:var(--fox); border-color:var(--fox); }
+
+  /* drop animation */
+  .drop-in { animation:drop .62s cubic-bezier(.34,1.32,.5,1) both; }
+  @keyframes drop {
+    0% { opacity:0; transform:translateY(-120px) rotate(-4deg) scale(.94); }
+    55% { opacity:1; transform:translateY(10px) rotate(1.5deg) scale(1.01); }
+    72% { transform:translateY(-6px) rotate(-.8deg); }
+    86% { transform:translateY(3px) rotate(.4deg); }
+    100% { opacity:1; transform:translateY(0) rotate(0) scale(1); }
+  }
+  .tray.thud { animation:thud .3s ease-out; }
+  @keyframes thud { 0%{transform:translateY(0)} 40%{transform:translateY(3px)} 100%{transform:translateY(0)} }
+
+  .footer { text-align:center; margin-top:44px; padding-top:22px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.8; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prizrak — random offering</div>
+      <h1>The <span class="specter">Existential</span> Vending Machine</h1>
+      <p class="sub">Sixteen slots behind smudged glass. Punch in a code and the coil turns — but nothing edible drops. What lands in the tray is a snack-sized dread, packaged, priced, and labelled with nutrition facts. Exact change in existential currency preferred.</p>
+    </header>
+
+    <div class="machine" id="machine">
+      <div class="brandbar">
+        <span class="mk">DREAD-O-MATIC 3000</span>
+        <span class="lit"><span class="blip"></span>STOCKED &amp; HUMMING</span>
+      </div>
+
+      <div class="glass" aria-label="product rack behind glass">
+        <div class="rack" id="rack"></div>
+      </div>
+
+      <div class="console">
+        <div class="display" aria-live="polite">
+          <div class="line1" id="disp-line">SELECT A CODE</div>
+          <div class="entry" id="disp-entry"><span class="caret">_</span></div>
+        </div>
+        <div class="keypad" id="keypad"></div>
+      </div>
+
+      <div class="tray-shell">
+        <div class="tray-label">↓ collect your purchase below ↓</div>
+        <div class="tray" id="tray" aria-live="polite">
+          <div class="flap"></div>
+          <div class="empty-msg" id="tray-empty">the tray is empty<br>as, arguably, are we all</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p class="kicker">no refunds &middot; no closure &middot; the machine does not make change and cannot be reasoned with</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ HELPERS ============================ */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickFresh(arr, last){
+  if(arr.length < 2) return arr[0];
+  let v, g=0; do { v = pick(arr); } while(v === last && ++g < 16);
+  return v;
+}
+function rint(lo, hi){ return lo + Math.floor(Math.random()*(hi-lo+1)); }
+function chance(p){ return Math.random() < p; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+/* ============================ CONTENT POOLS ============================ */
+
+/* Each slot is a "product line": glyph + colour + a family of dread.
+   The name / slogan / facts are combinatorial so every pull differs. */
+
+const GLYPHS = ['🕳️','⏳','🪞','🌑','☕','🥀','📉','🫀','🧊','🕯️','🪫','🌫️','🧦','📮','🔦','🛎️','🪦','🎈','🧭','🫧','📼','🔩','🪤','🧵','⛓️','🩹','🪥','🗿','🧸','📎','🔮','🫙'];
+
+const ACCENTS = ['#86e0c0','#e3b341','#b7a6e0','#e06a6a','#6ba3d6','#d7d1c1','#8fd694','#e0a06a'];
+
+/* dread families — the "flavour" of the product */
+const FLAVORS = [
+  'The Slow Realization','Untimely Clarity','Ambient Doom','The 3 A.M. Special',
+  'Deferred Panic','Low-Grade Longing','Existential Original','Recurring Sunday',
+  'Cold Comfort','The Unread Message','Peak Sunk Cost','Second-Guess Supreme',
+  'The Inevitable','Mild Cosmic Horror','Nostalgia (Weaponized)','The Forever Errand',
+  'Dread Lite','Buyer\'s Remorse','The Open Loop','Tepid Despair','Salted Regret',
+  'The Long Pause','Off-Brand Hope','Generic Yearning'
+];
+
+/* brand prefixes / suffixes — snack-brand parody */
+const BRAND_PRE = [
+  'Crunch','Sun','Nutri','Zesty','Golden','Snak','Frost','Mega','Lil\'','Grand',
+  'Puff','Twist','Choco','Munch','Fizz','Deli','Wonder','Crisp','Velvet','Hollow',
+  'Whisper','Fresh','Dusk','Void','Plain','Honest'
+];
+const BRAND_SUF = [
+  '-os','-z','ums','-Bites','Crunch','Puffs','Melts','Nuggets','Chews','Rolls',
+  '-Pop','Twists','Wafers','Clusters','Crisps','Drops','Loops','Sticks','Bits','Flakes'
+];
+
+/* product name adjectives + nouns (the "snack" itself) */
+const P_ADJ = [
+  'Existential','Nagging','Undercooked','Room-Temperature','Off-Season','Discontinued',
+  'Artisanal','Fun-Sized','Family-Sized','Individually-Wrapped','Reduced-Fat','Extra-Bleak',
+  'Sugar-Free','Slow-Release','Fast-Acting','Shelf-Stable','Cave-Aged','Pre-Chewed',
+  'Ethically-Sourced','Small-Batch','Bulk','Vintage','Generic','Limited-Edition',
+  'Microwavable','Hand-Wringing','Free-Range','Cold-Pressed','Air-Fried','Freeze-Dried'
+];
+const P_NOUN = [
+  'Dread','Doubt','Regret','Longing','Panic','Ennui','Malaise','Foreboding','Angst',
+  'Nostalgia','Yearning','Unease','Melancholy','Despair','Loneliness','Doom','Restlessness',
+  'Inadequacy','Impostor Syndrome','Existential Weight','Quiet Dread','Beige Sadness',
+  'Free-Floating Anxiety','Vague Guilt','Low Hum of Mortality','Unnamed Longing',
+  'Static Loneliness','Delayed Grief','Pre-Emptive Nostalgia','Mid-Afternoon Void'
+];
+
+/* deadpan slogans / tag copy */
+const SLOGANS = [
+  'Now with 30% more of what you were already afraid of.',
+  'Tastes like the exact moment you remember the email.',
+  'Part of this complete breakdown.',
+  'The snack that snacks back.',
+  'Melts in your mind, not in your hands.',
+  'Bet you can\'t have just one existential crisis.',
+  'Because closure was never on the menu.',
+  'Betcha can\'t stop at one intrusive thought.',
+  'The official flavor of lying awake.',
+  'Snap into a fresh sense of impending doom.',
+  'Finally — a feeling you can hold in your hand for once.',
+  'Now shaped like the future, which is to say formless.',
+  'Contains real, farm-fresh consequences.',
+  'The taste that lingers, and lingers, and lingers.',
+  'Get the feeling you had at 3 A.M., any time of day.',
+  'Guaranteed to expire slightly after you do.',
+  'Ask your reflection if this snack is right for you.',
+  'Zero grams of resolution. As always.',
+  'For when hunger isn\'t the emptiness you meant.',
+  'It\'s not a phase. It\'s a snack. It\'s both.',
+  'Ships with the crushing knowledge that it was on sale last week.',
+  'Deliciously indistinguishable from your default mood.',
+  'Best served while staring at a middle distance.',
+  'Now in a resealable bag you\'ll never fully reseal.'
+];
+
+/* tagline directly under the name */
+const P_TAGS = [
+  'a portable helping of the human condition',
+  'shelf-stable existential filler',
+  'the feeling, snack-sized and shrink-wrapped',
+  'net weight of one small, private collapse',
+  'individually wrapped, communally felt',
+  'a dread you can carry in one pocket',
+  'the void, but in a fun new resealable format',
+  'bite-sized clarity you didn\'t ask for',
+  'now legally distinct from a granola bar',
+  'proudly manufactured in a facility that also processes hope',
+  'a snack that is really more of a mood',
+  'contents may have settled during the night, again'
+];
+
+/* nutrition-fact "nutrients" — combinatorial */
+const NUTRIENTS = [
+  'Dread','Existential Weight','Doubt','Regret','Longing','Nostalgia','Closure',
+  'Resolution','Hope','Meaning','Clarity','Reassurance','Sleep','Certainty','Peace',
+  'Serotonin','Follow-Through','Small Talk','Object Permanence','Whimsy','Warmth',
+  'Ambition','Self-Worth','Perspective','Patience','Boundaries','Willpower','Closure (again)'
+];
+/* nutrients that are "bad" (you get a lot of) vs "good" (you get 0g of) */
+const BAD_NUTRIENTS = ['Dread','Existential Weight','Doubt','Regret','Longing','Nostalgia','Foreboding','Angst','Ennui','Static','Cortisol','Intrusive Thoughts','Second Thoughts','Malaise','The Ick','Unease','Rumination','Beige Sadness'];
+const GOOD_NUTRIENTS = ['Closure','Resolution','Hope','Meaning','Clarity','Reassurance','Sleep','Certainty','Peace','Serotonin','Follow-Through','Object Permanence','Warmth','Self-Worth','Perspective','Willpower','Boundaries','Whimsy','Answers'];
+
+/* the "% Daily Value" footnote flavor */
+const DV_NOTES = [
+  '* Percent Daily Values are based on a life of quiet, unexamined dread.',
+  '* Daily Values assume you were already like this.',
+  '* Values not evaluated by anyone who could have helped.',
+  '* Based on a 2,000-worry diet. Your worries may vary.',
+  '* Percent Ruined Value based on a standard Tuesday.',
+  '* Individual results will resemble everyone else\'s.',
+  '* Not a significant source of closure, meaning, or a good night\'s sleep.',
+  '* Consult the void before beginning any feeling.'
+];
+
+/* strange currencies for price */
+const CURRENCIES = [
+  { sym:'⌸', unit:'unlived Sundays', lo:2, hi:9, dec:false },
+  { sym:'☾', unit:'hours of sleep', lo:1, hi:6, dec:true },
+  { sym:'♒', unit:'good intentions', lo:3, hi:40, dec:false },
+  { sym:'✶', unit:'once-promising futures', lo:1, hi:4, dec:false },
+  { sym:'⌗', unit:'unread messages', lo:12, hi:340, dec:false },
+  { sym:'❍', unit:'small compromises', lo:2, hi:14, dec:false },
+  { sym:'⟡', unit:'grams of your patience', lo:5, hi:80, dec:false },
+  { sym:'✜', unit:'birthdays you forgot to feel', lo:1, hi:5, dec:false },
+  { sym:'☍', unit:'draft texts never sent', lo:4, hi:60, dec:false },
+  { sym:'⏥', unit:'perfectly good afternoons', lo:1, hi:8, dec:false },
+  { sym:'✧', unit:'wishes rounded down', lo:2, hi:11, dec:false },
+  { sym:'⊗', unit:'closed browser tabs of yourself', lo:7, hi:99, dec:false }
+];
+
+/* "Contains / Allergen" line */
+const ALLERGENS = [
+  'Contains: existentialism. Manufactured in a facility that also processes hope.',
+  'May contain traces of a person you used to be.',
+  'Contains: dread, sulfites, and one (1) unresolved conversation.',
+  'Allergen notice: made near actual meaning; cross-contamination likely.',
+  'Contains: the number you didn\'t call back.',
+  'Warning: contents settle at approximately 3 A.M.',
+  'Allergen: prolonged eye contact with your own reflection.',
+  'Contains: nightshade, hindsight, and a soft, generalized ache.',
+  'May contain everything you were putting off.',
+  'Contains: 100% recycled worries. Nothing here is new.'
+];
+
+/* "Directions / Serving" microcopy */
+const DIRECTIONS = [
+  'Serving suggestion: alone, in the car, engine off.',
+  'For best results, consume while pretending to work.',
+  'Do not operate heavy machinery, relationships, or optimism while feeling this.',
+  'Reseal after use. It will not reseal.',
+  'Keep out of reach of your own better judgment.',
+  'Refrigerate after opening; it changes nothing but feels responsible.',
+  'Pairs well with a long, unblinking stare.',
+  'Store in a cool, dark place, i.e., wherever you already keep this feeling.',
+  'Microwave on high until you remember why.',
+  'Enjoy responsibly, which is to say, do not.'
+];
+
+/* origin lines */
+const ORIGINS = [
+  'Product of the Void','Bottled at Source (the Void)','Locally Sourced Dread',
+  'Imported from a Worse Timeline','Harvested at Peak Ripeness (2019)',
+  'Product of Sunday, 4:47 P.M.','Grown in the Pit of Your Stomach',
+  'Distributed by the Ministry of It\'s Fine','Fair-Trade Foreboding','Direct from the Group Chat You Muted'
+];
+
+/* short "flavor notes" like a fancy bag */
+const FLAVOR_NOTES = [
+  'notes of copper, rain, and a door left open',
+  'finishes with dust and distant thunder',
+  'top notes of cold coffee, base notes of Sunday',
+  'earthy, with a lingering hospital-hallway finish',
+  'bright acidity giving way to a deep, patient gloom',
+  'hints of hotel carpet and unanswered voicemail',
+  'a bouquet of wet wool and half-remembered names',
+  'smoky, with a long finish you can\'t quite place',
+  'notes of ozone, laundry, and running out of time',
+  'delicate, with an aftertaste of "you had one job"'
+];
+
+/* MFG / batch style */
+const BATCH_PRE = ['BATCH','LOT','RUN','SUPPLY','KEG'];
+
+/* ============================ SLOT SETUP ============================ */
+const CODES = [];
+['A','B','C','D'].forEach(r => { for(let c=1;c<=4;c++) CODES.push(r+c); });
+
+/* build a stable per-slot identity (glyph, accent, shelf name) */
+const glyphPool = GLYPHS.slice();
+function takeGlyph(){
+  if(glyphPool.length === 0) return pick(GLYPHS);
+  return glyphPool.splice(Math.floor(Math.random()*glyphPool.length),1)[0];
+}
+const SLOTS = CODES.map((code,i) => {
+  return {
+    code,
+    glyph: takeGlyph(),
+    accent: ACCENTS[i % ACCENTS.length],
+    shelf: null // filled below
+  };
+});
+/* give each slot a short shelf-name (family) — distinct */
+(function(){
+  const used = new Set();
+  SLOTS.forEach(s => {
+    let f, g=0;
+    do { f = pick(FLAVORS); g++; } while(used.has(f) && g < 40);
+    used.add(f);
+    s.shelf = f;
+  });
+})();
+
+/* ============================ GENERATION ============================ */
+
+let lastBrandPre = null;
+function brandName(){
+  const pre = pickFresh(BRAND_PRE, lastBrandPre); lastBrandPre = pre;
+  return pre + pick(BRAND_SUF);
+}
+
+function productName(){
+  return pick(P_ADJ) + ' ' + pick(P_NOUN);
+}
+
+function priceStr(){
+  const c = pick(CURRENCIES);
+  let amt;
+  if(c.dec){ amt = (c.lo + Math.random()*(c.hi-c.lo)).toFixed(1); }
+  else { amt = String(rint(c.lo, c.hi)); }
+  return c.sym + ' ' + amt + ' ' + c.unit;
+}
+
+function netWeight(){
+  const forms = [
+    () => (rint(6,340)) + 'g of ' + pick(BAD_NUTRIENTS).toLowerCase(),
+    () => (rint(1,12)) + ' fl. sighs',
+    () => 'net wt. one (1) ' + pick(['bad feeling','small collapse','private wince','held breath','sinking feeling']),
+    () => (rint(2,9)) + '.' + rint(0,9) + ' oz (before it settles)',
+    () => 'approx. ' + rint(40,900) + ' calories of avoidance',
+    () => 'serves ' + rint(1,1) + ', repeatedly'
+  ];
+  return pick(forms)();
+}
+
+/* build the nutrition rows: mostly bad nutrients with high numbers,
+   plus a couple of "good" nutrients pinned at 0g — the joke. */
+function buildNutrition(){
+  const rows = [];
+  const usedBad = new Set(), usedGood = new Set();
+  const nBad = rint(3,4), nGood = rint(2,3);
+  for(let i=0;i<nBad;i++){
+    let n, g=0; do { n = pick(BAD_NUTRIENTS); g++; } while(usedBad.has(n) && g<20);
+    usedBad.add(n);
+    const grams = rint(2,48);
+    const dv = rint(40,320);
+    rows.push({ nm:n, amt:grams+'g', dv:dv+'%', bad:true });
+  }
+  for(let i=0;i<nGood;i++){
+    let n, g=0; do { n = pick(GOOD_NUTRIENTS); g++; } while(usedGood.has(n) && g<20);
+    usedGood.add(n);
+    rows.push({ nm:n, amt:'0g', dv:'0%', bad:false });
+  }
+  return rows;
+}
+
+function skuStr(){
+  const a = String.fromCharCode(65+rint(0,25));
+  const b = String.fromCharCode(65+rint(0,25));
+  return a+b+'-'+rint(1000,9999)+'-'+rint(10,99);
+}
+
+function barcodeSVG(accent){
+  const W = 240, H = 34;
+  let x = 4, s = '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="barcode">';
+  while(x < W-4){
+    const w = rint(1,4);
+    if(chance(0.55)){
+      const col = chance(0.12) ? accent : '#d7d1c1';
+      s += '<rect x="'+x+'" y="0" width="'+w+'" height="'+(H-8)+'" fill="'+col+'"/>';
+    }
+    x += w + rint(1,3);
+  }
+  s += '</svg>';
+  return s;
+}
+
+function generateProduct(slot){
+  const brand = brandName();
+  const nutri = buildNutrition();
+  return {
+    slot,
+    brand,
+    tagline: pickFresh(P_TAGS, lastTag),
+    slogan: pickFresh(SLOGANS, lastSlogan),
+    price: priceStr(),
+    weight: netWeight(),
+    nutrition: nutri,
+    dvNote: pick(DV_NOTES),
+    allergen: pick(ALLERGENS),
+    directions: pick(DIRECTIONS),
+    origin: pick(ORIGINS),
+    notes: pick(FLAVOR_NOTES),
+    sku: skuStr(),
+    batch: pick(BATCH_PRE)+' '+rint(0,9)+String.fromCharCode(65+rint(0,25))+rint(100,999),
+    bestBefore: pick(['best before you notice','best by the end of this feeling','use by never','expires slightly after you do','freshest at 3 A.M.'])
+  };
+}
+let lastTag = null, lastSlogan = null, lastProductName = null;
+
+/* wrap productName with no-immediate-repeat */
+function productNameFresh(){
+  let v, g=0; do { v = productName(); g++; } while(v === lastProductName && g<20);
+  lastProductName = v; return v;
+}
+
+/* ============================ RENDER ============================ */
+
+function renderProduct(p){
+  const nRows = p.nutrition.map(r =>
+    '<div class="n-row"><span class="nm"><b>'+esc(r.nm)+'</b></span>'+
+    '<span class="nm">'+esc(r.amt)+'</span>'+
+    '<span class="dv">'+esc(r.dv)+'</span></div>'
+  ).join('');
+
+  return ''+
+  '<div class="product drop-in" style="--accent:'+esc(p.slot.accent)+'">'+
+    '<div class="p-top">'+
+      '<div class="p-glyph">'+p.slot.glyph+'</div>'+
+      '<div>'+
+        '<div class="p-brandline">'+esc(p.brand)+' &middot; slot '+esc(p.slot.code)+'</div>'+
+        '<h3 class="p-name">'+esc(p.displayName)+'</h3>'+
+        '<div class="p-tag">'+esc(p.tagline)+'</div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="p-slogan"><span class="qt">&ldquo;</span>'+esc(p.slogan)+'<span class="qt">&rdquo;</span></div>'+
+
+    '<div class="p-nutri">'+
+      '<div class="n-title">Nutrition Facts</div>'+
+      '<div class="n-serv">Serv. size: 1 lingering thought &middot; '+esc(p.weight)+'</div>'+
+      '<div class="n-row head"><span class="nm">Amount per serving</span><span class="nm">wt.</span><span class="dv">% RV*</span></div>'+
+      nRows+
+      '<div class="n-foot">'+esc(p.dvNote)+'<br>'+esc(p.allergen)+'</div>'+
+    '</div>'+
+
+    '<div class="p-facts">'+
+      '<div class="fact"><div class="f-label">Price</div><div class="f-val big">'+esc(p.price)+'</div></div>'+
+      '<div class="fact"><div class="f-label">Best Before</div><div class="f-val">'+esc(p.bestBefore)+'</div></div>'+
+      '<div class="fact"><div class="f-label">Origin</div><div class="f-val">'+esc(p.origin)+'</div></div>'+
+      '<div class="fact"><div class="f-label">Flavor Notes</div><div class="f-val">'+esc(p.notes)+'</div></div>'+
+      '<div class="fact"><div class="f-label">Directions</div><div class="f-val">'+esc(p.directions)+'</div></div>'+
+      '<div class="fact"><div class="f-label">'+esc(p.batch)+'</div><div class="f-val">shelf: '+esc(p.slot.shelf)+'</div></div>'+
+    '</div>'+
+
+    '<div class="p-barcode">'+barcodeSVG(p.slot.accent)+
+      '<div class="p-sku">'+esc(p.sku)+'</div>'+
+    '</div>'+
+
+    '<div class="p-actions">'+
+      '<button class="mini" id="again-btn" type="button">↺ vend again</button>'+
+      '<button class="mini" id="copy-btn" type="button">⎘ copy label</button>'+
+      '<button class="mini" id="random-btn" type="button">⚄ surprise me</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function productToText(p){
+  const L = [];
+  L.push('THE EXISTENTIAL VENDING MACHINE — slot '+p.slot.code);
+  L.push(p.brand.toUpperCase());
+  L.push(p.displayName.toUpperCase());
+  L.push('"'+p.tagline+'"');
+  L.push('');
+  L.push('  "'+p.slogan+'"');
+  L.push('');
+  L.push('NUTRITION FACTS');
+  L.push('Serving size: 1 lingering thought · '+p.weight);
+  p.nutrition.forEach(r => L.push('  '+r.nm+' ...... '+r.amt+'   ('+r.dv+' RV)'));
+  L.push('  '+p.dvNote);
+  L.push('  '+p.allergen);
+  L.push('');
+  L.push('Price:        '+p.price);
+  L.push('Best before:  '+p.bestBefore);
+  L.push('Origin:       '+p.origin);
+  L.push('Flavor notes: '+p.notes);
+  L.push('Directions:   '+p.directions);
+  L.push('SKU '+p.sku+' · '+p.batch);
+  L.push('');
+  L.push('— no refunds · no closure · vended by the Dread-o-Matic 3000');
+  return L.join('\n');
+}
+
+/* ============================ WIRING ============================ */
+
+const rackEl = document.getElementById('rack');
+const keypadEl = document.getElementById('keypad');
+const dispLine = document.getElementById('disp-line');
+const dispEntry = document.getElementById('disp-entry');
+const trayEl = document.getElementById('tray');
+const trayEmpty = document.getElementById('tray-empty');
+
+let entry = '';           // current keypad entry, e.g. "A" then "A3"
+let armedSlot = null;     // slot object currently valid & armed
+let currentProduct = null;
+let busy = false;
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* --- build rack --- */
+const slotEls = {};
+SLOTS.forEach(slot => {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'slot';
+  el.dataset.code = slot.code;
+  el.innerHTML =
+    '<div class="code">'+slot.code+'</div>'+
+    '<div class="glyph">'+slot.glyph+'</div>'+
+    '<div class="pname">'+esc(slot.shelf)+'</div>'+
+    '<div class="coil"></div>'+
+    '<div class="soldout">restocking</div>';
+  el.addEventListener('click', () => { setEntry(slot.code); });
+  rackEl.appendChild(el);
+  slotEls[slot.code] = el;
+});
+
+/* --- build keypad --- */
+keypadEl.innerHTML = '';
+const padOrder = ['A','B','C','1','2','3','D','4','⌫'];
+padOrder.forEach(k => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'key' + (k === '⌫' ? ' del' : '');
+  b.textContent = k;
+  b.addEventListener('click', () => {
+    if(k === '⌫') backspace();
+    else typeChar(k);
+  });
+  keypadEl.appendChild(b);
+});
+/* VEND button spans the bottom row */
+const vendBtn = document.createElement('button');
+vendBtn.type = 'button';
+vendBtn.className = 'key ok';
+vendBtn.style.gridColumn = 'span 3';
+vendBtn.id = 'vend-btn';
+vendBtn.textContent = 'VEND ▸';
+vendBtn.disabled = true;
+vendBtn.addEventListener('click', vend);
+keypadEl.appendChild(vendBtn);
+
+function isLetter(c){ return /[A-D]/.test(c); }
+function isDigit(c){ return /[1-4]/.test(c); }
+
+function typeChar(c){
+  if(busy) return;
+  // entry format: <letter><digit>. Letter first, then digit.
+  if(isLetter(c)){
+    entry = c;              // start fresh with a row letter
+  } else if(isDigit(c)){
+    if(entry.length === 0) return;      // need a letter first
+    entry = entry.charAt(0) + c;        // set the column
+  }
+  refreshEntry();
+}
+function backspace(){
+  if(busy) return;
+  entry = entry.slice(0, -1);
+  refreshEntry();
+}
+function setEntry(code){
+  if(busy) return;
+  entry = code;
+  refreshEntry();
+  // clicking a slot also gives a hint that VEND is ready
+}
+
+function refreshEntry(){
+  const valid = /^[A-D][1-4]$/.test(entry);
+  dispEntry.innerHTML = esc(entry) + '<span class="caret">' + (entry.length < 2 ? '_' : '') + '</span>';
+  // armed slot
+  Object.values(slotEls).forEach(e => e.classList.remove('armed'));
+  armedSlot = null;
+  if(valid){
+    armedSlot = SLOTS.find(s => s.code === entry);
+    if(armedSlot){
+      slotEls[entry].classList.add('armed');
+      dispLine.textContent = armedSlot.shelf.toUpperCase();
+    }
+  } else if(entry.length === 1){
+    dispLine.textContent = 'ROW ' + entry + ' — CHOOSE 1–4';
+  } else {
+    dispLine.textContent = 'SELECT A CODE';
+  }
+  vendBtn.disabled = !valid || busy;
+}
+
+function setBusy(b){
+  busy = b;
+  vendBtn.disabled = b || !armedSlot;
+  keypadEl.querySelectorAll('.key').forEach(k => { if(k !== vendBtn) k.disabled = b; });
+}
+
+function vend(){
+  if(busy || !armedSlot) return;
+  const slot = armedSlot;
+  setBusy(true);
+  dispLine.textContent = 'DISPENSING…';
+  dispEntry.innerHTML = esc(slot.code) + '<span class="caret"></span>';
+
+  const el = slotEls[slot.code];
+  if(!reduceMotion){ el.classList.add('turning'); }
+
+  const build = () => {
+    // generate product with no-immediate-repeat on the punchy fields
+    const p = generateProduct(slot);
+    p.displayName = productNameFresh();
+    lastTag = p.tagline; lastSlogan = p.slogan;
+    currentProduct = p;
+
+    trayEmpty.style.display = 'none';
+    // clear any prior product
+    const old = trayEl.querySelector('.product');
+    if(old) old.remove();
+    trayEl.insertAdjacentHTML('beforeend', renderProduct(p));
+    if(!reduceMotion){
+      trayEl.classList.add('thud');
+      setTimeout(() => trayEl.classList.remove('thud'), 320);
+    }
+    wireProductButtons();
+
+    el.classList.remove('turning');
+    dispLine.textContent = 'ENJOY — ' + slot.code + ' VENDED';
+    setBusy(false);
+    vendBtn.disabled = false;
+  };
+
+  if(reduceMotion){ build(); }
+  else { setTimeout(build, 640); }
+}
+
+function wireProductButtons(){
+  const again = document.getElementById('again-btn');
+  const copy = document.getElementById('copy-btn');
+  const rnd = document.getElementById('random-btn');
+  if(again) again.addEventListener('click', () => { if(armedSlot) vend(); });
+  if(rnd) rnd.addEventListener('click', () => {
+    let s, g=0; do { s = pick(SLOTS); g++; } while(armedSlot && s.code === armedSlot.code && g<10);
+    setEntry(s.code);
+    vend();
+  });
+  if(copy) copy.addEventListener('click', () => {
+    const text = productToText(currentProduct);
+    const done = () => {
+      copy.textContent = '✓ copied';
+      copy.classList.add('copied');
+      showToast('label copied — tape it to something you love');
+      setTimeout(() => { copy.textContent = '⎘ copy label'; copy.classList.remove('copied'); }, 1900);
+    };
+    const fail = () => showToast('copy unavailable — commit it to memory instead');
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done, fail));
+    } else {
+      fallbackCopy(text, done, fail);
+    }
+  });
+}
+
+function fallbackCopy(text, done, fail){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    done();
+  } catch(e){ fail(); }
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* keyboard support */
+window.addEventListener('keydown', (e) => {
+  if(busy) return;
+  const k = e.key.toUpperCase();
+  if(/^[A-D]$/.test(k)){ typeChar(k); }
+  else if(/^[1-4]$/.test(k)){ typeChar(k); }
+  else if(e.key === 'Backspace'){ backspace(); e.preventDefault(); }
+  else if(e.key === 'Enter'){ if(armedSlot) vend(); }
+});
+
+refreshEntry();
+</script>
+</body>
+</html>

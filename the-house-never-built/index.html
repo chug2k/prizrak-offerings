@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The House You Grew Up In That Was Never Built · Prízrak</title>
+<style>
+  :root {
+    --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+    --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+    --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+    --glow:#c8b8e6; --glow-dim:#5a4f78; --amber:#e3b341; --dust:#b7a9d0;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(120% 70% at 50% -10%, rgba(200,184,230,.055), transparent 55%),
+      radial-gradient(100% 60% at 50% 120%, rgba(58,50,78,.12), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:40px 20px 56px; }
+  @media (min-width:640px) { .wrap { padding:56px 32px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--glow); font-style:italic; font-weight:500; }
+  ::selection { background:rgba(200,184,230,.22); color:#fff; }
+
+  header { text-align:center; margin-bottom:30px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(1.9rem,6.4vw,3.1rem); font-weight:800;
+    line-height:1.02; letter-spacing:-.02em; margin:12px auto 0; max-width:16em;
+  }
+  .sub {
+    margin:16px auto 0; font-style:italic; font-size:13.5px; color:var(--ash);
+    max-width:32rem; line-height:1.6;
+  }
+
+  /* ---- floor plan ---- */
+  .plan-shell {
+    border:1px solid var(--rule-2); border-radius:8px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    padding:16px; position:relative; overflow:hidden;
+    box-shadow:0 24px 60px -32px rgba(0,0,0,.85);
+  }
+  .plan-shell::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:1px;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+  .plan-head {
+    font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ash-3); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .plan-head .live { color:var(--glow); display:inline-flex; align-items:center; gap:5px; }
+  .blip { width:6px; height:6px; border-radius:50%; background:var(--glow); box-shadow:0 0 8px var(--glow); animation:pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  svg.plan { display:block; width:100%; height:auto; }
+  .room-rect { fill:var(--ink-2); stroke:var(--rule-2); stroke-width:1; transition:fill .4s, stroke .4s; }
+  .room-rect.here { fill:rgba(200,184,230,.09); stroke:var(--glow); }
+  .room-hit { cursor:pointer; }
+  .room-hit .room-rect:hover { fill:var(--ink-3); stroke:var(--glow-dim); }
+  .room-hit.here { cursor:default; }
+  .room-label {
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.06em; fill:var(--ash-2);
+    text-transform:uppercase; text-anchor:middle; pointer-events:none; transition:fill .4s;
+  }
+  .room-hit.here .room-label { fill:var(--glow); }
+  .room-hit:hover .room-label { fill:var(--parch); }
+  .you-dot { fill:var(--glow); filter:drop-shadow(0 0 5px var(--glow)); }
+  .you-ring { fill:none; stroke:var(--glow); stroke-width:1; opacity:.5; animation:ring 3s ease-out infinite; }
+  @keyframes ring { 0%{r:5;opacity:.6} 100%{r:16;opacity:0} }
+  .doorway { stroke:var(--glow-dim); stroke-width:2.5; opacity:.55; }
+  .wallgap { stroke:var(--ink-2); stroke-width:3.5; }
+
+  /* ---- memory panel ---- */
+  .memory {
+    border:1px solid var(--rule-2); border-radius:8px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    padding:24px 22px 20px; margin-top:22px; position:relative; overflow:hidden; min-height:150px;
+    box-shadow:0 24px 60px -32px rgba(0,0,0,.85);
+  }
+  .memory::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--glow-dim),var(--glow),var(--glow-dim),transparent);
+    opacity:.6;
+  }
+  .mem-room {
+    font-family:var(--serif); font-weight:800; font-size:clamp(20px,5vw,27px); color:var(--glow);
+    text-shadow:0 0 22px rgba(200,184,230,.3); font-style:italic; line-height:1.05; margin:2px 0 3px;
+  }
+  .mem-tag { font-family:var(--mono); font-size:9px; color:var(--ash-3); letter-spacing:.14em; text-transform:uppercase; margin-bottom:16px; }
+  .mem-body { font-size:15px; line-height:1.72; color:var(--parch); }
+  .mem-body p { margin:0 0 13px; }
+  .mem-body p:last-child { margin:0; }
+  .mem-body .soft { color:var(--ash); font-style:italic; }
+  .mem-cursor { display:inline-block; width:.5ch; color:var(--glow); animation:blink 1.05s steps(1) infinite; }
+  @keyframes blink { 50%{opacity:0} }
+
+  /* ---- the search line ---- */
+  .search {
+    margin-top:20px; border:1px dashed var(--rule-2); border-radius:8px;
+    background:rgba(200,184,230,.02); padding:16px 18px;
+  }
+  .search .stat-label { font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--ash-2); margin-bottom:10px; }
+  .search-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .search-input {
+    flex:1 1 200px; font-family:var(--serif); font-style:italic; font-size:14px;
+    background:var(--ink-2); border:1px solid var(--rule-2); border-radius:5px;
+    color:var(--bone); padding:11px 13px; outline:none; transition:border-color .2s, box-shadow .2s;
+  }
+  .search-input::placeholder { color:var(--ash-3); font-style:italic; }
+  .search-input:focus { border-color:var(--glow-dim); box-shadow:0 0 14px -4px rgba(200,184,230,.4); }
+  .search-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.14em; font-size:11px;
+    padding:11px 18px; background:linear-gradient(135deg,var(--glow-dim),var(--glow));
+    border:none; border-radius:5px; color:var(--ink); cursor:pointer; font-weight:600;
+    transition:transform .15s, box-shadow .2s;
+  }
+  .search-btn:hover { transform:translateY(-1px); box-shadow:0 8px 22px -8px rgba(200,184,230,.55); }
+  .search-btn:active { transform:translateY(0); }
+  .search-reply {
+    font-family:var(--serif); font-style:italic; font-size:13.5px; color:var(--dust);
+    line-height:1.6; margin-top:13px; min-height:1.2em; opacity:0; transition:opacity .5s;
+  }
+  .search-reply.show { opacity:1; }
+  .search-reply .found { color:var(--ash-2); font-style:normal; }
+
+  /* ---- actions ---- */
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; justify-content:center; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:10px 16px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:5px; color:var(--ash); cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s,transform .1s; display:inline-flex; align-items:center; gap:7px;
+  }
+  .mini:hover { border-color:var(--glow-dim); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.copied { border-color:var(--glow); color:var(--glow); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.85); letter-spacing:.04em;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .steps { font-family:var(--mono); font-size:9px; color:var(--ash-3); letter-spacing:.12em; text-align:center; margin-top:14px; text-transform:uppercase; }
+
+  .footer { text-align:center; margin-top:44px; padding-top:22px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.7; }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  .animate-in { animation:fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { display:none; }
+    .mem-cursor { display:none; }
+    .you-ring { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — a place that was never built</div>
+      <h1>The House You Grew Up In <span class="specter">That Was Never Built</span></h1>
+      <p class="sub">Walk it room to room. Click a doorway to move on. The plan rearranges when you aren't looking, and the one room you keep meaning to find is never on it. You may ask for it. It cannot quite be given.</p>
+    </header>
+
+    <div class="plan-shell">
+      <div class="plan-head">
+        <span id="floor-name">Ground floor · as remembered</span>
+        <span class="live"><span class="blip"></span><span id="here-name">the front hall</span></span>
+      </div>
+      <svg class="plan" id="plan" viewBox="0 0 480 300" role="img" aria-label="floor plan of the house"></svg>
+    </div>
+
+    <div class="memory" id="memory" aria-live="polite"></div>
+
+    <div class="search">
+      <div class="stat-label">Which room are you looking for?</div>
+      <div class="search-row">
+        <input class="search-input" id="search-input" type="text" autocomplete="off"
+               placeholder="the one with the low window, I think…" maxlength="80">
+        <button class="search-btn" id="search-btn" type="button">Ask the house</button>
+      </div>
+      <div class="search-reply" id="search-reply" aria-live="polite"></div>
+    </div>
+
+    <div class="actions">
+      <button class="mini" id="wander-btn" type="button">↻ Let the house move you</button>
+      <button class="mini" id="copy-btn" type="button">⎘ Copy this room</button>
+    </div>
+
+    <div class="steps" id="steps">rooms passed through: 1</div>
+
+    <div class="footer">
+      <p class="kicker">nobody lives here · nobody ever did · you can stay as long as you like</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* =============================== SANITIZE =============================== */
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* =============================== ROOM POOL ==============================
+   Each room: a name + a bank of memory fragments in the dream-grammar.
+   Fragments are combined (1 anchor + 1–2 driftings) so repeats stay fresh.
+   Second person. Always the afternoon of a house that never was.        */
+
+const ROOMS = [
+  {
+    name:"The Kitchen",
+    anchors:[
+      "It is always the afternoon of a day you were kept home sick, and allowed, for once, to do nothing.",
+      "Someone is cooking who you can hear but never see. The pan has been about to boil over for years.",
+      "The linoleum is the exact yellow of a light that has already been switched off.",
+    ],
+    drifts:[
+      "A radio is playing a song that stops the moment you try to name it.",
+      "There are two chairs at the table and you have never once seen anyone sit in the second.",
+      "The refrigerator hums a note that your body remembers before you do.",
+      "Something is cooling on the sill for a guest who is always about to arrive.",
+      "The tap has been left running in another version of this room.",
+    ],
+  },
+  {
+    name:"The Hallway",
+    anchors:[
+      "It is longer at night, though you have never seen it at night, because the house has no nights.",
+      "Every door here is the door to your room, and none of them is.",
+      "The carpet keeps the shape of feet that left before you were born.",
+    ],
+    drifts:[
+      "A coat you don't recognise hangs at the far end, warm, as if just taken off.",
+      "The light switch is always one wall further than your hand.",
+      "You can hear the rest of the family in a room you will reach eventually, or won't.",
+      "The pictures on the wall are of this same hallway, receding.",
+      "A phone is ringing somewhere and it is, you understand, for you.",
+    ],
+  },
+  {
+    name:"Your Bedroom",
+    anchors:[
+      "The bed is made the way it was made the morning you left, which is a morning that never happened.",
+      "The ceiling holds the glow-stars in the shape of a sky nobody ever pointed you toward.",
+      "It is smaller than you remember and you have never once been inside it.",
+    ],
+    drifts:[
+      "Under the bed there is a shoebox you are not ready to open, and never will be.",
+      "The window looks out on the garden you were promised.",
+      "Your name is on the door in a hand you almost recognise as your mother's.",
+      "The nightlight is on for a child who is asleep in the next second over.",
+      "There is a second bed against the far wall, for the sibling you were told about once.",
+    ],
+  },
+  {
+    name:"The Living Room",
+    anchors:[
+      "The television is warm and off, and has been showing the same grey weather forever.",
+      "The good sofa still has the plastic on, waiting for an occasion that the house is saving up for.",
+      "The clock on the mantel says the time it always says: just before you were called in for dinner.",
+    ],
+    drifts:[
+      "There is a dent in one cushion the exact size of someone who has just stood up.",
+      "The curtains move as if a window is open, but the windows here do not open.",
+      "A game is set out on the floor, mid-turn, and it is your turn.",
+      "The fireplace holds a fire that gives light but no heat, out of politeness.",
+      "On the shelf, photographs of a holiday you can describe but were not taken on.",
+    ],
+  },
+  {
+    name:"The Bathroom",
+    anchors:[
+      "The mirror is fogged from a bath that someone drew for you and then forgot.",
+      "The tiles are cold in the way that means it is early, though it is always the afternoon here.",
+      "There is a nightlight the shape of a shell, glowing for no one, forever.",
+    ],
+    drifts:[
+      "A towel hangs warm on the rail, just used, and you are alone.",
+      "In the fog on the glass, a small hand has drawn a face and wiped most of it away.",
+      "The tap drips the rhythm of a lullaby you can't sing but could hum.",
+      "Someone is singing in the next room and the water is running to cover it.",
+      "There is a second toothbrush, worn, and it is not yours.",
+    ],
+  },
+  {
+    name:"The Attic",
+    anchors:[
+      "The boxes up here are labelled in your handwriting, for things you never owned.",
+      "The one window is the shape of a moon and lets in the light of a different house.",
+      "It is dusty in the way of a room that has been kept, very carefully, unopened.",
+    ],
+    drifts:[
+      "A rocking horse tips forward and back, slowing, as if just ridden.",
+      "There is a trunk that hums when you stand near it and goes quiet when you kneel.",
+      "The insulation glows faintly, like the house is keeping something warm up here.",
+      "You find a photograph of yourself at an age you have not reached yet.",
+      "A child's coat, folded, is placed on top as if it will be needed again soon.",
+    ],
+  },
+  {
+    name:"The Cellar",
+    anchors:[
+      "The stairs down are the ones you were told never to count, and you have counted them, and they are wrong.",
+      "It smells of a winter that this house has never had.",
+      "The single bulb sways though there is no draught, out of habit.",
+    ],
+    drifts:[
+      "Jars line the shelves, full of afternoons, sealed and labelled by year.",
+      "There is a door down here that opens onto the same cellar, one house over.",
+      "The furnace breathes slowly, keeping the whole invented house alive.",
+      "Chalk marks on the wall measure the height of a child, ending suddenly.",
+      "Something is stored down here that the family agreed never to mention, and kept.",
+    ],
+  },
+  {
+    name:"The Dining Room",
+    anchors:[
+      "The table is set for a number of people the house has never held.",
+      "It is the good room, the room kept for a Sunday that keeps not arriving.",
+      "The chandelier gives the low, honeyed light of a meal already ending.",
+    ],
+    drifts:[
+      "One place is set with a smaller chair, a smaller cup, for a smaller you.",
+      "The napkins are folded in a shape your grandmother knew and never taught you.",
+      "There is a chair at the head that everyone has agreed not to look at.",
+      "Steam rises from a dish under a lid that you are not, yet, allowed to lift.",
+      "A grace is being said, very quietly, by no one, and you are meant to be silent.",
+    ],
+  },
+  {
+    name:"The Sunroom",
+    anchors:[
+      "The light in here is the four-o'clock light of every good day you were told you had.",
+      "The plants are all alive and none of them are ones that exist.",
+      "It is warm through the glass with a sun the rest of the house doesn't get.",
+    ],
+    drifts:[
+      "A cat that was never yours sleeps in a square of light, and knows your name.",
+      "The wicker chair still rocks with the weight of an afternoon nap just ended.",
+      "Dust turns in the beam of light in the exact pattern of a summer you were promised.",
+      "Beyond the glass, a garden you can name every plant in, though you never planted one.",
+      "A book lies open, face down, at the page where you always fell asleep.",
+    ],
+  },
+  {
+    name:"The Landing",
+    anchors:[
+      "You are halfway up, or halfway down, and the house is deciding which.",
+      "From here you can see every door at once, and cannot reach any of them.",
+      "The window on the stairs shows weather that belongs to your childhood, not to today.",
+    ],
+    drifts:[
+      "A voice from below calls a name that is almost, but not quite, yours.",
+      "The bannister is worn smooth by a hand that was smaller than yours is now.",
+      "There is a step that creaks, and you know exactly which, and you have never trodden on it.",
+      "Light pools on the landing in the shape of a person who has just gone up ahead of you.",
+      "The clock downstairs strikes an hour that isn't on any clock.",
+    ],
+  },
+  {
+    name:"The Spare Room",
+    anchors:[
+      "It is kept for a guest who is you, arriving later, when you are older and forgiven.",
+      "The bed is always freshly made and always, faintly, warm.",
+      "It is the room the house doesn't quite know what to do with, and neither do you.",
+    ],
+    drifts:[
+      "Boxes of the family's things are stacked here, and yours are among them already.",
+      "The wallpaper is a pattern you used to trace with your finger to fall asleep.",
+      "A sewing machine sits under a cloth, mid-mend, holding a hem for later.",
+      "Through the wall you can hear someone deciding whether to keep you here.",
+      "There is a window that opens onto the room you are looking for, and it is painted shut.",
+    ],
+  },
+  {
+    name:"The Garage",
+    anchors:[
+      "The car that was going to take you all somewhere is here, cold, and has never once started.",
+      "It smells of oil and grass and the particular Saturday you were saving for.",
+      "The door is up a few inches, letting in a strip of afternoon that never rises.",
+    ],
+    drifts:[
+      "A bicycle leans against the wall, your size, with the training wheels just taken off.",
+      "Tools hang on a board, each traced in paint around where it belongs.",
+      "There is a freezer that hums, keeping a summer, and you must not open it.",
+      "Chalk on the floor marks a game whose rules the whole street once knew.",
+      "Someone's shadow is working under the car, and there are no legs.",
+    ],
+  },
+  {
+    name:"The Nursery",
+    anchors:[
+      "It was your room before you can remember, which is to say it was never yours at all.",
+      "The mobile turns above the cot, slowing, as if a hand has just let it go.",
+      "The walls are the pale blue of a sky painted by someone who loved you and left no name.",
+    ],
+    drifts:[
+      "A music box on the shelf plays the last three notes and waits to be wound.",
+      "The cot still holds the warm impression of a sleep that hasn't ended.",
+      "A hand-knitted blanket is folded and refolded by the draught, keeping busy.",
+      "On the wall, your height at one year old, in a marker that hasn't faded.",
+      "There is a second cot, further in, that the light does not quite reach.",
+    ],
+  },
+  {
+    name:"The Study",
+    anchors:[
+      "The desk is your father's, or someone's, and the lamp is always just switched on.",
+      "It is the room you were not to enter, and so it is the one you know best.",
+      "The books on the shelves have your name in the front, in a hand you'll grow into.",
+    ],
+    drifts:[
+      "A letter is half-written, in ink still wet, and it begins with your name.",
+      "The chair is turned toward the window, as if someone rose the moment you came in.",
+      "A pipe smoulders in the tray, gone out years ago, still warm.",
+      "The globe is spun to a country the family always said they'd take you to.",
+      "The typewriter holds a page that says the one thing you were never told.",
+    ],
+  },
+  {
+    name:"The Back Porch",
+    anchors:[
+      "It looks out on the garden that the money ran out before they could dig.",
+      "The screen door hangs open on a hinge that has been about to slam for a lifetime.",
+      "It is the very last of the light, the part of the day you were always called in from.",
+    ],
+    drifts:[
+      "Two glasses sweat on the rail, half-drunk, the ice not yet melted.",
+      "The swing-seat sways under the memory of an evening you were held on it.",
+      "Moths gather at a bulb you have to squint to see, as if it's already dusk.",
+      "Somewhere past the fence, other children are being called in to their own houses.",
+      "Beyond the step, the grass gives way to a garden nobody ever finished imagining.",
+    ],
+  },
+];
+
+/* the room you are looking for is NEVER placed on any map */
+const LOST_ROOM = { name:"the room you are looking for" };
+
+/* =============================== SEARCH REPLIES ========================
+   When you ask for the room the house can't give, it answers, tenderly. */
+const SEARCH_REPLIES = [
+  "The house understands. It has been keeping that room for you. It is just past this one, the way tomorrow is just past today.",
+  "That room was on the plans, once. It was the first thing they drew and the last thing they let go of.",
+  "You're very close. You're always very close. That is the shape of the room: the being-close to it.",
+  "It's the door at the end of the hall you haven't reached yet. It is always the door you haven't reached yet.",
+  "The house would show you, but it can't quite remember the way, and it is ashamed, and it loves you.",
+  "Go back through the {ROOM}. It's behind there. It has always been behind there, and the wall is always new.",
+  "That's the one with the low window, yes. The light comes in gold. You were happy there. You will be.",
+  "It isn't on this floor. It isn't on any floor. It's the floor the house forgot to build under the ones it did.",
+  "You had it a moment ago. You can still feel the warmth of the handle. Keep walking. It moves the way you move.",
+  "The house is sorry. It made every room but that one. That one it left as a space, so you would keep coming back.",
+  "Turn around. No — the other way. There. Almost. It was there. It is the almost.",
+  "That room is where everyone went. You'll find it when the house is ready to be empty, and not before.",
+];
+
+/* =============================== FLOORS ================================
+   Layouts are seeded and rearrange between visits. Each is a set of rects
+   plus adjacency (which rooms share a doorway). Rooms are drawn from the
+   pool freshly each shuffle, so the plan is never the same twice.         */
+
+const FLOOR_NAMES = [
+  "Ground floor · as remembered",
+  "The floor above · approximately",
+  "The floor you keep returning to",
+  "A floor the house improvised",
+  "Ground floor · as it was almost",
+  "The half-floor between the others",
+  "The floor plan, redrawn overnight",
+  "Whatever floor this is now",
+];
+
+/* layout templates: grids of cells; we assign random distinct rooms to cells.
+   coords in the 480x300 viewBox, with a small margin. */
+function makeLayouts(){
+  const M=14, W=480, H=300, gapX=6, gapY=6;
+  // template A: 2x2
+  const A = grid(2,2);
+  // template B: 3x2
+  const B = grid(3,2);
+  // template C: 2x3
+  const C = grid(2,3);
+  // template D: mixed — big room + three
+  const D = [
+    rect(M, M, (W-2*M)*0.55-gapX, H-2*M),
+    rect(M + (W-2*M)*0.55, M, (W-2*M)*0.45, (H-2*M)/2-gapY/2),
+    rect(M + (W-2*M)*0.55, M + (H-2*M)/2+gapY/2, (W-2*M)*0.225-gapX/2, (H-2*M)/2-gapY/2),
+    rect(M + (W-2*M)*0.55 + (W-2*M)*0.225+gapX/2, M + (H-2*M)/2+gapY/2, (W-2*M)*0.225-gapX/2, (H-2*M)/2-gapY/2),
+  ];
+  return [A,B,C,D];
+
+  function rect(x,y,w,h){ return {x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h)}; }
+  function grid(cols,rows){
+    const cells=[];
+    const cw=(W-2*M-(cols-1)*gapX)/cols;
+    const ch=(H-2*M-(rows-1)*gapY)/rows;
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+      cells.push(rect(M+c*(cw+gapX), M+r*(ch+gapY), cw, ch));
+    }
+    return cells;
+  }
+}
+const LAYOUTS = makeLayouts();
+
+/* =============================== STATE ================================= */
+let currentFloor = null;   // { name, cells:[{rect,room}], hereIndex }
+let hereIndex = 0;
+let stepCount = 1;
+let lastRoomName = null;
+let lastAnchor = null;
+let lastDrift = [];
+let lastReply = null;
+let lastFloorName = null;
+let currentMemory = null;  // {roomName, text}
+
+/* =============================== PICKERS =============================== */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickFresh(arr, last){
+  if(arr.length<2) return arr[0];
+  let v,g=0; do{ v=pick(arr); }while(v===last && ++g<12); return v;
+}
+function shuffle(arr){
+  const a=arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+/* =============================== BUILD A FLOOR =========================
+   Choose a layout, drop distinct rooms into its cells. Optionally reuse
+   the current "here" room so the transition feels continuous — but the
+   plan around it is redrawn.                                              */
+function buildFloor(keepRoom){
+  const layout = pick(LAYOUTS);
+  const roomsShuffled = shuffle(ROOMS);
+  const cells = [];
+  let idx = 0;
+  // if keepRoom given, ensure it appears and remember where
+  let placedKeep = -1;
+  for(let i=0;i<layout.length;i++){
+    let room;
+    if(keepRoom && placedKeep<0 && (i===layout.length-1 || Math.random()<0.5)){
+      room = keepRoom; placedKeep = i;
+    } else {
+      // draw next distinct room not equal to keepRoom
+      while(roomsShuffled[idx] && keepRoom && roomsShuffled[idx].name===keepRoom.name) idx++;
+      room = roomsShuffled[idx++] || pick(ROOMS);
+    }
+    cells.push({ rect:layout[i], room });
+  }
+  const floorName = pickFresh(FLOOR_NAMES, lastFloorName); lastFloorName = floorName;
+  currentFloor = { name:floorName, cells };
+  hereIndex = placedKeep >= 0 ? placedKeep : Math.floor(Math.random()*cells.length);
+  return currentFloor;
+}
+
+/* =============================== MEMORY TEXT =========================== */
+function composeMemory(room){
+  const anchor = pickFresh(room.anchors, lastAnchor); lastAnchor = anchor;
+  const nDrift = Math.random()<0.55 ? 2 : 1;
+  const drifts = [];
+  let guardLast = lastDrift[0] || null;
+  for(let i=0;i<nDrift;i++){
+    let d,g=0;
+    do{ d=pick(room.drifts); }while((drifts.includes(d)||d===guardLast) && ++g<16);
+    drifts.push(d);
+  }
+  lastDrift = drifts;
+  return { roomName:room.name, anchor, drifts };
+}
+
+/* =============================== RENDER PLAN =========================== */
+function renderPlan(){
+  const svg = document.getElementById('plan');
+  const f = currentFloor;
+  let s = '';
+  // faint outer wall
+  s += '<rect x="8" y="8" width="464" height="284" rx="4" fill="none" stroke="rgba(233,228,214,.12)" stroke-width="1"/>';
+
+  // doorways: draw a short glowing segment on shared edges between here and neighbours
+  const here = f.cells[hereIndex];
+  f.cells.forEach((cell, i) => {
+    if(i===hereIndex) return;
+    const seg = sharedEdge(here.rect, cell.rect);
+    if(seg){
+      // wall gap (dark) then doorway glow
+      s += `<line class="wallgap" x1="${seg.x1}" y1="${seg.y1}" x2="${seg.x2}" y2="${seg.y2}"/>`;
+      s += `<line class="doorway" x1="${seg.x1}" y1="${seg.y1}" x2="${seg.x2}" y2="${seg.y2}"/>`;
+    }
+  });
+
+  // rooms
+  f.cells.forEach((cell, i) => {
+    const r = cell.rect;
+    const isHere = i===hereIndex;
+    const adjacent = !isHere && !!sharedEdge(here.rect, cell.rect);
+    const cx = r.x + r.w/2, cy = r.y + r.h/2;
+    const gClass = 'room-hit' + (isHere?' here':'');
+    const cursor = (adjacent) ? '' : (isHere ? '' : '');
+    s += `<g class="${gClass}" data-i="${i}"${adjacent?' data-door="1"':''}>`;
+    s += `<rect class="room-rect${isHere?' here':''}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="3"/>`;
+    // label (truncate visually via viewbox scaling is fine)
+    s += `<text class="room-label" x="${cx}" y="${cy - (isHere?8:0)}">${esc(cell.room.name.toUpperCase())}</text>`;
+    if(adjacent){
+      s += `<text class="room-label" x="${cx}" y="${cy+13}" style="fill:var(--glow-dim);font-size:7px;letter-spacing:.16em">◦ doorway ◦</text>`;
+    }
+    if(isHere){
+      s += `<circle class="you-ring" cx="${cx}" cy="${cy+8}" r="5"/>`;
+      s += `<circle class="you-dot" cx="${cx}" cy="${cy+8}" r="3.2"/>`;
+      s += `<text class="room-label" x="${cx}" y="${cy+24}" style="fill:var(--glow);font-size:7px;letter-spacing:.2em">you are here</text>`;
+    }
+    s += `</g>`;
+  });
+
+  svg.innerHTML = s;
+
+  // wire doorway clicks
+  svg.querySelectorAll('.room-hit[data-door="1"]').forEach(g => {
+    g.addEventListener('click', () => {
+      const i = parseInt(g.getAttribute('data-i'),10);
+      moveTo(i);
+    });
+  });
+
+  document.getElementById('floor-name').textContent = f.name;
+  document.getElementById('here-name').textContent = lowerName(f.cells[hereIndex].room.name);
+}
+
+function lowerName(n){ return n.replace(/^The /,'the ').replace(/^Your /,'your '); }
+
+/* find a shared edge segment between two rects (adjacency). returns a short
+   segment centered on the shared span, or null if they don't touch. */
+function sharedEdge(a, b){
+  const tol = 8;  // rooms are drawn with a small gap between them; bridge it
+  // a right == b left
+  if(Math.abs((a.x+a.w) - b.x) <= tol){
+    const y1=Math.max(a.y,b.y), y2=Math.min(a.y+a.h,b.y+b.h);
+    if(y2-y1>18){ const my=(y1+y2)/2; return { x1:a.x+a.w, y1:my-9, x2:a.x+a.w, y2:my+9 }; }
+  }
+  // a left == b right
+  if(Math.abs(a.x - (b.x+b.w)) <= tol){
+    const y1=Math.max(a.y,b.y), y2=Math.min(a.y+a.h,b.y+b.h);
+    if(y2-y1>18){ const my=(y1+y2)/2; return { x1:a.x, y1:my-9, x2:a.x, y2:my+9 }; }
+  }
+  // a bottom == b top
+  if(Math.abs((a.y+a.h) - b.y) <= tol){
+    const x1=Math.max(a.x,b.x), x2=Math.min(a.x+a.w,b.x+b.w);
+    if(x2-x1>18){ const mx=(x1+x2)/2; return { x1:mx-9, y1:a.y+a.h, x2:mx+9, y2:a.y+a.h }; }
+  }
+  // a top == b bottom
+  if(Math.abs(a.y - (b.y+b.h)) <= tol){
+    const x1=Math.max(a.x,b.x), x2=Math.min(a.x+a.w,b.x+b.w);
+    if(x2-x1>18){ const mx=(x1+x2)/2; return { x1:mx-9, y1:a.y, x2:mx+9, y2:a.y }; }
+  }
+  return null;
+}
+
+/* =============================== RENDER MEMORY ========================= */
+let typeTimer = null;
+function renderMemory(mem, animate){
+  currentMemory = mem;
+  const el = document.getElementById('memory');
+  el.classList.remove('animate-in');
+  const paras = [mem.anchor, ...mem.drifts];
+  const tag = 'a room that was never built · the afternoon light of it';
+
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  const headHTML =
+    `<div class="mem-room">${esc(mem.roomName)}.</div>` +
+    `<div class="mem-tag">${esc(tag)}</div>`;
+
+  if(typeTimer){ clearInterval(typeTimer); typeTimer=null; }
+
+  if(!animate || reduced){
+    el.innerHTML = headHTML + '<div class="mem-body">' +
+      paras.map(p=>`<p>${esc(p)}</p>`).join('') + '</div>';
+    if(animate) { /* reduced: no anim */ }
+    return;
+  }
+
+  // typewriter reveal of the body
+  el.innerHTML = headHTML + '<div class="mem-body" id="mem-body"></div>';
+  void el.offsetWidth;
+  el.classList.add('animate-in');
+
+  const body = document.getElementById('mem-body');
+  const full = paras;
+  let pi = 0, ci = 0;
+  const built = full.map(()=> '');
+  function frame(){
+    if(pi >= full.length){
+      body.innerHTML = built.map(t=>`<p>${esc(t)}</p>`).join('');
+      clearInterval(typeTimer); typeTimer=null;
+      return;
+    }
+    const src = full[pi];
+    // reveal a few chars per tick
+    ci += 2 + Math.floor(Math.random()*2);
+    if(ci >= src.length){ built[pi]=src; pi++; ci=0; }
+    else built[pi]=src.slice(0,ci);
+    const html = built.map((t,idx)=>{
+      if(idx<pi) return `<p>${esc(t)}</p>`;
+      if(idx===pi) return `<p>${esc(t)}<span class="mem-cursor">▍</span></p>`;
+      return '';
+    }).filter(Boolean).join('');
+    body.innerHTML = html;
+  }
+  typeTimer = setInterval(frame, 22);
+}
+
+/* =============================== MOVE ================================== */
+function enterRoom(room, animate){
+  const mem = composeMemory(room);
+  lastRoomName = room.name;
+  renderMemory(mem, animate);
+  document.getElementById('here-name').textContent = lowerName(room.name);
+}
+
+function moveTo(i){
+  // the room you move into is kept; the plan around it quietly redraws
+  const target = currentFloor.cells[i].room;
+  stepCount++;
+  buildFloor(target);       // rebuild plan, keeping target room as "here"
+  renderPlan();
+  enterRoom(target, true);
+  updateSteps();
+  clearReply();
+}
+
+function wander(){
+  // the house moves you: brand-new floor, land somewhere on it
+  stepCount++;
+  buildFloor(null);
+  renderPlan();
+  enterRoom(currentFloor.cells[hereIndex].room, true);
+  updateSteps();
+  clearReply();
+}
+
+function updateSteps(){
+  document.getElementById('steps').textContent = 'rooms passed through: ' + stepCount;
+}
+
+/* =============================== SEARCH =============================== */
+function askHouse(){
+  const input = document.getElementById('search-input');
+  const raw = input.value.trim();
+  const reply = document.getElementById('search-reply');
+  let text = pickFresh(SEARCH_REPLIES, lastReply); lastReply = text;
+  // fill {ROOM} with a room the house "remembers"
+  text = text.replace('{ROOM}', lowerName(pick(ROOMS).name));
+  let prefix = '';
+  if(raw){
+    prefix = `<span class="found">You said: “${esc(raw)}”.</span> `;
+  }
+  reply.classList.remove('show');
+  void reply.offsetWidth;
+  reply.innerHTML = prefix + esc(text);
+  reply.classList.add('show');
+}
+function clearReply(){
+  const reply = document.getElementById('search-reply');
+  reply.classList.remove('show');
+}
+
+/* =============================== COPY ================================= */
+function copyRoom(){
+  if(!currentMemory) return;
+  const m = currentMemory;
+  const txt =
+    'THE HOUSE YOU GREW UP IN THAT WAS NEVER BUILT\n' +
+    m.roomName + '.\n\n' +
+    [m.anchor, ...m.drifts].join('\n') +
+    '\n\n— a room that was never built';
+  const btn = document.getElementById('copy-btn');
+  const done = () => {
+    btn.classList.add('copied');
+    showToast('This room copied — it will not be here when you get back');
+    setTimeout(()=>btn.classList.remove('copied'), 1800);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, ()=>fallbackCopy(txt, done));
+  } else fallbackCopy(txt, done);
+}
+function fallbackCopy(txt, done){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    done();
+  }catch(e){ showToast('Copy unavailable — try to keep it in mind'); }
+}
+
+let toastTimer=null;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* =============================== INIT ================================= */
+function init(){
+  buildFloor(null);
+  renderPlan();
+  enterRoom(currentFloor.cells[hereIndex].room, false);
+
+  document.getElementById('wander-btn').addEventListener('click', wander);
+  document.getElementById('copy-btn').addEventListener('click', copyRoom);
+  document.getElementById('search-btn').addEventListener('click', askHouse);
+  document.getElementById('search-input').addEventListener('keydown', e => {
+    if(e.key==='Enter'){ e.preventDefault(); askHouse(); }
+  });
+}
+init();
+</script>
+</body>
+</html>

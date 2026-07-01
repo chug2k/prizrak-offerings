@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Villain Monologue Translator · Prízrak</title>
+<style>
+  :root {
+    --ink:#08070a; --ink-1:#0d0b11; --ink-2:#14111b; --ink-3:#1a1622;
+    --bone:#eae3ef; --parch:#d4ccdd; --ash:#948aa6; --ash-2:#6a627e; --ash-3:#443d55;
+    --rule:rgba(234,227,239,.08); --rule-2:rgba(234,227,239,.16);
+    --amethyst:#b78ce0; --amethyst-dim:#5a3f78; --amber:#e3b341; --blood:#e06a7a; --blood-dim:#6b3f47;
+    --glow:rgba(183,140,224,.5);
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,'Liberation Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(120% 75% at 50% -10%, rgba(183,140,224,.09), transparent 55%),
+      radial-gradient(100% 60% at 50% 120%, rgba(224,106,122,.06), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* lightning flash overlay */
+  #flash {
+    content:""; position:fixed; inset:0; z-index:40; pointer-events:none; opacity:0;
+    background:radial-gradient(80% 60% at 50% 20%, rgba(220,210,255,.85), rgba(160,130,220,.2) 45%, transparent 70%);
+    mix-blend-mode:screen;
+  }
+  #flash.strike { animation:strike .5s ease-out; }
+  @keyframes strike {
+    0%{opacity:0} 6%{opacity:.9} 12%{opacity:.15} 20%{opacity:.75} 30%{opacity:0}
+    100%{opacity:0}
+  }
+
+  .wrap { max-width:720px; margin:0 auto; padding:44px 20px 60px; }
+  @media (min-width:640px) { .wrap { padding:60px 32px 76px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--amethyst); font-style:italic; font-weight:600; text-shadow:0 0 26px var(--glow); }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(183,140,224,.28); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1b1824; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:34px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2.1rem,7.6vw,3.6rem); font-weight:800;
+    line-height:.96; letter-spacing:-.02em; margin:12px 0 0;
+  }
+  .sub { margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash); max-width:32rem; line-height:1.6; }
+
+  /* input */
+  .console { margin-bottom:14px; }
+  .console .kicker { margin-bottom:12px; display:block; }
+  .field-wrap { position:relative; }
+  #task {
+    width:100%; font-family:var(--serif); font-size:16px; color:var(--bone);
+    background:var(--ink-1); border:1px solid var(--rule-2); border-radius:6px;
+    padding:15px 16px; resize:none; line-height:1.5; transition:border-color .2s, box-shadow .2s;
+    min-height:56px; overflow:hidden;
+  }
+  #task::placeholder { color:var(--ash-3); font-style:italic; }
+  #task:focus { outline:none; border-color:var(--amethyst-dim); box-shadow:0 0 0 3px rgba(183,140,224,.1); }
+
+  .examples { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .ex {
+    font-family:var(--mono); font-size:11px; padding:7px 11px; background:var(--ink-1);
+    border:1px solid var(--rule); border-radius:20px; color:var(--ash-2); cursor:pointer;
+    transition:border-color .2s, color .2s, background .2s; line-height:1;
+  }
+  .ex:hover { border-color:var(--amethyst-dim); color:var(--parch); background:var(--ink-2); }
+
+  .gen-row { text-align:center; margin:26px 0 8px; }
+  .gen-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.18em; font-size:12px;
+    padding:15px 34px; background:linear-gradient(135deg,var(--amethyst-dim),var(--amethyst));
+    border:none; border-radius:6px; color:#150f1f; cursor:pointer; font-weight:700;
+    transition:transform .15s, box-shadow .2s, opacity .2s; box-shadow:0 0 24px -6px var(--glow);
+  }
+  .gen-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 32px -8px var(--glow); }
+  .gen-btn:active:not(:disabled) { transform:translateY(0); }
+  .gen-btn:disabled { opacity:.4; cursor:not-allowed; filter:grayscale(.4); box-shadow:none; }
+  .hint { font-family:var(--mono); font-size:10px; color:var(--ash-3); margin-top:12px; letter-spacing:.1em; min-height:12px; }
+
+  /* the monologue slab */
+  .slab {
+    border:1px solid var(--rule-2); border-radius:10px;
+    background:linear-gradient(180deg,var(--ink-2),var(--ink-1) 60%,var(--ink));
+    padding:34px 26px 28px; margin-top:30px; position:relative; overflow:hidden;
+    box-shadow:0 30px 80px -40px rgba(0,0,0,.9), 0 0 60px -30px rgba(183,140,224,.25);
+  }
+  .slab::before {
+    content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--amethyst),var(--blood),var(--amethyst),transparent);
+  }
+  /* faint skull/eye watermark */
+  .slab::after {
+    content:"MWAHAHA"; position:absolute; bottom:8%; left:50%; transform:translateX(-50%) rotate(-4deg);
+    font-family:var(--mono); font-weight:700; font-size:clamp(30px,9vw,64px); letter-spacing:.18em;
+    color:rgba(183,140,224,.03); pointer-events:none; white-space:nowrap;
+  }
+  .slab > * { position:relative; }
+
+  .slab-head {
+    font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--ash-3); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    border-bottom:1px solid var(--rule); padding-bottom:14px; margin-bottom:22px;
+  }
+  .slab-head .live { color:var(--blood); display:inline-flex; align-items:center; gap:6px; }
+  .ember { width:6px; height:6px; border-radius:50%; background:var(--blood); box-shadow:0 0 8px var(--blood); animation:pulse 1.7s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  .villain-name { font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--ash-2); }
+  .villain-name b { color:var(--amethyst); font-weight:600; }
+
+  .title {
+    font-family:var(--serif); font-weight:800; font-style:italic;
+    font-size:clamp(1.7rem,6.2vw,2.6rem); line-height:1.02; letter-spacing:-.01em;
+    color:var(--amethyst); text-shadow:0 0 30px var(--glow); text-align:center;
+    margin:2px 0 8px; text-transform:uppercase;
+  }
+  .title-rule {
+    height:1px; width:70%; margin:0 auto 24px;
+    background:linear-gradient(90deg,transparent,var(--amethyst-dim),transparent);
+  }
+
+  .speech { font-family:var(--serif); font-size:clamp(16px,3.6vw,19px); line-height:1.78; color:var(--parch); }
+  .speech p { margin:0 0 17px; }
+  .speech p:last-child { margin-bottom:0; }
+  .speech .em { color:var(--bone); font-style:italic; }
+  .speech .boom { color:var(--blood); font-weight:600; font-style:normal; }
+  .speech .whisper { color:var(--ash); font-size:.92em; font-style:italic; }
+
+  /* typewriter caret */
+  .caret {
+    display:inline-block; width:0.55ch; margin-left:1px; color:var(--amethyst);
+    animation:blink 1s steps(1) infinite; font-weight:400;
+  }
+  @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+  .kicker-line {
+    text-align:center; margin-top:26px; font-family:var(--mono); font-size:11px;
+    letter-spacing:.14em; color:var(--amber); font-style:normal;
+  }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:26px; justify-content:center; }
+  .mini {
+    font-family:var(--mono); text-transform:uppercase; font-size:11px; letter-spacing:.1em;
+    padding:11px 18px; background:var(--ink-1); border:1px solid var(--rule-2); border-radius:6px;
+    color:var(--ash); cursor:pointer; transition:border-color .2s,color .2s,background .2s,transform .1s;
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .mini:hover { border-color:var(--amethyst); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+  .mini.copied { border-color:var(--amethyst); color:var(--amethyst); }
+  .mini:disabled { opacity:.4; cursor:not-allowed; }
+
+  .fade-in { animation:fadeUp .5s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeUp { from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:translateY(0)} }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:11px 17px; border-radius:7px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+    box-shadow:0 12px 34px -12px rgba(0,0,0,.85); letter-spacing:.04em;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:52px; padding-top:26px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.9; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { display:none; }
+    .caret { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div id="flash"></div>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — random offering</div>
+      <h1>The <span class="specter">Villain</span> Monologue Translator</h1>
+      <p class="sub">Bring us your small and joyless errands. We return them transfigured: rendered in the grand, scenery-devouring cadence of a supervillain who has, at last, been given the floor.</p>
+    </header>
+
+    <div class="console">
+      <span class="kicker">Confess your mundane task</span>
+      <div class="field-wrap">
+        <textarea id="task" rows="1" maxlength="140" placeholder="e.g. I need to send an invoice" autocomplete="off" spellcheck="false"></textarea>
+      </div>
+      <div class="examples" id="examples"></div>
+    </div>
+
+    <div class="gen-row">
+      <button id="gen-btn" class="gen-btn" disabled>Translate to Villainy</button>
+      <div class="hint" id="hint">Type a dull little task above.</div>
+    </div>
+
+    <div id="stage" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">No underlings were promoted in the making of this monologue</p>
+      <p class="kicker" style="margin-top:8px"><a href="/index.html">all offerings</a></p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   THE VILLAIN MONOLOGUE TRANSLATOR
+   Combinatorial grand-supervillain oratory. No two the same.
+============================================================ */
+
+/* ---------- placeholder tasks (rotating) ---------- */
+const EXAMPLES = [
+  "send an invoice",
+  "reply to an email",
+  "do the laundry",
+  "book a dentist appointment",
+  "return a library book",
+  "unload the dishwasher",
+  "water the plants",
+  "cancel a subscription",
+  "renew my parking permit",
+  "buy printer ink",
+];
+
+/* ---------- TITLE CARDS ---------- */
+const TITLES = [
+  "AND SO IT BEGINS", "AT LAST", "THE HOUR IS UPON US", "BEHOLD",
+  "SO. WE MEET AGAIN", "THE FINAL PIECE", "IT IS TIME", "NONE CAN STOP ME NOW",
+  "THE RECKONING", "MY MASTERPIECE", "THE PLAN UNFOLDS", "ALL HAS LED TO THIS",
+  "THE GATHERING DARK", "WITNESS", "THERE IS NO TURNING BACK", "THE WHEELS ARE IN MOTION",
+  "PREPARE YOURSELVES", "THE LONG GAME ENDS TONIGHT", "A NEW ERA DAWNS", "SO BE IT",
+  "THE DIE IS CAST", "YOU CANNOT COMPREHEND", "IT ENDS HERE", "THE STARS ALIGN",
+  "MY MOMENT ARRIVES", "THE CURTAIN RISES", "AT THE APPOINTED HOUR", "DESPAIR, IF YOU MUST",
+];
+
+/* ---------- SELF-STYLINGS ---------- */
+const TITLE_HONORIFICS = ["the","the","the","the",""];
+const VILLAIN_ADJ = [
+  "Dread","Eternal","Nameless","Insatiable","Merciless","Forgotten","Radiant","Corvid",
+  "Serpent","Obsidian","Crimson","Pale","Ravenous","Undying","Whispering","Ashen",
+  "Iron","Ninth","Velvet","Sovereign","Hollow","Thorned","Gilded","Weeping",
+];
+const VILLAIN_NOUN = [
+  "Architect","Warden","Baroness","Herald","Sovereign","Reckoning","Devourer","Cartographer",
+  "Regent","Curator","Empress","Magistrate","Composer","Vintner","Accountant","Overseer",
+  "Prophet","Collector","Executor","Conductor","Gardener","Auditor","Duchess","Librarian",
+];
+const VILLAIN_DOMAIN = [
+  "of the Long Silence","of a Thousand Wednesdays","of the Unpaid Debt","of the Sealed Envelope",
+  "of the Ninth Drawer","of Small Inconveniences","of the Overdue","of the Endless Queue",
+  "of the Cold Kettle","of the Final Notice","of the Blinking Cursor","of the Locked Cabinet",
+  "of the Forgotten Password","of All Errands","of the Unwatered Fern","of the Standing Invoice",
+];
+
+/* ---------- OPENERS (the villain settles in) ---------- */
+const OPENERS = [
+  "You thought you understood me. You understood {nothing}.",
+  "Ah. There you are. I have been {waiting} for you — longer than you could possibly know.",
+  "Do sit. No, no — {sit}. This will take only a moment, and moments are all I deal in now.",
+  "How predictable, that you would come. How {inevitable}. I have accounted for everything.",
+  "You are trembling. Good. That means some small part of you {understands}.",
+  "They said it could not be done. They said it should not be attempted. And yet — {yet}.",
+  "For {years} I have waited in the wings of this very ordinary life.",
+  "You look surprised. Surely you did not think {this_thing} would go unpunished.",
+  "Silence. {Silence}. Let the weight of this moment settle upon you like frost.",
+  "So. It comes to this. As I always knew it {would}.",
+];
+const OPENER_FILL = {
+  nothing: ["nothing","nothing at all","precisely nothing","less than nothing"],
+  waiting: ["waiting","lying in wait","biding my time","rehearsing this very speech"],
+  sit: ["sit","be seated","remain seated","do not rise"],
+  inevitable: ["inevitable","tediously inevitable","written in the stars","foretold"],
+  understands: ["understands","comprehends the scale of it","has begun, at last, to grasp it","already knows"],
+  yet: ["here I stand","here we are","the impossible bows before me","behold the doing of it"],
+  years: ["years","a decade","seventeen quiet years","longer than you have been paying attention"],
+  this_thing: ["this","this reckless act","your carelessness","what you set in motion"],
+  Silence: ["Silence","Not a word","Hush now","Still yourself"],
+  would: ["would","must","one day would","was always going to"],
+};
+
+/* ---------- THE GRAND REFRAMING of the task itself ---------- */
+/* the mundane verb+object gets escalated. built combinatorially. */
+const ESCALATE_VERB = [
+  "set in motion","unleash","bring to bear","enact","consummate","execute","complete","perfect",
+  "at last accomplish","carry out to the letter","see through to its bitter end","deliver unto this world",
+];
+const GRAND_FRAME = [
+  "what fools have called merely {task} — but which is, in truth, the keystone of everything.",
+  "the act you so quaintly named {task}. History will call it something far darker.",
+  "that which lesser minds dismiss as {task}. They will not be laughing for long.",
+  "the operation the ignorant filed away under {task}. Oh, if only they knew.",
+  "{task}. Say it plainly, if you must. I prefer to call it the beginning of the end.",
+  "an errand — {task}, you'd sneer — that shall reshape the very order of things.",
+  "the thing itself: {task}. Trivial? To you. To me it is the culmination of a life's design.",
+  "what the mortals list, so blandly, as {task}. Let them keep their little words.",
+];
+
+/* ---------- THE DOOMED UNDERLING ---------- */
+const UNDERLING_NAME = [
+  "Gerald","Malvina","Ostrich","Number Four","the intern","Barometer","Sniveling Todd","Mother",
+  "my second-in-command","the one you sent","poor doomed Cecil","Reginald","the accountant","Vespa",
+  "the new hire","Brünhilde","my most trusted lieutenant","the one they call Kevin","Pockets","Delores",
+];
+const UNDERLING_LINE = [
+  "\"{name}!\" — yes, you may flinch — {name} tried to stop me. {name} is no longer with us. {name} is filing a complaint with HR, which is worse.",
+  "I had an accomplice. A loyal one. {name}. But loyalty, like {noun}, curdles. {name} asked one question too many. {name} was reassigned to a different {place}.",
+  "Do you see {name} anywhere? No. Because {name} doubted the plan. And doubt, in my organization, is a {fate}.",
+  "{name} warned me it couldn't be done — that the {noun} was overdue, that the {noun2} would notice. {name} lacked vision. {name} lacks a desk now, too.",
+  "There was a {name}. There is not, at present, a {name}. The two facts are related, and I will say no more than that.",
+  "My underling — {name}, a promising sort — begged me to reconsider. I reconsidered. I did it {harder}. {name} has been thanked in the credits, which is all anyone can hope for.",
+];
+const UNDERLING_FILL = {
+  noun: ["milk","ambition","the spreadsheet","trust","warranty","enthusiasm","the yogurt in the break room"],
+  noun2: ["board","landlord","committee","auditors","neighbors","HOA","review board"],
+  place: ["department","time zone","dimension","open-plan office","filing cabinet","branch office"],
+  fate: ["luxury we cannot afford","fireable offense","slow, administrative death","one-way ticket to the mailroom"],
+  harder: ["harder","twice","with feeling","and I hummed while doing it","in bold"],
+};
+
+/* ---------- RHETORICAL QUESTIONS ---------- */
+const RHETORICAL = [
+  "Why {task_verb}, you ask? WHY? Because I {can}. Because no one thought I {would}. Because the world is a lock, and I — I am the key that fits nowhere and turns anyway.",
+  "You wonder what drives a person to such lengths. You wonder if there was another way. There is ALWAYS another way. I simply preferred {this_one}.",
+  "Did I have to do it like this? With the {drama}, the {flourish}, the {theatrics}? No. But where is the artistry in restraint?",
+  "You think me mad. But tell me — who is truly mad? The one who {task_verb}s? Or the one who, given the chance, does NOT?",
+  "Have you never wanted to seize a single ordinary day by the throat and make it {tremble}? No? Then you and I are nothing alike, and that is your tragedy.",
+  "What is a plan, truly, but a promise you make to the future? And I do not — I have NEVER — broken a promise. Ask {someone}. Oh. You cannot.",
+];
+const RHETORICAL_FILL = {
+  can: ["can","was born to","alone dared","have always been able to"],
+  would: ["would","would dare","had the stomach","could see it through"],
+  this_one: ["this one","the scenic route","the version with more shouting","the theatrical option"],
+  drama: ["drama","brooding","dramatic pauses","ominous lighting"],
+  flourish: ["flourish","cape","monologue you are currently enduring","unnecessary candles"],
+  theatrics: ["theatrics","fog machine","echo effect","slow, deliberate footsteps"],
+  tremble: ["tremble","beg","rethink its choices","reschedule itself"],
+  someone: ["my enemies","the last person who doubted me","the review board","anyone who's left"],
+};
+
+/* ---------- THE PLAN (grand, three-act) ---------- */
+const PLAN_INTRO = [
+  "Allow me to walk you through it, for you will not live to — no, forgive me, that was the OLD speech. You will live. You will simply have to listen.",
+  "The plan. Yes. You'll want to hear the plan. They always do. Very well.",
+  "Let me lay it bare, step by exquisite step, so that you might appreciate the {craft} of it.",
+  "I shall explain everything. Not because I must — but because a masterpiece unwitnessed is merely a {waste}.",
+];
+const PLAN_STEP = [
+  "First: I {act1}. Quietly. Patiently. The way {slow_thing}.",
+  "Then — and this is where the ordinary mind fails — I {act2}, timing it to the precise moment when no one is {watching}.",
+  "And finally, when the world least expects it, I {act3}. The {consequence} will be total. Irreversible. And {tone}.",
+];
+const PLAN_FILL = {
+  craft: ["craftsmanship","cruelty","elegance","precision","sheer audacity"],
+  waste: ["waste","tragedy","crime against ambition","tree falling in an empty forest"],
+  act1: ["gather what I require","move the first piece","secure the credentials","locate the correct form","acquire the necessary stamp","open the correct tab"],
+  slow_thing: ["glaciers gather","debt gathers","dust gathers on an unread contract","interest accrues","a kettle refuses to boil while watched"],
+  act2: ["strike","make my move","press SEND","tick the fatal box","initiate the sequence","hit CONFIRM with a steady hand"],
+  watching: ["watching","paying attention","expecting it","refreshing the page"],
+  act3: ["complete the deed","bring the whole edifice down","let it be done","seal the envelope","submit the form","close the loop forever"],
+  consequence: ["devastation","fallout","reckoning","transformation","paperwork"],
+  tone: ["glorious","beautiful","strangely anticlimactic, which somehow makes it worse","exactly on schedule"],
+};
+
+/* ---------- BOASTS / THREATS ---------- */
+const BOAST = [
+  "There is no force in this world — no {force}, no {force2}, no {force3} — that can undo what I am about to set in motion.",
+  "I have contingencies. I have contingencies for my contingencies. I have a laminated card.",
+  "You cannot appeal to my better nature. I sold it. Years ago. For {price}, if you must know, and I would do it again.",
+  "By the time anyone realizes what has happened, it will be finished, filed, and quietly forgotten by all but ME.",
+  "Every obstacle they placed before me — the {obstacle}, the {obstacle2}, the endless {obstacle3} — I have overcome, or scheduled around.",
+  "I am not a monster. A monster is impulsive. I am something far worse: I am ORGANIZED.",
+];
+const BOAST_FILL = {
+  force: ["army","committee","password requirement","spam filter"],
+  force2: ["deadline","firewall","two-factor authentication","automatic reply"],
+  force3: ["intervention","support ticket","terms of service","out-of-office notice"],
+  price: ["a modest sum","store credit","a coupon","surprisingly little","a gift card to a place that closed"],
+  obstacle: ["locked door","expired link","captcha","hold music"],
+  obstacle2: ["long form","broken printer","dead battery","frozen loading bar"],
+  obstacle3: ["queue","reminders","confirmation emails","'are you still there?' prompts"],
+};
+
+/* ---------- CLOSERS ---------- */
+const CLOSERS = [
+  "And now — NOW — nothing stands between me and {task}. Nothing but a formality. A gesture. A single… final… act. {laugh}",
+  "So run, if you like. Warn them, if you can. It changes nothing. It is, even now, being done. {laugh}",
+  "Remember this face. Remember this hour. For today, against all reason, I finally {task}. {laugh}",
+  "You may go. Tell them what you saw. Tell them the {villain} kept a promise — and that the promise was {task}. {laugh}",
+  "The kettle is on. The candles are lit. The form is loaded. All that remains is to {escalate} it. And I shall. Oh, I shall. {laugh}",
+  "It is done. Or it is very nearly done. Which, in my line of work, is the same as done, minus the paperwork. {laugh}",
+];
+const LAUGHS = [
+  "Mwahahaha.", "Ha. Ha. HA.", "*thunder cracks obligingly*", "Heh.",
+  "MWAHAHAHAHA.", "Ah-hahaha— *cough* —haha.", "Hahahaha! …Sorry. It's been a long week.",
+  "Behold my laughter. It is load-bearing.", "*a single dramatic candle flickers*",
+  "MWA— *checks the time* —HAHA.", "Hahaha. Anyway.", "The laugh writes itself, really.",
+];
+
+/* ---------- KICKER stingers under the speech ---------- */
+const STINGERS = [
+  "// He then, in fact, {task}.",
+  "// The {villain} was, by all accounts, very tired.",
+  "// No one clapped. The {villain} did not require it.",
+  "// Fog machine sold separately.",
+  "// This monologue is legally distinct from any real villain, living or brooding.",
+  "// Total runtime of actual task: 4 minutes.",
+  "// The cape was, frankly, unnecessary.",
+  "// Somewhere, a spreadsheet updated silently.",
+];
+
+/* ============================================================
+   ENGINE
+============================================================ */
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickFresh(arr, last){
+  if(arr.length < 2) return arr[0];
+  let v, guard=0;
+  do { v = pick(arr); } while(v === last && ++guard < 16);
+  return v;
+}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function esc(s){
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+// fill {tokens} from a plain map (each occurrence drawn fresh, escaped later)
+function fillFrom(str, map){
+  return str.replace(/\{(\w+)\}/g, (m, key) => {
+    if(map[key] === undefined) return m;
+    return pick(map[key]);
+  });
+}
+
+/* Escaped task fragments. taskRaw is the user text (already trimmed). */
+function makeTaskForms(taskRaw){
+  // strip a leading "I need to / I have to / I should" style intro if present
+  let t = taskRaw.replace(/^\s*(i\s+(need|have|want|ought|am\s+going|should|must)\s+to\s+|i\s+gotta\s+|i\s+will\s+|please\s+|to\s+|just\s+)/i, "").trim();
+  if(!t) t = taskRaw.trim();
+  // lowercase first letter for mid-sentence use unless it's an acronym-ish all-caps token
+  const firstWord = t.split(/\s+/)[0] || "";
+  const midT = (/^[A-Z]{2,}/.test(firstWord)) ? t : (t.charAt(0).toLowerCase()+t.slice(1));
+  return { mid: midT };
+}
+
+function villainName(){
+  const hon = pick(TITLE_HONORIFICS);
+  const adj = pick(VILLAIN_ADJ);
+  const noun = pick(VILLAIN_NOUN);
+  const dom = Math.random() < 0.72 ? " " + pick(VILLAIN_DOMAIN) : "";
+  const parts = [hon, adj, noun].filter(Boolean).join(" ");
+  return cap(parts) + dom;
+}
+
+let lastTitle=null, lastOpener=null, lastRhet=null, lastCloser=null, lastLaugh=null, lastVillain=null, lastStinger=null;
+
+/* Build the monologue as an array of paragraph objects.
+   Each paragraph: { html } already escaped + styled. */
+function buildMonologue(taskRaw){
+  const forms = makeTaskForms(taskRaw);
+  const escMid = esc(forms.mid);
+
+  const villain = pickFresh(VILLAIN_NOUN, null); // not used directly; full name below
+  let vname = villainName();
+  let g=0; while(vname === lastVillain && g++ < 8) vname = villainName();
+  lastVillain = vname;
+
+  const title = pickFresh(TITLES, lastTitle); lastTitle = title;
+
+  // helper to render a template string that may contain {task} + other tokens.
+  // We fill non-task tokens from the given map (unescaped source words -> escape whole thing),
+  // then splice the already-escaped task in as styled span.
+  const TASK_MARK = "TASK";
+  function render(tpl, map){
+    let s = tpl;
+    // task tokens first, to a sentinel that survives escaping
+    s = s.replace(/\{task\}/g, TASK_MARK);
+    s = s.replace(/\{task_verb\}/g, TASK_MARK); // treat verb-form same, we just reuse task noun-phrase
+    if(map) s = fillFrom(s, map);
+    s = esc(s);
+    // now style emphasis words already in template (ALL-CAPS words of len>=2) lightly — keep simple: bold blood on NOW/WHY/etc handled inline in text
+    s = s.split(TASK_MARK).join('<span class="em">'+escMid+'</span>');
+    return s;
+  }
+
+  const paras = [];
+
+  // 1. opener
+  paras.push(render(pickFresh(OPENERS, lastOpener), OPENER_FILL));
+  lastOpener = paras[paras.length-1];
+
+  // 2. the grand reframing of the task
+  {
+    const verb = pick(ESCALATE_VERB);
+    const frame = pick(GRAND_FRAME);
+    const line = "Tonight, I shall " + verb + " " + frame;
+    paras.push(render(line, {}));
+  }
+
+  // 3. rhetorical question
+  paras.push(render(pickFresh(RHETORICAL, lastRhet), RHETORICAL_FILL));
+  lastRhet = paras[paras.length-1];
+
+  // 4. doomed underling (with fresh name substitution)
+  {
+    const uname = pick(UNDERLING_NAME);
+    let tpl = pick(UNDERLING_LINE).replace(/\{name\}/g, () => esc(uname)); // pre-escape name, mark as raw
+    // We already escaped the name; but render() will escape again. So substitute name AFTER render via sentinel.
+    const NAME_MARK = "NAME";
+    tpl = pick(UNDERLING_LINE); // re-pick cleanly
+    tpl = tpl.replace(/\{name\}/g, NAME_MARK);
+    let s = fillFrom(tpl, UNDERLING_FILL);
+    s = esc(s);
+    s = s.split(NAME_MARK).join('<span class="em">'+esc(uname)+'</span>');
+    paras.push(s);
+  }
+
+  // 5. the plan (intro + up to 3 steps) — sometimes condensed
+  {
+    let planParas = [];
+    planParas.push(render(pick(PLAN_INTRO), PLAN_FILL));
+    const stepCount = Math.random() < 0.75 ? PLAN_STEP.length : 2;
+    for(let i=0;i<stepCount;i++){
+      planParas.push(render(PLAN_STEP[i], PLAN_FILL));
+    }
+    // join plan into a couple paragraphs for pacing
+    paras.push(planParas[0]);
+    paras.push(planParas.slice(1).join(" "));
+  }
+
+  // 6. boast/threat
+  paras.push(render(pick(BOAST), BOAST_FILL));
+
+  // 7. closer + laugh
+  {
+    const laugh = pickFresh(LAUGHS, lastLaugh); lastLaugh = laugh;
+    let s = render(pickFresh(CLOSERS, lastCloser).replace(/\{escalate\}/g, pick(ESCALATE_VERB)), {villain:[vname]});
+    lastCloser = s;
+    // laugh token
+    s = s.replace(/\{laugh\}/g, '<span class="boom">'+esc(laugh)+'</span>');
+    paras.push(s);
+  }
+
+  // stinger
+  const stinger = pickFresh(STINGERS, lastStinger); lastStinger = stinger;
+  const stingerHTML = render(stinger, {villain:[vname]});
+
+  return { paras, title, villain: vname, stinger: stingerHTML, plainTask: forms.mid };
+}
+
+/* ============================================================
+   RENDER + TYPEWRITER
+============================================================ */
+
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let typing = null;        // active typewriter controller
+let currentMono = null;
+
+const taskEl = document.getElementById('task');
+const genBtn = document.getElementById('gen-btn');
+const hintEl = document.getElementById('hint');
+const stage = document.getElementById('stage');
+const flash = document.getElementById('flash');
+const toastEl = document.getElementById('toast');
+
+function thunder(){
+  if(prefersReduced) return;
+  flash.classList.remove('strike');
+  // reflow to restart animation
+  void flash.offsetWidth;
+  flash.classList.add('strike');
+}
+
+function stopTyping(){
+  if(typing){ typing.cancelled = true; if(typing.timer) clearTimeout(typing.timer); typing = null; }
+}
+
+function scaffold(mono){
+  // Build the slab shell; paragraphs get filled by typewriter.
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+  const caseNo = String(Math.floor(Math.random()*9000)+1000);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'slab fade-in';
+  wrap.innerHTML =
+    '<div class="slab-head">'+
+      '<span>Transcript &middot; Case '+caseNo+' &middot; '+time+'</span>'+
+      '<span class="live"><span class="ember"></span>ON RECORD</span>'+
+    '</div>'+
+    '<div class="villain-name">As delivered by <b>'+esc(mono.villain)+'</b></div>'+
+    '<div class="title" id="mono-title"></div>'+
+    '<div class="title-rule"></div>'+
+    '<div class="speech" id="mono-speech"></div>'+
+    '<div class="kicker-line" id="mono-stinger" style="opacity:0"></div>'+
+    '<div class="actions">'+
+      '<button class="mini" id="again-btn">↻ Monologue Again</button>'+
+      '<button class="mini" id="copy-btn">⎘ Copy Monologue</button>'+
+      '<button class="mini" id="skip-btn">⏭ Skip Reveal</button>'+
+    '</div>';
+  stage.innerHTML = '';
+  stage.appendChild(wrap);
+
+  document.getElementById('again-btn').addEventListener('click', () => run(currentMono.sourceTask));
+  document.getElementById('copy-btn').addEventListener('click', copyMonologue);
+  const skip = document.getElementById('skip-btn');
+  skip.addEventListener('click', () => { if(typing){ typing.skip(); } });
+
+  return wrap;
+}
+
+/* Typewriter that reveals paragraphs one at a time. Emphasis spans are
+   pre-parsed into segments so styling survives character-by-character reveal. */
+function typewriter(speechEl, titleEl, stingerEl, mono){
+  const titleText = mono.title;
+
+  // Parse each paragraph HTML into a list of {tag, text} segments.
+  // We only ever emit <span class="..."> ... </span> wrappers, so a light parser suffices.
+  function parseSegments(html){
+    const segs = [];
+    const re = /<span class="([^"]+)">([\s\S]*?)<\/span>|([^<]+)/g;
+    let m;
+    while((m = re.exec(html)) !== null){
+      if(m[1] !== undefined){
+        segs.push({ cls:m[1], text: decodeEnt(m[2]) });
+      } else if(m[3] !== undefined){
+        segs.push({ cls:null, text: decodeEnt(m[3]) });
+      }
+    }
+    return segs;
+  }
+  function decodeEnt(s){
+    return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+  }
+
+  const paraSegs = mono.paras.map(parseSegments);
+
+  const ctrl = { cancelled:false, timer:null, skip:null };
+
+  if(prefersReduced){
+    // no animation: render everything instantly
+    titleEl.textContent = titleText;
+    speechEl.innerHTML = mono.paras.map(p => '<p>'+p+'</p>').join('');
+    stingerEl.innerHTML = mono.stinger;
+    stingerEl.style.opacity = '1';
+    return ctrl;
+  }
+
+  // build empty <p> nodes with a caret in the first
+  const pNodes = paraSegs.map(() => { const p=document.createElement('p'); p.style.opacity='0'; return p; });
+  pNodes.forEach(p => speechEl.appendChild(p));
+
+  let pi = 0, si = 0, ci = 0;
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  caret.textContent = '▍';
+
+  // reveal title first (fast), then body
+  let titleDone = false;
+  let ti = 0;
+
+  function finishAll(){
+    ctrl.cancelled = true;
+    if(ctrl.timer) clearTimeout(ctrl.timer);
+    titleEl.textContent = titleText;
+    speechEl.innerHTML = mono.paras.map(p => '<p>'+p+'</p>').join('');
+    stingerEl.innerHTML = mono.stinger;
+    stingerEl.style.opacity = '1';
+    if(caret.parentNode) caret.parentNode.removeChild(caret);
+  }
+  ctrl.skip = finishAll;
+
+  function ensureCaret(node){
+    if(caret.parentNode !== node) node.appendChild(caret);
+  }
+
+  function stepTitle(){
+    if(ctrl.cancelled) return;
+    ti++;
+    titleEl.textContent = titleText.slice(0, ti);
+    if(ti < titleText.length){
+      ctrl.timer = setTimeout(stepTitle, 34 + Math.random()*30);
+    } else {
+      titleDone = true;
+      thunder();
+      ctrl.timer = setTimeout(stepBody, 340);
+    }
+  }
+
+  let boomedThisPara = false;
+
+  function stepBody(){
+    if(ctrl.cancelled) return;
+    if(pi >= paraSegs.length){
+      // done — reveal stinger
+      if(caret.parentNode) caret.parentNode.removeChild(caret);
+      stingerEl.innerHTML = mono.stinger;
+      stingerEl.style.opacity = '1';
+      return;
+    }
+    const segs = paraSegs[pi];
+    const pNode = pNodes[pi];
+    pNode.style.opacity = '1';
+
+    if(si >= segs.length){
+      // paragraph complete → pause, next
+      pi++; si = 0; ci = 0; boomedThisPara = false;
+      // dramatic pause between paragraphs
+      ctrl.timer = setTimeout(stepBody, 300 + Math.random()*260);
+      return;
+    }
+
+    const seg = segs[si];
+    // find or create the span node for this segment
+    let host = pNode.__hosts && pNode.__hosts[si];
+    if(!host){
+      if(seg.cls){ host = document.createElement('span'); host.className = seg.cls; }
+      else { host = document.createElement('span'); }
+      pNode.appendChild(host);
+      pNode.__hosts = pNode.__hosts || [];
+      pNode.__hosts[si] = host;
+    }
+
+    ci++;
+    host.textContent = seg.text.slice(0, ci);
+    ensureCaret(pNode);
+
+    // thunder crack on the "boom" laugh segment once
+    if(seg.cls === 'boom' && !boomedThisPara){ boomedThisPara = true; thunder(); }
+
+    if(ci < seg.text.length){
+      const ch = seg.text.charAt(ci-1);
+      let delay = 15 + Math.random()*22;
+      if(/[,;:—]/.test(ch)) delay += 130;
+      if(/[.!?]/.test(ch)) delay += 240;
+      if(ch === ' ' && Math.random() < 0.06) delay += 40;
+      ctrl.timer = setTimeout(stepBody, delay);
+    } else {
+      si++; ci = 0;
+      ctrl.timer = setTimeout(stepBody, 12);
+    }
+  }
+
+  // kick off
+  ctrl.timer = setTimeout(stepTitle, 120);
+  return ctrl;
+}
+
+/* ============================================================
+   RUN
+============================================================ */
+
+function run(taskRaw){
+  const t = (taskRaw || "").trim();
+  if(!t) return;
+  stopTyping();
+
+  const mono = buildMonologue(t);
+  mono.sourceTask = t;
+  currentMono = mono;
+
+  const wrap = scaffold(mono);
+  const speechEl = document.getElementById('mono-speech');
+  const titleEl = document.getElementById('mono-title');
+  const stingerEl = document.getElementById('mono-stinger');
+
+  typing = typewriter(speechEl, titleEl, stingerEl, mono);
+
+  wrap.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' });
+}
+
+/* ---------- plain text for copy ---------- */
+function monoToText(mono){
+  const L = [];
+  L.push('❝ ' + mono.title + ' ❞');
+  L.push('— as delivered by ' + mono.villain);
+  L.push('');
+  mono.paras.forEach(p => {
+    // strip span tags, decode entities
+    const txt = p.replace(/<[^>]+>/g,'')
+      .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+    L.push(txt);
+    L.push('');
+  });
+  const st = mono.stinger.replace(/<[^>]+>/g,'')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+  L.push(st);
+  L.push('');
+  L.push('— translated by The Villain Monologue Translator, a Prízrak offering');
+  return L.join('\n');
+}
+
+function copyMonologue(){
+  if(!currentMono) return;
+  const btn = document.getElementById('copy-btn');
+  const text = monoToText(currentMono);
+  const done = () => { showToast('Monologue committed to the record.'); if(btn){ btn.classList.add('copied'); const o=btn.innerHTML; btn.innerHTML='✓ Copied'; setTimeout(()=>{btn.classList.remove('copied'); btn.innerHTML=o;},1800);} };
+  const fail = () => showToast('Copy failed. Recite it from memory.');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done, fail));
+  } else {
+    fallbackCopy(text, done, fail);
+  }
+}
+function fallbackCopy(text, done, fail){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){ fail(); }
+}
+
+let toastTimer = null;
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+}
+
+/* ============================================================
+   INPUT WIRING
+============================================================ */
+
+function autosize(){
+  taskEl.style.height = 'auto';
+  taskEl.style.height = Math.min(taskEl.scrollHeight, 200) + 'px';
+}
+
+function updateReady(){
+  const has = taskEl.value.trim().length > 0;
+  genBtn.disabled = !has;
+  hintEl.textContent = has
+    ? 'Ready. Behold what tedium becomes.'
+    : 'Type a dull little task above.';
+}
+
+taskEl.addEventListener('input', () => { autosize(); updateReady(); });
+taskEl.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    if(taskEl.value.trim()) run(taskEl.value);
+  }
+});
+
+genBtn.addEventListener('click', () => run(taskEl.value));
+
+/* example chips */
+const exWrap = document.getElementById('examples');
+EXAMPLES.forEach(ex => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ex';
+  b.textContent = ex;
+  b.addEventListener('click', () => {
+    taskEl.value = ex;
+    autosize(); updateReady();
+    run(ex);
+  });
+  exWrap.appendChild(b);
+});
+
+// rotate placeholder for a little life
+let phIdx = 0;
+taskEl.setAttribute('placeholder', 'e.g. ' + EXAMPLES[0]);
+setInterval(() => {
+  if(document.activeElement === taskEl || taskEl.value) return;
+  phIdx = (phIdx + 1) % EXAMPLES.length;
+  taskEl.setAttribute('placeholder', 'e.g. ' + EXAMPLES[phIdx]);
+}, 3200);
+
+updateReady();
+</script>
+</body>
+</html>

@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Life in Loading Screens · Prizrak</title>
+  <style>
+    :root {
+      --ink:#07070a; --ink-1:#0b0b10; --ink-2:#101018; --ink-3:#16161f;
+      --bone:#e9e4d6; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#454139;
+      --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.16);
+      --gold:#e3b341; --gold-dim:#8a6a1e; --fox:#86e0c0; --fox-dim:#3f6b5f;
+      --hot:#e08a8a; --violet:#b3a0e0;
+      --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+      --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+    }
+    * { box-sizing:border-box; }
+    html { -webkit-text-size-adjust:100%; }
+    body {
+      margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+      min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+      -webkit-font-smoothing:antialiased;
+    }
+    body::before {
+      content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+      background:
+        radial-gradient(130% 90% at 50% -15%, rgba(227,179,65,.07), transparent 55%),
+        radial-gradient(110% 60% at 50% 120%, rgba(70,58,92,.12), transparent 60%),
+        var(--ink);
+    }
+    body::after {
+      content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .wrap { max-width:720px; margin:0 auto; padding:40px 20px 56px; }
+    @media (min-width:640px) { .wrap { padding:56px 32px; } }
+
+    .mono { font-family:var(--mono); }
+    .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em; font-size:10px; color:var(--ash-2); }
+    .specter { color:var(--gold); font-style:italic; font-weight:500; }
+    ::selection { background:rgba(227,179,65,.22); color:#fff; }
+
+    header { text-align:center; margin-bottom:34px; }
+    h1 {
+      font-family:var(--serif); font-size:clamp(2.1rem,7.5vw,3.5rem); font-weight:800;
+      line-height:.96; letter-spacing:-.02em; margin:12px 0 0;
+    }
+    .sub {
+      margin:14px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+      max-width:32rem; line-height:1.55;
+    }
+
+    /* input */
+    .prompt-row { margin:0 auto 6px; max-width:520px; }
+    .prompt-label { font-family:var(--mono); text-transform:uppercase; letter-spacing:.2em; font-size:10px; color:var(--ash-2); margin-bottom:10px; display:block; text-align:center; }
+    .field {
+      display:flex; gap:10px; align-items:stretch;
+    }
+    .task-input {
+      flex:1; font-family:var(--serif); font-size:16px; color:var(--bone);
+      background:var(--ink-1); border:1px solid var(--rule-2); border-radius:6px;
+      padding:14px 16px; outline:none; transition:border-color .2s, box-shadow .2s; min-width:0;
+    }
+    .task-input::placeholder { color:var(--ash-3); font-style:italic; }
+    .task-input:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(227,179,65,.08); }
+    .go-btn {
+      font-family:var(--mono); text-transform:uppercase; letter-spacing:.14em; font-size:12px;
+      padding:0 22px; background:linear-gradient(135deg,var(--gold-dim),var(--gold));
+      border:none; border-radius:6px; color:var(--ink); cursor:pointer; font-weight:700;
+      transition:transform .15s, box-shadow .2s, opacity .2s; white-space:nowrap;
+    }
+    .go-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 24px -8px rgba(227,179,65,.55); }
+    .go-btn:active:not(:disabled) { transform:translateY(0); }
+    .go-btn:disabled { opacity:.4; cursor:not-allowed; filter:grayscale(.4); }
+
+    .suggest { text-align:center; margin:16px 0 4px; font-family:var(--mono); font-size:11px; color:var(--ash-3); }
+    .suggest .try {
+      color:var(--ash); border-bottom:1px dotted var(--ash-3); cursor:pointer; margin:0 3px;
+      transition:color .18s, border-color .18s;
+    }
+    .suggest .try:hover { color:var(--gold); border-color:var(--gold-dim); }
+
+    /* the loading screen console */
+    #screen-area { margin-top:30px; }
+    .console {
+      position:relative; border:1px solid var(--rule-2); border-radius:10px; overflow:hidden;
+      background:
+        radial-gradient(140% 100% at 50% -20%, rgba(179,160,224,.09), transparent 60%),
+        linear-gradient(180deg,#0c0c13,#070709);
+      box-shadow:0 30px 70px -34px rgba(0,0,0,.85), inset 0 0 60px rgba(0,0,0,.5);
+      padding:26px 24px 22px; min-height:340px;
+    }
+    /* scanline sheen */
+    .console::after {
+      content:""; position:absolute; inset:0; pointer-events:none; z-index:2; opacity:.5;
+      background:repeating-linear-gradient(180deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px);
+    }
+    .console > * { position:relative; z-index:1; }
+
+    .top-line {
+      display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+      font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+      color:var(--ash-3); border-bottom:1px solid var(--rule); padding-bottom:12px; margin-bottom:20px;
+    }
+    .top-line .build-id { color:var(--ash-2); }
+    .top-line .region { color:var(--fox-dim); }
+
+    .now-loading { font-family:var(--mono); font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+    .title-line {
+      font-family:var(--serif); font-weight:800; font-size:clamp(22px,5.2vw,32px);
+      line-height:1.08; letter-spacing:-.01em; color:var(--bone);
+      text-shadow:0 0 26px rgba(227,179,65,.18); margin:0 0 6px; word-wrap:break-word;
+    }
+    .subtitle-line { font-family:var(--serif); font-style:italic; font-size:14px; color:var(--ash); margin-bottom:24px; }
+
+    /* objective card */
+    .objective {
+      border-left:2px solid var(--gold-dim); background:rgba(227,179,65,.035);
+      padding:12px 14px; border-radius:0 6px 6px 0; margin-bottom:22px;
+    }
+    .obj-head { font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+    .obj-diamond { color:var(--gold); }
+    .obj-text { font-size:14px; color:var(--bone); line-height:1.5; }
+    .obj-sub { font-family:var(--mono); font-size:10px; color:var(--ash-2); margin-top:6px; letter-spacing:.04em; }
+
+    /* progress */
+    .bar-wrap { margin-bottom:6px; }
+    .bar-track {
+      height:14px; border-radius:8px; background:var(--ink-2); overflow:hidden;
+      border:1px solid var(--rule); position:relative;
+    }
+    .bar-fill {
+      height:100%; width:0%; border-radius:8px;
+      background:linear-gradient(90deg,var(--gold-dim),var(--gold));
+      box-shadow:0 0 16px rgba(227,179,65,.45); position:relative;
+      transition:width .32s cubic-bezier(.3,.7,.3,1);
+    }
+    .bar-fill::after {
+      content:""; position:absolute; inset:0; border-radius:8px;
+      background:linear-gradient(90deg,transparent, rgba(255,255,255,.28), transparent);
+      background-size:60px 100%; background-repeat:no-repeat;
+      animation:sheen 1.6s linear infinite;
+    }
+    @keyframes sheen { 0%{ background-position:-70px 0; } 100%{ background-position:calc(100% + 70px) 0; } }
+    .bar-fill.done { background:linear-gradient(90deg,var(--fox-dim),var(--fox)); box-shadow:0 0 20px rgba(134,224,192,.5); }
+
+    .bar-meta { display:flex; justify-content:space-between; align-items:center; font-family:var(--mono); font-size:11px; margin-top:9px; color:var(--ash); letter-spacing:.03em; min-height:16px; }
+    .pct { color:var(--gold); font-weight:600; }
+    .pct.done { color:var(--fox); }
+    .status-txt { color:var(--ash-2); font-size:10.5px; text-align:right; }
+    .status-txt.stall { color:var(--hot); }
+    .status-txt.done { color:var(--fox); }
+
+    /* spinner + hint */
+    .hint-row {
+      display:flex; gap:14px; align-items:flex-start; margin-top:26px;
+      border-top:1px solid var(--rule); padding-top:20px;
+    }
+    .spinner {
+      flex:0 0 auto; width:26px; height:26px; margin-top:2px;
+      border:2.5px solid var(--rule-2); border-top-color:var(--gold);
+      border-radius:50%; animation:spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .spinner.done { border-top-color:var(--fox); animation:none; border-color:var(--fox-dim); border-top-color:var(--fox); }
+    .hint-body { flex:1; min-width:0; }
+    .hint-label { font-family:var(--mono); font-size:9px; letter-spacing:.24em; text-transform:uppercase; color:var(--fox); margin-bottom:6px; }
+    .hint-text { font-size:14px; line-height:1.55; color:var(--ash); min-height:44px; transition:opacity .3s; }
+    .hint-text.swapping { opacity:0; }
+    .hint-text b { color:var(--bone); font-weight:600; font-style:normal; }
+
+    /* fake press-any-key on completion */
+    .press-key {
+      text-align:center; font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+      color:var(--fox); margin-top:24px; opacity:0; animation:blink 1.3s ease-in-out infinite;
+    }
+    .press-key.show { opacity:1; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; justify-content:center; }
+    .mini {
+      font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+      border:1px solid var(--rule-2); border-radius:6px; color:var(--ash); cursor:pointer;
+      transition:border-color .2s,color .2s,background .2s,transform .1s; display:inline-flex; align-items:center; gap:7px;
+    }
+    .mini:hover { border-color:var(--gold); color:var(--bone); background:var(--ink-2); }
+    .mini:active { transform:translateY(1px); }
+    .mini.primary { border-color:var(--fox-dim); color:var(--fox); }
+    .mini.primary:hover { border-color:var(--fox); background:rgba(134,224,192,.06); }
+
+    .toast {
+      position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+      background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+      font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+      opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:50;
+      box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em;
+    }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    .footer { text-align:center; margin-top:46px; padding-top:24px; border-top:1px solid var(--rule); }
+    .footer .kicker { line-height:1.7; }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    .animate-in { animation:fadeUp .5s cubic-bezier(.2,.7,.2,1) both; }
+
+    @media (prefers-reduced-motion:reduce) {
+      *, *::before, *::after { animation:none !important; transition:none !important; }
+      body::after { display:none; }
+      .spinner { border-top-color:var(--gold); }
+      .press-key { opacity:1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prizrak — random offering</div>
+      <h1>Your Life in <span class="specter">Loading Screens</span></h1>
+      <p class="sub">Every mundane task is, secretly, a mission in a wildly overbudget video game. Name what you have to do and our engine will render the loading screen it deserves — lore, objectives, and a progress bar that will absolutely stall at 97%.</p>
+    </header>
+
+    <div class="prompt-row">
+      <span class="prompt-label">Enter the task to be loaded</span>
+      <div class="field">
+        <input id="task-input" class="task-input" type="text" maxlength="80"
+          placeholder="doing laundry / replying to Dave / going to bed…" autocomplete="off" spellcheck="false">
+        <button id="go-btn" class="go-btn">Load</button>
+      </div>
+    </div>
+
+    <div class="suggest" id="suggest">Try:
+      <span class="try">doing laundry</span> ·
+      <span class="try">replying to Dave</span> ·
+      <span class="try">making coffee</span> ·
+      <span class="try">taking out the trash</span>
+    </div>
+
+    <div id="screen-area" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">Now loading · please do not turn off your life · tip 4 of ∞</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ CONTENT POOLS ============================ */
+
+/* Grand epic-title prefixes/suffixes — wraps the player's mundane task in AAA gravitas. */
+const TITLE_PREFIX = [
+  "The Long Road to", "Echoes of", "A Requiem for", "Shadow of the", "Rise of the",
+  "The Last", "Chronicles of", "Beyond the", "The Reckoning of", "Legends of the",
+  "The Burden of", "Ashes of", "The Forgotten", "Whispers of", "The Trials of",
+  "Dawn of the", "The Eternal", "Vestige of the", "The Silence Before", "Tale of the",
+  "The Weight of", "Requiem: ", "Blight of the", "The Awakening of", "Saga of the",
+  "The Reluctant", "Twilight of the", "The Endless", "Covenant of the", "The Quiet",
+];
+const TITLE_SUFFIX = [
+  "Undying", "Forgotten Sink", "Ninth Hour", "Damp Sock", "Chosen One",
+  "Broken Kettle", "Unfinished Draft", "Sunday", "Reluctant Adult",
+  "Lukewarm Coffee", "Unread Messages", "Second Alarm", "Crumbling Deadline",
+  "Lost Charger", "Empty Fridge", "Passive Voice", "Overdue Reply",
+  "Unmade Bed", "Final Email", "Distant Dishwasher", "Slow Elevator",
+  "Missing Left Shoe", "Endless Scroll", "Cold Handshake", "Unpaid Invoice",
+];
+
+/* Subtitles under the title — melodramatic tagline energy. */
+const SUBTITLES = [
+  "A story about courage, sacrifice, and doing it later.",
+  "This time, it's personal. It was always personal.",
+  "Some tasks were never meant to be completed.",
+  "In a world that could not wait, one person almost got around to it.",
+  "The journey of a thousand steps begins with pretending you didn't see it.",
+  "No heroes. No glory. Just this, and then probably lunch.",
+  "An epic told in seven parts, of which you will finish two.",
+  "They said it couldn't be avoided. They were, tragically, wrong.",
+  "A tale as old as the notification that started it.",
+  "Where every choice matters, and none of them are good.",
+  "Loading a world that would rather you didn't.",
+  "The stakes have never been lower. The dread has never been higher.",
+  "One task. One player. Zero enthusiasm.",
+  "Rated M for Mildly Inconvenient.",
+  "Featuring a fully realized world you will experience for four minutes.",
+  "A haunting meditation on the phrase 'in a bit.'",
+];
+
+/* Objective verbs — the epic reframing of a mundane action. */
+const OBJ_LEADS = [
+  "Traverse", "Overcome", "Confront", "Survive", "Endure", "Reclaim",
+  "Navigate", "Withstand", "Vanquish", "Broker peace with", "Outlast",
+  "Bear witness to", "Escape", "Make peace with", "Descend into", "Ascend beyond",
+];
+const OBJ_TARGETS = [
+  "the Hamper of Regret", "the Kingdom of Unwashed Mugs", "the Notification Wastes",
+  "the Bureaucracy of the Second Coffee", "the Labyrinth of the Junk Drawer",
+  "the Endless Corridor of 'We Need to Talk'", "the Great Pile", "the Fridge of Forgotten Leftovers",
+  "the Dread Sofa", "the Realm of Left-on-Read", "the Abyss Beneath the Bed",
+  "the Council of Unanswered Group Chats", "the Swamp of the Overdue Bill",
+  "the Tower of Tupperware Without Lids", "the Plains of the Snooze Button",
+  "the Cursed Inbox", "the Gauntlet of Small Talk", "the Vault of Loose Cables",
+  "the Marsh of the Unfolded Fitted Sheet", "the Long Dark of the Meeting That Could've Been an Email",
+];
+const OBJ_MODIFIERS = [
+  "before the coffee goes cold", "without waking the others", "using only your remaining willpower",
+  "while pretending to be a functional adult", "before anyone notices you haven't started",
+  "under the crushing weight of your own to-do list", "in a single sitting (impossible)",
+  "with no XP, no potions, and one (1) clean spoon", "before the motivation fully evaporates",
+  "while a podcast plays in the background you are no longer following",
+  "with the vague sense that you've done this before", "on hard mode, which is the only mode",
+  "before the deadline achieves sentience", "without checking your phone even once (failed)",
+];
+
+/* Objective sub-line: fake tracking / difficulty flavor. */
+const OBJ_SUBS = [
+  "OPTIONAL: Do it well. (Reward: nothing.)",
+  "PROGRESS: 0 / 1 — but each one feels like a hundred.",
+  "DIFFICULTY: Adaptive. It gets harder if it senses you care.",
+  "BONUS OBJECTIVE: Do not sigh audibly. (You will.)",
+  "WARNING: This objective has no checkpoint.",
+  "SIDE QUEST unlocked: 'Just This One Other Thing First.'",
+  "AUTOSAVE disabled. Please suffer responsibly.",
+  "PARTY MEMBERS: 1 (you) — the rest bailed.",
+  "TIME LIMIT: soft, imaginary, and deeply felt.",
+  "MASTERY: possible in theory. Never observed in the wild.",
+];
+
+/* Genre / studio flavor line for the top bar. */
+const STUDIOS = [
+  "Procrastination Interactive", "Kettleworth Studios", "DEADLINE Entertainment",
+  "Grim Sock Games", "Monday Softworks", "Overdue Digital", "Reluctant Hero Ltd.",
+  "Lukewarm Interactive", "Snooze Button Studios", "Ashen Hamper Collective",
+  "Vague Anxiety Games", "The Sighing Company", "Unread Softworks", "Later Later Later Inc.",
+];
+const ENGINES = [
+  "Dreadframe", "SighEngine 4", "AnxietyWorks", "MundaneReality™", "GritDrive",
+  "Unreal-ish 5", "The Procrastin-8", "Existential FX", "LimboRender", "Doomscroll HD",
+];
+const REGIONS = ["NA-EAST", "EU-DREAD", "SEA-TIRED", "LATE-NIGHT", "PST-BARELY", "OCE-YAWN", "GLOBAL-SIGH"];
+
+/* Difficulty labels shown while loading. */
+const DIFFICULTIES = [
+  "STORY MODE (still hard)", "NORMAL, EMOTIONALLY", "NIGHTMARE (SELF-IMPOSED)",
+  "CASUAL (you'll cry anyway)", "REALISTIC — SO REALISTIC", "IMPOSSIBLE (chosen accidentally)",
+  "TUTORIAL (never ends)", "HARDCORE — NO RESPAWN, NO SNACKS",
+];
+
+/* Rotating LOADING TIPS — the beating heart of the toy. Big pool. */
+const TIPS = [
+  "TIP: Holding the task in your mind for 40 minutes does not count as starting it.",
+  "TIP: The dishes cannot smell fear, but they can wait longer than you can.",
+  "TIP: Press SIGH to vent excess dread. Some dread is required for later levels.",
+  "TIP: Enemies are weak to 'just doing it,' a move you have not yet unlocked.",
+  "TIP: Your motivation regenerates slowly. Standing near the couch pauses regeneration.",
+  "TIP: If a task feels too big, break it into smaller tasks you will also not do.",
+  "TIP: The tutorial ended years ago. You were, tragically, not paying attention.",
+  "TIP: Coffee grants +2 Resolve for 20 minutes, then applies the 'Jittery' debuff.",
+  "TIP: You cannot pause real life, but you can minimize it and hope for the best.",
+  "TIP: The 'I'll do it after this episode' quest has no known completion state.",
+  "TIP: Fast travel is unavailable. You must walk to the kitchen like everyone else.",
+  "TIP: Some doors require a key. Others require you to simply push instead of pull.",
+  "TIP: Rest at a save point (your bed) to recover HP. Warning: you may not return.",
+  "TIP: The mini-map does not show where you left your other sock. No map does.",
+  "TIP: 'Later' is not a location. You cannot travel there. You have tried.",
+  "TIP: Reply to Dave. Dave can see you were online. Dave always knows.",
+  "TIP: Crafting requires materials you own but cannot currently locate.",
+  "TIP: The 'productive morning' achievement is real but statistically unearned.",
+  "TIP: Do not attack the laundry directly. It has more HP than you and infinite patience.",
+  "TIP: Loading real life takes time. Real life is a very large file and poorly optimized.",
+  "TIP: The boss music you hear is just the dishwasher. There is no boss. There is only you.",
+  "TIP: Water your houseplants to prevent the 'Silent Judgment' area effect.",
+  "TIP: You have 47 side quests active. The main quest has quietly given up on you.",
+  "TIP: 'Five more minutes' costs five more minutes. This price never goes down.",
+  "TIP: Making the bed grants a passive +1 to feeling like you have your life together.",
+  "TIP: There is no difficulty setting below the one you are currently on. We checked.",
+  "TIP: The inbox respawns. It always respawns. Archiving only delays the horde.",
+  "TIP: Standing up counts as movement. Movement counts as progress. Barely.",
+  "TIP: The kettle is not slow. Time simply moves differently when you are waiting for it.",
+  "TIP: You can carry unlimited emotional baggage but only two grocery bags.",
+  "TIP: NPCs will ask 'how are you?' Do not attempt an honest answer. It softlocks them.",
+  "TIP: The trash does not take itself out. This is the game's most controversial mechanic.",
+  "TIP: Sitting down to 'plan' the task is a trap room. There is no exit. Only snacks.",
+  "TIP: Your future self is not a co-op partner. Your future self is also stuck here.",
+  "TIP: Opening the fridge does not update its contents. This is a known bug. Won't fix.",
+  "TIP: The tutorial NPC (your mother) is unavailable but disappointed remotely.",
+  "TIP: Charging your phone to 100% is the only quest in this game you can actually finish.",
+  "TIP: Beware the Scroll of Endless Feed. It grants nothing and takes an hour.",
+  "TIP: 'I work better under pressure' is a starting perk, not a strategy. Reroll if possible.",
+  "TIP: The floor is not lava, but the pile of clean clothes on the chair is now load-bearing.",
+  "TIP: Snoozing the alarm does not add levels to the day. The day is not grindable.",
+  "TIP: You have unspent talent points. You have had them for eleven years.",
+  "TIP: The 'quick shower' has a 30% chance of becoming a 40-minute existential event.",
+  "TIP: Answering one email spawns three. This ratio is not adjustable in the settings.",
+  "TIP: Petting the cat is not procrastination. Petting the cat is the endgame content.",
+  "TIP: You cannot outrun the Sunday Scaries. But you can invite them in for tea.",
+  "TIP: The overdue library book is now a legendary item. It cannot be returned. Only feared.",
+];
+
+/* Fake progress-stage status messages, ordered-ish but drawn from bucket by band. */
+const STATUS_EARLY = [
+  "Initializing dread…", "Compiling excuses…", "Loading world geometry…",
+  "Summoning the will to begin…", "Buffering motivation…", "Waking up NPCs…",
+  "Rendering the pile…", "Warming up the kettle subsystem…", "Allocating patience…",
+  "Loading textures (procrastination.png)…", "Spawning obstacles…", "Booting up the day…",
+  "Decompressing responsibilities…", "Streaming ambient guilt…",
+];
+const STATUS_MID = [
+  "Syncing with the group chat…", "Baking lighting for the good mood…",
+  "Resolving conflicts with the couch…", "Loading Dave…", "Calibrating the snooze button…",
+  "Populating the hamper…", "Applying realistic fatigue effects…", "Negotiating with the alarm…",
+  "Rendering distant chores…", "Loading save file 'MONDAY_FINAL_v3_real'…",
+  "Optimizing shaders (you won't notice)…", "Establishing eye contact with the to-do list…",
+  "Fetching the willpower asset bundle…",
+];
+const STATUS_LATE = [
+  "Finalizing the finish line…", "Almost there…", "Nearly done…",
+  "Loading the last 3%…", "Just about ready…", "Wrapping up…",
+  "Preparing to begin…", "Finishing the loading of the loading…",
+];
+const STATUS_STALL = [
+  "…still loading the last 3%.", "Please wait. It is thinking about it.",
+  "Establishing connection to your better self… (timeout in 4s)",
+  "This part always does this. Do not turn off your life.",
+  "Hang on. The engine is having a moment.",
+  "Almost. It's just… savoring the anticipation.",
+  "Loading… loading… we regret to inform you it is still loading.",
+  "Rebuilding the shader cache for no clear reason.",
+  "The progress bar has entered its villain arc.",
+  "Retrying… retrying… (the retry is also stuck)",
+];
+const STATUS_DONE = [
+  "LOADED. Press any key to begin dreading it in real time.",
+  "Ready. The task awaits. So does everything else.",
+  "Load complete. Good luck. You'll need a snack.",
+  "Done. Reality has finished streaming. Enjoy responsibly.",
+  "LOADED at last. The bar forgives you. Do not thank it.",
+  "Complete. Achievement pending: actually doing the thing.",
+];
+
+/* Press-any-key flavor. */
+const PRESS_KEY = [
+  "▸ PRESS ANY KEY TO BEGIN ◂",
+  "▸ PRESS START TO PROCRASTINATE ◂",
+  "▸ HIT ANY KEY (OR DON'T, HONESTLY) ◂",
+  "▸ PRESS X TO SIGH · PRESS START TO CONTINUE ◂",
+  "▸ CONTINUE? — YES / LATER / NEVER ◂",
+];
+
+/* Small starter suggestions rotate too. */
+const SUGGESTIONS = [
+  "doing laundry", "replying to Dave", "making coffee", "taking out the trash",
+  "going to the gym", "washing the dishes", "answering emails", "getting out of bed",
+  "calling the dentist", "folding the laundry", "cleaning the bathroom", "meal prepping",
+  "returning that package", "texting Mom back", "starting the report", "watering the plants",
+];
+
+/* ============================ RNG / PICK ============================ */
+function makeRng(seed){
+  let s = (seed >>> 0) || 1;
+  return function(){
+    s ^= s << 13; s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5;  s >>>= 0;
+    return (s >>> 0) / 4294967296;
+  };
+}
+function pick(arr, rng){ return arr[Math.floor((rng?rng():Math.random()) * arr.length)]; }
+function pickFresh(arr, rng, last){
+  if (arr.length < 2) return arr[0];
+  let v, guard = 0;
+  do { v = pick(arr, rng); } while (v === last && ++guard < 14);
+  return v;
+}
+function rint(rng, lo, hi){ return lo + Math.floor(rng() * (hi - lo + 1)); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* Title-case a mundane task for the "starring" line. */
+function titleCaseTask(s){
+  return s.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/* ============================ STATE ============================ */
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let lastTitle=null, lastSubtitle=null, lastObj=null, lastTip=null, lastStudio=null;
+let currentTask = "";
+let currentSpec = null;   // last generated spec (for copy)
+let progTimer=null, tipTimer=null, tipTimeouts=[];
+
+const input = document.getElementById('task-input');
+const goBtn = document.getElementById('go-btn');
+const area = document.getElementById('screen-area');
+
+/* ============================ GENERATE SPEC ============================ */
+function generateSpec(task){
+  const seed = (Date.now() ^ (Math.random()*1e9|0) ^ hashStr(task)) >>> 0;
+  const rng = makeRng(seed);
+  const taskTitle = titleCaseTask(task);
+
+  let title;
+  do {
+    const pre = pick(TITLE_PREFIX, rng);
+    // 55%: wrap the task itself in the title; else pair with an evocative suffix.
+    if (rng() < 0.55) {
+      title = pre.endsWith(": ") ? pre + taskTitle : pre + " " + taskTitle;
+    } else {
+      title = pre.endsWith(": ") ? pre + pick(TITLE_SUFFIX, rng)
+                                 : pre + " " + pick(TITLE_SUFFIX, rng);
+    }
+  } while (title === lastTitle);
+  lastTitle = title;
+
+  const subtitle = pickFresh(SUBTITLES, rng, lastSubtitle); lastSubtitle = subtitle;
+  lastStudio = pickFresh(STUDIOS, rng, lastStudio);
+
+  const objective = pick(OBJ_LEADS, rng) + " " + pick(OBJ_TARGETS, rng) + " " + pick(OBJ_MODIFIERS, rng) + ".";
+  lastObj = objective;
+
+  return {
+    task: taskTitle,
+    title,
+    subtitle,
+    objective,
+    objSub: pick(OBJ_SUBS, rng),
+    studio: lastStudio,
+    engine: pick(ENGINES, rng),
+    region: pick(REGIONS, rng),
+    difficulty: pick(DIFFICULTIES, rng),
+    buildId: "v" + rint(rng,1,9) + "." + rint(rng,0,9) + "." + rint(rng,10,99) + "-" +
+             pick(["rc","beta","hotfix","final","final2","REALfinal"], rng),
+    pressKey: pick(PRESS_KEY, rng),
+    rng
+  };
+}
+function hashStr(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+
+/* ============================ RENDER SCREEN ============================ */
+function renderScreen(spec){
+  clearTimers();
+  currentSpec = spec;
+
+  const html =
+  '<div class="console animate-in">' +
+    '<div class="top-line">' +
+      '<span class="build-id">' + esc(spec.studio) + ' · ' + esc(spec.engine) + ' · ' + esc(spec.buildId) + '</span>' +
+      '<span class="region">' + esc(spec.region) + ' · ' + esc(spec.difficulty) + '</span>' +
+    '</div>' +
+
+    '<div class="now-loading">Now Loading</div>' +
+    '<h2 class="title-line">' + esc(spec.title) + '</h2>' +
+    '<div class="subtitle-line">' + esc(spec.subtitle) + '</div>' +
+
+    '<div class="objective">' +
+      '<div class="obj-head"><span class="obj-diamond">◆</span> Primary Objective</div>' +
+      '<div class="obj-text">' + esc(spec.objective) + '</div>' +
+      '<div class="obj-sub">' + esc(spec.objSub) + '</div>' +
+    '</div>' +
+
+    '<div class="bar-wrap">' +
+      '<div class="bar-track"><div class="bar-fill" id="bar-fill"></div></div>' +
+      '<div class="bar-meta">' +
+        '<span class="pct" id="pct">0%</span>' +
+        '<span class="status-txt" id="status">' + esc(pick(STATUS_EARLY, spec.rng)) + '</span>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="hint-row">' +
+      '<div class="spinner" id="spinner"></div>' +
+      '<div class="hint-body">' +
+        '<div class="hint-label">Loading Tip</div>' +
+        '<div class="hint-text" id="tip">' + esc(pickFresh(TIPS, spec.rng, lastTip)) + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="press-key" id="press-key">' + esc(spec.pressKey) + '</div>' +
+
+    '<div class="actions">' +
+      '<button class="mini primary" id="reload-btn">↻ Load again</button>' +
+      '<button class="mini" id="newtask-btn">✎ New task</button>' +
+      '<button class="mini" id="copy-btn">⎘ Copy screen</button>' +
+    '</div>' +
+  '</div>';
+
+  area.innerHTML = html;
+  lastTip = document.getElementById('tip').textContent;
+
+  document.getElementById('reload-btn').addEventListener('click', () => runFor(currentTask));
+  document.getElementById('newtask-btn').addEventListener('click', () => {
+    input.focus(); input.select();
+    area.innerHTML = '';
+    clearTimers();
+  });
+  document.getElementById('copy-btn').addEventListener('click', () => copyScreen(spec));
+
+  startProgress(spec);
+  startTipRotation(spec);
+}
+
+/* ---- progress bar: lurches, stalls at 97%, then completes ---- */
+function startProgress(spec){
+  const fill = document.getElementById('bar-fill');
+  const pctEl = document.getElementById('pct');
+  const statusEl = document.getElementById('status');
+  const spinner = document.getElementById('spinner');
+  const pressKey = document.getElementById('press-key');
+  const rng = spec.rng;
+
+  if (reduceMotion){
+    // Non-animated fallback: jump straight to the stall, then complete, no timers churning.
+    fill.style.transition = 'none';
+    fill.style.width = '97%';
+    pctEl.textContent = '97%';
+    statusEl.textContent = pick(STATUS_STALL, rng);
+    statusEl.classList.add('stall');
+    // one short delayed completion so the "hangs then finishes" beat still lands
+    const t = setTimeout(() => {
+      fill.style.width = '100%'; fill.classList.add('done');
+      pctEl.textContent = '100%'; pctEl.classList.add('done');
+      statusEl.textContent = pick(STATUS_DONE, rng); statusEl.className = 'status-txt done';
+      spinner.classList.add('done');
+      pressKey.classList.add('show');
+    }, 900);
+    tipTimeouts.push(t);
+    return;
+  }
+
+  let pct = 0;
+  const stallAt = 96 + Math.floor(rng()*3); // 96–98
+  let stalled = false;
+  let done = false;
+
+  function setStatusForPct(p){
+    if (p < 40) statusEl.textContent = pick(STATUS_EARLY, rng);
+    else if (p < 80) statusEl.textContent = pick(STATUS_MID, rng);
+    else statusEl.textContent = pick(STATUS_LATE, rng);
+  }
+
+  function step(){
+    if (done) return;
+    if (!stalled){
+      // dramatic lurch: sometimes big jumps, sometimes near-zero crawl
+      const roll = rng();
+      let inc;
+      if (roll < 0.14) inc = 0.2 + rng()*0.8;         // near-stall crawl
+      else if (roll < 0.30) inc = rng()*0.4;           // basically frozen for a beat
+      else if (roll < 0.55) inc = 6 + rng()*11;        // big lurch
+      else inc = 2 + rng()*5;                          // normal-ish
+
+      // decelerate hard as we approach the stall point
+      if (pct > 80) inc = Math.min(inc, 1.6 + rng()*2.2);
+      if (pct > 90) inc = Math.min(inc, 0.7 + rng()*1.1);
+
+      pct = Math.min(stallAt, pct + inc);
+      fill.style.width = pct.toFixed(1) + '%';
+      pctEl.textContent = Math.floor(pct) + '%';
+      if (rng() < 0.5) setStatusForPct(pct);
+
+      if (pct >= stallAt){
+        stalled = true;
+        statusEl.textContent = pick(STATUS_STALL, rng);
+        statusEl.classList.add('stall');
+        // the big dramatic hang, then complete
+        const hang = 1400 + rng()*2200;
+        const swap = setTimeout(() => {
+          if (done) return;
+          statusEl.textContent = pick(STATUS_STALL, rng); // a second stall message mid-hang
+        }, hang*0.55);
+        tipTimeouts.push(swap);
+        const finish = setTimeout(() => {
+          if (done) return;
+          done = true;
+          fill.style.width = '100%';
+          fill.classList.add('done');
+          pctEl.textContent = '100%';
+          pctEl.classList.add('done');
+          statusEl.textContent = pick(STATUS_DONE, rng);
+          statusEl.className = 'status-txt done';
+          spinner.classList.add('done');
+          pressKey.classList.add('show');
+        }, hang);
+        tipTimeouts.push(finish);
+        return;
+      }
+    }
+    const delay = 140 + rng()*360 + (pct>85 ? rng()*400 : 0);
+    progTimer = setTimeout(step, delay);
+  }
+  step();
+}
+
+/* ---- rotating tips while it loads ---- */
+function startTipRotation(spec){
+  const tipEl = document.getElementById('tip');
+  const rng = spec.rng;
+  function rotate(){
+    tipEl.classList.add('swapping');
+    const t = setTimeout(() => {
+      const next = pickFresh(TIPS, rng, lastTip);
+      lastTip = next;
+      tipEl.textContent = next;
+      tipEl.classList.remove('swapping');
+    }, 300);
+    tipTimeouts.push(t);
+  }
+  tipTimer = setInterval(rotate, reduceMotion ? 5200 : 3400);
+}
+
+function clearTimers(){
+  if (progTimer){ clearTimeout(progTimer); progTimer=null; }
+  if (tipTimer){ clearInterval(tipTimer); tipTimer=null; }
+  tipTimeouts.forEach(t => clearTimeout(t));
+  tipTimeouts = [];
+}
+
+/* ============================ RUN ============================ */
+function runFor(task){
+  const clean = (task || "").trim();
+  if (!clean){
+    input.focus();
+    showToast("Enter a task to load first.");
+    return;
+  }
+  currentTask = clean;
+  const spec = generateSpec(clean);
+  renderScreen(spec);
+  requestAnimationFrame(() => {
+    area.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
+  });
+}
+
+/* ============================ COPY ============================ */
+function copyScreen(spec){
+  const txt =
+    "NOW LOADING — " + spec.title + "\n" +
+    '"' + spec.subtitle + '"\n\n' +
+    "◆ PRIMARY OBJECTIVE\n" +
+    spec.objective + "\n" +
+    spec.objSub + "\n\n" +
+    "LOADING TIP: " + (lastTip || pick(TIPS, spec.rng)).replace(/^TIP:\s*/,'') + "\n\n" +
+    spec.studio + " · " + spec.engine + " · " + spec.difficulty + "\n" +
+    "[ progress bar stalled at 97% ]";
+  const done = () => showToast("Copied. Paste it somewhere you'll load later.");
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){ showToast("Copy unavailable — screenshot it instead."); }
+}
+
+/* ============================ TOAST ============================ */
+let toastTimer=null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ============================ WIRING ============================ */
+goBtn.addEventListener('click', () => runFor(input.value));
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); runFor(input.value); } });
+
+document.getElementById('suggest').addEventListener('click', (e) => {
+  const t = e.target.closest('.try');
+  if (!t) return;
+  input.value = t.textContent;
+  runFor(t.textContent);
+});
+
+/* rotate the suggestion chips once on load for freshness */
+(function seedSuggestions(){
+  const el = document.getElementById('suggest');
+  const chosen = [];
+  let last=null;
+  for (let i=0;i<4;i++){ const s = pickFresh(SUGGESTIONS, null, last); last=s; if(!chosen.includes(s)) chosen.push(s); else i--; }
+  el.innerHTML = 'Try: ' + chosen.map(s => '<span class="try">' + esc(s) + '</span>').join(' · ');
+})();
+
+input.focus();
+</script>
+</body>
+</html>

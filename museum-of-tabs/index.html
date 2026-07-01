@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Museum of Your Browser Tabs · Prizrak</title>
+<style>
+  :root {
+    --ink:#0a0a0c; --ink-1:#0d0d11; --ink-2:#121218; --ink-3:#16161d;
+    --bone:#e9e4d6; --parch:#d7d1c1; --ash:#9a948a; --ash-2:#6f6a61; --ash-3:#4a463f;
+    --rule:rgba(233,228,214,.09); --rule-2:rgba(233,228,214,.17);
+    --gild:#c9a34e; --gild-dim:#6e5a2c; --fox:#86e0c0; --fox-dim:#3f6b5f;
+    --plaque:#151217; --plaque-line:rgba(201,163,78,.22);
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; position:relative; overflow-x:hidden; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(130% 80% at 50% -14%, rgba(201,163,78,.06), transparent 55%),
+      radial-gradient(100% 60% at 50% 120%, rgba(52,44,72,.10), transparent 60%),
+      var(--ink);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width:760px; margin:0 auto; padding:44px 20px 60px; }
+  @media (min-width:640px) { .wrap { padding:60px 32px 76px; } }
+
+  .mono { font-family:var(--mono); }
+  .kicker { font-family:var(--mono); text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .specter { color:var(--gild); font-style:italic; font-weight:500; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(201,163,78,.24); color:#fff; }
+  ::-webkit-scrollbar { width:10px; }
+  ::-webkit-scrollbar-thumb { background:#1b1b22; border-radius:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+
+  header { text-align:center; margin-bottom:36px; }
+  h1 {
+    font-family:var(--serif); font-size:clamp(2.1rem,7.4vw,3.6rem); font-weight:800;
+    line-height:.98; letter-spacing:-.02em; margin:12px 0 0;
+  }
+  .sub {
+    margin:16px auto 0; font-style:italic; font-size:14px; color:var(--ash);
+    max-width:32rem; line-height:1.58;
+  }
+
+  /* ---- entry / controls ---- */
+  .foyer {
+    border:1px solid var(--rule-2); border-radius:8px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    padding:26px 22px; margin-top:6px; text-align:center; position:relative; overflow:hidden;
+    box-shadow:0 24px 60px -34px rgba(0,0,0,.8);
+  }
+  .foyer::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:1px;
+    background:linear-gradient(90deg,transparent,var(--plaque-line),transparent);
+  }
+  .foyer .prompt { font-family:var(--mono); text-transform:uppercase; letter-spacing:.16em; font-size:11px; color:var(--ash-2); margin-bottom:16px; }
+  .count-row { display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap; }
+  .stepper {
+    font-family:var(--mono); font-size:22px; width:46px; height:46px; line-height:1;
+    background:var(--ink-2); border:1px solid var(--rule-2); border-radius:6px; color:var(--ash);
+    cursor:pointer; transition:border-color .18s,color .18s,background .18s,transform .1s;
+  }
+  .stepper:hover { border-color:var(--gild); color:var(--gild); background:var(--ink-3); }
+  .stepper:active { transform:translateY(1px); }
+  #count {
+    font-family:var(--serif); font-weight:800; font-size:44px; width:120px; text-align:center;
+    background:transparent; border:none; border-bottom:2px solid var(--rule-2); color:var(--bone);
+    padding:2px 0 6px; letter-spacing:.01em;
+  }
+  #count:focus { outline:none; border-bottom-color:var(--gild); color:var(--gild); }
+  #count::-webkit-outer-spin-button, #count::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  #count { -moz-appearance:textfield; }
+  .count-cap { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); margin-top:10px; min-height:13px; }
+
+  .presets { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:18px; }
+  .preset {
+    font-family:var(--mono); font-size:10.5px; padding:7px 11px; background:var(--ink-2);
+    border:1px solid var(--rule); border-radius:5px; color:var(--ash-2); cursor:pointer;
+    transition:border-color .18s,color .18s,background .18s; letter-spacing:.04em;
+  }
+  .preset:hover { border-color:var(--gild-dim); color:var(--parch); background:var(--ink-3); }
+
+  .curate-row { text-align:center; margin:26px 0 4px; }
+  .curate-btn {
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.18em; font-size:12px;
+    padding:15px 32px; background:linear-gradient(135deg,var(--gild-dim),var(--gild));
+    border:none; border-radius:6px; color:#1a1408; cursor:pointer; font-weight:700;
+    transition:transform .15s,box-shadow .2s,opacity .2s; box-shadow:0 0 22px -6px rgba(201,163,78,.5);
+  }
+  .curate-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 30px -10px rgba(201,163,78,.6); }
+  .curate-btn:active:not(:disabled) { transform:translateY(0); }
+  .curate-btn:disabled { opacity:.4; cursor:not-allowed; filter:grayscale(.4); box-shadow:none; }
+
+  .hidden { display:none; }
+
+  /* ---- exhibition ---- */
+  #exhibition { margin-top:32px; }
+
+  .wall-text {
+    border:1px solid var(--rule-2); border-radius:8px; padding:26px 24px 24px;
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgba(201,163,78,.05), transparent 60%),
+      linear-gradient(180deg,var(--ink-1),var(--ink));
+    position:relative; overflow:hidden;
+  }
+  .wall-text::before {
+    content:""; position:absolute; inset:0 0 auto 0; height:2px;
+    background:linear-gradient(90deg,var(--gild-dim),var(--gild),var(--gild-dim));
+  }
+  .exhibit-eyebrow { font-family:var(--mono); font-size:9px; letter-spacing:.24em; text-transform:uppercase; color:var(--gild); margin-bottom:12px; }
+  .exhibit-title { font-family:var(--serif); font-weight:800; font-size:clamp(20px,5vw,27px); line-height:1.1; letter-spacing:-.01em; margin:0 0 4px; }
+  .exhibit-sub { font-family:var(--serif); font-style:italic; font-size:14px; color:var(--ash); margin:8px 0 16px; }
+  .exhibit-body { font-size:13.5px; line-height:1.72; color:var(--parch); }
+  .exhibit-body p { margin:0 0 12px; } .exhibit-body p:last-child { margin:0; }
+  .exhibit-meta { display:flex; flex-wrap:wrap; gap:14px 26px; margin-top:18px; padding-top:16px; border-top:1px solid var(--rule); }
+  .exhibit-meta > div { min-width:0; }
+  .meta-label { font-family:var(--mono); font-size:8.5px; text-transform:uppercase; letter-spacing:.18em; color:var(--ash-3); margin-bottom:3px; }
+  .meta-val { font-size:13px; color:var(--parch); }
+  .meta-val.gild { color:var(--gild); }
+
+  .section-rule {
+    font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.2em; color:var(--ash-2);
+    display:flex; align-items:center; gap:12px; margin:34px 0 4px;
+  }
+  .section-rule::before, .section-rule::after { content:""; flex:1; height:1px; background:var(--rule); }
+
+  /* gallery pieces */
+  .piece {
+    display:grid; grid-template-columns:104px 1fr; gap:18px; align-items:start;
+    border:1px solid var(--rule); border-radius:8px; padding:18px; margin-top:16px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink)); position:relative; overflow:hidden;
+  }
+  @media (max-width:520px) { .piece { grid-template-columns:1fr; } }
+
+  .frame {
+    aspect-ratio:1/1.18; border:5px solid #2a2418; border-radius:2px;
+    background:
+      linear-gradient(135deg, rgba(201,163,78,.12), transparent 55%),
+      var(--ink-2);
+    box-shadow:inset 0 0 0 1px rgba(201,163,78,.16), 0 8px 22px -12px rgba(0,0,0,.9);
+    position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center;
+  }
+  .frame svg { width:100%; height:100%; display:block; }
+  @media (max-width:520px) { .frame { max-width:150px; margin:0 auto; } }
+
+  .plaque {
+    background:
+      linear-gradient(180deg, rgba(201,163,78,.05), transparent),
+      var(--plaque);
+    border:1px solid var(--plaque-line); border-radius:4px; padding:14px 16px 15px;
+    box-shadow:inset 0 1px 0 rgba(201,163,78,.10);
+  }
+  .plaque-artist { font-family:var(--serif); font-style:italic; font-size:12px; color:var(--gild); letter-spacing:.01em; }
+  .plaque-title { font-family:var(--serif); font-weight:700; font-size:16px; line-height:1.24; margin:3px 0 2px; }
+  .plaque-title em { color:var(--parch); font-style:italic; font-weight:400; }
+  .plaque-medium { font-family:var(--mono); font-size:10.5px; color:var(--ash); letter-spacing:.02em; margin-top:7px; line-height:1.5; }
+  .plaque-note { font-size:12.5px; font-style:italic; line-height:1.6; color:var(--ash-2); margin-top:11px; padding-top:10px; border-top:1px solid var(--rule); }
+  .plaque-acq { font-family:var(--mono); font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ash-3); margin-top:10px; }
+
+  .verdict {
+    margin-top:32px; border:1px dashed var(--rule-2); border-radius:8px; padding:20px 22px;
+    background:rgba(201,163,78,.028); position:relative;
+  }
+  .verdict .meta-label { color:var(--gild); }
+  .verdict-quote { font-family:var(--serif); font-style:italic; font-size:15px; line-height:1.62; color:var(--parch); margin-top:8px; }
+  .verdict-sig { font-family:var(--mono); font-size:10px; color:var(--ash-3); letter-spacing:.05em; margin-top:12px; }
+
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:26px; justify-content:center; }
+  .mini {
+    font-family:var(--mono); font-size:11px; padding:11px 18px; background:var(--ink-1);
+    border:1px solid var(--rule-2); border-radius:6px; color:var(--ash); cursor:pointer;
+    transition:border-color .18s,color .18s,background .18s; display:inline-flex; align-items:center; gap:7px; letter-spacing:.03em;
+  }
+  .mini:hover { border-color:var(--gild); color:var(--bone); background:var(--ink-2); }
+  .mini:active { transform:translateY(1px); }
+
+  .toast {
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .25s,transform .25s; z-index:50;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.8); letter-spacing:.04em;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .footer { text-align:center; margin-top:52px; padding-top:24px; border-top:1px solid var(--rule); }
+  .footer .kicker { line-height:1.9; }
+  .footer a { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3); }
+  .footer a:hover { color:var(--ash); }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .animate-in { animation:fadeUp .5s cubic-bezier(.2,.7,.2,1) both; }
+  .stagger > * { animation:fadeUp .5s cubic-bezier(.2,.7,.2,1) both; }
+
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::after { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prizrak — permanent collection</div>
+      <h1>The Museum of Your <span class="specter">Browser Tabs</span></h1>
+      <p class="sub">Every tab you keep open is a small monument to a decision you never made. Tell us how many are open right now, and our curators will mount a solemn retrospective of your attention. Admission is free. Closure is not included.</p>
+    </header>
+
+    <div class="foyer">
+      <div class="prompt">How many tabs are open at this exact moment?</div>
+      <div class="count-row">
+        <button class="stepper" id="dec" type="button" aria-label="fewer tabs">–</button>
+        <input id="count" type="number" min="1" max="999" value="17" inputmode="numeric" aria-label="number of open tabs">
+        <button class="stepper" id="inc" type="button" aria-label="more tabs">+</button>
+      </div>
+      <div class="count-cap" id="count-cap"></div>
+      <div class="presets">
+        <button class="preset" data-n="3" type="button">the disciplined (3)</button>
+        <button class="preset" data-n="12" type="button">a normal Tuesday (12)</button>
+        <button class="preset" data-n="34" type="button">researching something (34)</button>
+        <button class="preset" data-n="88" type="button">a cry for help (88)</button>
+      </div>
+    </div>
+
+    <div class="curate-row">
+      <button id="curate-btn" class="curate-btn" type="button">Curate the Exhibition</button>
+    </div>
+
+    <div id="exhibition" class="hidden" aria-live="polite"></div>
+
+    <div class="footer">
+      <p class="kicker">The gift shop sells only bookmarks &middot; none of them work</p>
+      <a href="/index.html">all offerings</a>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================ CONTENT POOLS ============================ */
+
+/* Each "tab" is assembled from a species (what kind of tab it is) plus
+   generative plaque fields. Species carry their own flavor so the museum
+   feels like it really looked at your specific browsing shame. */
+
+const SPECIES = [
+  {
+    kind:'research',
+    artists:['The Committee of Good Intentions','An Anonymous Optimist','The Future Self (never arrived)','A Version of You With More Time'],
+    titles:['Something I Meant to Read','The Article I Am, in Spirit, Reading','Untitled (Open Since)','A Longform I Believe In','The Thing I Sent Myself','Deep Dive, Abandoned at the Shallows','Notes Toward a Project'],
+    mediums:['abandoned research','open scholarship','unfinished inquiry','deferred literacy','archival hope'],
+    notes:[
+      'The subject opened this tab believing they were the kind of person who would return to it. They were not. The tab remains, patient and unread, a small altar to the person they intended to become.',
+      'Left open across three device restarts, two OS updates, and one genuine emergency, this piece endures where the reason for opening it does not.',
+      'Scholars debate whether this tab was ever truly read or merely hovered near, the way one hovers near a gym.',
+      'The scrollbar has not moved past the introduction. The introduction has, by now, moved on without it.'
+    ]
+  },
+  {
+    kind:'shopping',
+    artists:['A Cart That Was Never Loved','The Impulse, Frozen','A Wishlist of One','Late-Night Commerce, Anonymous'],
+    titles:['The Thing in the Cart','Item, Contemplated','Almost Purchased','The Checkout Not Reached','A Size That May No Longer Exist','Still $47, Still Waiting','The Cheaper One in Another Tab'],
+    mediums:['unfulfilled commerce','abandoned cart','deferred desire','window shopping, load-bearing'],
+    notes:[
+      'The object of desire sits in the cart, priced, sized, and profoundly unpurchased. The subject returns occasionally to look at it, the way one visits a relative in a home.',
+      'This tab exists so the subject can feel they are "thinking about it." The item has been sold out twice and restocked twice. The subject remains unaware, and unmoved.',
+      'A monument to the moment just before a decision — a moment the subject has learned to live inside indefinitely.',
+      'Notably, a nearly identical item is open in another tab, cheaper by four dollars. Neither will be bought. Both will be mourned.'
+    ]
+  },
+  {
+    kind:'video',
+    artists:['A Paused Frame, Eternal','The Algorithm, Uninvited','A 47-Minute Commitment','The Autoplay That Won'],
+    titles:['Paused at 3:12','I Will Finish This','The Video I Started Confidently','Something With a Long Runtime','A Tutorial I Believe Will Change Me','The Recommended One','Muted, For Reasons'],
+    mediums:['suspended playback','ambient distraction','a paused video, indefinitely','buffering hope'],
+    notes:[
+      'Frozen mid-sentence, the speaker gestures forever toward a point they will never be permitted to make. The subject muted them weeks ago and cannot recall why they were speaking.',
+      'This work was opened during a moment of aspiration — a tutorial, a documentary, a thing that would improve the subject. It has instead improved the subject’s tab count.',
+      'The progress bar sits at eleven percent, a number the subject finds neither shameful enough to close nor promising enough to resume.',
+      'It continues to consume a small amount of memory and a larger amount of the subject’s residual guilt.'
+    ]
+  },
+  {
+    kind:'work',
+    artists:['A Ticket That Will Not Close','The Doc Nobody Owns','A Thread You Were CC’d On','Obligation, Rendered in Chrome'],
+    titles:['The Document I Should Be In','A Ticket, Assigned to No One Emotionally','The Spreadsheet','A Thread I Am Losing','The Thing Due Thursday','Work-Adjacent','A Meeting That Ended Hours Ago'],
+    mediums:['professional obligation','open-plan dread','a document, load-bearing','deferred productivity'],
+    notes:[
+      'The subject keeps this tab open as proof — to whom, unclear — that work is happening. It is not. But the tab is open, and openness, they have decided, is a form of effort.',
+      'A shared document to which forty people have access and no one has commitment. It updates itself faintly, like a tide, without the subject.',
+      'This tab was opened for a meeting that has since concluded, adjourned, and been forgotten by all attendees except this tab, which grieves it still.',
+      'Closing it would imply the task is done. The task is not done. The tab, therefore, is eternal.'
+    ]
+  },
+  {
+    kind:'reference',
+    artists:['A Definition, Consulted Once','The Wikipedia Rabbit Hole','A Recipe for a Meal Not Cooked','The How-To, Unheeded'],
+    titles:['How to Do the Thing','A Word I Looked Up','The Recipe I Won’t Make','Instructions, Partially Followed','A Chart of Something','The Answer I Already Forgot','Step 3 of 9'],
+    mediums:['abandoned instruction','consulted knowledge','a recipe, aspirational','reference, load-bearing'],
+    notes:[
+      'The subject looked something up, absorbed nothing, and left the tab open in case the knowledge decides to enter them by proximity. It has not. It will not.',
+      'A recipe for an ambitious dish. The subject has read the ingredient list four times and cooked pasta each time. The recipe forgives them; the museum does not.',
+      'Opened to answer a single question that has long since been answered, forgotten, and re-asked in a different tab now also open.',
+      'This piece represents the exact moment the subject believed they would learn a new skill. The moment has been preserved. The skill has not.'
+    ]
+  },
+  {
+    kind:'social',
+    artists:['A Feed, Refreshing Alone','The Notification That Lied','A Timeline You Fell Into','Someone Else’s Vacation'],
+    titles:['The Feed','A Profile I Was Not Meant to Find','Someone’s Wedding','The Argument in the Comments','A Post From 2019','The Thing Everyone Is Talking About','Scrolled, Not Read'],
+    mediums:['ambient comparison','doomscroll, framed','a feed, self-refreshing','social sediment'],
+    notes:[
+      'Left open to a feed that has refreshed itself so many times it no longer resembles the one the subject opened. It is a river; the subject is a stone it politely ignores.',
+      'The subject navigated, via a chain of decisions they cannot reconstruct, to the profile of a stranger’s cousin’s ex. The tab remembers the journey. The subject has repressed it.',
+      'A single post, screenshotted mentally and never acted upon, kept open in case it becomes relevant. It will not.',
+      'This tab is where the subject goes to feel briefly informed and lastingly worse. Attendance is compulsive; admission is one’s afternoon.'
+    ]
+  },
+  {
+    kind:'planning',
+    artists:['A Trip That Won’t Be Taken','The Flight, Un-booked','A Life Considered, Then Tabled','Wanderlust, Minimized'],
+    titles:['A Flight to Somewhere','The Apartment I’ll Never Rent','A Trip in the Planning Phase (Forever)','Prices for a Life I Won’t Live','The Getaway','An Itinerary of One','Round-Trip, Hypothetically'],
+    mediums:['deferred escape','aspirational logistics','a plan, indefinitely staged','future tense, load-bearing'],
+    notes:[
+      'The subject priced a flight to a city they will describe, at dinner parties, as "somewhere I really want to go." The tab is the closest they will get. It has a nice view of the fare.',
+      'A monument to the phrase "we should really do this sometime." Sometime remains open in the browser; nowhere on the calendar.',
+      'The dates in this tab have already passed. The subject has not noticed. The tab, tactfully, has not mentioned it.',
+      'This piece captures the exact resolution of a life change — a trip, a move, a new self — held in a state of permanent almost.'
+    ]
+  },
+  {
+    kind:'mystery',
+    artists:['Unknown','A Tab of Uncertain Origin','No One Remembers','A Ghost in the Session'],
+    titles:['Untitled (Why Is This Open)','The Tab of Unknown Provenance','I Did Not Open This','A Blank Where a Reason Should Be','Something From an Earlier Session','The One I’m Afraid to Close','Origin Unknown'],
+    mediums:['mystery, unattributed','provenance lost','a tab of unknown intent','session sediment'],
+    notes:[
+      'No one, least of all the subject, can account for this tab’s presence. It may predate the current session. It may predate the current laptop. It is kept out of superstition.',
+      'The subject is afraid that closing this tab will break something they cannot name. They are almost certainly correct, and will never test it.',
+      'This piece has survived every purge, every "let me just clean up," every solemn vow to be better. It watches those vows die. It remains.',
+      'Attributed to no intention and no memory, this tab exists as pure browser, unmediated by purpose. Scholars find it beautiful. The subject finds it unsettling.'
+    ]
+  }
+];
+
+/* combinatorial museum-name generator */
+const MUSEUM_PREFIX = [
+  'The Institute for','The Museum of','The Gallery of','The Archive of','The Foundation for',
+  'The Collection of','The Hall of','The Bureau of','The National Registry of','The Retrospective on'
+];
+const MUSEUM_SUBJECT = [
+  'Deferred Attention','Unfinished Reading','Suspended Intent','the Almost-Done',
+  'Digital Procrastination','the Open and the Unread','Postponed Selfhood','Curated Avoidance',
+  'the Tabs You Cannot Close','Ambient Guilt','Recreational Distraction','the Unfinished'
+];
+
+/* exhibition titles scale in severity by tab count */
+const EXHIBIT_TITLES = {
+  light:[
+    'A Modest Retrospective',
+    'Small Works: A Study in Restraint',
+    'The Contained Collection',
+    'Minor Distractions, Tastefully Arranged',
+    'A Quiet Room'
+  ],
+  medium:[
+    'The Sprawl: Selected Works',
+    'Attention in Fragments',
+    'A Survey of Divided Focus',
+    'The Middle Period',
+    'Studies in Splitting the Difference'
+  ],
+  heavy:[
+    'The Great Accumulation',
+    'A Retrospective of Ruin',
+    'Everything, All at Once, Forever',
+    'The Complete Works of a Person Who Cannot Choose',
+    'Late Style: The Doomscroll Years'
+  ],
+  catastrophic:[
+    'The Overwhelm: A Career Retrospective',
+    'Monument to a Mind Ablaze',
+    'The Collection That Broke the Curator',
+    'Total Attention Failure, in Oil and Ram',
+    'A Requiem, in Tabs'
+  ]
+};
+
+const WALL_INTRO = {
+  light:[
+    'This is a small, disciplined collection — the work of a subject who, against every modern incentive, has kept their attention nearly whole. We do not entirely trust it.',
+    'The curators approached this exhibition with relief. Here, at last, is a mind that closes things. A rare and endangered practice, presented without irony.'
+  ],
+  medium:[
+    'What follows is a mid-career survey of a divided attention — not yet ruined, no longer innocent. The subject has begun to open more than they can ever return to. This is where it starts.',
+    'This exhibition documents the exact moment focus becomes furniture: a comfortable clutter the subject has stopped seeing, and would miss if it were gone.'
+  ],
+  heavy:[
+    'The subject arrives at this exhibition already exhausted. So do we. What you are about to see is not a collection so much as a sedimentary record — layers of intent laid down and never disturbed.',
+    'This is a serious body of work, in the way a serious illness is serious. Each piece was opened with purpose. Purpose did not survive the opening. The tabs did.'
+  ],
+  catastrophic:[
+    'We must be honest with our patrons: the curators recommended against mounting this exhibition. The collection exceeds the load-bearing capacity of both the browser and the human spirit. Proceed gently.',
+    'This is not a museum visit. It is an intervention with better lighting. The volume of work on display suggests a subject who no longer opens tabs so much as inhabits a slow-moving avalanche of them.'
+  ]
+};
+
+const CURATOR_VERDICTS = {
+  light:[
+    'A restrained and frankly suspicious collection. The subject closes tabs. We have alerted the appropriate authorities out of sheer disbelief.',
+    'The curators find little to criticize and are, professionally, quite disturbed by that. Come back when you’re struggling like the rest of us.'
+  ],
+  medium:[
+    'A promising collection in decline. The subject still believes they are in control. This exhibition is the last document produced before that belief becomes untenable.',
+    'The through-line is clear: everything here was opened by someone who meant well. Meaning well, we regret to report, is not a filing system.'
+  ],
+  heavy:[
+    'Taken together, the works form a portrait of a mind that has confused "keeping something open" with "getting something done." It is a common tragedy, rendered here at scale.',
+    'The curator wishes to note that closing even one of these tabs would constitute the most productive act of the subject’s week, and that this is precisely why it will not happen.'
+  ],
+  catastrophic:[
+    'The curators, having surveyed the full collection, have quietly updated their own resumes. This is not a browser. It is a haunting. The subject is advised to seek help, or at minimum, a second monitor to grieve on.',
+    'We cannot in good conscience call this a retrospective, as retrospection implies an ending, and this collection has none. It grows as you read this. Somewhere, a fan is spinning. Godspeed.'
+  ]
+};
+
+const CURATOR_NAMES = [
+  'Dr. Imelda Fensterwald','the Senior Curator (on leave)','B. Ndiaye, Curator-at-Large',
+  'Prof. Alistair Crumb','the Acquisitions Committee','Vasquez, Curator of Modern Neglect',
+  'the Curator Emeritus, under protest','M. Okonkwo, Head of Deferred Media',
+  'the Docent Who Could Not Look Away','Chief Curator of the Unfinished'
+];
+
+const CURATOR_TITLES = [
+  'Chief Curator','Curator of Digital Sediment','Head of Attention Studies',
+  'Registrar of the Unread','Curator of Suspended Media','Director of Acquisitions (Involuntary)'
+];
+
+/* acquisition note fragments (combinatorial) */
+const ACQ_VERB = ['Opened','Acquired','Reopened','Inherited','Rediscovered','Left open since','Salvaged'];
+const ACQ_DAYS = () => (1 + Math.floor(rng()*220));
+const ACQ_MODE = [
+  'from a link the subject no longer trusts',
+  'during a moment of misplaced ambition',
+  'via a chain of clicks now lost to history',
+  'in lieu of doing the actual task',
+  'and never once revisited',
+  'against the advice of the subject’s better judgment',
+  'while looking for something else entirely',
+  'at 2 a.m., naturally'
+];
+
+/* frame color palettes for the generative artwork */
+const ART_PALETTES = [
+  ['#c9a34e','#6e5a2c','#e9e4d6'],
+  ['#86e0c0','#3f6b5f','#d7d1c1'],
+  ['#b98a8a','#6b3f3f','#e9e4d6'],
+  ['#8a9dc9','#3f4d6b','#d7d1c1'],
+  ['#c98ab9','#6b3f5c','#e9e4d6'],
+  ['#a3c98a','#4d6b3f','#d7d1c1'],
+  ['#9a948a','#4a463f','#d7d1c1']
+];
+
+/* ============================ RNG + PRIMITIVES ============================ */
+
+let rng = Math.random;
+function makeRng(seed) {
+  let s = (seed >>> 0) || 1;
+  return function() {
+    s ^= s << 13; s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5;  s >>>= 0;
+    return (s >>> 0) / 4294967296;
+  };
+}
+function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
+function pickFresh(arr, last){
+  if(arr.length < 2) return arr[0];
+  let v, guard=0;
+  do { v = pick(arr); } while(v === last && ++guard < 14);
+  return v;
+}
+function rint(lo, hi){ return lo + Math.floor(rng()*(hi-lo+1)); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================ GENERATIVE ARTWORK ============================ */
+
+function makeArt(seedKind){
+  const pal = pick(ART_PALETTES);
+  const bg = '#0f0e14';
+  const W=100, H=118;
+  const modes = ['orbit','strata','monolith','scatter','grid','arch','void'];
+  const mode = pick(modes);
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="gallery piece">`;
+  s += `<rect width="${W}" height="${H}" fill="${bg}"/>`;
+  const cx=W/2, cy=H/2;
+
+  if(mode==='orbit'){
+    s += `<circle cx="${cx}" cy="${cy}" r="30" fill="none" stroke="${pal[1]}" stroke-width="0.7" opacity="0.5"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="18" fill="none" stroke="${pal[0]}" stroke-width="1.4"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="4" fill="${pal[0]}"/>`;
+    const n = rint(3,6);
+    for(let i=0;i<n;i++){ const a=rng()*Math.PI*2, r=12+rng()*24; s+=`<circle cx="${(cx+Math.cos(a)*r).toFixed(1)}" cy="${(cy+Math.sin(a)*r).toFixed(1)}" r="${(1+rng()*2.4).toFixed(1)}" fill="${pal[2]}" opacity="0.85"/>`; }
+  } else if(mode==='strata'){
+    const n = rint(5,9);
+    for(let i=0;i<n;i++){ const y=(i+1)*(H/(n+1)); const c=[pal[0],pal[1],pal[2]][i%3]; s+=`<rect x="8" y="${(y-2).toFixed(1)}" width="${(60+rng()*24).toFixed(0)}" height="${(2+rng()*3).toFixed(1)}" fill="${c}" opacity="${(0.4+rng()*0.5).toFixed(2)}"/>`; }
+  } else if(mode==='monolith'){
+    const w=18+rng()*14, h=60+rng()*30;
+    s += `<rect x="${(cx-w/2).toFixed(1)}" y="${(cy-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${pal[1]}" opacity="0.55"/>`;
+    s += `<rect x="${(cx-w/2).toFixed(1)}" y="${(cy-h/2).toFixed(1)}" width="${(w*0.4).toFixed(1)}" height="${h.toFixed(1)}" fill="${pal[0]}" opacity="0.8"/>`;
+    s += `<line x1="${cx}" y1="${(cy-h/2).toFixed(1)}" x2="${cx}" y2="${(cy+h/2).toFixed(1)}" stroke="${pal[2]}" stroke-width="0.5" opacity="0.6"/>`;
+  } else if(mode==='scatter'){
+    const n = rint(14,28);
+    for(let i=0;i<n;i++){ const x=8+rng()*(W-16), y=8+rng()*(H-16); const c=[pal[0],pal[1],pal[2]][i%3]; const r=0.6+rng()*2.6; s+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${c}" opacity="${(0.35+rng()*0.55).toFixed(2)}"/>`; }
+  } else if(mode==='grid'){
+    const cols=rint(3,5), rows=rint(4,6); const cw=(W-16)/cols, ch=(H-16)/rows;
+    for(let r0=0;r0<rows;r0++) for(let c0=0;c0<cols;c0++){ if(rng()<0.4) continue; const c=[pal[0],pal[1],pal[2]][(r0+c0)%3]; s+=`<rect x="${(8+c0*cw+1).toFixed(1)}" y="${(8+r0*ch+1).toFixed(1)}" width="${(cw-2).toFixed(1)}" height="${(ch-2).toFixed(1)}" fill="${c}" opacity="${(0.3+rng()*0.5).toFixed(2)}"/>`; }
+  } else if(mode==='arch'){
+    s += `<path d="M20 ${H-16} L20 ${cy} A ${cx-20} ${cx-20} 0 0 1 ${W-20} ${cy} L ${W-20} ${H-16}" fill="none" stroke="${pal[0]}" stroke-width="1.6"/>`;
+    s += `<path d="M32 ${H-16} L32 ${cy+8} A ${cx-32} ${cx-32} 0 0 1 ${W-32} ${cy+8} L ${W-32} ${H-16}" fill="none" stroke="${pal[1]}" stroke-width="0.8" opacity="0.6"/>`;
+    s += `<circle cx="${cx}" cy="${cy+2}" r="2.5" fill="${pal[2]}"/>`;
+  } else { // void
+    s += `<circle cx="${cx}" cy="${cy}" r="26" fill="${pal[1]}" opacity="0.14"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="26" fill="none" stroke="${pal[0]}" stroke-width="0.6" opacity="0.5"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="9" fill="${bg}"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="9" fill="none" stroke="${pal[2]}" stroke-width="0.5" opacity="0.4"/>`;
+  }
+  s += `</svg>`;
+  return s;
+}
+
+/* ============================ PLAQUE / PIECE GENERATION ============================ */
+
+const YEARS = ['MMXIX','MMXX','MMXXI','MMXXII','MMXXIII','MMXXIV','MMXXV','MMXXVI'];
+
+function makeAcquisition(){
+  const v = pick(ACQ_VERB);
+  if(v === 'Left open since'){
+    return v + ' ' + ACQ_DAYS() + ' days ago, ' + pick(ACQ_MODE);
+  }
+  return v + ' ' + pick(ACQ_MODE) + ' · ' + ACQ_DAYS() + ' days in the collection';
+}
+
+function makeMedium(sp){
+  const base = pick(sp.mediums);
+  const days = ACQ_DAYS();
+  const unit = days > 60 ? 'days (untouched)' : 'days';
+  return base + ', ' + days + ' ' + unit;
+}
+
+let lastPieceTitle = null, lastPieceNote = null;
+
+function makePiece(){
+  const sp = pick(SPECIES);
+  const artist = pick(sp.artists);
+  const title = pickFresh(sp.titles, lastPieceTitle); lastPieceTitle = title;
+  const note = pickFresh(sp.notes, lastPieceNote); lastPieceNote = note;
+  return {
+    artist,
+    title,
+    year: pick(YEARS),
+    medium: makeMedium(sp),
+    note,
+    acq: makeAcquisition(),
+    art: makeArt(sp.kind)
+  };
+}
+
+/* ============================ TIER LOGIC ============================ */
+
+function tierFor(n){
+  if(n <= 6) return 'light';
+  if(n <= 20) return 'medium';
+  if(n <= 55) return 'heavy';
+  return 'catastrophic';
+}
+
+const CAP_LINES = [
+  { max:1,  txt:'One tab. A monk. A mystery.' },
+  { max:3,  txt:'Suspiciously few. The curators are wary.' },
+  { max:6,  txt:'A tidy mind. We do not trust it.' },
+  { max:12, txt:'A normal amount of quiet chaos.' },
+  { max:20, txt:'Focus has begun to fray, tastefully.' },
+  { max:35, txt:'Research mode. Or a slow unraveling.' },
+  { max:55, txt:'This is a lot of tabs. Genuinely.' },
+  { max:90, txt:'A cry for help, elegantly rendered.' },
+  { max:9999, txt:'We have contacted your browser’s next of kin.' }
+];
+function capFor(n){
+  for(const c of CAP_LINES){ if(n <= c.max) return c.txt; }
+  return '';
+}
+
+/* number of pieces shown scales with count but is bounded for readability */
+function pieceCountFor(n){
+  if(n <= 4) return n;
+  if(n <= 8) return 4;
+  if(n <= 20) return 5;
+  if(n <= 55) return 6;
+  return 7;
+}
+
+/* ============================ ASSEMBLE + RENDER ============================ */
+
+let lastExhibitTitle = null, lastWallIntro = null, lastVerdict = null, lastMuseum = null;
+let currentExhibit = null;
+
+function museumName(){
+  return pickFresh(MUSEUM_PREFIX, lastMuseum) + ' ' + pick(MUSEUM_SUBJECT);
+}
+
+function generateExhibition(n){
+  const seed = (Date.now() ^ (n * 2654435761) ^ (Math.random()*1e9 | 0)) >>> 0;
+  rng = makeRng(seed);
+  lastPieceTitle = null; lastPieceNote = null;
+
+  const tier = tierFor(n);
+  const museum = pickFresh(MUSEUM_PREFIX, lastMuseum) + ' ' + pick(MUSEUM_SUBJECT); lastMuseum = museum.split(' ').slice(0,2).join(' ');
+  const exhibitTitle = pickFresh(EXHIBIT_TITLES[tier], lastExhibitTitle); lastExhibitTitle = exhibitTitle;
+  const wallIntro = pickFresh(WALL_INTRO[tier], lastWallIntro); lastWallIntro = wallIntro;
+  const verdict = pickFresh(CURATOR_VERDICTS[tier], lastVerdict); lastVerdict = verdict;
+
+  const pc = pieceCountFor(n);
+  const pieces = [];
+  for(let i=0;i<pc;i++) pieces.push(makePiece());
+
+  const notShown = Math.max(0, n - pc);
+  const catalog = 'No. ' + rint(100,999) + '.' + rint(10,99);
+  const curator = pick(CURATOR_NAMES);
+  const curTitle = pick(CURATOR_TITLES);
+
+  return { n, tier, museum, exhibitTitle, wallIntro, verdict, pieces, notShown, catalog, curator, curTitle };
+}
+
+function renderExhibition(x){
+  const piecesHTML = x.pieces.map(p => `
+    <figure class="piece">
+      <div class="frame">${p.art}</div>
+      <figcaption class="plaque">
+        <div class="plaque-artist">${esc(p.artist)}, ${esc(p.year)}</div>
+        <div class="plaque-title">${esc(p.title)}</div>
+        <div class="plaque-medium">${esc(p.medium)}</div>
+        <div class="plaque-note">${esc(p.note)}</div>
+        <div class="plaque-acq">${esc(p.acq)}</div>
+      </figcaption>
+    </figure>`).join('');
+
+  const tierLabel = { light:'Chamber Exhibition', medium:'Main Gallery', heavy:'East & West Wings', catastrophic:'The Entire Building' }[x.tier];
+  const notShownLine = x.notShown > 0
+    ? `<div class="section-rule">${x.notShown} further work${x.notShown===1?'':'s'} held in storage, deemed too painful to hang</div>`
+    : `<div class="section-rule">The collection, complete</div>`;
+
+  return `
+    <div class="wall-text animate-in">
+      <div class="exhibit-eyebrow">${esc(x.museum)} &nbsp;·&nbsp; ${esc(x.catalog)}</div>
+      <h2 class="exhibit-title">${esc(x.exhibitTitle)}</h2>
+      <div class="exhibit-sub">A retrospective in ${x.n} tab${x.n===1?'':'s'}, mounted without the subject’s consent.</div>
+      <div class="exhibit-body"><p>${esc(x.wallIntro)}</p></div>
+      <div class="exhibit-meta">
+        <div><div class="meta-label">Works on Display</div><div class="meta-val gild">${x.n}</div></div>
+        <div><div class="meta-label">Gallery</div><div class="meta-val">${esc(tierLabel)}</div></div>
+        <div><div class="meta-label">Est. RAM Consumed</div><div class="meta-val">${(x.n*0.34 + 0.6).toFixed(1)} GB</div></div>
+        <div><div class="meta-label">Admission</div><div class="meta-val">Free · closure extra</div></div>
+      </div>
+    </div>
+
+    <div class="section-rule">Selected works from the collection</div>
+    <div class="stagger" id="pieces">${piecesHTML}</div>
+
+    ${notShownLine}
+
+    <div class="verdict animate-in">
+      <div class="meta-label">Curator’s Statement</div>
+      <div class="verdict-quote">&ldquo;${esc(x.verdict)}&rdquo;</div>
+      <div class="verdict-sig">— ${esc(x.curator)}, ${esc(x.curTitle)}</div>
+    </div>
+
+    <div class="actions">
+      <button class="mini" id="recurate-btn" type="button">↻ Re-curate</button>
+      <button class="mini" id="copy-btn" type="button">⎘ Copy wall text</button>
+      <button class="mini" id="close-all-btn" type="button">✕ Close all tabs</button>
+    </div>
+  `;
+}
+
+function exhibitToText(x){
+  const L = [];
+  L.push(x.museum.toUpperCase());
+  L.push(x.exhibitTitle);
+  L.push('A retrospective in ' + x.n + ' tab' + (x.n===1?'':'s') + '.');
+  L.push('');
+  L.push(x.wallIntro);
+  L.push('');
+  L.push('SELECTED WORKS');
+  x.pieces.forEach(p => {
+    L.push('  • "' + p.title + '" — ' + p.artist + ', ' + p.year);
+    L.push('    ' + p.medium);
+    L.push('    ' + p.note);
+    L.push('');
+  });
+  if(x.notShown > 0) L.push('(' + x.notShown + ' further works held in storage.)');
+  L.push('');
+  L.push('CURATOR’S STATEMENT');
+  L.push('"' + x.verdict + '"');
+  L.push('— ' + x.curator + ', ' + x.curTitle);
+  return L.join('\n');
+}
+
+/* ============================ WIRING ============================ */
+
+const countInput = document.getElementById('count');
+const countCap = document.getElementById('count-cap');
+const curateBtn = document.getElementById('curate-btn');
+const exhibition = document.getElementById('exhibition');
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function clampCount(){
+  let v = parseInt(countInput.value, 10);
+  if(!Number.isFinite(v)) v = 1;
+  v = Math.max(1, Math.min(999, v));
+  countInput.value = v;
+  return v;
+}
+function updateCap(){
+  const raw = parseInt(countInput.value, 10);
+  const v = Number.isFinite(raw) ? Math.max(1, Math.min(999, raw)) : null;
+  countCap.textContent = v ? capFor(v) : 'Enter a number, be honest.';
+}
+
+document.getElementById('inc').addEventListener('click', () => { countInput.value = Math.min(999, clampCount()+1); updateCap(); });
+document.getElementById('dec').addEventListener('click', () => { countInput.value = Math.max(1, clampCount()-1); updateCap(); });
+countInput.addEventListener('input', updateCap);
+countInput.addEventListener('blur', () => { clampCount(); updateCap(); });
+countInput.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); clampCount(); curate(); } });
+
+document.querySelectorAll('.preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    countInput.value = btn.getAttribute('data-n');
+    updateCap();
+    curate();
+  });
+});
+
+function curate(){
+  const n = clampCount();
+  const x = generateExhibition(n);
+  currentExhibit = x;
+  exhibition.innerHTML = renderExhibition(x);
+  exhibition.classList.remove('hidden');
+
+  // stagger the pieces in
+  if(!prefersReduced){
+    const nodes = exhibition.querySelectorAll('.stagger > *');
+    nodes.forEach((el, i) => { el.style.animationDelay = (0.06 * i + 0.1) + 's'; });
+  }
+
+  wireResultButtons();
+  exhibition.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function wireResultButtons(){
+  const recurate = document.getElementById('recurate-btn');
+  const copyBtn = document.getElementById('copy-btn');
+  const closeAll = document.getElementById('close-all-btn');
+  if(recurate) recurate.addEventListener('click', () => curate());
+  if(copyBtn) copyBtn.addEventListener('click', copyWallText);
+  if(closeAll) closeAll.addEventListener('click', () => {
+    showToast(pick([
+      'You will not close all tabs. We both know this.',
+      'Bold of you to press that. Nothing happened, as expected.',
+      'The tabs remain. So does the guilt. The exhibition continues.',
+      'Denied. A collection this fine cannot simply be dismissed.'
+    ]));
+  });
+}
+
+function copyWallText(){
+  if(!currentExhibit) return;
+  const txt = exhibitToText(currentExhibit);
+  const done = () => showToast('Wall text copied — frame it, or don’t');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch(e){ showToast('Copy unavailable — commit it to memory'); }
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+curateBtn.addEventListener('click', () => curate());
+
+/* init */
+updateCap();
+</script>
+</body>
+</html>
