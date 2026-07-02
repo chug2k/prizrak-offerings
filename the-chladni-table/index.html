@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Chladni Table · Prízrak</title>
+<style>
+  :root{
+    --bg:#070809;
+    --bg-1:#0b0d10;
+    --bg-2:#0f1216;
+    --line:rgba(190,210,225,.10);
+    --line-2:rgba(190,210,225,.18);
+    --ink:#c7d2da;
+    --ink-dim:#6b7681;
+    --ink-ghost:#333c44;
+    --accent:#7fd4d0;
+    --accent-2:#a0b8e6;
+    --glow:rgba(127,212,208,.5);
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+    font-family:var(--serif); line-height:1.5; -webkit-font-smoothing:antialiased;
+    display:flex; align-items:center; justify-content:center; padding:22px 14px;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(120% 78% at 50% -12%, rgba(127,212,208,.06), transparent 56%),
+      radial-gradient(100% 60% at 50% 118%, rgba(160,184,230,.045), transparent 60%),
+      var(--bg);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.035; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  ::selection{ background:rgba(127,212,208,.24); color:#fff; }
+
+  main{
+    width:100%; max-width:720px;
+    background:linear-gradient(180deg,var(--bg-1),var(--bg));
+    border:1px solid var(--line-2); border-radius:16px;
+    box-shadow:0 40px 90px -50px #000, inset 0 0 0 1px rgba(255,255,255,.012);
+    padding:26px 22px 22px;
+  }
+  @media (min-width:560px){ main{ padding:32px 30px 26px; } }
+
+  .kicker{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.22em;
+    font-size:9.5px; color:var(--ink-dim); }
+  h1{
+    font-family:var(--serif); font-weight:700; letter-spacing:-.012em;
+    font-size:clamp(1.7rem,5.6vw,2.5rem); line-height:1.04; margin:10px 0 0;
+    color:#eaf1f4; text-shadow:0 0 22px rgba(127,212,208,.16);
+  }
+  h1 .spec{ color:var(--accent); font-style:italic; font-weight:500; }
+  .sub{ margin:11px 0 0; font-style:italic; font-size:13.5px; color:var(--ink-dim);
+    max-width:40rem; line-height:1.6; }
+
+  .shell{
+    margin-top:20px; position:relative; border-radius:12px; overflow:hidden;
+    border:1px solid var(--line-2);
+    box-shadow:inset 0 0 70px -24px #000, 0 0 70px -34px var(--glow);
+    background:#050607;
+  }
+  canvas#plate{ display:block; width:100%; height:auto; touch-action:none; cursor:crosshair; }
+
+  .readout{
+    position:absolute; right:11px; top:10px; pointer-events:none;
+    font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-align:right;
+    color:var(--ink-ghost);
+  }
+  .readout .hz{ color:var(--accent); text-shadow:0 0 10px var(--glow); }
+  .caption{
+    position:absolute; left:12px; bottom:11px; pointer-events:none;
+    font-family:var(--mono); font-size:11px; letter-spacing:.05em;
+    color:var(--accent); text-shadow:0 0 12px var(--glow);
+    transition:opacity .6s ease; max-width:70%;
+  }
+
+  .hint{ font-family:var(--mono); font-size:9.5px; letter-spacing:.1em; color:var(--ink-ghost);
+    margin-top:11px; }
+
+  .controls{ margin-top:16px; }
+  .slider-row{ display:flex; align-items:center; gap:14px; }
+  .slider-row .label{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.16em;
+    font-size:9px; color:var(--ink-dim); white-space:nowrap; }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; flex:1; height:2px;
+    background:var(--line-2); border-radius:2px; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 10px var(--glow); transition:transform .12s, box-shadow .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.18); box-shadow:0 0 16px var(--glow); }
+  input[type=range]::-moz-range-thumb{ width:14px; height:14px; border:none; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 10px var(--glow); cursor:pointer; }
+  input[type=range]:focus-visible{ outline:none; }
+  input[type=range]:focus-visible::-webkit-slider-thumb{ box-shadow:0 0 0 3px var(--glow); }
+
+  .actions{ display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; align-items:center; }
+  .btn{
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.18em; font-size:10px;
+    background:transparent; border:1px solid var(--line-2); color:var(--ink-dim);
+    border-radius:8px; padding:10px 16px; cursor:pointer;
+    transition:border-color .15s,color .15s,box-shadow .15s,transform .1s;
+  }
+  .btn:hover{ border-color:var(--accent); color:var(--ink); box-shadow:0 0 20px -8px var(--glow); }
+  .btn:active{ transform:translateY(1px); }
+  .btn:focus-visible{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--glow); }
+  .seed{ font-family:var(--mono); font-size:10px; letter-spacing:.12em; color:var(--ink-ghost); margin-left:auto; }
+
+  footer{ margin-top:20px; padding-top:14px; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-ghost); text-align:center; }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(18px);
+    background:var(--bg-2); border:1px solid var(--line-2); color:var(--ink);
+    font-family:var(--mono); font-size:11px; padding:10px 16px; border-radius:8px;
+    opacity:0; pointer-events:none; transition:opacity .25s,transform .25s; z-index:50;
+    box-shadow:0 14px 34px -12px #000; letter-spacing:.04em;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion:reduce){
+    .caption{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <div class="kicker">Prízrak / offerings — instrument 31 — resonance</div>
+    <h1>The Chladni <span class="spec">Table</span></h1>
+    <p class="sub">A steel plate, strewn with fine sand, held at one dark note. Turn the dial and the grains flee the shaking, gathering along the lines that do not move — stars, lattices, quiet mandalas that dissolve and re-form. Physics, worn as ornament.</p>
+
+    <div class="shell">
+      <canvas id="plate" width="900" height="640" aria-label="A vibrating plate on which fine sand gathers along the still nodal lines of a standing wave, forming symmetric figures."></canvas>
+      <div class="readout"><span class="hz" id="hz">—</span><br><span id="mode" style="color:var(--ink-ghost)">mode —</span></div>
+      <div class="caption" id="caption">the plate is still</div>
+    </div>
+
+    <p class="hint">drag the plate to bow it awake · sweep the dial to change the note</p>
+
+    <div class="controls">
+      <div class="slider-row">
+        <span class="label">frequency</span>
+        <input id="freq" type="range" min="0" max="1000" value="230" aria-label="frequency">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="new-btn" type="button">new plate</button>
+      <button class="btn" id="sweep-btn" type="button">auto-sweep</button>
+      <button class="btn" id="tint-btn" type="button">tint</button>
+      <button class="btn" id="save-btn" type="button">save frame</button>
+      <span class="seed" id="seed">—</span>
+    </div>
+
+    <footer>the sand knows where the plate is quiet · <a href="/index.html" style="color:inherit;text-decoration:none">all offerings</a></footer>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+(function(){
+  const canvas = document.getElementById('plate');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- logical size (buffer guarded by DPR) ---------- */
+  const CW = 900, CH = 640;              // logical drawing units
+  let dpr = 1, VW = CW, VH = CH;         // device pixel dims
+  function sizeCanvas(){
+    const cssW = canvas.clientWidth || CW;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // cap the backing buffer so we never allocate something enormous
+    const targetW = Math.min(cssW, 900);
+    const scale = targetW / CW;
+    VW = Math.round(CW * scale * dpr);
+    VH = Math.round(CH * scale * dpr);
+    // guard
+    if (VW * VH > 3_600_000){ const k = Math.sqrt(3_600_000/(VW*VH)); VW=Math.round(VW*k); VH=Math.round(VH*k); }
+    canvas.width = VW; canvas.height = VH;
+    ctx.setTransform(VW/CW, 0, 0, VH/CH, 0, 0);   // draw in logical CW×CH space
+  }
+
+  /* ---------- seeded PRNG (mulberry32) ---------- */
+  function makeRng(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function newSeed(){ return (Math.random()*4294967296) >>> 0; }
+
+  /* ---------- plate geometry ---------- */
+  // The plate sits inside a margin; sand lives in [0,1]×[0,1] normalized plate coords.
+  const MARGIN = 64;
+  const PW = CW - MARGIN*2, PH = CH - MARGIN*2;
+
+  /* ---------- Chladni standing-wave field ----------
+     Amplitude of a square-plate standing wave (superposed symmetric modes):
+       u(x,y) = a·cos(nπx)cos(mπy) + b·cos(mπx)cos(nπy)
+     Nodal lines are where u = 0. Sand descends |u| toward 0.
+     We morph (n,m,a,b) with the frequency dial; a "plate" seed adds
+     gentle warps so no two plates look alike.                              */
+  let seed = newSeed();
+  let rng = makeRng(seed);
+  let plate = null;      // {warpX, warpY, warpA, aa, bb, tint}
+  let tintIndex = 0;
+
+  const TINTS = [
+    { name:'iron',   sand:'#d8e2e8', hot:'#eaf3f6', glowH:186, glowS:60, glowL:56 },
+    { name:'brass',  sand:'#e7d6ae', hot:'#f5ead0', glowH:44,  glowS:60, glowL:58 },
+    { name:'verdigris', sand:'#bfe3cf', hot:'#e2f4ea', glowH:158, glowS:52, glowL:56 },
+    { name:'ash-violet', sand:'#cdc7ea', hot:'#e8e4f6', glowH:250, glowS:48, glowL:62 }
+  ];
+
+  function makePlate(){
+    plate = {
+      warpX: 0.06 + rng()*0.12,   // subtle anharmonic bending -> irregular figures
+      warpY: 0.06 + rng()*0.12,
+      warpPhX: rng()*Math.PI*2,
+      warpPhY: rng()*Math.PI*2,
+      mix: 0.55 + rng()*0.4,      // balance of the two superposed terms
+      swirl: (rng()*2-1)*0.10     // a whisper of rotational asymmetry
+    };
+  }
+
+  // frequency (0..1000 dial) -> mode numbers (n,m) and amplitudes.
+  // higher freq -> higher mode numbers -> finer, busier figures.
+  function modeFor(freqDial){
+    const f = freqDial/1000;                    // 0..1
+    // map to a continuous mode index; blend between integer modes for morphing
+    const modeMax = 9.4;
+    const mi = 0.8 + f*modeMax;                 // ~0.8 .. 10.2
+    const n = mi;
+    const m = 0.8 + f*modeMax*0.72 + 0.6;       // partner mode, slightly different -> asymmetric stars
+    return { n, m, mi };
+  }
+
+  // amplitude field at normalized plate coords (px,py in 0..1)
+  function field(px, py, M){
+    const P = plate;
+    // apply a gentle nonlinear warp so figures gain organic irregularity
+    let x = px + P.warpX*Math.sin(py*Math.PI*2 + P.warpPhX)*0.06;
+    let y = py + P.warpY*Math.sin(px*Math.PI*2 + P.warpPhY)*0.06;
+    // rotational whisper
+    const cx=x-0.5, cy=y-0.5;
+    x = 0.5 + cx*Math.cos(P.swirl) - cy*Math.sin(P.swirl);
+    y = 0.5 + cx*Math.sin(P.swirl) + cy*Math.cos(P.swirl);
+    const n=M.n, m=M.m;
+    const a = P.mix, b = 1-P.mix + 0.35;
+    const t1 = Math.cos(n*Math.PI*x)*Math.cos(m*Math.PI*y);
+    const t2 = Math.cos(m*Math.PI*x)*Math.cos(n*Math.PI*y);
+    return a*t1 + b*t2;
+  }
+
+  /* ---------- sand particles ---------- */
+  const MAX_SAND = reduce ? 5200 : 9000;
+  let sand = null;   // Float32 arrays for x,y (normalized 0..1)
+  function initSand(){
+    const n = MAX_SAND;
+    sand = { n, x:new Float32Array(n), y:new Float32Array(n), s:new Float32Array(n) };
+    for(let i=0;i<n;i++){
+      sand.x[i] = rng();
+      sand.y[i] = rng();
+      sand.s[i] = 0.55 + rng()*0.9;   // grain size factor
+    }
+  }
+  function scatterSand(){
+    for(let i=0;i<sand.n;i++){ sand.x[i]=rng(); sand.y[i]=rng(); }
+  }
+
+  /* ---------- controls / state ---------- */
+  let freqDial = 230;
+  let energy = 0;          // vibration energy 0..1 (drives shake + settling)
+  let targetEnergy = 0.9;  // resting drive level
+  let sweep = false;
+  let sweepDir = 1;
+  let paused = false;
+  const pointer = { active:false, x:0, y:0, hx:0, hy:0, has:false };
+
+  const freqEl = document.getElementById('freq');
+  const hzEl = document.getElementById('hz');
+  const modeEl = document.getElementById('mode');
+  const captionEl = document.getElementById('caption');
+  const seedEl = document.getElementById('seed');
+
+  function hzFor(dial){ return Math.round(60 + (dial/1000)*(2360)); }  // pseudo-Hz label
+
+  function updateReadout(){
+    const M = modeFor(freqDial);
+    hzEl.textContent = hzFor(freqDial) + ' hz';
+    modeEl.textContent = 'mode ' + M.n.toFixed(1) + '·' + M.m.toFixed(1);
+    seedEl.textContent = 'seed ' + seed.toString(16).padStart(8,'0');
+  }
+
+  const CAPTIONS = [
+    'the sand finds the quiet',
+    'stars where the plate stands still',
+    'a lattice, briefly',
+    'it gathers on the lines that do not move',
+    'the figure holds its breath',
+    'symmetry, dissolving',
+    'the grains flee the shaking'
+  ];
+  let lastCap='';
+  function refreshCaption(){
+    let c;
+    if(energy < 0.08) c = 'the plate is still';
+    else {
+      const M = modeFor(freqDial);
+      const idx = (Math.floor(M.mi) + (sweep?1:0)) % CAPTIONS.length;
+      c = CAPTIONS[idx];
+    }
+    if(c!==lastCap){
+      lastCap=c;
+      captionEl.style.opacity='0';
+      setTimeout(()=>{ captionEl.textContent=c; captionEl.style.opacity='1'; }, reduce?0:280);
+    }
+  }
+
+  /* ---------- physics step ----------
+     Each grain samples the field and steps DOWN the |u| gradient (toward a
+     nodal line where u≈0). Shaking (proportional to |u| and energy) jostles
+     grains off antinodes; grains near nodes settle and stop.               */
+  const EPS = 0.0032;
+  function grad(px, py, M){
+    const c = field(px,py,M);
+    const gx = (Math.abs(field(px+EPS,py,M)) - Math.abs(field(px-EPS,py,M)))/(2*EPS);
+    const gy = (Math.abs(field(px,py+EPS,M)) - Math.abs(field(px,py-EPS,M)))/(2*EPS);
+    return { c, gx, gy };
+  }
+
+  function step(dt){
+    // energy relaxes toward target; pointer bowing injects energy
+    targetEnergy = 0.62 + (freqDial/1000)*0.34;
+    if(pointer.active) targetEnergy = 1;
+    energy += (targetEnergy - energy) * Math.min(1, dt*2.4);
+
+    const M = modeFor(freqDial);
+    const N = sand.n;
+    const settle = 0.020 + 0.030*(1-energy*0.4);   // gradient descent rate
+    const shakeBase = 0.0090 * (0.35 + energy);
+
+    // pointer bow: a local swell that pushes grains outward briefly
+    const pActive = pointer.active;
+    const pdx = pointer.x, pdy = pointer.y;
+
+    for(let i=0;i<N;i++){
+      let x = sand.x[i], y = sand.y[i];
+      const g = grad(x,y,M);
+      const amp = Math.abs(g.c);                    // 0 at node, 1 at antinode
+
+      // descend the amplitude gradient toward the nearest nodal line
+      const gl = g.gx*g.gx + g.gy*g.gy + 1e-6;
+      const stepMag = settle * amp;                 // move faster when far from a node
+      x -= g.gx/Math.sqrt(gl) * stepMag * Math.sqrt(amp);
+      y -= g.gy/Math.sqrt(gl) * stepMag * Math.sqrt(amp);
+
+      // shaking: grains on strongly-vibrating regions get kicked randomly.
+      // near nodes (amp≈0) almost no kick -> they settle and stay (the figure).
+      const shake = shakeBase * amp * amp;
+      if(shake > 0.00002){
+        x += (rng()*2-1)*shake;
+        y += (rng()*2-1)*shake;
+      }
+
+      // pointer bow disturbance
+      if(pActive){
+        const ddx = x - pdx, ddy = y - pdy;
+        const d2 = ddx*ddx + ddy*ddy;
+        if(d2 < 0.020){
+          const f = (0.020 - d2)/0.020;
+          x += ddx*f*0.14 + (rng()*2-1)*0.01*f;
+          y += ddy*f*0.14 + (rng()*2-1)*0.01*f;
+        }
+      }
+
+      // keep within plate; reflect softly at edges (sand piles at rim)
+      if(x<0.002){ x = 0.002 + (0.002-x)*0.5; } else if(x>0.998){ x = 0.998 - (x-0.998)*0.5; }
+      if(y<0.002){ y = 0.002 + (0.002-y)*0.5; } else if(y>0.998){ y = 0.998 - (y-0.998)*0.5; }
+
+      sand.x[i]=x; sand.y[i]=y;
+    }
+  }
+
+  /* ---------- render ---------- */
+  let hueDrift=0;
+  function draw(){
+    const T = TINTS[tintIndex];
+    hueDrift += 0.03;
+
+    // plate backdrop — brushed dark steel
+    ctx.fillStyle = '#050607';
+    ctx.fillRect(0,0,CW,CH);
+
+    // vignette-ish ambient glow from center, tinted
+    const amb = ctx.createRadialGradient(CW/2, CH/2, 40, CW/2, CH/2, CW*0.62);
+    amb.addColorStop(0, `hsla(${T.glowH},${T.glowS}%,${T.glowL}%,0.06)`);
+    amb.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = amb; ctx.fillRect(0,0,CW,CH);
+
+    // the steel plate face
+    const plateGrad = ctx.createLinearGradient(MARGIN,MARGIN,MARGIN,MARGIN+PH);
+    plateGrad.addColorStop(0,'#0d1013');
+    plateGrad.addColorStop(0.5,'#0a0d10');
+    plateGrad.addColorStop(1,'#070a0c');
+    ctx.fillStyle = plateGrad;
+    roundRect(MARGIN,MARGIN,PW,PH,10); ctx.fill();
+
+    // faint anisotropic brushed sheen
+    ctx.save();
+    ctx.globalAlpha = 0.05;
+    ctx.strokeStyle = '#9fb4c0';
+    ctx.lineWidth = 0.5;
+    for(let yy=MARGIN+6; yy<MARGIN+PH; yy+=7){
+      ctx.beginPath(); ctx.moveTo(MARGIN+4,yy); ctx.lineTo(MARGIN+PW-4,yy+Math.sin(yy*0.3)*0.6); ctx.stroke();
+    }
+    ctx.restore();
+
+    // subtle nodal-line shimmer under the sand (where the plate is quiet)
+    if(energy > 0.05){
+      drawNodalGhost(T);
+    }
+
+    // clip sand to the plate face
+    ctx.save();
+    roundRect(MARGIN,MARGIN,PW,PH,10); ctx.clip();
+
+    // draw sand with additive glow
+    ctx.globalCompositeOperation = 'lighter';
+    const N = sand.n;
+    const M = modeFor(freqDial);
+    // sand color: quiet grains bright/hot, agitated grains dim
+    const baseR = parseInt(T.sand.slice(1,3),16);
+    const baseG = parseInt(T.sand.slice(3,5),16);
+    const baseB = parseInt(T.sand.slice(5,7),16);
+    const hotR = parseInt(T.hot.slice(1,3),16);
+    const hotG = parseInt(T.hot.slice(3,5),16);
+    const hotB = parseInt(T.hot.slice(5,7),16);
+
+    for(let i=0;i<N;i++){
+      const x = sand.x[i], y = sand.y[i];
+      const amp = Math.abs(field(x,y,M));
+      const sx = MARGIN + x*PW;
+      const sy = MARGIN + y*PH;
+      // settled (low amp) grains glow hot & bright; agitated grains are faint
+      const settledness = 1 - Math.min(1, amp*3.2);
+      const a = 0.10 + settledness*0.62;
+      // color lerp toward hot when settled
+      const r = Math.round(baseR + (hotR-baseR)*settledness);
+      const gg = Math.round(baseG + (hotG-baseG)*settledness);
+      const b = Math.round(baseB + (hotB-baseB)*settledness);
+      const rad = sand.s[i]*(0.7 + settledness*1.0);
+      ctx.fillStyle = `rgba(${r},${gg},${b},${a})`;
+      ctx.beginPath();
+      ctx.arc(sx,sy,rad,0,6.283);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+
+    // plate rim highlight
+    ctx.strokeStyle = 'rgba(180,200,214,.14)';
+    ctx.lineWidth = 1;
+    roundRect(MARGIN+0.5,MARGIN+0.5,PW-1,PH-1,10); ctx.stroke();
+
+    // driver dot at plate center (the bolt that shakes it), pulsing with energy
+    const pr = 3 + energy*3 + Math.sin(hueDrift*0.6)*energy*1.4;
+    const dg = ctx.createRadialGradient(CW/2,CH/2,0,CW/2,CH/2,pr*4);
+    dg.addColorStop(0,`hsla(${T.glowH},${T.glowS}%,${T.glowL+12}%,${0.5*energy})`);
+    dg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = dg;
+    ctx.beginPath(); ctx.arc(CW/2,CH/2,pr*4,0,6.283); ctx.fill();
+
+    // outer soft vignette
+    const vig = ctx.createRadialGradient(CW/2,CH/2,CH*0.34,CW/2,CH/2,CW*0.72);
+    vig.addColorStop(0,'transparent');
+    vig.addColorStop(1,'rgba(0,0,0,0.5)');
+    ctx.fillStyle = vig; ctx.fillRect(0,0,CW,CH);
+  }
+
+  // faint bright thread tracing the nodal lines (sampled contour of u≈0)
+  function drawNodalGhost(T){
+    const M = modeFor(freqDial);
+    const step = 5;
+    ctx.save();
+    roundRect(MARGIN,MARGIN,PW,PH,10); ctx.clip();
+    ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle = `hsla(${T.glowH},${T.glowS}%,${T.glowL}%,0.05)`;
+    for(let sx=0; sx<PW; sx+=step){
+      for(let sy=0; sy<PH; sy+=step){
+        const px = sx/PW, py = sy/PH;
+        const v = Math.abs(field(px,py,M));
+        if(v < 0.05){
+          ctx.fillRect(MARGIN+sx-1, MARGIN+sy-1, step, step);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  /* ---------- main loop ---------- */
+  let last=0, capTimer=0;
+  function frame(now){
+    rafId = requestAnimationFrame(frame);
+    if(!last) last = now;
+    let dt = (now-last)/1000; last = now;
+    if(dt>0.05) dt=0.05;
+
+    if(!paused){
+      // sweep automation
+      if(sweep){
+        freqDial += sweepDir * 46 * dt;
+        if(freqDial>=1000){ freqDial=1000; sweepDir=-1; }
+        else if(freqDial<=0){ freqDial=0; sweepDir=1; }
+        freqEl.value = freqDial;
+      }
+      // multiple physics substeps for stability
+      const sub = 2;
+      for(let k=0;k<sub;k++) step(dt/sub);
+    }
+    draw();
+
+    capTimer += dt;
+    if(capTimer>0.8){ capTimer=0; refreshCaption(); updateReadout(); }
+  }
+  let rafId=0;
+
+  /* ---------- reduced-motion still frame ---------- */
+  function renderStill(){
+    // relax the sand onto the nodal lines over many silent iterations, then draw once
+    energy = 0.35;
+    for(let i=0;i<420;i++) step(1/60);
+    energy = 0.28;
+    draw();
+    updateReadout();
+    refreshCaption();
+  }
+
+  /* ---------- pointer ---------- */
+  function posFromEvent(ev){
+    const r = canvas.getBoundingClientRect();
+    const nx = (ev.clientX - r.left)/r.width;   // 0..1 across canvas
+    const ny = (ev.clientY - r.top)/r.height;
+    // convert to plate-normalized coords (account for margin)
+    const px = (nx*CW - MARGIN)/PW;
+    const py = (ny*CH - MARGIN)/PH;
+    return { x: Math.max(0,Math.min(1,px)), y: Math.max(0,Math.min(1,py)) };
+  }
+  canvas.addEventListener('pointerdown', ev=>{
+    ev.preventDefault();
+    canvas.setPointerCapture?.(ev.pointerId);
+    const p = posFromEvent(ev);
+    pointer.active=true; pointer.x=p.x; pointer.y=p.y; pointer.has=true;
+    if(reduce) renderStill();
+  });
+  canvas.addEventListener('pointermove', ev=>{
+    if(!pointer.active) return;
+    const p = posFromEvent(ev);
+    pointer.x=p.x; pointer.y=p.y;
+    if(reduce) renderStill();
+  });
+  function endPointer(){ pointer.active=false; }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('pointerleave', ()=>{ if(pointer.active) endPointer(); });
+
+  /* ---------- controls ---------- */
+  freqEl.value = freqDial;
+  freqEl.addEventListener('input', ()=>{
+    freqDial = parseInt(freqEl.value,10);
+    sweep=false; sweepBtn.textContent='auto-sweep';
+    updateReadout();
+    if(reduce) renderStill();
+  });
+
+  const newBtn = document.getElementById('new-btn');
+  const sweepBtn = document.getElementById('sweep-btn');
+  const tintBtn = document.getElementById('tint-btn');
+  const saveBtn = document.getElementById('save-btn');
+
+  newBtn.addEventListener('click', ()=>{
+    seed = newSeed(); rng = makeRng(seed);
+    makePlate(); scatterSand();
+    updateReadout();
+    if(reduce) renderStill();
+  });
+  sweepBtn.addEventListener('click', ()=>{
+    if(reduce){
+      // in reduced mode, just nudge to a new note + settle
+      freqDial = (freqDial+180)%1000; freqEl.value=freqDial; renderStill(); return;
+    }
+    sweep = !sweep;
+    sweepBtn.textContent = sweep ? 'stop sweep' : 'auto-sweep';
+  });
+  tintBtn.addEventListener('click', ()=>{
+    tintIndex = (tintIndex+1)%TINTS.length;
+    const T = TINTS[tintIndex];
+    document.documentElement.style.setProperty('--accent', `hsl(${T.glowH},${T.glowS}%,${T.glowL}%)`);
+    document.documentElement.style.setProperty('--glow', `hsla(${T.glowH},${T.glowS}%,${T.glowL}%,0.5)`);
+    if(reduce) renderStill();
+  });
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=>t.classList.remove('show'), 2400);
+  }
+  saveBtn.addEventListener('click', ()=>{
+    try{
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url; a.download = 'chladni-'+seed.toString(16)+'-'+hzFor(freqDial)+'hz.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      showToast('frame saved — the figure, held still');
+    }catch(e){
+      showToast('the plate declines to be captured');
+    }
+  });
+
+  /* ---------- visibility / lifecycle ---------- */
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden){ paused=true; }
+    else { paused=false; last=0; }
+  });
+
+  let resizeT=0;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(resizeT);
+    resizeT = setTimeout(()=>{ sizeCanvas(); if(reduce) renderStill(); }, 120);
+  });
+
+  /* ---------- boot ---------- */
+  sizeCanvas();
+  makePlate();
+  initSand();
+  updateReadout();
+
+  const T = TINTS[tintIndex];
+  document.documentElement.style.setProperty('--accent', `hsl(${T.glowH},${T.glowS}%,${T.glowL}%)`);
+  document.documentElement.style.setProperty('--glow', `hsla(${T.glowH},${T.glowS}%,${T.glowL}%,0.5)`);
+
+  if(reduce){
+    renderStill();
+  } else {
+    // pre-settle a little so the first visible frame already shows a figure forming
+    for(let i=0;i<60;i++){ energy=0.7; step(1/60); }
+    rafId = requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>

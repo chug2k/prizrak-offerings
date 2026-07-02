@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Frost Oracle · Prízrak</title>
+<style>
+  :root{
+    --ink:#04070b; --ink-1:#070b12; --ink-2:#0b1119; --ink-3:#101823;
+    --pane:#060a10;
+    --frost:#cfe6f2; --frost-dim:#8fb7cc; --ash:#5c7382; --ash-2:#3d4e5a; --ash-3:#28353e;
+    --rule:rgba(180,214,232,.08); --rule-2:rgba(180,214,232,.16);
+    --ice:#a9d6ef; --ice-glow:#6fb6e6;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--frost); font-family:var(--serif);
+    min-height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased;
+    position:fixed; inset:0;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(130% 90% at 50% -18%, rgba(111,182,230,.08), transparent 56%),
+      radial-gradient(120% 70% at 50% 120%, rgba(60,90,110,.05), transparent 62%),
+      var(--ink);
+  }
+  /* faint grain */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:6; pointer-events:none; opacity:.035; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  #glass{ position:fixed; inset:0; z-index:1; display:block; cursor:crosshair; touch-action:none; }
+
+  /* ---- overlay chrome ---- */
+  .frame{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+
+  header{
+    position:absolute; top:0; left:0; right:0; padding:26px 26px 0; text-align:center;
+    -webkit-user-select:none; user-select:none;
+  }
+  .kicker{
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.26em;
+    font-size:9.5px; color:var(--ash-2);
+  }
+  h1{
+    font-family:var(--serif); font-weight:700; font-size:clamp(1.6rem,5.2vw,2.7rem);
+    line-height:1.04; letter-spacing:.005em; margin:9px 0 0; color:var(--frost);
+    text-shadow:0 0 26px rgba(111,182,230,.28);
+  }
+  h1 .em{ color:var(--ice); font-style:italic; font-weight:500; }
+  .sub{
+    margin:11px auto 0; font-style:italic; font-size:13px; color:var(--frost-dim);
+    max-width:30rem; line-height:1.6; opacity:.82;
+  }
+
+  /* ---- bottom control bar ---- */
+  .dock{
+    position:absolute; left:50%; bottom:22px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center;
+    padding:11px 16px; border-radius:12px; pointer-events:auto;
+    background:rgba(8,13,20,.55); backdrop-filter:blur(9px);
+    border:1px solid var(--rule-2);
+    box-shadow:0 18px 50px -26px rgba(0,0,0,.9), inset 0 0 0 1px rgba(180,214,232,.03);
+    max-width:calc(100vw - 24px);
+  }
+  .ctl{ display:flex; align-items:center; gap:9px; }
+  .ctl label{
+    font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.16em;
+    color:var(--ash); white-space:nowrap;
+  }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:96px; height:2px;
+    background:var(--rule-2); border-radius:2px; cursor:pointer; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:12px; height:12px; border-radius:50%;
+    background:var(--ice); box-shadow:0 0 10px rgba(111,182,230,.7); transition:transform .12s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.2); }
+  input[type=range]::-moz-range-thumb{
+    width:12px; height:12px; border:none; border-radius:50%;
+    background:var(--ice); box-shadow:0 0 10px rgba(111,182,230,.7); cursor:pointer;
+  }
+  .btn{
+    font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.16em;
+    padding:9px 14px; background:rgba(12,18,26,.7); border:1px solid var(--rule-2);
+    border-radius:7px; color:var(--frost-dim); cursor:pointer;
+    transition:border-color .18s, color .18s, background .18s, transform .1s;
+    display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+  }
+  .btn:hover{ border-color:var(--ice); color:var(--frost); background:rgba(18,28,40,.8); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.done{ border-color:var(--ice); color:var(--ice); }
+  .div{ width:1px; height:22px; background:var(--rule-2); }
+
+  .hint{
+    position:absolute; left:0; right:0; bottom:78px; text-align:center; pointer-events:none;
+    font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--ash-2);
+    -webkit-user-select:none; user-select:none; transition:opacity .8s ease;
+  }
+
+  .readout{
+    position:absolute; top:24px; right:26px; text-align:right; pointer-events:none;
+    font-family:var(--mono); font-size:9px; letter-spacing:.14em; color:var(--ash-3);
+    -webkit-user-select:none; user-select:none; line-height:1.7;
+  }
+  .readout .v{ color:var(--frost-dim); }
+
+  .toast{
+    position:fixed; left:50%; bottom:92px; transform:translateX(-50%) translateY(14px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--frost);
+    font-family:var(--mono); font-size:10.5px; padding:10px 15px; border-radius:8px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:9;
+    box-shadow:0 12px 34px -12px rgba(0,0,0,.85); letter-spacing:.05em; max-width:88vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (max-width:560px){
+    input[type=range]{ width:72px; }
+    .sub{ display:none; }
+    .dock{ gap:11px; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .hint{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="glass" aria-label="A dark pane of glass on which crystalline frost grows from where you touch."></canvas>
+
+  <div class="frame">
+    <header>
+      <div class="kicker">Prízrak — an instrument of cold</div>
+      <h1>The Frost <span class="em">Oracle</span></h1>
+      <p class="sub">Breathe on the glass. Touch it, and the ice will answer — a fern of frost creeping outward, unrepeatable, from the warmth you left behind.</p>
+    </header>
+
+    <div class="readout">
+      <div>crystals&nbsp; <span class="v" id="r-count">0</span></div>
+      <div>frozen&nbsp;&nbsp; <span class="v" id="r-pct">0%</span></div>
+    </div>
+
+    <div class="hint" id="hint">touch the glass to seed the frost · drag to breathe a trail</div>
+
+    <div class="dock">
+      <div class="ctl">
+        <label for="chill">chill</label>
+        <input id="chill" type="range" min="0" max="100" value="58" aria-label="chill — growth speed">
+      </div>
+      <div class="ctl">
+        <label for="fern">fern</label>
+        <input id="fern" type="range" min="0" max="100" value="46" aria-label="fern — branch delicacy">
+      </div>
+      <div class="div"></div>
+      <button class="btn" id="clear-btn" type="button">✦ thaw</button>
+      <button class="btn" id="fill-btn" type="button">❄ let it fill</button>
+      <button class="btn" id="save-btn" type="button">⤓ keep frame</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+(function(){
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const canvas = document.getElementById('glass');
+  const ctx = canvas.getContext('2d', { alpha:false });
+
+  /* ------------------------------------------------------------------ */
+  /* sizing — DPR-aware but capped so buffers never get huge            */
+  /* ------------------------------------------------------------------ */
+  let W=0, H=0, DPR=1;
+  // simulation grid (coarser than pixels for performance + fern scale)
+  let GW=0, GH=0, CELL=0;
+  let occupied = null;   // Uint8Array grid: 0 empty, >0 crystal (stores age/tier)
+  let field = null;      // Float32Array: attraction field (frozen neighbours near each cell)
+  let ageGrid = null;    // Uint16Array: when each cell froze (for shimmer)
+
+  let frozenCount = 0;
+  let tick = 0;
+
+  // walkers: diffusing particles that stick when adjacent to frost
+  let walkers = [];
+  const params = { chill:58, fern:46 };
+
+  // seeds queued from pointer, released gradually
+  let running = !reduce;
+
+  function computeSize(){
+    W = Math.max(320, window.innerWidth);
+    H = Math.max(320, window.innerHeight);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+
+    // choose cell size: aim for a grid of manageable size (~ <= 260k cells)
+    // larger cells = chunkier ice, smaller = finer. tie loosely to viewport.
+    CELL = 3;
+    GW = Math.ceil((W * DPR) / CELL);
+    GH = Math.ceil((H * DPR) / CELL);
+    // guard: cap total cells
+    const MAXCELLS = 320000;
+    while (GW * GH > MAXCELLS){
+      CELL += 1;
+      GW = Math.ceil((W * DPR) / CELL);
+      GH = Math.ceil((H * DPR) / CELL);
+    }
+  }
+
+  function allocGrids(){
+    const n = GW * GH;
+    occupied = new Uint8Array(n);
+    field = new Float32Array(n);
+    ageGrid = new Uint16Array(n);
+    frozenCount = 0;
+  }
+
+  const idx = (gx, gy) => gy * GW + gx;
+
+  /* ------------------------------------------------------------------ */
+  /* seeded RNG for per-session variety (fresh each reset)              */
+  /* ------------------------------------------------------------------ */
+  let rngState = (Date.now() ^ (Math.random()*1e9|0)) >>> 0;
+  function rng(){
+    let s = rngState;
+    s ^= s << 13; s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5; s >>>= 0;
+    rngState = s;
+    return (s >>> 0) / 4294967296;
+  }
+  function reseed(){ rngState = (Date.now() ^ (Math.random()*1e9|0) ^ (frozenCount*2654435761)) >>> 0; }
+
+  /* ------------------------------------------------------------------ */
+  /* rendering canvas (frost drawn incrementally, never fully cleared   */
+  /* except on thaw). We keep an offscreen ice layer for the bloom.     */
+  /* ------------------------------------------------------------------ */
+  let iceCanvas, iceCtx;        // full-res ice structure (crisp)
+  function buildLayers(){
+    iceCanvas = document.createElement('canvas');
+    iceCanvas.width = canvas.width;
+    iceCanvas.height = canvas.height;
+    iceCtx = iceCanvas.getContext('2d');
+    iceCtx.clearRect(0,0,iceCanvas.width,iceCanvas.height);
+  }
+
+  /* draw the dark pane background (with a breath of vignette + a chill sheen) */
+  function paintPane(){
+    const w = canvas.width, h = canvas.height;
+    const g = ctx.createRadialGradient(w*0.5, h*0.34, 0, w*0.5, h*0.5, Math.hypot(w,h)*0.62);
+    g.addColorStop(0, '#0a1119');
+    g.addColorStop(0.55, '#070c13');
+    g.addColorStop(1, '#03060a');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,w,h);
+
+    // faint frozen breath-bloom in the upper middle
+    const b = ctx.createRadialGradient(w*0.5, h*0.16, 0, w*0.5, h*0.16, h*0.4);
+    b.addColorStop(0, 'rgba(90,150,190,0.06)');
+    b.addColorStop(1, 'transparent');
+    ctx.fillStyle = b;
+    ctx.fillRect(0,0,w,h);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* SEEDING                                                            */
+  /* ------------------------------------------------------------------ */
+  function freezeCell(gx, gy, tier){
+    if (gx<0||gy<0||gx>=GW||gy>=GH) return;
+    const i = idx(gx,gy);
+    if (occupied[i]) return;
+    occupied[i] = tier || 1;
+    ageGrid[i] = tick & 0xffff;
+    frozenCount++;
+    // bump attraction field of 8-neighbours so nearby walkers feel the pull
+    for (let dy=-1; dy<=1; dy++){
+      for (let dx=-1; dx<=1; dx++){
+        if(!dx && !dy) continue;
+        const nx=gx+dx, ny=gy+dy;
+        if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+        field[idx(nx,ny)] += 1;
+      }
+    }
+    // paint this cell onto the ice layer
+    stampIce(gx, gy, tier || 1);
+  }
+
+  // convert grid cell -> device px
+  function stampIce(gx, gy, tier){
+    const px = gx * CELL, py = gy * CELL;
+    const s = CELL;
+    // tier influences brightness: fresh growth glints brighter
+    const bright = tier >= 2 ? 1 : 0.86;
+    iceCtx.fillStyle = tier >= 2
+      ? 'rgba(224,244,255,'+ (0.92*bright) +')'
+      : 'rgba(176,214,236,0.82)';
+    iceCtx.fillRect(px, py, s, s);
+    // a soft glint core
+    iceCtx.fillStyle = 'rgba(120,180,220,0.35)';
+    iceCtx.fillRect(px - 1, py - 1, s + 2, s + 2);
+  }
+
+  function seedAt(cx, cy){
+    // cx,cy in device px
+    const gx = Math.floor(cx / CELL), gy = Math.floor(cy / CELL);
+    freezeCell(gx, gy, 2);
+    // spawn a cluster of walkers around the seed to start growth
+    spawnWalkers(gx, gy, 26 + Math.floor(rng()*22));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* WALKERS (diffusion-limited aggregation)                            */
+  /* Walkers spawn on a ring around the active frost, random-walk with  */
+  /* a slight bias toward field gradient, and stick when adjacent to    */
+  /* an occupied cell. A directional bias creates fern-like dendrites.  */
+  /* ------------------------------------------------------------------ */
+  const MAX_WALKERS = 1400;
+
+  function spawnWalkers(gx, gy, n){
+    for (let k=0; k<n && walkers.length < MAX_WALKERS; k++){
+      const ang = rng()*Math.PI*2;
+      const rad = 6 + rng()*14;
+      let wx = gx + Math.cos(ang)*rad;
+      let wy = gy + Math.sin(ang)*rad;
+      wx = Math.max(1, Math.min(GW-2, wx));
+      wy = Math.max(1, Math.min(GH-2, wy));
+      walkers.push({ x:wx, y:wy, tx:gx, ty:gy });
+    }
+  }
+
+  // pick a fresh spawn point near existing frost so growth continues across the pane
+  let frostSamples = [];   // list of recently-frozen cells to spawn near
+  function noteFrost(gx, gy){
+    if (frostSamples.length < 400) frostSamples.push(gx, gy);
+    else {
+      // reservoir-ish: overwrite random slot
+      const s = (Math.floor(rng()*200))*2;
+      frostSamples[s] = gx; frostSamples[s+1] = gy;
+    }
+  }
+
+  function replenishWalkers(){
+    if (frozenCount === 0) return;
+    const want = Math.floor(6 + (params.chill/100)*10);
+    let added = 0, guard = 0;
+    while (walkers.length < MAX_WALKERS && added < want && guard < 80){
+      guard++;
+      if (frostSamples.length === 0) break;
+      const s = Math.floor(rng()*(frostSamples.length/2))*2;
+      const gx = frostSamples[s], gy = frostSamples[s+1];
+      if (gx===undefined) continue;
+      const ang = rng()*Math.PI*2;
+      const rad = 10 + rng()*22;
+      let wx = Math.round(gx + Math.cos(ang)*rad);
+      let wy = Math.round(gy + Math.sin(ang)*rad);
+      if (wx<1||wy<1||wx>=GW-1||wy>=GH-1) continue;
+      if (occupied[idx(wx,wy)]) continue;
+      walkers.push({ x:wx, y:wy, tx:gx, ty:gy });
+      added++;
+    }
+  }
+
+  function neighbourFrost(gx, gy){
+    // return true if any of 8-neighbours occupied
+    for (let dy=-1; dy<=1; dy++){
+      for (let dx=-1; dx<=1; dx++){
+        if(!dx && !dy) continue;
+        const nx=gx+dx, ny=gy+dy;
+        if(nx<0||ny<0||nx>=GW||ny>=GH) continue;
+        if(occupied[idx(nx,ny)]) return true;
+      }
+    }
+    return false;
+  }
+
+  function stepWalkers(){
+    // stickiness lower => more delicate ferns (walkers wander further, thinner branches)
+    // fern slider: high = delicate/feathery (lower stick prob + stronger tip bias)
+    const delicate = params.fern / 100;         // 0..1
+    const stickP = 1 - delicate*0.55;            // 0.45..1
+    const tipBias = 0.35 + delicate*0.5;         // pull toward existing frost tips
+
+    const speed = 1 + Math.floor((params.chill/100)*2); // walk substeps
+
+    for (let i = walkers.length - 1; i >= 0; i--){
+      const w = walkers[i];
+      let stuck = false;
+
+      for (let sstep=0; sstep<speed; sstep++){
+        const gx = Math.round(w.x), gy = Math.round(w.y);
+        if (gx<1||gy<1||gx>=GW-1||gy>=GH-1){ walkers.splice(i,1); stuck=true; break; }
+
+        if (neighbourFrost(gx, gy)){
+          if (rng() < stickP){
+            const tier = (rng() < 0.25) ? 2 : 1;
+            freezeCell(gx, gy, tier);
+            noteFrost(gx, gy);
+            walkers.splice(i, 1);
+            stuck = true;
+            break;
+          }
+        }
+
+        // biased random walk: bias toward the seed/tip it was spawned for (grows dendrites)
+        let bx = 0, by = 0;
+        const dx = w.tx - w.x, dy = w.ty - w.y;
+        const dm = Math.hypot(dx, dy) || 1;
+        bx = (dx/dm) * tipBias;
+        by = (dy/dm) * tipBias;
+        // random jitter dominates so structure stays fractal
+        const jx = (rng()*2 - 1);
+        const jy = (rng()*2 - 1);
+        w.x += jx + bx*0.6;
+        w.y += jy + by*0.6;
+      }
+      if (stuck) continue;
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* RENDER                                                             */
+  /* ------------------------------------------------------------------ */
+  function render(){
+    paintPane();
+
+    // bloom: draw the ice layer blurred + additive underneath, then crisp on top
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.5;
+    ctx.filter = 'blur(6px)';
+    ctx.drawImage(iceCanvas, 0, 0);
+    ctx.filter = 'blur(2px)';
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(iceCanvas, 0, 0);
+    ctx.restore();
+
+    // crisp structure
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.95;
+    ctx.filter = 'none';
+    ctx.drawImage(iceCanvas, 0, 0);
+    ctx.restore();
+
+    // a moving sparkle sweep: pick a few recently frozen cells and glint them
+    drawSparkles();
+
+    // faint edge vignette to keep it a "pane"
+    const w = canvas.width, h = canvas.height;
+    const v = ctx.createRadialGradient(w/2,h/2, h*0.32, w/2,h/2, Math.hypot(w,h)*0.6);
+    v.addColorStop(0,'transparent');
+    v.addColorStop(1,'rgba(0,0,0,0.5)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0,0,w,h);
+  }
+
+  let sparkPhase = 0;
+  function drawSparkles(){
+    if (reduce) return;
+    sparkPhase += 0.05;
+    // sample along frostSamples and twinkle a handful
+    const n = frostSamples.length/2;
+    if (n < 2) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const count = Math.min(30, Math.floor(n));
+    for (let k=0; k<count; k++){
+      const s = (Math.floor(rng()*n))*2;
+      const gx = frostSamples[s], gy = frostSamples[s+1];
+      if (gx===undefined) continue;
+      const tw = 0.5 + 0.5*Math.sin(sparkPhase*3 + s);
+      if (tw < 0.7) continue;
+      const px = gx*CELL + CELL/2, py = gy*CELL + CELL/2;
+      const r = (1.4 + tw*2.4) * DPR;
+      const grd = ctx.createRadialGradient(px,py,0, px,py,r);
+      grd.addColorStop(0, 'rgba(220,244,255,'+ (0.5*tw) +')');
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(px,py,r,0,6.283);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* SIM LOOP                                                           */
+  /* ------------------------------------------------------------------ */
+  let raf = 0;
+  let visible = true;
+
+  function frame(){
+    raf = requestAnimationFrame(frame);
+    if (!visible) return;
+
+    if (running){
+      // number of walker steps per frame scales with chill
+      const iters = 1 + Math.floor((params.chill/100)*3);
+      for (let i=0; i<iters; i++){
+        stepWalkers();
+      }
+      replenishWalkers();
+      tick++;
+    }
+    render();
+
+    // periodic readout
+    if ((tick & 15) === 0) updateReadout();
+  }
+
+  const totalCells = () => GW*GH;
+  function updateReadout(){
+    document.getElementById('r-count').textContent = frozenCount.toLocaleString();
+    const pct = Math.min(100, (frozenCount / totalCells())*100);
+    document.getElementById('r-pct').textContent = pct.toFixed(1) + '%';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* AUTO-FILL — "let it fill": rain seeds across the pane over time    */
+  /* ------------------------------------------------------------------ */
+  let autoFill = false;
+  let autoTimer = 0;
+
+  function maybeAutoFill(){
+    if (!autoFill) return;
+    autoTimer++;
+    // sprinkle a fresh seed occasionally in empty regions to nucleate ferns
+    if (autoTimer % 24 === 0){
+      let guard=0;
+      while(guard++ < 20){
+        const gx = 2 + Math.floor(rng()*(GW-4));
+        const gy = 2 + Math.floor(rng()*(GH-4));
+        if (occupied[idx(gx,gy)]) continue;
+        // avoid seeding right on top of existing frost too often
+        freezeCell(gx, gy, 2);
+        noteFrost(gx, gy);
+        spawnWalkers(gx, gy, 14);
+        break;
+      }
+    }
+  }
+
+  // hook auto-fill into the frame loop cheaply
+  const _stepWalkers = stepWalkers;
+
+  /* ------------------------------------------------------------------ */
+  /* POINTER INPUT                                                      */
+  /* ------------------------------------------------------------------ */
+  function toDevice(ev){
+    const rect = canvas.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+    return { x, y };
+  }
+
+  let pointerDown = false;
+  let lastSeedX = -999, lastSeedY = -999;
+  let seededOnce = false;
+
+  function trySeed(p){
+    // throttle by distance so a drag lays a trail of seeds
+    const d = Math.hypot(p.x - lastSeedX, p.y - lastSeedY);
+    if (d < CELL*6 && seededOnce) return;
+    lastSeedX = p.x; lastSeedY = p.y;
+    seedAt(p.x, p.y);
+    noteFrost(Math.floor(p.x/CELL), Math.floor(p.y/CELL));
+    seededOnce = true;
+    hideHint();
+    if (reduce) growStill(900);
+  }
+
+  canvas.addEventListener('pointerdown', (ev)=>{
+    ev.preventDefault();
+    pointerDown = true;
+    canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId);
+    const p = toDevice(ev);
+    lastSeedX = -999; lastSeedY = -999;
+    trySeed(p);
+  });
+  canvas.addEventListener('pointermove', (ev)=>{
+    if (!pointerDown) return;
+    trySeed(toDevice(ev));
+  });
+  function endPointer(){ pointerDown = false; }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+
+  let hintHidden = false;
+  function hideHint(){
+    if (hintHidden) return;
+    hintHidden = true;
+    const h = document.getElementById('hint');
+    h.style.opacity = '0';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* REDUCED MOTION — grow a composed still frame, no animation loop    */
+  /* ------------------------------------------------------------------ */
+  function growStill(steps){
+    for (let i=0; i<steps; i++){
+      stepWalkers();
+      if ((i & 7) === 0) replenishWalkers();
+    }
+    render();
+    updateReadout();
+  }
+
+  function composeStillScene(){
+    // seed a few nucleation points and grow a beautiful static fernscape
+    reseed();
+    const seeds = 5 + Math.floor(rng()*3);
+    for (let s=0; s<seeds; s++){
+      const gx = Math.floor(GW*(0.15 + rng()*0.7));
+      const gy = Math.floor(GH*(0.15 + rng()*0.7));
+      freezeCell(gx, gy, 2);
+      noteFrost(gx, gy);
+      spawnWalkers(gx, gy, 30);
+    }
+    growStill(5200);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* CONTROLS                                                           */
+  /* ------------------------------------------------------------------ */
+  function bindSlider(id, key){
+    const el = document.getElementById(id);
+    el.value = params[key];
+    el.addEventListener('input', ()=>{
+      params[key] = parseInt(el.value,10);
+      if (reduce){ render(); }
+    });
+  }
+  bindSlider('chill','chill');
+  bindSlider('fern','fern');
+
+  function thaw(){
+    reseed();
+    walkers = [];
+    frostSamples = [];
+    allocGrids();
+    buildLayers();
+    autoFill = false;
+    document.getElementById('fill-btn').classList.remove('done');
+    document.getElementById('fill-btn').textContent = '❄ let it fill';
+    seededOnce = false;
+    hintHidden = false;
+    const h = document.getElementById('hint');
+    h.style.opacity = '';
+    render();
+    updateReadout();
+    showToast('the glass is clear again.');
+  }
+
+  document.getElementById('clear-btn').addEventListener('click', ()=>{
+    thaw();
+    if (reduce) render();
+  });
+
+  document.getElementById('fill-btn').addEventListener('click', (e)=>{
+    if (reduce){
+      // in reduced mode, compose a fuller still scene immediately
+      composeStillScene();
+      showToast('a pane of frost, composed.');
+      return;
+    }
+    autoFill = !autoFill;
+    e.currentTarget.classList.toggle('done', autoFill);
+    e.currentTarget.textContent = autoFill ? '❄ filling…' : '❄ let it fill';
+    if (autoFill && frozenCount === 0){
+      // give it a nucleus to start from
+      seedAt(canvas.width*0.5, canvas.height*0.5);
+    }
+    hideHint();
+  });
+
+  document.getElementById('save-btn').addEventListener('click', (e)=>{
+    try{
+      // render one clean composite then export
+      render();
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'frost-oracle-' + Date.now() + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      const b = e.currentTarget;
+      b.classList.add('done');
+      const o = b.textContent; b.textContent = '⤓ kept';
+      setTimeout(()=>{ b.classList.remove('done'); b.textContent = o; }, 1600);
+    }catch(err){
+      showToast('the frame slipped away. try again.');
+    }
+  });
+
+  let toastTimer = null;
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> t.classList.remove('show'), 2600);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* VISIBILITY / RESIZE                                                */
+  /* ------------------------------------------------------------------ */
+  document.addEventListener('visibilitychange', ()=>{
+    visible = !document.hidden;
+  });
+
+  let resizeTimer = null;
+  window.addEventListener('resize', ()=>{
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(()=>{
+      // preserve the current ice bitmap, rescale onto the new buffer
+      const old = iceCanvas;
+      const oldGW = GW, oldGH = GH, oldCELL = CELL;
+      const oldOcc = occupied, oldAge = ageGrid;
+      computeSize();
+      allocGrids();
+      buildLayers();
+      // re-stamp existing frost into the new grid (nearest mapping)
+      if (oldOcc){
+        walkers = [];
+        for (let gy=0; gy<oldGH; gy++){
+          for (let gx=0; gx<oldGW; gx++){
+            const t = oldOcc[gy*oldGW+gx];
+            if (!t) continue;
+            const dx = (gx*oldCELL) / oldCELL; // device px -> new grid
+            const px = gx*oldCELL, py = gy*oldGH? 0:0;
+            const ngx = Math.floor((gx*oldCELL) / CELL);
+            const ngy = Math.floor((gy*oldCELL) / CELL);
+            if (ngx>=0 && ngy>=0 && ngx<GW && ngy<GH){
+              const i = idx(ngx,ngy);
+              if (!occupied[i]){
+                occupied[i] = t;
+                frozenCount++;
+                stampIce(ngx, ngy, t);
+                for (let ddy=-1; ddy<=1; ddy++)for(let ddx=-1; ddx<=1; ddx++){
+                  if(!ddx&&!ddy)continue;
+                  const nx=ngx+ddx, ny=ngy+ddy;
+                  if(nx<0||ny<0||nx>=GW||ny>=GH)continue;
+                  field[idx(nx,ny)] += 1;
+                }
+                noteFrost(ngx, ngy);
+              }
+            }
+          }
+        }
+      }
+      render();
+      updateReadout();
+    }, 180);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* fold auto-fill into the loop by wrapping stepWalkers call site     */
+  /* ------------------------------------------------------------------ */
+  // patch frame's per-iteration behaviour: we call maybeAutoFill each frame
+  const origFrame = frame;
+
+  /* ------------------------------------------------------------------ */
+  /* BOOT                                                               */
+  /* ------------------------------------------------------------------ */
+  computeSize();
+  allocGrids();
+  buildLayers();
+  paintPane();
+  render();
+  updateReadout();
+
+  if (reduce){
+    composeStillScene();
+  } else {
+    // small ambient nucleus so the pane isn't dead-empty on load — a whisper of frost
+    // in one corner that suggests the last breath. subtle, offset from center.
+    seedAt(canvas.width*0.5, canvas.height*0.30);
+    // wire auto-fill into the animation frame
+    (function loopWithFill(){
+      raf = requestAnimationFrame(function tickFrame(){
+        raf = requestAnimationFrame(tickFrame);
+        if (!visible) return;
+        if (running){
+          const iters = 1 + Math.floor((params.chill/100)*3);
+          for (let i=0; i<iters; i++) stepWalkers();
+          maybeAutoFill();
+          replenishWalkers();
+          tick++;
+        }
+        render();
+        if ((tick & 15) === 0) updateReadout();
+      });
+    })();
+  }
+
+})();
+</script>
+</body>
+</html>
