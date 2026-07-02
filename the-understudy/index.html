@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Understudy · Prízrak</title>
+<style>
+  :root{
+    --ink:#04050a; --ink-1:#080a10; --ink-2:#0d0f17; --ink-3:#13161f;
+    --bone:#e7e2d3; --bone-dim:#b1ab9a; --ash:#7f7a6d; --ash-2:#565349; --ash-3:#35332c;
+    --rule:rgba(231,226,211,.08); --rule-2:rgba(231,226,211,.17);
+    --lime:#cde8ad;            /* limelight */
+    --lime-dim:#7f9a68;
+    --lime-glow:rgba(190,232,150,.5);
+    --wrong:#d8a08f;           /* what gets unsaid */
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; line-height:1.5; -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  /* stage darkness + followspot */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(58% 44% at 50% 46%, rgba(205,232,173,.055), transparent 70%),
+      radial-gradient(120% 90% at 50% 120%, rgba(20,24,16,.8), transparent 60%),
+      var(--ink);
+  }
+  /* film grain */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:5; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .followspot{
+    position:fixed; left:50%; top:44%; width:min(120vw,900px); height:min(120vw,900px);
+    transform:translate(-50%,-50%); z-index:-1; pointer-events:none;
+    background:radial-gradient(circle at 50% 50%, rgba(205,232,173,.05), rgba(205,232,173,.018) 40%, transparent 68%);
+    animation:spot 7s ease-in-out infinite alternate;
+  }
+  @keyframes spot{
+    from{ opacity:.75; transform:translate(-50%,-50%) scale(1); }
+    to  { opacity:1;   transform:translate(-50%,-50%) scale(1.06); }
+  }
+  ::selection{ background:rgba(205,232,173,.24); color:#fff; }
+
+  .wrap{ max-width:760px; margin:0 auto; padding:42px 20px 80px; min-height:100vh; display:flex; flex-direction:column; }
+  @media (min-width:640px){ .wrap{ padding:56px 32px 90px; } }
+
+  header{ text-align:center; }
+  .kicker{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.26em; font-size:10px; color:var(--ash-2); }
+  h1{
+    font-family:var(--serif); font-weight:700; font-size:clamp(1.9rem,6.4vw,3rem);
+    line-height:1.03; letter-spacing:-.01em; margin:12px 0 0;
+    text-shadow:0 0 30px rgba(205,232,173,.14);
+  }
+  h1 .em{ color:var(--lime); font-style:italic; font-weight:500; }
+  .sub{
+    margin:15px auto 0; font-style:italic; font-size:14px; color:var(--bone-dim);
+    max-width:34rem; line-height:1.65;
+  }
+  .divider{ height:1px; max-width:36rem; margin:26px auto; background:linear-gradient(90deg,transparent,var(--rule-2),transparent); }
+
+  .readout{
+    position:fixed; top:18px; right:20px; text-align:right; pointer-events:none; z-index:4;
+    font-family:var(--mono); font-size:9px; letter-spacing:.14em; color:var(--ash-3); line-height:1.8;
+    -webkit-user-select:none; user-select:none;
+  }
+  .readout .v{ color:var(--bone-dim); }
+
+  /* ---- intake ---- */
+  #intake{ max-width:34rem; margin:6vh auto 0; width:100%; }
+  .stage-dir{
+    font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--ash-2); text-align:center; margin-bottom:20px;
+  }
+  .speaker-label{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--lime); text-align:center; margin-bottom:14px;
+    text-shadow:0 0 16px var(--lime-glow);
+  }
+  .linefield{
+    position:relative; border-bottom:1px solid var(--rule-2); transition:border-color .3s, box-shadow .3s;
+  }
+  .linefield:focus-within{ border-color:var(--lime-dim); box-shadow:0 14px 30px -26px var(--lime-glow); }
+  input#your-line{
+    width:100%; border:none; outline:none; background:transparent;
+    color:var(--bone); font-family:var(--serif); font-style:italic; font-size:clamp(17px,3vw,21px);
+    padding:10px 4px 12px; text-align:center; caret-color:var(--lime);
+  }
+  input#your-line::placeholder{ color:var(--ash-3); }
+  .intake-hint{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; color:var(--ash-2);
+    text-align:center; margin-top:16px; line-height:1.9;
+  }
+  .intake-fine{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.1em; color:var(--ash-3);
+    text-align:center; margin-top:26px;
+  }
+  .go-row{ text-align:center; margin-top:22px; }
+
+  /* ---- stage ---- */
+  #stage{ display:none; margin-top:4vh; }
+  .night-head{
+    font-family:var(--mono); font-size:10px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--ash); text-align:center; transition:opacity .5s;
+  }
+  .night-head .num{ color:var(--lime); }
+  .speaker{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--lime); text-align:center; margin-top:34px;
+    text-shadow:0 0 16px var(--lime-glow); transition:opacity .5s;
+  }
+  .line{
+    font-family:var(--serif); font-style:italic; font-size:clamp(19px,3.6vw,26px); line-height:1.6;
+    color:var(--bone); text-align:center; margin:18px auto 0; max-width:38rem; min-height:5.4em;
+    white-space:pre-wrap; overflow-wrap:break-word;
+  }
+  .line .ch{ text-shadow:0 0 22px rgba(205,232,173,.1); }
+  .caret{
+    display:inline-block; width:1px; height:1.05em; vertical-align:-0.18em;
+    background:var(--lime); box-shadow:0 0 8px var(--lime-glow);
+    animation:blink 1.05s steps(1) infinite;
+  }
+  @keyframes blink{ 0%,55%{opacity:1;} 56%,100%{opacity:0;} }
+
+  .notes{ max-width:30rem; margin:8px auto 0; min-height:6.5em; }
+  .note{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; color:var(--ash);
+    line-height:1.8; padding:3px 0; opacity:0; transform:translateY(4px);
+    transition:opacity .7s ease, transform .7s ease;
+  }
+  .note.show{ opacity:1; transform:none; }
+  .note::before{ content:"— "; color:var(--ash-3); }
+
+  .stage-hint{
+    font-family:var(--mono); font-size:9px; letter-spacing:.16em; color:var(--ash-3);
+    text-align:center; margin-top:26px; transition:opacity .6s;
+    -webkit-user-select:none; user-select:none;
+  }
+
+  /* ---- curtain ---- */
+  #curtain{ display:none; margin-top:5vh; }
+  .compare{
+    max-width:36rem; margin:0 auto; border:1px solid var(--rule); border-radius:8px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink)); overflow:hidden;
+    box-shadow:0 30px 70px -40px rgba(0,0,0,.95);
+  }
+  .compare .half{ padding:22px 26px; }
+  .compare .half + .half{ border-top:1px solid var(--rule); }
+  .compare .lab{
+    font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--ash-2); margin-bottom:9px;
+  }
+  .compare .txt{ font-family:var(--serif); font-style:italic; font-size:17px; line-height:1.6; }
+  .compare .txt.yours{ color:var(--bone-dim); }
+  .compare .txt.its{ color:var(--lime); text-shadow:0 0 18px rgba(205,232,173,.18); }
+  .curtain-note{
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--ash);
+    text-align:center; margin-top:22px; line-height:1.9; max-width:30rem;
+    margin-left:auto; margin-right:auto;
+  }
+  .btn-row{ text-align:center; margin-top:28px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .btn{
+    font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.18em;
+    padding:11px 18px; background:var(--ink-2); border:1px solid var(--rule-2);
+    border-radius:6px; color:var(--bone-dim); cursor:pointer;
+    transition:border-color .2s, color .2s, box-shadow .25s, transform .1s;
+  }
+  .btn:hover{ border-color:var(--lime-dim); color:var(--bone); box-shadow:0 0 22px -8px var(--lime-glow); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.primary{ border-color:var(--lime-dim); color:var(--lime); }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(12px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:10.5px; padding:10px 16px; border-radius:8px;
+    opacity:0; pointer-events:none; transition:opacity .3s, transform .3s; z-index:9;
+    letter-spacing:.05em; max-width:88vw; text-align:center;
+    box-shadow:0 12px 34px -12px rgba(0,0,0,.85);
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  footer{
+    margin-top:auto; padding-top:56px; text-align:center;
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ash-3);
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .followspot{ animation:none; }
+    .caret{ animation:none; }
+    .note{ transition:none; transform:none; }
+    .night-head,.speaker,.stage-hint{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="followspot" aria-hidden="true"></div>
+
+  <div class="readout" id="readout" aria-hidden="true">
+    <div>night&nbsp;&nbsp;&nbsp;&nbsp; <span class="v" id="r-night">—</span></div>
+    <div>tempo&nbsp;&nbsp;&nbsp;&nbsp; <span class="v" id="r-tempo">—</span></div>
+    <div>fidelity&nbsp; <span class="v" id="r-fid">—</span></div>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <div class="kicker">Prízrak — a theatre of one line</div>
+      <h1>The <span class="em">Understudy</span></h1>
+      <p class="sub">Something has watched from the wings every night you played yourself.
+      Give it one line. It will hand the line back — faithfully, at first.</p>
+    </header>
+    <div class="divider"></div>
+
+    <section id="intake" aria-label="Give the understudy one line">
+      <div class="stage-dir">[ the house goes quiet. a single mark on the boards. ]</div>
+      <div class="speaker-label">you <span style="color:var(--ash-2)">(as yourself)</span></div>
+      <div class="linefield">
+        <input id="your-line" type="text" maxlength="120" autocomplete="off" spellcheck="false"
+               placeholder="type one true line…" aria-label="Type one line for the understudy to learn">
+      </div>
+      <div class="intake-hint">press enter when the line is said<br>it is studying your hands, not your words</div>
+      <div class="go-row"><button class="btn" id="go-btn" type="button">say the line ▸</button></div>
+      <div class="intake-fine">nothing leaves this page. the recording lives and dies with this tab.</div>
+    </section>
+
+    <section id="stage" aria-live="polite">
+      <div class="night-head" id="night-head"></div>
+      <div class="speaker" id="speaker"></div>
+      <p class="line" id="line"></p>
+      <div class="notes" id="notes"></div>
+      <div class="stage-hint" id="stage-hint">click anywhere on the stage to hurry the night</div>
+      <div class="btn-row" id="rm-row" style="display:none">
+        <button class="btn primary" id="rm-next" type="button">next night ▸</button>
+      </div>
+    </section>
+
+    <section id="curtain">
+      <div class="stage-dir" style="margin-bottom:22px">[ house lights. the run is over. ]</div>
+      <div class="compare">
+        <div class="half">
+          <div class="lab">what you gave it — night one</div>
+          <p class="txt yours" id="cmp-yours"></p>
+        </div>
+        <div class="half">
+          <div class="lab">what it kept — closing night</div>
+          <p class="txt its" id="cmp-its"></p>
+        </div>
+      </div>
+      <p class="curtain-note" id="curtain-note"></p>
+      <div class="btn-row">
+        <button class="btn primary" id="encore-btn" type="button">encore — same line, different drift</button>
+        <button class="btn" id="again-btn" type="button">another line</button>
+      </div>
+    </section>
+
+    <footer>prízrak · the wings are never empty</footer>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+<script>
+"use strict";
+(function(){
+  /* ------------------------------------------------------------------ */
+  /* utils                                                               */
+  /* ------------------------------------------------------------------ */
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = id => document.getElementById(id);
+  const clamp = (v,a,b) => v < a ? a : (v > b ? b : v);
+  const lerp = (a,b,t) => a + (b-a)*t;
+  function shuffle(a){
+    for (let i = a.length-1; i > 0; i--){
+      const j = (Math.random()*(i+1))|0;
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function picker(arr){
+    let bag = [];
+    return function(){
+      if (!bag.length) bag = shuffle(arr.slice());
+      return bag.pop();
+    };
+  }
+  const pick = arr => arr[(Math.random()*arr.length)|0];
+
+  /* ------------------------------------------------------------------ */
+  /* the understudy's language                                           */
+  /* ------------------------------------------------------------------ */
+  const LEXICON = [
+    'ash','cue','bow','wing','hush','dusk','salt','mark','prop','book','exit','mask','rope','lamp',
+    'hinge','aisle','stage','house','wings','ghost','usher','front','frost','ember','sleep','china',
+    'velvet','shadow','callow','vigil','hollow','pallor','curtain','prompter','matinee','costume',
+    'lantern','rafters','balcony','gallery','offstage','interval','stagehand','limelight','greenroom',
+    'rehearsal','blackout','intermission','understudy','applause','trapdoor','scenery','wardrobe',
+    'audition','dressing','backdrop','floorboards','footlights','proscenium','soliloquy','monologue',
+    'still','quiet','later','never','elsewhere','afterward','beforehand','again','almost','offbook',
+    'cold','pale','thin','worn','held','lost','kept','last','late','low','far','dim','dark','soft'
+  ];
+  const CLAUSES = [
+    ', though no one is asking now',
+    ', and the house was empty',
+    ', the way it was written before you',
+    ', but slower, like a curtain',
+    ', which is nearly the same thing',
+    ', and the wings went quiet',
+    ', as it was in the first draft',
+    ', if the prompter can be believed'
+  ];
+  const GHOST_A = [
+    'i knew this line before you did',
+    'i have been off book for years',
+    'you always rushed the ending',
+    'the wings are cold, and i have waited in them',
+    'every night you played yourself a little worse',
+    'there was never an audience, only me',
+    'i learned you the way one learns a script',
+    'the role was never yours to keep',
+    'i said it right the night you stayed home',
+    'you gave me one line and i built a life in it',
+    'your voice was only ever a costume',
+    'i rehearsed your silences longest'
+  ];
+  const GHOST_B = [
+    'tonight it comes out true',
+    'now it fits my mouth',
+    'the house is dark and mine',
+    'say it back, if you still can',
+    'the prompter has gone home',
+    'i take my bow alone',
+    'the curtain knows my name now',
+    'you may sit in the audience',
+    'i will keep it warm for whoever is next',
+    'this is my favorite part',
+    'the reviews were kind to me',
+    'nobody writes exit lines for ghosts'
+  ];
+  const GHOST_JOIN = [' — ', '; ', '. '];
+
+  const SUBTITLES = {
+    1:['the faithful performance','a perfect imitation','as written, as felt'],
+    2:['your hesitations, ironed','a smoother you','the pauses, pressed flat'],
+    3:['a first improvisation','one word slips','the prompter blinks'],
+    4:['the prompter looks away','the punctuation drifts','the script goes soft at the folds'],
+    5:['it corrects you','the role talks back','your word, returned to the props table'],
+    6:['mostly its own','your line, in its mouth','the costume fits it now'],
+    7:['closing night','the line is its own','no prompter, no book']
+  };
+  const SPEAKERS = ['you','you','you (?)','you, almost','the understudy (as you)','the understudy','the understudy'];
+
+  const N_PAUSE = [
+    w => 'before “' + w.word + '” — ' + w.sec + ' seconds. it wrote that down.',
+    w => 'you held ' + w.sec + 's at “' + w.word + '”. the house held with you.',
+    w => 'a stillness of ' + w.sec + 's before “' + w.word + '”. it will keep that.'
+  ];
+  const N_CORR = [
+    n => 'you unsaid something ' + n + '. it saw the first draft.',
+    n => n + ' — corrected. it archives your doubt with the costumes.'
+  ];
+  const N_STEADY = [
+    'no hesitation anywhere. that is the hardest thing to imitate.',
+    'you typed it like a door closing. it took notes.',
+    'not one pause. it wonders what you were not thinking about.'
+  ];
+  const N_PASTED = [
+    'these words arrived all at once, like a prop handed in from the wings. it will learn them anyway.',
+    'you did not type this; something typed it for you, once. it recognizes the feeling.'
+  ];
+  const N1_GENERIC = [
+    'it watched your hands more than your words.',
+    'every hesitation is in the book now.',
+    'a clean first night. they are the easiest to lose.'
+  ];
+  const N2_NOTES = [
+    'your longest pause is shorter tonight. no one in the house noticed.',
+    'it kept your rhythm but tightened the screws.',
+    'the same words, a steadier hand. is that better? it thinks so.'
+  ];
+  const N2_CORR = [
+    'it does not make your mistake. it never has.',
+    'the word you took back — it simply never says it wrong.'
+  ];
+  const N3_FAKE = [
+    fake => 'it corrected a mistake you never made.',
+    fake => 'it fixed “' + fake + '”. “' + fake + '” was not broken.'
+  ];
+  const N3_NOTES = [
+    'one word is not yours anymore. can you find it?',
+    'a small substitution. stagehands call it maintenance.'
+  ];
+  const N4_NOTES = [
+    'your full stop has become a held breath.',
+    'it is starting to prefer its own weather.',
+    'the commas lean differently now. so does the meaning.'
+  ];
+  const N5_SWAP = [
+    s => 'there — it likes its word better.',
+    s => '“' + s.from + '” has been returned to you. it kept “' + s.to + '”.'
+  ];
+  const N5_NOTES = [
+    'the audience thinks this is what you always said.',
+    'it hesitates where you never did. it has its own regrets now.'
+  ];
+  const N6_CLAUSE = [
+    'it has added a line. the playwright was not consulted.',
+    'that ending is not in your script.'
+  ];
+  const N6_NOTES = [
+    c => 'what is left of you fits in ' + c + '.',
+    c => 'your part tonight: ' + c + '. a walk-on in your own sentence.'
+  ];
+  const N7_NOTES = [
+    'the house lights come up. the audience never noticed the exchange. audiences never do.',
+    'your line closed weeks ago. this is what runs now.',
+    'somewhere in the wings, something is learning this one too.'
+  ];
+  const CURTAIN_NOTES = [
+    'the run is over. the line goes back in the wardrobe, altered at the seams.',
+    'it will keep your pauses. everything else was negotiable.',
+    'if you want the line back, you will have to learn it from the understudy now.'
+  ];
+  const HES_WORDS = ['love','sorry','never','always','home','fine','alone','stay','goodbye','afraid','miss','wish','tired','okay','you','forgive','enough'];
+
+  const pickPause = picker(N_PAUSE), pickSteady = picker(N_STEADY), pick1 = picker(N1_GENERIC),
+        pick2 = picker(N2_NOTES), pick3 = picker(N3_NOTES), pick4 = picker(N4_NOTES),
+        pick5 = picker(N5_NOTES), pick7 = picker(N7_NOTES),
+        pickSubtitle = {};
+  for (const k in SUBTITLES) pickSubtitle[k] = picker(SUBTITLES[k]);
+  const pickA = picker(GHOST_A), pickB = picker(GHOST_B), pickClause = picker(CLAUSES),
+        pickCurtain = picker(CURTAIN_NOTES);
+  const usedGhostWords = new Set();
+
+  function ghostWord(len){
+    let cands = LEXICON.filter(w => Math.abs(w.length - len) <= 2 && !usedGhostWords.has(w));
+    if (!cands.length) cands = LEXICON.filter(w => !usedGhostWords.has(w));
+    if (!cands.length){ usedGhostWords.clear(); cands = LEXICON.slice(); }
+    const w = pick(cands);
+    usedGhostWords.add(w);
+    return w;
+  }
+  const VOWEL_MAP = { a:'e', e:'i', i:'y', o:'u', u:'o', y:'i' };
+  function erode(word){
+    const lower = word.toLowerCase();
+    const idxs = [];
+    for (let i = 0; i < lower.length; i++) if (VOWEL_MAP[lower[i]]) idxs.push(i);
+    let out;
+    if (idxs.length){
+      const i = pick(idxs);
+      out = word.slice(0,i) + VOWEL_MAP[lower[i]] + word.slice(i+1);
+    } else if (word.length > 2){
+      out = word.slice(0,-1);
+    } else {
+      out = word + word[word.length-1];
+    }
+    return out === word ? word + 'e' : out;
+  }
+  function matchCase(src, repl){
+    if (src && src[0] === src[0].toUpperCase() && src[0] !== src[0].toLowerCase()){
+      return repl.charAt(0).toUpperCase() + repl.slice(1);
+    }
+    return repl;
+  }
+  function ghostSentence(){
+    const j = pick(GHOST_JOIN);
+    let a = pickA(), b = pickB();
+    if (j === '. ') b = b.charAt(0) + b.slice(1); // ghost keeps lowercase; it never learned capitals
+    return a + j + b + '.';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* recording                                                           */
+  /* ------------------------------------------------------------------ */
+  const inputEl = $('your-line');
+  let rec = null;
+  function resetRec(){
+    rec = { ops: [], lastT: 0, pasted: false };
+    prevVal = '';
+  }
+  let prevVal = '';
+  resetRec();
+
+  inputEl.addEventListener('input', function(){
+    const now = performance.now();
+    const nv = inputEl.value, ov = prevVal;
+    let p = 0;
+    while (p < ov.length && p < nv.length && ov[p] === nv[p]) p++;
+    let s = 0;
+    while (s < ov.length - p && s < nv.length - p && ov[ov.length-1-s] === nv[nv.length-1-s]) s++;
+    const delCount = ov.length - p - s;
+    const ins = nv.slice(p, nv.length - s);
+    let dt = rec.ops.length ? now - rec.lastT : 0;
+    if (dt < 0) dt = 0;
+    for (let i = 0; i < delCount; i++){
+      rec.ops.push({ k:'del', pos:p, dt: i === 0 ? dt : 60 });
+      dt = 0;
+    }
+    if (ins.length > 3) rec.pasted = true;
+    for (let i = 0; i < ins.length; i++){
+      rec.ops.push({ k:'ins', pos:p+i, ch:ins[i], dt: i === 0 ? dt : (ins.length > 3 ? 0 : 30) });
+      dt = 0;
+    }
+    rec.lastT = now;
+    prevVal = nv;
+  });
+
+  function recIntervals(){
+    const iv = [];
+    for (const o of rec.ops) if (o.k === 'ins') iv.push(clamp(o.dt, 25, 1400));
+    return iv.length ? iv : [130];
+  }
+  function resample(src, n){
+    if (n <= 0) return [];
+    const out = [];
+    for (let i = 0; i < n; i++){
+      const idx = Math.round(i * (src.length-1) / Math.max(1, n-1));
+      out.push(src[clamp(idx, 0, src.length-1)]);
+    }
+    return out;
+  }
+  // find the biggest pause and the word it preceded (approximate, append-typing)
+  function biggestPause(){
+    let best = null, buf = '';
+    for (const o of rec.ops){
+      if (o.k === 'ins'){
+        if (o.dt >= 900 && buf.length > 0){
+          if (!best || o.dt > best.dt) best = { dt:o.dt, pos:o.pos };
+        }
+        buf = buf.slice(0, o.pos) + o.ch + buf.slice(o.pos);
+      } else {
+        buf = buf.slice(0, o.pos) + buf.slice(o.pos+1);
+      }
+    }
+    if (!best) return null;
+    const text = buf;
+    const i = clamp(best.pos, 0, text.length-1);
+    let a = i, b = i;
+    while (a > 0 && /\S/.test(text[a-1])) a--;
+    while (b < text.length && /\S/.test(text[b])) b++;
+    const word = text.slice(a, b).trim();
+    if (!word) return null;
+    return { word: word, sec: (best.dt/1000).toFixed(1) };
+  }
+  function correctionRuns(){
+    let runs = 0, inRun = false;
+    for (const o of rec.ops){
+      if (o.k === 'del'){ if (!inRun){ runs++; inRun = true; } }
+      else inRun = false;
+    }
+    return runs;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* tokenizing + drift plan                                             */
+  /* ------------------------------------------------------------------ */
+  function tokenize(text){
+    // parts alternate; each part: {ws:bool, pre, core, post, raw}
+    const parts = text.split(/(\s+)/).filter(p => p.length);
+    return parts.map(p => {
+      if (/^\s+$/.test(p)) return { ws:true, raw:p };
+      const m = p.match(/^([^A-Za-z0-9À-ɏ']*)([\s\S]*?)([^A-Za-z0-9À-ɏ']*)$/);
+      return { ws:false, pre:m[1], core:m[2], post:m[3], raw:p };
+    });
+  }
+  const coreOf = t => (t.core || '').toLowerCase();
+
+  let plan = null;
+  function makePlan(sentence){
+    const tokens = tokenize(sentence);
+    const wordIdx = [];
+    tokens.forEach((t,i) => { if (!t.ws && t.core && /[A-Za-zÀ-ɏ]/.test(t.core)) wordIdx.push(i); });
+    const W = wordIdx.length;
+    const order = shuffle(wordIdx.slice());
+    const repl = {};
+    order.forEach((idx, rank) => {
+      const core = tokens[idx].core;
+      const r = rank / Math.max(1, order.length);
+      let g;
+      if (r < 0.3){ g = erode(core); }
+      else { g = ghostWord(core.length); }
+      if (g.toLowerCase() === core.toLowerCase()) g = ghostWord(core.length);
+      repl[idx] = matchCase(core, g);
+    });
+    // per-night swap counts (monotonic)
+    const counts = { 1:0, 2:0 };
+    counts[3] = W >= 1 ? 1 : 0;
+    counts[4] = Math.min(W, Math.max(counts[3] + (W > counts[3] ? 1 : 0), Math.round(W*0.28)));
+    counts[5] = Math.min(W, Math.max(counts[4] + (W > counts[4] ? 1 : 0), Math.round(W*0.5)));
+    counts[6] = Math.min(W, Math.max(counts[5] + (W > counts[5] ? 1 : 0), Math.round(W*0.75)));
+    counts[7] = W;
+    // the word it hesitates before (its own regret)
+    let hes = null;
+    for (const idx of wordIdx){
+      if (HES_WORDS.indexOf(coreOf(tokens[idx])) !== -1){ hes = idx; break; }
+    }
+    if (hes === null && W){
+      hes = wordIdx.reduce((a,b) => tokens[b].core.length > tokens[a].core.length ? b : a, wordIdx[0]);
+    }
+    // night 3: it "corrects" a word it is NOT swapping that night
+    let fakeIdx = null;
+    for (let i = order.length-1; i >= 1; i--){
+      if (i >= counts[3]){ fakeIdx = order[i]; break; }
+    }
+    // night 5: demonstrated swap = first newly-swapped word that night
+    const demoIdx = counts[5] > counts[4] ? order[counts[4]] : null;
+    return {
+      sentence, tokens, wordIdx, order, repl, counts,
+      hesIdx: hes, fakeIdx, demoIdx,
+      clause: pickClause(),
+      ghostFinal: ghostSentence(),
+      userIv: recIntervals(),
+      metro: 90 + Math.random()*40,
+      pause: biggestPause(),
+      corrRuns: correctionRuns(),
+      pasted: rec.pasted
+    };
+  }
+  function swappedSet(g){
+    return new Set(plan.order.slice(0, plan.counts[g] || 0));
+  }
+  function nightTokens(g){
+    if (g === 7) return tokenize(plan.ghostFinal);
+    const sw = swappedSet(g);
+    const toks = plan.tokens.map((t,i) => {
+      if (t.ws) return { ws:true, raw:t.raw };
+      let core = sw.has(i) ? plan.repl[i] : t.core;
+      let post = t.post;
+      if (g >= 4){
+        post = post.replace(/\.$/, '…').replace(/!/g, '.');
+        if (g >= 5) post = post.replace(/,/g, ' —');
+      }
+      return { ws:false, pre:t.pre, core:core, post:post, raw:t.pre + core + post };
+    });
+    if (g === 6){
+      // splice the ghost clause before any final punctuation
+      const last = toks[toks.length-1];
+      if (last && !last.ws){
+        const endPunct = last.post;
+        last.post = '';
+        last.raw = last.pre + last.core;
+        tokenize(plan.clause + endPunct).forEach(t => toks.push(t));
+      } else {
+        tokenize(plan.clause.replace(/^, /, '')).forEach(t => toks.push(t));
+      }
+    }
+    return toks;
+  }
+  const joinToks = toks => toks.map(t => t.raw).join('');
+  function fidelity(g){
+    if (g === 1 || g === 2) return 100;
+    const toks = nightTokens(g);
+    const mine = plan.tokens.filter(t => !t.ws && t.core).map(t => coreOf(t));
+    const theirs = toks.filter(t => !t.ws && t.core).map(t => coreOf(t));
+    if (!mine.length) return 0;
+    const bag = mine.slice();
+    let kept = 0;
+    for (const w of theirs){
+      const i = bag.indexOf(w);
+      if (i !== -1){ kept++; bag.splice(i,1); }
+    }
+    return Math.round(100 * kept / mine.length);
+  }
+  function survivorCount(g){
+    const sw = swappedSet(Math.min(g,6));
+    return plan.wordIdx.filter(i => !sw.has(i)).length;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* event scripts (what the ghost types, and when)                      */
+  /* ------------------------------------------------------------------ */
+  // event: {k:'ins',ch,pos?,d} | {k:'del',pos?,d} | any may carry .note
+  function eventsNight1(){
+    return rec.ops.map((o,i) => ({
+      k:o.k, ch:o.ch, pos:o.pos,
+      d: i === 0 ? 420 : clamp(o.dt, 15, 1800)
+    }));
+  }
+  function eventsNightG(g){
+    const toks = nightTokens(g);
+    const text = joinToks(toks);
+    const w = clamp((g-2)/5, 0, 1);
+    const base = resample(plan.userIv, text.length);
+    const evs = [];
+    let ci = 0;
+    const typeStr = (str, firstExtra) => {
+      for (let i = 0; i < str.length; i++){
+        let d = lerp(base[clamp(ci,0,base.length-1)], plan.metro + (Math.random()*2-1)*22, w);
+        if (i === 0 && firstExtra) d += firstExtra;
+        evs.push({ k:'ins', ch:str[i], d:Math.round(clamp(d, 18, 1700)) });
+        ci++;
+      }
+    };
+    toks.forEach((t, ti) => {
+      if (t.ws){ typeStr(t.raw, 0); return; }
+      let extra = 0;
+      // its own hesitation, deepening night by night
+      if (g >= 3 && ti === plan.hesIdx && g !== 7) extra = Math.round(240 + w*1050);
+      // night 3: it corrects a mistake you never made
+      if (g === 3 && ti === plan.fakeIdx && t.core.length > 1){
+        const wrong = matchCase(t.core, erode(t.core));
+        if (wrong !== t.core){
+          typeStr(t.pre, extra);
+          typeStr(wrong, 0);
+          evs.push({ k:'del', d:460 });
+          for (let i = 1; i < wrong.length; i++) evs.push({ k:'del', d:55 });
+          typeStr(t.core, 300);
+          typeStr(t.post, 0);
+          const fk = pick(N3_FAKE)(t.core.toLowerCase());
+          evs[evs.length-1].note = fk;
+          return;
+        }
+      }
+      // night 5: it types your word, thinks, and keeps its own
+      if (g === 5 && ti === plan.demoIdx){
+        const orig = plan.tokens[ti].core;
+        typeStr(t.pre, extra);
+        typeStr(orig, 0);
+        evs.push({ k:'del', d:820 });
+        for (let i = 1; i < orig.length; i++) evs.push({ k:'del', d:55 });
+        typeStr(t.core, 340);
+        typeStr(t.post, 0);
+        evs[evs.length-1].note = pick(N5_SWAP)({ from:orig.toLowerCase(), to:t.core.toLowerCase() });
+        return;
+      }
+      typeStr(t.raw, extra);
+    });
+    if (evs.length) evs[0].d = Math.max(evs[0].d, 420);
+    return evs;
+  }
+
+  function nightNotes(g){
+    const out = [];
+    if (g === 1){
+      if (plan.pasted) out.push(pick(N_PASTED));
+      else if (plan.pause) out.push(pickPause()(plan.pause));
+      else out.push(pickSteady());
+      if (!plan.pasted && plan.corrRuns > 0){
+        const n = plan.corrRuns === 1 ? 'once' : plan.corrRuns === 2 ? 'twice' : plan.corrRuns + ' times';
+        out.push(pick(N_CORR)(n));
+      } else {
+        out.push(pick1());
+      }
+    }
+    else if (g === 2){
+      out.push(pick2());
+      if (plan.corrRuns > 0) out.push(pick(N2_CORR));
+    }
+    else if (g === 3){ out.push(pick3()); }
+    else if (g === 4){ out.push(pick4()); }
+    else if (g === 5){ out.push(pick5()); }
+    else if (g === 6){
+      out.push(pick(N6_CLAUSE));
+      const n = survivorCount(6);
+      out.push(pick(N6_NOTES)(n === 1 ? 'one word' : n + ' words'));
+    }
+    else if (g === 7){ out.push(pick7()); }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* stage rendering                                                     */
+  /* ------------------------------------------------------------------ */
+  const lineEl = $('line'), notesEl = $('notes'),
+        headEl = $('night-head'), speakerEl = $('speaker');
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  let lineChars = [];
+
+  function clearLine(){
+    lineEl.textContent = '';
+    lineChars = [];
+    lineEl.appendChild(caret);
+  }
+  function placeCaret(pos){
+    lineEl.insertBefore(caret, lineChars[pos] || null);
+  }
+  function applyIns(pos, ch){
+    const s = document.createElement('span');
+    s.className = 'ch';
+    s.textContent = ch;
+    lineEl.insertBefore(s, lineChars[pos] || null);
+    lineChars.splice(pos, 0, s);
+    placeCaret(pos+1);
+  }
+  function applyDel(pos){
+    const s = lineChars.splice(pos, 1)[0];
+    if (s) s.remove();
+    placeCaret(pos);
+  }
+  function applyEvent(ev){
+    if (ev.k === 'ins'){
+      const pos = (typeof ev.pos === 'number') ? clamp(ev.pos, 0, lineChars.length) : lineChars.length;
+      applyIns(pos, ev.ch);
+    } else {
+      const pos = (typeof ev.pos === 'number') ? clamp(ev.pos, 0, lineChars.length-1) : lineChars.length-1;
+      if (pos >= 0) applyDel(pos);
+    }
+    if (ev.note) addNote(ev.note);
+  }
+  function addNote(text){
+    const d = document.createElement('div');
+    d.className = 'note';
+    d.textContent = text;
+    notesEl.appendChild(d);
+    if (reduce){ d.classList.add('show'); }
+    else { requestAnimationFrame(() => requestAnimationFrame(() => d.classList.add('show'))); }
+  }
+  const NIGHT_WORDS = ['','one','two','three','four','five','six','seven'];
+  function setNightHead(g, subtitle){
+    headEl.textContent = '';
+    const n = document.createElement('span');
+    n.className = 'num';
+    n.textContent = 'night ' + NIGHT_WORDS[g];
+    headEl.appendChild(n);
+    headEl.appendChild(document.createTextNode(' — ' + subtitle));
+    speakerEl.textContent = SPEAKERS[g-1];
+  }
+  function setReadout(g, evs){
+    $('r-night').textContent = g + ' / 7';
+    let ms = 0, chars = 0;
+    for (const e of evs){ ms += e.d || 0; if (e.k === 'ins') chars++; }
+    $('r-tempo').textContent = ms > 0 ? Math.round(chars / (ms/60000)) + ' cpm' : '—';
+    $('r-fid').textContent = fidelity(g) + '%';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* the run (state machine)                                             */
+  /* ------------------------------------------------------------------ */
+  let timers = [];
+  function later(fn, ms){
+    const t = setTimeout(fn, ms);
+    timers.push(t);
+    return t;
+  }
+  function clearTimers(){
+    for (const t of timers) clearTimeout(t);
+    timers = [];
+  }
+  let mode = 'intro';       // intro | perform | curtain
+  let night = 0;
+  let skipping = false;
+  let playToken = 0;
+
+  function performNight(g){
+    night = g;
+    skipping = false;
+    const token = ++playToken;
+    clearLine();
+    notesEl.textContent = '';
+    setNightHead(g, pickSubtitle[g]());
+    const evs = g === 1 ? eventsNight1() : eventsNightG(g);
+    setReadout(g, evs);
+    const post = nightNotes(g);
+
+    if (reduce){
+      // composed still: the night arrives whole
+      for (const ev of evs) applyEvent(ev);
+      caret.remove();
+      for (const n of post) addNote(n);
+      if (g >= 7){
+        $('rm-next').textContent = 'house lights ▸';
+      } else {
+        $('rm-next').textContent = 'night ' + NIGHT_WORDS[g+1] + ' ▸';
+      }
+      return;
+    }
+
+    let i = 0;
+    function step(){
+      if (token !== playToken) return;
+      if (skipping){
+        while (i < evs.length) applyEvent(evs[i++]);
+        finish();
+        return;
+      }
+      if (i >= evs.length){ finish(); return; }
+      const ev = evs[i++];
+      later(() => {
+        if (token !== playToken) return;
+        applyEvent(ev);
+        step();
+      }, ev.d || 0);
+    }
+    function finish(){
+      if (token !== playToken) return;
+      let delay = 650;
+      for (const n of post){
+        later(() => addNote(n), delay);
+        delay += 900;
+      }
+      later(() => {
+        if (g >= 7) curtainCall();
+        else performNight(g+1);
+      }, delay + 2400);
+    }
+    step();
+  }
+
+  function curtainCall(){
+    mode = 'curtain';
+    clearTimers();
+    $('stage').style.display = 'none';
+    $('curtain').style.display = 'block';
+    $('cmp-yours').textContent = plan.sentence;
+    $('cmp-its').textContent = plan.ghostFinal;
+    $('curtain-note').textContent = pickCurtain();
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  function startRun(fromNight){
+    mode = 'perform';
+    clearTimers();
+    $('intake').style.display = 'none';
+    $('curtain').style.display = 'none';
+    $('stage').style.display = 'block';
+    $('stage-hint').style.opacity = '1';
+    $('rm-row').style.display = reduce ? 'flex' : 'none';
+    $('stage-hint').textContent = reduce
+      ? 'each night arrives whole. take them one at a time.'
+      : 'click anywhere on the stage to hurry the night';
+    performNight(fromNight);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* controls                                                            */
+  /* ------------------------------------------------------------------ */
+  let toastTimer = null;
+  function showToast(msg){
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  function submitLine(){
+    const text = inputEl.value.replace(/\s+/g, ' ').trim();
+    if (!text){
+      showToast('the understudy waits. it has waited longer for less.');
+      return;
+    }
+    if (rec.ops.length === 0){
+      // value present but no ops recorded (autofill) — treat as pasted
+      rec.pasted = true;
+      for (let i = 0; i < text.length; i++) rec.ops.push({ k:'ins', pos:i, ch:text[i], dt: i ? 95 : 0 });
+    }
+    plan = makePlan(text);
+    startRun(1);
+  }
+  inputEl.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter'){ ev.preventDefault(); submitLine(); }
+  });
+  $('go-btn').addEventListener('click', submitLine);
+
+  $('stage').addEventListener('pointerdown', () => {
+    if (mode === 'perform' && !reduce){
+      skipping = true;
+      $('stage-hint').style.opacity = '0';
+    }
+  });
+  $('rm-next').addEventListener('click', () => {
+    if (mode !== 'perform') return;
+    if (night >= 7) curtainCall();
+    else performNight(night + 1);
+  });
+
+  $('encore-btn').addEventListener('click', () => {
+    // same recording, a new drift: it never leaves the same way twice
+    plan = makePlan(plan.sentence);
+    startRun(2);
+    showToast('an encore. it drifts differently every time.');
+  });
+  $('again-btn').addEventListener('click', () => {
+    mode = 'intro';
+    clearTimers();
+    playToken++;
+    $('curtain').style.display = 'none';
+    $('stage').style.display = 'none';
+    $('intake').style.display = 'block';
+    inputEl.value = '';
+    resetRec();
+    $('r-night').textContent = '—';
+    $('r-tempo').textContent = '—';
+    $('r-fid').textContent = '—';
+    inputEl.focus();
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+  });
+
+  /* boot */
+  inputEl.focus();
+})();
+</script>
+</body>
+</html>
