@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Coastline Problem · Prízrak</title>
+<style>
+  :root{
+    --ink:#0a0906; --ink-1:#0e0c08; --ink-2:#14110b; --ink-3:#1b1710;
+    --bone:#e6ddc8; --parch:#cec4ab; --ash:#948a76; --ash-2:#6b6251; --ash-3:#464033;
+    --rule:rgba(230,221,200,.08); --rule-2:rgba(230,221,200,.17);
+    --lamp:#e0aa52; --lamp-dim:#8f6c33; --lamp-glow:rgba(224,170,82,.16);
+    --sea:#7fa8a4; --sea-dim:#4c6764;
+    --red:#c07a5c;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; line-height:1.55; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(95% 60% at 50% -8%, rgba(224,170,82,.06), transparent 55%),
+      radial-gradient(80% 50% at 50% 116%, rgba(127,168,164,.045), transparent 60%),
+      var(--ink);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:6; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  ::selection{ background:rgba(224,170,82,.24); color:#fff; }
+  ::-webkit-scrollbar{ width:10px; }
+  ::-webkit-scrollbar-thumb{ background:#211c12; border-radius:8px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  .wrap{ max-width:760px; margin:0 auto; padding:40px 18px 54px; }
+  @media(min-width:700px){ .wrap{ padding:50px 28px 60px; } }
+
+  header{ text-align:center; margin-bottom:20px; }
+  .kicker{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.26em; font-size:9.5px; color:var(--ash-2); }
+  h1{
+    font-weight:700; font-size:clamp(1.9rem,6.2vw,2.9rem); line-height:1.05;
+    margin:12px 0 0; letter-spacing:-.01em; text-shadow:0 0 30px var(--lamp-glow);
+  }
+  h1 .em{ color:var(--lamp); font-style:italic; font-weight:500; }
+  .sub{ margin:14px auto 0; font-style:italic; font-size:13.5px; color:var(--ash); max-width:40rem; line-height:1.66; }
+  .divider{ height:1px; max-width:40rem; margin:22px auto; background:linear-gradient(90deg,transparent,var(--rule-2),transparent); }
+
+  .panel{
+    position:relative; border:1px solid var(--rule-2); border-radius:12px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    box-shadow:0 30px 70px -42px rgba(0,0,0,.95);
+    padding:22px 18px 20px; overflow:hidden; margin-bottom:20px;
+  }
+  @media(min-width:700px){ .panel{ padding:26px 28px 24px; } }
+  .panel::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--lamp-dim),transparent); opacity:.55;
+  }
+
+  .commission{
+    display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px;
+  }
+  .comm-no{ font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; color:var(--ash-2); text-transform:uppercase; white-space:nowrap; }
+  .comm-text{ font-size:15.5px; font-style:italic; color:var(--parch); line-height:1.5; }
+  .comm-text b{ color:var(--bone); font-weight:600; }
+  .comm-scale{ font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; color:var(--ash-2); text-transform:uppercase; margin:2px 0 14px; }
+
+  .sheet{
+    position:relative; border:1px solid var(--rule-2); border-radius:8px; overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(230,221,200,.025), transparent 60%),
+      #0c0a07;
+  }
+  .sheet canvas{ display:block; width:100%; height:auto; touch-action:none; cursor:crosshair; }
+  .sheet .hint{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; text-align:center; padding:0 20px;
+    font-style:italic; font-size:13.5px; color:var(--ash-2);
+    transition:opacity .6s; line-height:1.7;
+  }
+  .sheet .hint.gone{ opacity:0; }
+  .sheet .status{
+    position:absolute; left:12px; bottom:9px; pointer-events:none;
+    font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--ash-2);
+  }
+  .sheet .status b{ color:var(--lamp); font-weight:500; }
+
+  .btn-row{ display:flex; gap:10px; justify-content:center; margin-top:18px; flex-wrap:wrap; }
+  .btn{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--parch); background:var(--ink-2); border:1px solid var(--rule-2);
+    padding:12px 20px; border-radius:8px; cursor:pointer;
+    transition:border-color .25s, color .25s, box-shadow .25s, opacity .25s;
+  }
+  .btn:hover{ border-color:var(--lamp-dim); color:var(--lamp); box-shadow:0 0 22px -6px var(--lamp-glow); }
+  .btn.primary{ border-color:var(--lamp-dim); color:var(--lamp); }
+  .btn:disabled{ opacity:.32; cursor:default; box-shadow:none; }
+  .btn:disabled:hover{ border-color:var(--rule-2); color:var(--parch); }
+
+  /* field log */
+  #fieldlog{ display:none; margin-top:18px; }
+  #fieldlog.show{ display:block; }
+  .fl-head{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--ash-2); margin-bottom:8px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  }
+  .fl-head b{ color:var(--lamp); font-weight:500; }
+  .fl-rows{ border:1px solid var(--rule); border-radius:8px; background:rgba(0,0,0,.22); overflow:hidden; }
+  .fl-row{
+    display:grid; grid-template-columns:1.15fr .8fr 1.1fr 1fr; gap:8px; align-items:baseline;
+    padding:8px 14px; font-family:var(--mono); font-size:10.5px; letter-spacing:.05em;
+    color:var(--parch); border-top:1px solid var(--rule);
+    opacity:0; transform:translateY(4px); transition:opacity .5s, transform .5s;
+  }
+  .fl-row.in{ opacity:1; transform:none; }
+  .fl-row:first-child{ border-top:none; }
+  .fl-row.head{ color:var(--ash-2); font-size:9px; letter-spacing:.18em; text-transform:uppercase; opacity:1; transform:none; }
+  .fl-row .grow{ color:var(--sea); }
+  .fl-row .len{ color:var(--lamp); }
+  @media(max-width:520px){ .fl-row{ grid-template-columns:1fr .7fr 1fr .9fr; font-size:9.5px; padding:8px 10px; } }
+
+  /* results */
+  #results{ display:none; }
+  #results.show{ display:block; }
+  .res-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  @media(max-width:640px){ .res-grid{ grid-template-columns:1fr; } }
+
+  .dim-card{ text-align:center; padding:18px 10px 14px; border:1px solid var(--rule); border-radius:10px; background:rgba(0,0,0,.2); }
+  .dim-label{ font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--ash-2); }
+  .dim-value{
+    font-family:var(--mono); font-size:clamp(2.4rem,8vw,3.4rem); color:var(--lamp);
+    text-shadow:0 0 34px var(--lamp-glow); line-height:1.15; margin:6px 0 2px; font-weight:500;
+  }
+  .dim-note{ font-size:12px; font-style:italic; color:var(--ash); line-height:1.6; padding:0 8px; }
+
+  .plot-card{ border:1px solid var(--rule); border-radius:10px; background:rgba(0,0,0,.2); padding:12px 12px 8px; }
+  .plot-card svg{ display:block; width:100%; height:auto; }
+  .plot-cap{ font-family:var(--mono); font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-2); text-align:center; margin:6px 0 4px; }
+
+  .ladder{ margin-top:18px; border:1px solid var(--rule); border-radius:10px; background:rgba(0,0,0,.18); overflow:hidden; }
+  .lad-title{ font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--ash-2); padding:10px 14px 6px; }
+  .lad-row{
+    display:flex; justify-content:space-between; gap:12px; align-items:baseline;
+    padding:6px 14px; font-size:12.5px; color:var(--ash); border-top:1px solid var(--rule);
+  }
+  .lad-row .ld{ font-family:var(--mono); font-size:10.5px; color:var(--ash-2); white-space:nowrap; }
+  .lad-row.you{ color:var(--lamp); background:rgba(224,170,82,.05); }
+  .lad-row.you .ld{ color:var(--lamp); }
+  .lad-row.you .ln{ font-style:italic; }
+
+  .verdict{ margin-top:20px; font-size:14.5px; line-height:1.78; color:var(--parch); max-width:38rem; }
+  .verdict p{ margin:0 0 12px; }
+  .verdict em{ color:var(--bone); }
+  .verdict .grew{ color:var(--sea); }
+  .filenote{
+    margin-top:16px; border-left:2px solid var(--ash-3); padding:2px 0 2px 14px;
+    font-size:12px; font-style:italic; color:var(--ash); line-height:1.7; max-width:36rem;
+  }
+  .filenote b{ color:var(--parch); font-weight:500; font-style:normal; font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; display:block; margin-bottom:3px; }
+
+  footer{ text-align:center; margin-top:26px; }
+  .foot{ font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--ash-3); line-height:2; }
+
+  @media (prefers-reduced-motion: reduce){
+    .fl-row, .line{ transition:none; }
+    .sheet .hint{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Prízrak · Office of Provisional Lengths</div>
+    <h1>The Coastline <span class="em">Problem</span></h1>
+    <p class="sub">Every shore is longer the closer you look. Draw the office one line, unbroken,
+      and the surveyors will walk it with shrinking rulers until it confesses its true dimension.
+      Nothing you draw will hold still while it is measured.</p>
+    <div class="divider"></div>
+  </header>
+
+  <section class="panel" id="deskPanel">
+    <div class="commission">
+      <span class="comm-no" id="commNo">Commission №1811-A</span>
+      <span class="comm-text" id="commText"></span>
+    </div>
+    <div class="comm-scale" id="commScale"></div>
+    <div class="sheet">
+      <canvas id="cv" aria-label="drawing sheet — draw one continuous line"></canvas>
+      <div class="hint" id="hint">one line, unbroken — begin anywhere.<br>a new stroke scraps the old one.</div>
+      <div class="status" id="status"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="surveyBtn" disabled>Run the survey</button>
+      <button class="btn" id="clearBtn">Scrap the sheet</button>
+      <button class="btn" id="newBtn">New commission</button>
+    </div>
+
+    <div id="fieldlog">
+      <div class="fl-head"><span>Field log — divider method</span><span id="flStatus"></span></div>
+      <div class="fl-rows" id="flRows"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="results">
+    <div class="res-grid">
+      <div class="dim-card">
+        <div class="dim-label">Hausdorff estimate · Richardson fit</div>
+        <div class="dim-value" id="dimVal">D ≈ 1.00</div>
+        <div class="dim-note" id="dimNote"></div>
+      </div>
+      <div class="plot-card">
+        <div id="plotHost"></div>
+        <div class="plot-cap">richardson plot · log rule vs log length</div>
+      </div>
+    </div>
+
+    <div class="ladder">
+      <div class="lad-title">The office ladder of known edges</div>
+      <div id="ladRows"></div>
+    </div>
+
+    <div class="verdict" id="verdict"></div>
+    <div class="filenote" id="filenote"></div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="againBtn">Survey another shore</button>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot">the office regrets that all measurements are provisional<br>
+      after L. F. Richardson, who noticed, and B. Mandelbrot, who said it out loud (1967)</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- writing pools ---------- */
+  var COMMISSIONS = [
+    "the coastline of the island you would flee to",
+    "the border of the country you founded with one other person",
+    "the crack in the first ceiling you ever memorized",
+    "the route you walk when a phone call goes badly",
+    "your signature, as it will look in thirty years",
+    "the profile of a mountain you saw exactly once",
+    "the horizon from a train window at dusk",
+    "the edge of the puddle you stepped around all winter",
+    "your resting heart, rendered as a line",
+    "the seam of the coat you should have kept",
+    "the river you grew up pretending was bigger",
+    "the shoreline of the lake in the dream that recurs",
+    "the outline of an animal asleep somewhere warm",
+    "the frontier between what you said and what you meant",
+    "the path lightning would take to reach you",
+    "the hem of the curtain in the room where you waited",
+    "the skyline of the city you almost moved to",
+    "the way home, drawn from memory, wrong",
+    "the wandering of your attention during the eulogy",
+    "the top edge of the letter you tore instead of sending",
+    "the coast your grandmother said the family came from",
+    "the crest of the wave that knocked you down as a child",
+    "the line where the water was, before the drought",
+    "the ridge you watched for weather every morning that year",
+    "the graph of a week you survived",
+    "the silhouette of everyone ahead of you in that queue",
+    "the boundary of the property dispute that outlived both parties",
+    "the trail of the ant you watched instead of working",
+    "the fold in the map exactly where you needed to read it",
+    "the orbit of the fly during the argument"
+  ];
+  var UNITS = [
+    {u:"league", pl:"leagues", px: 84},
+    {u:"verst", pl:"versts", px: 66},
+    {u:"chain", pl:"chains", px: 52},
+    {u:"li", pl:"li", px: 58},
+    {u:"stadion", pl:"stadia", px: 72},
+    {u:"cable", pl:"cables", px: 61}
+  ];
+  var OPENINGS = [
+    "The surveyors report as follows.",
+    "The field team has returned; their boots are wet and their figures disagree.",
+    "The measurement is complete, in the sense that we chose to stop.",
+    "Herewith the findings, sworn before the smallest ruler present.",
+    "The office has walked your line six ways and it was longer each time.",
+    "The instruments have been dried and the following is entered into record.",
+    "Your line was measured until the measuring became the longer task.",
+    "The survey concluded at dusk, as all honest surveys do."
+  ];
+  var BAND_SMOOTH = [
+    "It barely resists the ruler at all. Measured coarsely or finely, it gives the same account of itself — a rare and slightly suspicious honesty.",
+    "This is nearly a Euclidean object. The office sees perhaps two of these a year, usually drawn by engineers or liars.",
+    "It has the discipline of a causeway: every ruler agrees on it. Whatever you were remembering, you have smoothed it in the remembering.",
+    "So little roughness that the dividers grew bored. Lines like this are built, not lived."
+  ];
+  var BAND_GENTLE = [
+    "A mild shore. It hides a little extra length in its bends, the way a calm person hides an entire second life.",
+    "Gently resistant to measurement — the sort of coast where boats land easily and nothing much is ever defended.",
+    "It lengthens politely under scrutiny, a few percent at a time, like a story improving with retellings.",
+    "The roughness is there, but domesticated. This line has been walked often and has worn itself agreeable."
+  ];
+  var BAND_TEMPERATE = [
+    "A working coastline. Enough shelter for harbors, enough teeth to earn respect. Most lives, honestly drawn, come out about here.",
+    "It keeps a respectable amount of itself in reserve. Each smaller ruler found coastline the larger one had walked straight past.",
+    "There is real structure folded into this line — coves inside bends inside coves. The surveyors began naming them and had to be stopped.",
+    "Detailed but navigable. If this were a border, it would be disputed only occasionally, and only in winter."
+  ];
+  var BAND_RUGGED = [
+    "This is serious coast. The dividers kept finding harbors inside harbors, and one surveyor has asked to be reassigned.",
+    "Rough in the old way — the way of coasts that eat ships and grants alike. Its length is less a number than a mood.",
+    "Every scale of inspection turned up new indentation. The office suspects that whatever you drew from, you have not finished with it.",
+    "A line like this does not want a length. It wants a garrison."
+  ];
+  var BAND_FJORD = [
+    "Fjord country. The line withdraws into itself again and again, and the measured length climbed so fast we checked the instruments twice.",
+    "This is a coastline in the Norwegian sense: mostly interior. The shortest path between two points on it is by sea, in fog, against advice.",
+    "The dividers went in and did not come out where expected. Length, for a line like this, is a matter of commitment rather than fact.",
+    "The office classifies this as a deep-shelter coast. Things could hide along it for generations. Perhaps things have."
+  ];
+  var BAND_WILD = [
+    "At this roughness the word 'line' is a courtesy. It is trying to become a territory — to be area, not edge. The office has flagged it.",
+    "Length has effectively stopped being a property of this object. Each ruler reported a different coastline; each was correct; none will be paid.",
+    "This is the pathological register: the line fills space the way worry fills an evening. We recorded a number, but we do not stand behind it.",
+    "The surveyors declined to walk it a seventh time. The file has been moved to the cabinet we do not open in front of visitors."
+  ];
+  var CLOSINGS = [
+    "The office reminds you that this is not a fault in the line. It is a fault in the question.",
+    "File closed, provisionally. All files here are closed provisionally.",
+    "We have entered the figure in pencil. We enter everything in pencil now.",
+    "Should you require a final length, the office recommends requiring something else.",
+    "The map has been updated and is therefore already wrong.",
+    "No further action is possible. No further action was ever possible.",
+    "You may appeal the finding, but the appeal will be measured by the same office.",
+    "The tide, for what it is worth, agrees with neither of us.",
+    "We thank you for your line. It is longer than you meant it to be. They always are."
+  ];
+  var FILENOTES = [
+    "Lewis Fry Richardson noticed that Spain and Portugal disagreed about the length of their shared border by some two hundred kilometres. Both had measured carefully. Both were right.",
+    "Richardson gathered his coastline data while researching whether the length of a shared border predicted the likelihood of war. It was the border study that outlived him.",
+    "Mandelbrot's 1967 paper asked, in its title, how long the coast of Britain is. The paper is famous for declining to answer.",
+    "The west coast of Britain measures about D ≈ 1.25 — rough enough that Mandelbrot chose it as his first example, smooth enough that people still tried to argue.",
+    "A ruler one metre long finds a longer Norway than a ruler ten metres long. A ruler the length of a wave finds a Norway with no end.",
+    "The office once commissioned a final, definitive measurement of a small bay. The report is 41 years overdue and the surveyor still writes at Christmas.",
+    "Coastlines are the polite case. Clouds, lungs, lightning, and the surface of the brain all refuse the ruler the same way.",
+    "No natural thing yet examined by this office has turned out to be one-dimensional. We keep the classification for sentimental reasons."
+  ];
+  var LADDER = [
+    {d:1.00, name:"a causeway, a taut string, anything man-made and proud of it"},
+    {d:1.05, name:"the coast of South Africa — famously smooth, geologically aloof"},
+    {d:1.13, name:"the coast of Australia, taken as a whole"},
+    {d:1.25, name:"the west coast of Britain, Mandelbrot's first witness"},
+    {d:1.26, name:"Koch's snowflake, roughness by design"},
+    {d:1.52, name:"the coast of Norway, which is mostly fjord and refusal"},
+    {d:2.00, name:"a line so troubled it fills the map — edge become territory"}
+  ];
+
+  /* ---------- anti-repeat pick ---------- */
+  var LS_KEY = "prizrak-coastline-used";
+  var used = {};
+  try{ used = JSON.parse(localStorage.getItem(LS_KEY) || "{}") || {}; }catch(e){ used = {}; }
+  function pick(pool, key){
+    var seen = used[key] || [];
+    var avail = [];
+    for(var i=0;i<pool.length;i++) if(seen.indexOf(i)===-1) avail.push(i);
+    if(!avail.length){ seen = []; for(i=0;i<pool.length;i++) avail.push(i); }
+    var idx = avail[Math.floor(Math.random()*avail.length)];
+    seen.push(idx);
+    if(seen.length > Math.max(1, pool.length-1)) seen = seen.slice(-Math.max(1, pool.length-1));
+    used[key] = seen;
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(used)); }catch(e){}
+    return pool[idx];
+  }
+
+  /* ---------- state ---------- */
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var hint = document.getElementById('hint');
+  var statusEl = document.getElementById('status');
+  var surveyBtn = document.getElementById('surveyBtn');
+  var clearBtn = document.getElementById('clearBtn');
+  var newBtn = document.getElementById('newBtn');
+  var againBtn = document.getElementById('againBtn');
+  var fieldlog = document.getElementById('fieldlog');
+  var flRows = document.getElementById('flRows');
+  var flStatus = document.getElementById('flStatus');
+  var resultsEl = document.getElementById('results');
+
+  var pts = [];          // drawn stroke, css px
+  var drawing = false;
+  var surveying = false;
+  var unit = UNITS[0];
+  var W = 0, H = 0, DPR = 1;
+  var raf = 0;
+
+  var MIN_ARC = 220, MIN_PTS = 12;
+
+  function sizeCanvas(){
+    var rect = cv.parentElement.getBoundingClientRect();
+    W = Math.max(280, Math.floor(rect.width));
+    H = Math.max(220, Math.round(W * 0.58));
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR);
+    cv.height = Math.round(H * DPR);
+    cv.style.height = H + "px";
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    redrawInk(1);
+  }
+
+  function arcLength(p){
+    var L = 0;
+    for(var i=1;i<p.length;i++) L += Math.hypot(p[i].x-p[i-1].x, p[i].y-p[i-1].y);
+    return L;
+  }
+
+  function fmt(n){
+    if(!isFinite(n)) return "—";
+    if(n >= 100) return String(Math.round(n));
+    if(n >= 10) return n.toFixed(1);
+    return n.toFixed(2);
+  }
+
+  function newCommission(){
+    var no = 1700 + Math.floor(Math.random()*300);
+    var suf = "ABCDEFGHKMR".charAt(Math.floor(Math.random()*11));
+    document.getElementById('commNo').textContent = "Commission №" + no + "-" + suf;
+    var t = document.getElementById('commText');
+    t.textContent = "";
+    var b = document.createElement('b'); b.textContent = "Draw ";
+    t.appendChild(b);
+    t.appendChild(document.createTextNode(pick(COMMISSIONS,'comm') + "."));
+    unit = UNITS[Math.floor(Math.random()*UNITS.length)];
+    document.getElementById('commScale').textContent =
+      "scale of record: one " + unit.u + " to " + unit.px + " pixels · instrument: brass dividers, worn";
+  }
+
+  function clearSheet(keepHint){
+    pts = [];
+    surveying = false;
+    if(raf){ cancelAnimationFrame(raf); raf = 0; }
+    fieldlog.classList.remove('show');
+    flRows.textContent = "";
+    resultsEl.classList.remove('show');
+    surveyBtn.disabled = true;
+    statusEl.textContent = "";
+    if(!keepHint) hint.classList.remove('gone');
+    redrawInk(1);
+  }
+
+  /* ---------- drawing ---------- */
+  function drawGraticule(){
+    ctx.save();
+    ctx.strokeStyle = "rgba(230,221,200,.035)";
+    ctx.lineWidth = 1;
+    var step = 46;
+    for(var x=step; x<W; x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for(var y=step; y<H; y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    ctx.restore();
+  }
+  function strokeInk(alpha){
+    if(pts.length < 2) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#e6ddc8";
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.shadowColor = "rgba(230,221,200,.35)";
+    ctx.shadowBlur = alpha >= 1 ? 5 : 0;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function redrawInk(alpha){
+    ctx.clearRect(0,0,W,H);
+    drawGraticule();
+    strokeInk(alpha);
+  }
+
+  function evPos(e){
+    var r = cv.getBoundingClientRect();
+    return { x: Math.max(0,Math.min(W, e.clientX - r.left)), y: Math.max(0,Math.min(H, e.clientY - r.top)) };
+  }
+  cv.addEventListener('pointerdown', function(e){
+    if(surveying) return;
+    e.preventDefault();
+    cv.setPointerCapture(e.pointerId);
+    drawing = true;
+    pts = [evPos(e)];
+    hint.classList.add('gone');
+    resultsEl.classList.remove('show');
+    fieldlog.classList.remove('show');
+    flRows.textContent = "";
+    redrawInk(1);
+  });
+  cv.addEventListener('pointermove', function(e){
+    if(!drawing || surveying) return;
+    var p = evPos(e);
+    var last = pts[pts.length-1];
+    if(Math.hypot(p.x-last.x, p.y-last.y) < 1.2) return;
+    pts.push(p);
+    // incremental draw
+    ctx.save();
+    ctx.strokeStyle = "#e6ddc8"; ctx.lineWidth = 1.6;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.shadowColor = "rgba(230,221,200,.35)"; ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    ctx.restore();
+    var L = arcLength(pts);
+    statusEl.textContent = "";
+    var b = document.createElement('b'); b.textContent = fmt(L/unit.px) + " " + unit.pl;
+    statusEl.appendChild(document.createTextNode("ink laid: "));
+    statusEl.appendChild(b);
+    statusEl.appendChild(document.createTextNode(" (at the crudest ruler)"));
+  });
+  function endStroke(e){
+    if(!drawing) return;
+    drawing = false;
+    var ok = pts.length >= MIN_PTS && arcLength(pts) >= MIN_ARC;
+    surveyBtn.disabled = !ok;
+    if(!ok && pts.length){
+      statusEl.textContent = "the commission requires a longer shore — draw on";
+    }
+  }
+  cv.addEventListener('pointerup', endStroke);
+  cv.addEventListener('pointercancel', endStroke);
+
+  /* ---------- geometry: resample + divider walk ---------- */
+  function resample(p, step){
+    var out = [ {x:p[0].x, y:p[0].y} ];
+    var ax = p[0].x, ay = p[0].y;
+    for(var i=1;i<p.length;i++){
+      var bx = p[i].x, by = p[i].y;
+      var d = Math.hypot(bx-ax, by-ay);
+      while(d >= step){
+        var t = step / d;
+        ax = ax + (bx-ax)*t; ay = ay + (by-ay)*t;
+        out.push({x:ax, y:ay});
+        d = Math.hypot(bx-ax, by-ay);
+      }
+      ax = bx; ay = by;
+    }
+    var lastO = out[out.length-1], lastP = p[p.length-1];
+    if(Math.hypot(lastP.x-lastO.x, lastP.y-lastO.y) > 0.01) out.push({x:lastP.x, y:lastP.y});
+    return out;
+  }
+
+  function dividerWalk(dense, r){
+    var anchors = [ dense[0] ];
+    var cur = dense[0];
+    var i = 1;
+    while(true){
+      var found = -1;
+      for(var j=i;j<dense.length;j++){
+        if(Math.hypot(dense[j].x-cur.x, dense[j].y-cur.y) >= r){ found = j; break; }
+      }
+      if(found < 0) break;
+      var a = dense[found-1], b = dense[found];
+      var lo = 0, hi = 1;
+      for(var k=0;k<14;k++){
+        var m = (lo+hi)/2;
+        var px = a.x + (b.x-a.x)*m, py = a.y + (b.y-a.y)*m;
+        if(Math.hypot(px-cur.x, py-cur.y) >= r) hi = m; else lo = m;
+      }
+      cur = { x: a.x + (b.x-a.x)*hi, y: a.y + (b.y-a.y)*hi };
+      anchors.push(cur);
+      i = found;
+      if(anchors.length > 5000) break;
+    }
+    var end = dense[dense.length-1];
+    var rem = Math.hypot(end.x-cur.x, end.y-cur.y);
+    return { anchors: anchors, steps: anchors.length-1, length: (anchors.length-1)*r + rem, rem: rem };
+  }
+
+  function linFit(xs, ys){
+    var n = xs.length, sx=0, sy=0, sxx=0, sxy=0;
+    for(var i=0;i<n;i++){ sx+=xs[i]; sy+=ys[i]; sxx+=xs[i]*xs[i]; sxy+=xs[i]*ys[i]; }
+    var denom = n*sxx - sx*sx;
+    if(Math.abs(denom) < 1e-12) return {m:0, b: sy/n};
+    var m = (n*sxy - sx*sy) / denom;
+    return { m:m, b:(sy - m*sx)/n };
+  }
+
+  function computeSurvey(){
+    var dense = resample(pts, 1.5);
+    // bbox
+    var minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+    for(var i=0;i<dense.length;i++){
+      var p=dense[i];
+      if(p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x;
+      if(p.y<miny)miny=p.y; if(p.y>maxy)maxy=p.y;
+    }
+    var diag = Math.hypot(maxx-minx, maxy-miny);
+    var scales = [];
+    var r = Math.max(24, diag/2.6);
+    for(var s=0;s<7;s++){
+      if(r < 4) break;
+      var res = dividerWalk(dense, r);
+      if(res.steps >= 1) scales.push({ r:r, steps:res.steps, length:res.length, anchors:res.anchors });
+      r = r / 1.9;
+    }
+    // fit on scales with >=2 spans; trim the saturated fine tail (below the
+    // line's feature floor the length stops growing and flattens the slope)
+    var fitPts = [];
+    for(i=0;i<scales.length;i++) if(scales[i].steps >= 2) fitPts.push(scales[i]);
+    while(fitPts.length > 4){
+      var fa = fitPts[fitPts.length-2], fb = fitPts[fitPts.length-1];
+      if(fb.length / fa.length - 1 < 0.005) fitPts.pop(); else break;
+    }
+    if(fitPts.length < 3) return null;
+    var xs=[], ys=[];
+    for(i=0;i<fitPts.length;i++){ xs.push(Math.log10(fitPts[i].r)); ys.push(Math.log10(fitPts[i].length)); }
+    var fit = linFit(xs, ys);
+    var D = 1 - fit.m;
+    D = Math.max(1.0, Math.min(1.99, D));
+    var growth = (scales[scales.length-1].length / scales[0].length - 1) * 100;
+    return { scales:scales, fitPts:fitPts, fit:fit, D:D, growth:growth, diag:diag };
+  }
+
+  /* ---------- survey animation ---------- */
+  function drawChords(anchors, upto, color, dotColor, alpha){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.3;
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.moveTo(anchors[0].x, anchors[0].y);
+    for(var i=1;i<=upto && i<anchors.length;i++) ctx.lineTo(anchors[i].x, anchors[i].y);
+    ctx.stroke();
+    ctx.fillStyle = dotColor;
+    for(i=0;i<=upto && i<anchors.length;i++){
+      ctx.beginPath(); ctx.arc(anchors[i].x, anchors[i].y, 2.1, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function renderFinal(survey){
+    // composed record state: the true line, faded, with a legible surveyor's
+    // polygon over it (the scale whose walk is visibly chordal)
+    var best = survey.scales[0], bestDiff = 1e9;
+    for(var i=0;i<survey.scales.length;i++){
+      var d = Math.abs(survey.scales[i].steps - 14);
+      if(d < bestDiff){ bestDiff = d; best = survey.scales[i]; }
+    }
+    redrawInk(0.5);
+    drawChords(best.anchors, best.anchors.length-1, "rgba(224,170,82,.9)", "#f0c880", 0.9);
+  }
+
+  function renderFrame(survey, k, frac){
+    redrawInk(0.28);
+    // previous scale faint
+    if(k > 0){
+      var prev = survey.scales[k-1];
+      drawChords(prev.anchors, prev.anchors.length-1, "rgba(127,168,164,.35)", "rgba(127,168,164,.4)", 0.5);
+    }
+    var cur = survey.scales[k];
+    var upto = Math.max(1, Math.floor(frac * (cur.anchors.length-1)));
+    drawChords(cur.anchors, upto, "#e0aa52", "#f0c880", 0.95);
+  }
+
+  function addLogRow(sc, immediate){
+    var row = document.createElement('div');
+    row.className = 'fl-row';
+    var c1 = document.createElement('span');
+    c1.textContent = "rule " + fmt(sc.r/unit.px) + " " + (sc.r/unit.px >= 0.995 && sc.r/unit.px < 1.005 ? unit.u : unit.pl);
+    var c2 = document.createElement('span');
+    c2.textContent = sc.steps + (sc.steps === 1 ? " span" : " spans");
+    var c3 = document.createElement('span'); c3.className = 'len';
+    c3.textContent = "shore: " + fmt(sc.length/unit.px) + " " + unit.pl;
+    var c4 = document.createElement('span'); c4.className = 'grow';
+    c4.textContent = sc.growText || "";
+    row.appendChild(c1); row.appendChild(c2); row.appendChild(c3); row.appendChild(c4);
+    flRows.appendChild(row);
+    if(immediate || REDUCED){ row.classList.add('in'); }
+    else { requestAnimationFrame(function(){ requestAnimationFrame(function(){ row.classList.add('in'); }); }); }
+  }
+
+  function runSurvey(){
+    if(surveying || pts.length < MIN_PTS) return;
+    var survey = computeSurvey();
+    if(!survey){
+      statusEl.textContent = "the line is too small to argue with — draw larger";
+      return;
+    }
+    surveying = true;
+    surveyBtn.disabled = true;
+    clearBtn.disabled = true;
+    newBtn.disabled = true;
+    resultsEl.classList.remove('show');
+    flRows.textContent = "";
+    fieldlog.classList.add('show');
+
+    // growth annotations
+    for(var i=0;i<survey.scales.length;i++){
+      var sc = survey.scales[i];
+      if(i===0){ sc.growText = "baseline"; }
+      else {
+        var g = (sc.length / survey.scales[0].length - 1) * 100;
+        sc.growText = (g >= 0 ? "+" : "") + (g >= 10 ? Math.round(g) : g.toFixed(1)) + "% and rising";
+      }
+    }
+
+    // header row
+    var head = document.createElement('div');
+    head.className = 'fl-row head';
+    ["ruler","spans","measured length","drift"].forEach(function(t){
+      var s = document.createElement('span'); s.textContent = t; head.appendChild(s);
+    });
+    flRows.appendChild(head);
+
+    if(REDUCED){
+      // no animation: final overlay + all rows at once
+      renderFinal(survey);
+      for(i=0;i<survey.scales.length;i++) addLogRow(survey.scales[i], true);
+      flStatus.textContent = "survey complete";
+      finishSurvey(survey);
+      return;
+    }
+
+    var k = 0, t0 = 0;
+    var PER_SCALE = 950; // ms per scale
+    function step(ts){
+      if(!t0) t0 = ts;
+      var frac = Math.min(1, (ts - t0) / PER_SCALE);
+      var sc = survey.scales[k];
+      flStatus.textContent = "";
+      var b = document.createElement('b');
+      b.textContent = "rule: " + fmt(sc.r/unit.px) + " " + unit.pl;
+      flStatus.appendChild(document.createTextNode("walking · "));
+      flStatus.appendChild(b);
+      renderFrame(survey, k, frac);
+      if(frac >= 1){
+        addLogRow(sc, false);
+        k++;
+        t0 = 0;
+        if(k >= survey.scales.length){
+          flStatus.textContent = "survey complete";
+          raf = 0;
+          renderFinal(survey);
+          finishSurvey(survey);
+          return;
+        }
+      }
+      raf = requestAnimationFrame(step);
+    }
+    raf = requestAnimationFrame(step);
+  }
+
+  /* ---------- results ---------- */
+  function buildPlot(survey){
+    var host = document.getElementById('plotHost');
+    host.textContent = "";
+    var NS = "http://www.w3.org/2000/svg";
+    var w = 320, h = 190, padL = 34, padR = 12, padT = 14, padB = 28;
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', "0 0 " + w + " " + h);
+    var xs = [], ys = [];
+    var i;
+    for(i=0;i<survey.fitPts.length;i++){ xs.push(Math.log10(survey.fitPts[i].r)); ys.push(Math.log10(survey.fitPts[i].length)); }
+    var xmin = Math.min.apply(null,xs), xmax = Math.max.apply(null,xs);
+    var ymin = Math.min.apply(null,ys), ymax = Math.max.apply(null,ys);
+    var xpad = (xmax-xmin)*0.12 || 0.2, ypad = (ymax-ymin)*0.18 || 0.05;
+    xmin-=xpad; xmax+=xpad; ymin-=ypad; ymax+=ypad;
+    function X(x){ return padL + (x-xmin)/(xmax-xmin) * (w-padL-padR); }
+    function Y(y){ return h-padB - (y-ymin)/(ymax-ymin) * (h-padT-padB); }
+    // frame
+    var fr = document.createElementNS(NS,'rect');
+    fr.setAttribute('x',padL); fr.setAttribute('y',padT);
+    fr.setAttribute('width',w-padL-padR); fr.setAttribute('height',h-padT-padB);
+    fr.setAttribute('fill','none'); fr.setAttribute('stroke','rgba(230,221,200,.14)');
+    svg.appendChild(fr);
+    // fitted line, clipped to the frame
+    var defs = document.createElementNS(NS,'defs');
+    var cp = document.createElementNS(NS,'clipPath'); cp.setAttribute('id','plotclip');
+    var cr = document.createElementNS(NS,'rect');
+    cr.setAttribute('x',padL); cr.setAttribute('y',padT);
+    cr.setAttribute('width',w-padL-padR); cr.setAttribute('height',h-padT-padB);
+    cp.appendChild(cr); defs.appendChild(cp); svg.appendChild(defs);
+    var ln = document.createElementNS(NS,'line');
+    ln.setAttribute('x1',X(xmin)); ln.setAttribute('y1',Y(survey.fit.m*xmin+survey.fit.b));
+    ln.setAttribute('x2',X(xmax)); ln.setAttribute('y2',Y(survey.fit.m*xmax+survey.fit.b));
+    ln.setAttribute('stroke','rgba(127,168,164,.75)'); ln.setAttribute('stroke-width','1.2');
+    ln.setAttribute('stroke-dasharray','4 3');
+    ln.setAttribute('clip-path','url(#plotclip)');
+    svg.appendChild(ln);
+    // points
+    for(i=0;i<xs.length;i++){
+      var c = document.createElementNS(NS,'circle');
+      c.setAttribute('cx',X(xs[i])); c.setAttribute('cy',Y(ys[i])); c.setAttribute('r','3.2');
+      c.setAttribute('fill','#e0aa52');
+      svg.appendChild(c);
+    }
+    // axis labels
+    function label(tx, x, y, anchor, rot){
+      var t = document.createElementNS(NS,'text');
+      t.setAttribute('x',x); t.setAttribute('y',y);
+      t.setAttribute('fill','rgba(148,138,118,.9)');
+      t.setAttribute('font-size','8.5');
+      t.setAttribute('font-family','ui-monospace, Menlo, monospace');
+      t.setAttribute('letter-spacing','.12em');
+      t.setAttribute('text-anchor',anchor||'middle');
+      if(rot) t.setAttribute('transform','rotate(-90 '+x+' '+y+')');
+      t.textContent = tx;
+      svg.appendChild(t);
+    }
+    label("LOG RULE →", (padL+w-padR)/2, h-8);
+    label("LOG LENGTH →", 12, (padT+h-padB)/2, 'middle', true);
+    label("slope " + survey.fit.m.toFixed(2) + "  ·  D = 1 − slope", (padL+w-padR)/2, padT+11);
+    host.appendChild(svg);
+  }
+
+  function bandFor(D){
+    if(D < 1.02) return BAND_SMOOTH;
+    if(D < 1.08) return BAND_GENTLE;
+    if(D < 1.18) return BAND_TEMPERATE;
+    if(D < 1.32) return BAND_RUGGED;
+    if(D < 1.5) return BAND_FJORD;
+    return BAND_WILD;
+  }
+  function bandKey(D){
+    if(D < 1.02) return 'b0'; if(D < 1.08) return 'b1'; if(D < 1.18) return 'b2';
+    if(D < 1.32) return 'b3'; if(D < 1.5) return 'b4'; return 'b5';
+  }
+
+  function buildLadder(D){
+    var host = document.getElementById('ladRows');
+    host.textContent = "";
+    var rows = LADDER.slice();
+    var you = { d: D, name: "your line, as drawn, this evening", you: true };
+    rows.push(you);
+    rows.sort(function(a,b){ return a.d - b.d || (a.you?1:0)-(b.you?1:0); });
+    for(var i=0;i<rows.length;i++){
+      var r = rows[i];
+      var div = document.createElement('div');
+      div.className = 'lad-row' + (r.you ? ' you' : '');
+      var n = document.createElement('span'); n.className='ln';
+      n.textContent = r.you ? "— " + r.name + " —" : r.name;
+      var d = document.createElement('span'); d.className='ld';
+      d.textContent = "D ≈ " + r.d.toFixed(2);
+      div.appendChild(n); div.appendChild(d);
+      host.appendChild(div);
+    }
+  }
+
+  function comparisonSentence(D){
+    var below = null, above = null;
+    for(var i=0;i<LADDER.length;i++){
+      if(LADDER[i].d <= D) below = LADDER[i];
+      if(LADDER[i].d > D && !above) above = LADDER[i];
+    }
+    if(D <= 1.005) return "It is, to the office's instruments, indistinguishable from " + LADDER[0].name + ". The office is quietly suspicious.";
+    if(!above) return "It sits at the top of the ladder, past Norway, past the snowflake, in the register where edges start applying to be territories.";
+    var belowName = below ? below.name : "a taut string";
+    return "Rougher than " + belowName + "; not yet " + above.name.replace(/^the /, "the ") + ".";
+  }
+
+  function finishSurvey(survey){
+    surveying = false;
+    clearBtn.disabled = false;
+    newBtn.disabled = false;
+    surveyBtn.disabled = false;
+
+    var D = survey.D;
+    document.getElementById('dimVal').textContent = "D ≈ " + D.toFixed(2);
+    var dn = document.getElementById('dimNote');
+    var first = survey.scales[0], last = survey.scales[survey.scales.length-1];
+    dn.textContent = "at the crude ruler, " + fmt(first.length/unit.px) + " " + unit.pl +
+      "; at the fine, " + fmt(last.length/unit.px) + " — the same line, asked more carefully.";
+
+    buildPlot(survey);
+    buildLadder(D);
+
+    var v = document.getElementById('verdict');
+    v.textContent = "";
+    var p1 = document.createElement('p');
+    var em1 = document.createElement('em'); em1.textContent = pick(OPENINGS,'open');
+    p1.appendChild(em1);
+    p1.appendChild(document.createTextNode(" " + pick(bandFor(D), bandKey(D))));
+    v.appendChild(p1);
+
+    var p2 = document.createElement('p');
+    p2.appendChild(document.createTextNode(comparisonSentence(D) + " "));
+    var grew = document.createElement('span'); grew.className = 'grew';
+    var g = survey.growth;
+    grew.textContent = "Your shore grew " + (g >= 10 ? Math.round(g) : g.toFixed(1)) +
+      "% while we measured it, and had we brought smaller rulers it would have grown again.";
+    p2.appendChild(grew);
+    v.appendChild(p2);
+
+    var p3 = document.createElement('p');
+    var em3 = document.createElement('em'); em3.textContent = pick(CLOSINGS,'close');
+    p3.appendChild(em3);
+    v.appendChild(p3);
+
+    var fn = document.getElementById('filenote');
+    fn.textContent = "";
+    var fb = document.createElement('b'); fb.textContent = "from the office files";
+    fn.appendChild(fb);
+    fn.appendChild(document.createTextNode(pick(FILENOTES,'file')));
+
+    resultsEl.classList.add('show');
+    if(!REDUCED){
+      try{ resultsEl.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){}
+    }
+  }
+
+  /* ---------- wiring ---------- */
+  surveyBtn.addEventListener('click', runSurvey);
+  clearBtn.addEventListener('click', function(){ if(!surveying) clearSheet(false); });
+  newBtn.addEventListener('click', function(){ if(!surveying){ newCommission(); clearSheet(false); } });
+  againBtn.addEventListener('click', function(){
+    if(surveying) return;
+    newCommission();
+    clearSheet(false);
+    try{ document.getElementById('deskPanel').scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth'}); }catch(e){}
+  });
+
+  var resizeT = 0;
+  window.addEventListener('resize', function(){
+    clearTimeout(resizeT);
+    resizeT = setTimeout(function(){ if(!surveying) sizeCanvas(); }, 150);
+  });
+
+  newCommission();
+  sizeCanvas();
+})();
+</script>
+</body>
+</html>
