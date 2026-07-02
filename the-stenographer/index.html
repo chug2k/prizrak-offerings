@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Stenographer · Prízrak</title>
+<style>
+  :root{
+    --ink:#08090e; --ink-1:#0c0d14; --ink-2:#10121b; --ink-3:#161826;
+    --bone:#e4ddce; --parch:#cdc5b2; --ash:#928a7b; --ash-2:#696254; --ash-3:#423d34;
+    --rule:rgba(228,221,206,.08); --rule-2:rgba(228,221,206,.16);
+    --iron:#a9b6de; --iron-dim:#5d6a92; --iron-glow:rgba(169,182,222,.16);
+    --strike:#c9a05a;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; line-height:1.55; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(110% 70% at 50% -10%, rgba(169,182,222,.055), transparent 55%),
+      radial-gradient(80% 50% at 50% 115%, rgba(201,160,90,.04), transparent 60%),
+      var(--ink);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:5; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  ::selection{ background:rgba(169,182,222,.24); color:#fff; }
+  ::-webkit-scrollbar{ width:10px; }
+  ::-webkit-scrollbar-thumb{ background:#1a1c28; border-radius:8px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  .wrap{ max-width:760px; margin:0 auto; padding:40px 18px 52px; display:flex; flex-direction:column; min-height:100vh; }
+  @media(min-width:700px){ .wrap{ padding:52px 28px 60px; } }
+
+  header{ text-align:center; margin-bottom:24px; }
+  .kicker{
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.26em;
+    font-size:9.5px; color:var(--ash-2);
+  }
+  h1{
+    font-weight:700; font-size:clamp(1.8rem,6vw,2.8rem); line-height:1.05;
+    margin:12px 0 0; letter-spacing:-.01em; text-shadow:0 0 30px var(--iron-glow);
+  }
+  h1 .em{ color:var(--iron); font-style:italic; font-weight:500; }
+  .sub{
+    margin:15px auto 0; font-style:italic; font-size:13.5px; color:var(--ash);
+    max-width:36rem; line-height:1.64;
+  }
+  .divider{
+    height:1px; max-width:38rem; margin:24px auto;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent);
+  }
+
+  .panel{
+    position:relative; border:1px solid var(--rule-2); border-radius:12px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    box-shadow:0 30px 70px -42px rgba(0,0,0,.95);
+    padding:26px 24px 24px; overflow:hidden;
+  }
+  @media(min-width:700px){ .panel{ padding:30px 34px 28px; } }
+  .panel::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--iron-dim),transparent); opacity:.6;
+  }
+
+  .stage-dir{
+    font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--ash-2);
+    text-align:center; margin-bottom:20px;
+  }
+  .terms{ font-size:14.5px; line-height:1.7; color:var(--parch); max-width:34rem; margin:0 auto; }
+  .terms em{ color:var(--bone); }
+  .fine{
+    margin-top:18px; text-align:center; font-family:var(--mono); font-size:9px;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3);
+  }
+  .btn-row{ display:flex; gap:12px; justify-content:center; margin-top:24px; flex-wrap:wrap; }
+  .btn{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--parch); background:var(--ink-2); border:1px solid var(--rule-2);
+    padding:11px 20px; border-radius:8px; cursor:pointer;
+    transition:border-color .25s, color .25s, box-shadow .25s;
+  }
+  .btn:hover{ border-color:var(--iron-dim); color:var(--iron); box-shadow:0 0 22px -6px var(--iron-glow); }
+  .btn.primary{ border-color:var(--iron-dim); color:var(--iron); }
+
+  /* ---- session ---- */
+  #session{ display:none; }
+  .q-count{
+    font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--ash-2); margin-bottom:6px; display:flex; justify-content:space-between; gap:10px;
+  }
+  .q-count .oath-note{ color:var(--iron-dim); letter-spacing:.06em; text-transform:none; text-align:right; }
+  .q-text{
+    font-size:clamp(1.15rem,3.4vw,1.5rem); font-style:italic; line-height:1.4;
+    color:var(--bone); margin:8px 0 18px; min-height:2.4em;
+  }
+  textarea{
+    width:100%; min-height:120px; resize:vertical;
+    background:var(--ink-2); border:1px solid var(--rule-2); border-radius:8px;
+    color:var(--bone); font-family:var(--serif); font-size:15px; line-height:1.6;
+    padding:14px 15px; outline:none; transition:border-color .25s;
+  }
+  textarea:focus{ border-color:var(--iron-dim); }
+  textarea::placeholder{ color:var(--ash-3); font-style:italic; }
+  .under-row{
+    display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+    margin-top:9px; min-height:16px;
+  }
+  .pen{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.1em; color:var(--iron);
+    opacity:0; transition:opacity .5s ease;
+  }
+  .pen.on{ opacity:.85; }
+  .pen .dots::after{ content:""; animation:dots 1.6s steps(4,end) infinite; }
+  @keyframes dots{ 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} 100%{content:""} }
+  .tally{
+    font-family:var(--mono); font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ash-3); text-align:right; white-space:nowrap;
+  }
+  .interstitial{
+    text-align:center; font-family:var(--mono); font-size:9.5px; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--iron-dim); margin-top:16px; min-height:14px;
+    opacity:0; transition:opacity .4s ease;
+  }
+  .interstitial.on{ opacity:1; }
+
+  /* ---- transcript ---- */
+  #record{ display:none; }
+  .rec-head{
+    font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--ash-2); text-align:center; margin-bottom:6px; line-height:1.9;
+  }
+  .rec-head .title{ color:var(--iron); font-size:10px; }
+  .exhibit{
+    position:relative; margin:22px 0 0; padding:18px 18px 16px 22px;
+    border:1px solid var(--rule); border-radius:10px; background:var(--ink-1);
+    opacity:0; transform:translateY(8px); transition:opacity .7s ease, transform .7s ease;
+  }
+  .exhibit.in{ opacity:1; transform:none; }
+  .exhibit::before{
+    content:""; position:absolute; top:10px; bottom:10px; left:9px; width:1px;
+    background:linear-gradient(180deg,transparent,var(--iron-dim),transparent); opacity:.5;
+  }
+  .ex-label{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--iron-dim); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  }
+  .ex-q{ font-style:italic; font-size:13.5px; color:var(--ash); margin:7px 0 13px; }
+  .ex-body{ font-size:14px; line-height:2.15; word-break:break-word; }
+  .bar{
+    display:inline-block; height:.68em; border-radius:2px; margin:0 .32ch;
+    background:rgba(228,221,206,.26); vertical-align:baseline;
+  }
+  .annot{
+    font-family:var(--mono); font-size:10px; letter-spacing:.03em; color:var(--iron);
+    background:rgba(169,182,222,.06); border:1px solid rgba(169,182,222,.14);
+    border-radius:4px; padding:1px 7px 2px; margin:0 .45ch; white-space:normal;
+  }
+  .annot.struck{ color:var(--strike); background:rgba(201,160,90,.06); border-color:rgba(201,160,90,.16); }
+  .annot-line{
+    display:block; font-family:var(--mono); font-size:10px; letter-spacing:.03em;
+    color:var(--iron); line-height:1.65; margin:9px 0;
+  }
+  .annot-line.struck{ color:var(--strike); }
+  .annot-line::before{ content:"⌇ "; color:var(--iron-dim); }
+  .ex-stat{
+    margin-top:11px; font-family:var(--mono); font-size:8.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ash-3);
+  }
+
+  .note-panel{
+    margin-top:26px; padding:22px 22px 20px; border:1px solid rgba(169,182,222,.2);
+    border-radius:10px; background:linear-gradient(180deg,rgba(169,182,222,.045),transparent);
+    opacity:0; transform:translateY(8px); transition:opacity .7s ease, transform .7s ease;
+  }
+  .note-panel.in{ opacity:1; transform:none; }
+  .note-label{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--iron); margin-bottom:12px;
+  }
+  .note-body p{ font-size:14px; line-height:1.75; color:var(--parch); margin:0 0 12px; }
+  .note-body p:last-child{ margin-bottom:0; }
+  .stamp{
+    margin-top:18px; display:inline-block; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--iron);
+    border:1px solid var(--iron-dim); border-radius:3px; padding:7px 12px;
+    transform:rotate(-1.2deg); background:rgba(169,182,222,.04);
+  }
+  .signoff{
+    margin-top:16px; font-style:italic; font-size:13px; color:var(--ash); line-height:1.7;
+  }
+
+  footer{
+    margin-top:auto; padding-top:56px; text-align:center;
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ash-3);
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .pen .dots::after{ animation:none; content:"…"; }
+    .exhibit, .note-panel{ transition:none; transform:none; }
+    .pen, .interstitial, .btn, textarea{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Prízrak — records division · night session</div>
+    <h1>The <span class="em">Stenographer</span></h1>
+    <p class="sub">She does not take down what you say. Ten thousand words cross her desk
+    a night, and every one of them is an alibi. She takes down the pauses.</p>
+  </header>
+  <div class="divider"></div>
+
+  <section class="panel" id="intro" aria-label="Instructions and oath">
+    <div class="stage-dir">[ a small office. one lamp. the sound of a nib that never quite stops. ]</div>
+    <p class="terms">Three questions will be put to you. Answer however you like —
+    <em>the words are never kept, never shown, never sent anywhere.</em> The page forgets
+    them the moment you do. What is transcribed is everything else: where you stopped,
+    for how long, what you took back. The parts of an answer that cannot be drafted.</p>
+    <div class="btn-row"><button class="btn primary" id="oath-btn" type="button">take the oath ▸</button></div>
+    <div class="fine">the oath is silent. you have already begun.</div>
+  </section>
+
+  <section class="panel" id="session" aria-label="Testimony">
+    <div class="q-count"><span id="q-num">question one of three</span><span class="oath-note" id="oath-note"></span></div>
+    <div class="q-text" id="q-text" aria-live="polite"></div>
+    <textarea id="answer" spellcheck="false" autocomplete="off"
+      aria-label="Your answer. The words are not kept; only the pauses are recorded."
+      placeholder="answer in your own time. the time is the answer."></textarea>
+    <div class="under-row">
+      <span class="pen" id="pen" aria-hidden="true"><span id="pen-text">…the pen is moving</span><span class="dots"></span></span>
+      <span class="tally" id="tally">pauses 0 · struck 0 · words ignored: all</span>
+    </div>
+    <div class="btn-row"><button class="btn primary" id="send-btn" type="button">enter it into the record ▸</button></div>
+    <div class="interstitial" id="interstitial" aria-live="polite"></div>
+  </section>
+
+  <section id="record" aria-label="The transcript" aria-live="polite">
+    <div class="panel">
+      <div class="rec-head">
+        <span class="title">In re: the matter of whatever you were about to say</span><br>
+        taken in shorthand · witnesses: the lamp, the nib · words disregarded per standing order
+      </div>
+      <div id="exhibits"></div>
+      <div class="note-panel" id="note-panel">
+        <div class="note-label">The stenographer's note — off the record</div>
+        <div class="note-body" id="note-body"></div>
+        <div><span class="stamp" id="stamp"></span></div>
+        <div class="signoff" id="signoff"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="again-btn" type="button">testify again — new questions ▸</button>
+      </div>
+    </div>
+  </section>
+
+  <footer>prízrak · the pauses are kept in perpetuity · somebody should</footer>
+</div>
+
+<script>
+"use strict";
+(function(){
+  /* ------------------------------------------------------------ */
+  /* utils                                                          */
+  /* ------------------------------------------------------------ */
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = id => document.getElementById(id);
+  const now = () => performance.now();
+  function shuffle(a){
+    for (let i=a.length-1; i>0; i--){ const j=(Math.random()*(i+1))|0; const t=a[i]; a[i]=a[j]; a[j]=t; }
+    return a;
+  }
+  function picker(arr){
+    let bag=[];
+    return function(){ if(!bag.length) bag=shuffle(arr.slice()); return bag.pop(); };
+  }
+  function fmt(ms){
+    const s = ms/1000;
+    return (s < 10 ? (Math.round(s*10)/10).toFixed(1) : String(Math.round(s)));
+  }
+  const ORD = ['zeroth','first','second','third','fourth','fifth','sixth','seventh','eighth','ninth','tenth',
+    'eleventh','twelfth','thirteenth','fourteenth','fifteenth','sixteenth','seventeenth','eighteenth','nineteenth','twentieth'];
+  function ordinal(n){
+    if (n >= 0 && n < ORD.length) return ORD[n];
+    const suf = (n%10===1&&n%100!==11)?'st':(n%10===2&&n%100!==12)?'nd':(n%10===3&&n%100!==13)?'rd':'th';
+    return n + suf;
+  }
+  function sub(t, map){ return t.replace(/\{(\w+)\}/g, (_,k)=> (k in map ? map[k] : '{'+k+'}')); }
+
+  /* ------------------------------------------------------------ */
+  /* the questions                                                  */
+  /* ------------------------------------------------------------ */
+  const Q1 = [
+    'What did you eat this morning?',
+    'Describe the room you are sitting in.',
+    'What is the weather doing right now?',
+    'What was the last thing you bought?',
+    'How did you sleep last night?',
+    'What is on the floor near your feet?',
+    'Name a sound you can hear right now.',
+    'What did you do an hour ago?',
+    'What is the nearest door to you, and is it open?',
+    'What time did you get up today?'
+  ];
+  const Q2 = [
+    'Name someone you have not spoken to in over a year.',
+    'What have you been meaning to do for months now?',
+    'What was the last lie you told that didn’t matter?',
+    'Whose phone number could you still dial from memory?',
+    'What did you almost say today, and to whom?',
+    'What are you pretending is fine?',
+    'What have you left unanswered on purpose?',
+    'Which of your habits would surprise the people who love you?',
+    'When did you last change your mind about something that mattered?',
+    'What do you do alone that you would stop doing if someone could see?'
+  ];
+  const Q3 = [
+    'What do you owe, and to whom?',
+    'Who are you when you are tired?',
+    'What are you waiting for permission to do?',
+    'What do you want that you have never said out loud?',
+    'Which apology are you still drafting?',
+    'Whom have you forgiven without ever telling them?',
+    'What would the person you were at ten think of the way you spent today?',
+    'What is the kindest thing you’ve done that nobody found out about?',
+    'What would you keep, if you could keep only what cannot be bought?',
+    'If you are honest, what would you do differently, knowing only what you knew at the time?'
+  ];
+  const pickQ1 = picker(Q1), pickQ2 = picker(Q2), pickQ3 = picker(Q3);
+
+  /* ------------------------------------------------------------ */
+  /* the stenographer's language                                    */
+  /* ------------------------------------------------------------ */
+  const INIT_INSTANT = [
+    'No pause at all before the first key. You came in already talking. Answers like this are packed the night before.',
+    'You began before the question had finished landing. I note this without judgment. I note everything without judgment. That is what makes it judgment.',
+    'Zero hesitation. Either the truth was standing by the door, or something else was wearing its coat.',
+    'The first key fell instantly. Rehearsed, or reflexive, or true — my shorthand has one symbol for all three, and it looks like a slammed door.',
+    'Not one beat of silence before you began. For the record: I had nothing to write down. I hate starting a page with nothing.'
+  ];
+  const INIT_SHORT = [
+    '{d}s before the first key. An ordinary breath — the small tax every answer pays at the border.',
+    '{d}s of nothing, then typing. The throat clearing itself. It barely counts. I wrote it down anyway.',
+    'A short silence, {d}s, before you began. The kind people don’t notice they’re taking. Those are my favorite kind.',
+    '{d}s — the pause of someone reading the question twice to be sure it wasn’t a trick. It wasn’t. This time.',
+    '{d}s before the first letter. Nothing remarkable. Even so: for {d} seconds, you and the question were alone together.'
+  ];
+  const INIT_MED = [
+    '{d} seconds before the first key. That is not reading time — the question was short. Something was being decided.',
+    '{d}s of stillness first. That pause has a shape I know: it is the answer arriving, and then the answer being dressed.',
+    'You waited {d} seconds to begin. In court they call it composing yourself. In here we call it what it is: choosing a version.',
+    '{d}s. A silence with furniture in it. You went somewhere else for part of it — the keys go quiet differently when you leave.',
+    '{d} seconds before anything. The honest answer knocked first. I heard it. Then someone else answered the door.'
+  ];
+  const INIT_LONG = [
+    '{d} seconds before the first keystroke. That is a real silence — the kind with a decision inside it. Whatever you typed after, this pause is the part I believe.',
+    '{d}s of nothing. For scale: entire apologies have been delivered in less time than you spent not starting.',
+    'You sat with it for {d} seconds. The question knew the answer’s address the whole time. It was waiting for you to admit you did too.',
+    '{d} seconds. Long enough that I set the pen down and looked up. You should know that almost never happens.'
+  ];
+  const INIT_VLONG = [
+    '{d} seconds before you began. I have transcribed confessions, verdicts, and one marriage proposal. This pause outlasted parts of all three.',
+    '{d}s. Around the ten-second mark a pause stops being hesitation and becomes a room you are living in. You furnished this one.',
+    '{d} seconds of silence to start. Whatever finally got typed was a survivor, not a first draft. The first draft is still in there, refusing to come out.'
+  ];
+
+  const MID_B1 = [
+    'a snag, the size of a doubt',
+    'a word weighed and found affordable',
+    'a flicker — something crossed the sentence and kept walking',
+    'small, but not nothing; nothing is smoother than that',
+    'a comma you didn’t type',
+    'the hand waiting on the mouth’s decision',
+    'barely a beat. I keep the barely ones too'
+  ];
+  const MID_B2 = [
+    'a swallowed word. they are always heavier going down',
+    'the sentence stopped here to check its exits',
+    'you looked away from the page here. the rhythm says so',
+    'a substitution happened in this gap — I’d stake the pen on it',
+    'the pause of a person deciding how much is enough',
+    'something true auditioned here and didn’t get the part',
+    'a held breath, mid-sentence. the sentence noticed'
+  ];
+  const MID_B3 = [
+    'a real silence. the sentence stood open like a door in winter while you decided who was coming through',
+    '{d} seconds inside a sentence is not thinking. it is negotiating',
+    'here the testimony left the room and came back wearing different clothes',
+    'this pause had a name in it. the name did not make the transcript. names rarely do',
+    'long enough to remember something. long enough to decide the record didn’t need it',
+    'the keys went so quiet I could hear the answer you weren’t typing'
+  ];
+  const MID_B4 = [
+    '{d} seconds, mid-answer. I have a symbol for pauses like this. it takes longer to draw than the pause takes to read, and it is worth it',
+    'an abyss, right here, with typing planted on both sides of it like hedges',
+    'whatever happened in these {d} seconds is the actual answer. what follows is the press release',
+    'the sentence waited so long it forgot what it was for. it remembered wrong. they usually do'
+  ];
+
+  const DEL_SMALL = [
+    '{n} struck — a letter reconsidered. even the small corrections testify',
+    '{n} struck. a typo, probably. I record “probably” in a special column',
+    '{n} withdrawn. grooming, not confession. noted anyway'
+  ];
+  const DEL_WORD = [
+    '{n} struck — about a word’s worth. the word had a door held open for it and everything',
+    '{n} characters taken back. withdrawn testimony is still testimony; it files under a different silence',
+    'a word went in, looked around, and was escorted out. {n} keys’ worth',
+    '{n} struck. the replacement was shorter. it is almost always shorter',
+    '{n} characters deleted here. I don’t keep what they said. I keep that they were said'
+  ];
+  const DEL_BIG = [
+    '{n} characters struck — a whole thought stood up, buttoned its coat, and left before it could be quoted',
+    '{n} struck. that was a sentence. it had a beginning, a middle, and a recipient',
+    'an entire passage withdrawn — {n} characters. the first draft is the deposition; the second is the settlement',
+    '{n} characters, gone. somewhere in the white of this page is a paragraph-shaped ghost, and it is the best writing you did tonight'
+  ];
+
+  const TRAIL_INSTANT = [
+    'Sent the instant the last key fell. No proofreading. Either confidence or escape; the exits look identical at speed.',
+    'You finished and fired in the same motion. The record admires the nerve and doubts the aim.',
+    'No pause before sending. Some answers you release. This one you dropped and walked away from.'
+  ];
+  const TRAIL_SHORT = [
+    '{d}s between the last key and sending. One read-through. Due diligence. The pen approves.',
+    'A {d}-second look before letting it go. Enough to catch typos. Not enough to catch anything else.'
+  ];
+  const TRAIL_MED = [
+    '{d} seconds you sat with the finished answer before sending it. Re-reading is what we call it. Rehearsing the consequences is what it is.',
+    'The answer was done for {d} seconds before you let it leave. It sat there like a letter at the mouth of a postbox. In the end you let go. People almost always let go.',
+    '{d}s of looking at what you’d written. Whatever you checked it against, it passed. Barely, I’d guess, from the wait.'
+  ];
+  const TRAIL_LONG = [
+    '{d} seconds between finishing and sending. That is not proofreading; that is standing at the door with your coat on. The answer went out anyway. They mostly do.',
+    'You held the finished answer for {d} seconds. Let the record show it was finished the whole time. Only the sending wasn’t.'
+  ];
+
+  const FLUENT = [
+    'No pauses over the line. No strikes. Start to finish, one clean pour. I am required to write “fluent” and permitted to think “prepared.”',
+    'The whole answer came out level, like something carried carefully a long way. Not one drop of silence spilled. You have carried this one before.',
+    'Nothing to transcribe between the words. Either this cost you nothing, or the costing was done years ago and this is the receipt.'
+  ];
+  const EMPTY_GLOSS = [
+    'You entered nothing into the record. For the whole {d} seconds, my pen never stopped. An empty answer is not a missing one — it is the only kind I can quote in full.',
+    'No words at all. Just {d} seconds of you, the question, and me. Of the three of us, the question blinked last.',
+    'Silence, complete: {d} seconds, signed by the send button. The most legible testimony of the night.'
+  ];
+  const EMPTY_QUICK = [
+    'You sent nothing, and you sent it immediately. Even refusals usually take a breath. This one had its coat on when I arrived.',
+    'Nothing, delivered at speed. A slammed drawer where an answer would go. I have transcribed slower slaps.',
+    'An instant blank. You didn’t decline the question; you returned it unopened. So noted, and underlined.'
+  ];
+  const PASTE_GLOSS = [
+    'Pasted, whole. The hesitation happened somewhere else, off the record, in another window. I got the body; the crime scene is elsewhere. The record resents this.',
+    'This answer arrived pre-assembled. Fine. But somewhere, at some earlier hour, you typed it the slow way — and whoever transcribed you then got the good part.'
+  ];
+
+  const PEN_LINES = [
+    '…the pen is moving',
+    '…she is writing this down',
+    '…this silence is being taken in shorthand',
+    '…still writing',
+    '…the nib has not lifted',
+    '…noted. and noted. and noted'
+  ];
+  const INTERSTITIAL = [
+    '— entered into the record —',
+    '— so noted —',
+    '— the pen catches up. next —',
+    '— filed. next —',
+    '— the ink is still wet. next —'
+  ];
+  const OATH_LINES = [
+    'for the record: you stood at the door {d}s before taking a silent oath',
+    'sworn in after {d}s of deciding whether to be sworn in. so noted',
+    'you read the terms for {d}s. or you were somewhere else. the pen can’t tell from here'
+  ];
+
+  const NOTE_OPEN = [
+    'The transcript is entered. A note before you go — off the record, which is to say, the truest part of it.',
+    'That concludes the taking of testimony. What follows is not in my job description, so it is the part worth reading.',
+    'The session is closed. The lamp stays on a moment longer for this.'
+  ];
+  const LONGEST_Q1 = [
+    'Interesting. The opening questions are not supposed to be the expensive ones. Whatever lived in that pause, it was not the question.',
+    'A breakfast-question silence of that size is never about breakfast. I have written this in the margin, where true things go.'
+  ];
+  const LONGEST_Q2 = [
+    'The middle question — the one about other people. It usually is.',
+    'The second question always costs the most in names. The pause is where the name was.'
+  ];
+  const LONGEST_Q3 = [
+    'That is the usual arrangement. The third question is built to cost more. You paid without haggling, which I respect.',
+    'The last question earned it honestly. Most people spend their longest silence there, standing where you stood.'
+  ];
+  const LONGEST_KIND_INITIAL = ' And it happened before you had typed a single character — the whole silence, spent at the threshold.';
+  const LONGEST_KIND_TRAIL = ' And it happened after the answer was already finished. You weren’t composing. You were deciding whether to let it leave.';
+  const ARC_GREW = [
+    'Your silences grew as the questions did. That is the sound of someone answering honestly at increasing altitude.',
+    'Each question bought a longer quiet than the last. Good. The alternative is a person who has stopped checking their answers against anything.'
+  ];
+  const ARC_SHRANK = [
+    'You hesitated less the deeper it went. Either the questions warmed you up, or you decided early how honest tonight would be, and stopped renegotiating.',
+    'The pauses thinned as the questions thickened. Somewhere before the end, you switched from weighing to reciting. I marked the spot.'
+  ];
+  const ARC_SPIKE = [
+    'The middle question stopped you longest, then the last one barely slowed you. Whatever the second one touched, the third had already been settled by it.',
+    'Your hesitation peaked in the middle and then fell away — the shape of a person who did the hard remembering early and coasted home on it.'
+  ];
+  const ARC_STEADY = [
+    'Your hesitation held steady across all three questions — a flat rate, as if silence were a toll you’d budgeted for in advance.',
+    'No arc to report: you paid each question the same measure of quiet. Even-handed, or guarded. The shorthand symbol is the same.'
+  ];
+  const STRIKES_NONE = [
+    'You struck nothing all night. Not one character taken back. I don’t know whether to file that under courage or under drafts written long before tonight.',
+    'Zero deletions across three answers. Everything you typed, you kept. Either you meant it all, or revision happens somewhere I can’t see — earlier, and in the dark.'
+  ];
+  const STRIKES_SOME = [
+    '{n} characters struck tonight, all told. Ordinary carpentry. Every finished sentence stands on a small pile of sawdust.',
+    'You took back {n} characters over the session. Nothing scandalous. The record notes only that taking back is also a way of saying.'
+  ];
+  const STRIKES_MANY = [
+    '{n} characters struck across three answers. The versions you deleted were, on average, more interesting. They always are. This is the tragedy of my profession.',
+    '{n} characters withdrawn tonight. At that volume it stops being correction and becomes a second testimony, given in reverse. I transcribed both.'
+  ];
+  const NO_SILENCE = [
+    'Your longest silence of the night was {d}s — barely a stumble. Three questions and not one made you stop. I will say what my colleagues won’t: nobody types that evenly for free.',
+    'Nothing tonight held you longer than {d}s. A frictionless witness. The record is clean, and I trust it the way I trust a hallway with no doors.'
+  ];
+  const SIGNOFF = [
+    'The words themselves are already gone — I never keep them; they were never the point. The pauses I keep. Somebody should.  — S.',
+    'Your words left the building the moment you did. The silences stay with me. They ask for so little, and they never revise.  — S.',
+    'I burn the words at dawn, per standing order. The pauses go in the drawer. On quiet nights I read them back, and they are never once untrue.  — S.'
+  ];
+
+  const DRAWERS_PAUSER = [
+    'Filed — drawer 11: answers that knew themselves and waited',
+    'Filed — drawer 4: testimony delivered at the speed of weighing',
+    'Filed — drawer 17: silences with furniture in them',
+    'Filed — drawer 23: the long-pause files, night shift'
+  ];
+  const DRAWERS_DELETER = [
+    'Filed — drawer 9: true on the first try, sent on the third',
+    'Filed — drawer 2: testimony, revised toward safety',
+    'Filed — drawer 21: the struck passages (annex)',
+    'Filed — drawer 12: answers with sawdust'
+  ];
+  const DRAWERS_FLUENT = [
+    'Filed — drawer 1: rehearsed or honest, no further sorting possible',
+    'Filed — drawer 6: clean pours',
+    'Filed — drawer 13: answers that arrived pre-grieved'
+  ];
+  const DRAWERS_EMPTY = [
+    'Filed — drawer 0: silences, complete',
+    'Filed — drawer 33: the unsaid, first person'
+  ];
+  const DRAWERS_MIXED = [
+    'Filed — drawer 8: ordinary hesitations, night shift',
+    'Filed — drawer 14: the usual human intervals',
+    'Filed — drawer 19: pending further silence',
+    'Filed — drawer 27: testimony, adequately paused'
+  ];
+
+  const gInitInstant = picker(INIT_INSTANT), gInitShort = picker(INIT_SHORT), gInitMed = picker(INIT_MED),
+        gInitLong = picker(INIT_LONG), gInitVlong = picker(INIT_VLONG),
+        gMid1 = picker(MID_B1), gMid2 = picker(MID_B2), gMid3 = picker(MID_B3), gMid4 = picker(MID_B4),
+        gDelS = picker(DEL_SMALL), gDelW = picker(DEL_WORD), gDelB = picker(DEL_BIG),
+        gTr0 = picker(TRAIL_INSTANT), gTr1 = picker(TRAIL_SHORT), gTr2 = picker(TRAIL_MED), gTr3 = picker(TRAIL_LONG),
+        gFluent = picker(FLUENT), gEmpty = picker(EMPTY_GLOSS), gEmptyQ = picker(EMPTY_QUICK), gPaste = picker(PASTE_GLOSS),
+        gPen = picker(PEN_LINES), gInter = picker(INTERSTITIAL), gOath = picker(OATH_LINES),
+        gOpen = picker(NOTE_OPEN), gLq1 = picker(LONGEST_Q1), gLq2 = picker(LONGEST_Q2), gLq3 = picker(LONGEST_Q3),
+        gGrew = picker(ARC_GREW), gShrank = picker(ARC_SHRANK), gSpike = picker(ARC_SPIKE), gSteady = picker(ARC_STEADY),
+        gS0 = picker(STRIKES_NONE), gS1 = picker(STRIKES_SOME), gS2 = picker(STRIKES_MANY),
+        gNoSil = picker(NO_SILENCE), gSign = picker(SIGNOFF),
+        gDrP = picker(DRAWERS_PAUSER), gDrD = picker(DRAWERS_DELETER), gDrF = picker(DRAWERS_FLUENT),
+        gDrE = picker(DRAWERS_EMPTY), gDrM = picker(DRAWERS_MIXED);
+
+  /* ------------------------------------------------------------ */
+  /* state + recording                                              */
+  /* ------------------------------------------------------------ */
+  const PAUSE_MS = 900;
+  const ta = $('answer');
+  const loadedAt = now();
+  let session = null;   // { qs, answers, idx, oathDelay }
+  let rec = null;       // per-question recorder
+  let penTimer = null;
+  let busy = false;     // interstitial lock
+
+  function startRec(){
+    rec = {
+      shownAt: now(), firstT: null, lastT: null,
+      initial: 0, pauses: [], strikes: [], curDel: null,
+      pasted: false
+    };
+    updateTally();
+  }
+
+  ta.addEventListener('beforeinput', function(e){
+    if (!rec || busy) return;
+    const t = now();
+    const type = e.inputType || '';
+    const caret = ta.selectionStart || 0;
+    const before = ta.value.slice(0, caret);
+    const trimmed = before.trim();
+    const wordsBefore = trimmed ? trimmed.split(/\s+/).length : 0;
+    const lastCh = before.slice(-1);
+    const midWord = !!lastCh && /\S/.test(lastCh);
+
+    if (type.indexOf('insertFromPaste') === 0 || type.indexOf('insertFromDrop') === 0) rec.pasted = true;
+
+    if (rec.firstT === null){
+      rec.firstT = t;
+      rec.initial = t - rec.shownAt;
+    } else {
+      const gap = t - rec.lastT;
+      if (gap >= PAUSE_MS){
+        const insSpace = type === 'insertText' && typeof e.data === 'string' && /^\s+$/.test(e.data);
+        const insBreak = type.indexOf('insertParagraph') === 0 || type.indexOf('insertLineBreak') === 0;
+        rec.pauses.push({ dur: gap, word: wordsBefore,
+          mid: midWord && type === 'insertText' && !insSpace && !insBreak });
+      }
+    }
+
+    const isDel = type.indexOf('delete') === 0;
+    if (isDel){
+      const span = Math.max(1, (ta.selectionEnd || 0) - (ta.selectionStart || 0) || 1);
+      if (rec.curDel && (t - rec.lastT) < 1600){
+        rec.curDel.n += span;
+      } else {
+        rec.curDel = { n: span, word: wordsBefore };
+        rec.strikes.push(rec.curDel);
+      }
+    } else {
+      rec.curDel = null;
+    }
+    rec.lastT = t;
+    updateTally();
+  });
+
+  function updateTally(){
+    if (!rec) return;
+    const struck = rec.strikes.reduce((s,c)=>s+c.n, 0);
+    $('tally').textContent = 'pauses ' + rec.pauses.length + ' · struck ' + struck + ' · words ignored: all';
+  }
+
+  /* live pen indicator: she writes only while you don't */
+  function penLoop(){
+    if (!rec || busy){ $('pen').classList.remove('on'); return; }
+    const t = now();
+    const idleSince = rec.lastT === null ? rec.shownAt : rec.lastT;
+    const idle = t - idleSince;
+    const focused = document.activeElement === ta;
+    const threshold = rec.lastT === null ? 2600 : 850;
+    const on = focused && idle > threshold;
+    const pen = $('pen');
+    if (on && !pen.classList.contains('on')){
+      $('pen-text').textContent = gPen();
+      pen.classList.add('on');
+    } else if (!on){
+      pen.classList.remove('on');
+    }
+  }
+
+  /* ------------------------------------------------------------ */
+  /* flow                                                           */
+  /* ------------------------------------------------------------ */
+  function newSession(){
+    const fromIntro = !session;
+    const oathDelay = fromIntro ? now() - loadedAt : 0;
+    session = {
+      qs: [
+        { q: pickQ1(), tier: 1 },
+        { q: pickQ2(), tier: 2 },
+        { q: pickQ3(), tier: 3 }
+      ],
+      answers: [], idx: 0
+    };
+    $('intro').style.display = 'none';
+    $('record').style.display = 'none';
+    $('exhibits').textContent = '';
+    $('session').style.display = 'block';
+    if (fromIntro && oathDelay > 6000){
+      $('oath-note').textContent = sub(gOath(), { d: fmt(oathDelay) });
+    } else {
+      $('oath-note').textContent = '';
+    }
+    showQuestion();
+    if (penTimer) clearInterval(penTimer);
+    penTimer = setInterval(penLoop, 300);
+  }
+
+  const COUNTS = ['one','two','three'];
+  function showQuestion(){
+    const i = session.idx;
+    $('q-num').textContent = 'question ' + COUNTS[i] + ' of three';
+    $('q-text').textContent = session.qs[i].q;
+    ta.value = '';
+    ta.disabled = false;
+    startRec();
+    ta.focus();
+  }
+
+  function submitAnswer(){
+    if (!rec || busy) return;
+    const t = now();
+    const val = ta.value;
+    const trimmed = val.trim();
+    const wordLens = trimmed ? trimmed.split(/\s+/).map(w => Math.min(w.length, 16)) : [];
+    const a = {
+      q: session.qs[session.idx].q,
+      tier: session.qs[session.idx].tier,
+      wordLens: wordLens,
+      chars: trimmed.length,
+      initial: rec.firstT === null ? 0 : rec.initial,
+      typed: rec.firstT !== null,
+      pauses: rec.pauses.slice(),
+      strikes: rec.strikes.filter(c => c.n > 0),
+      trailing: rec.lastT === null ? 0 : (t - rec.lastT),
+      total: t - rec.shownAt,
+      pasted: rec.pasted
+    };
+    session.answers.push(a);
+    rec = null;
+    $('pen').classList.remove('on');
+    ta.value = '';
+    ta.disabled = true;
+
+    session.idx++;
+    if (session.idx < 3){
+      busy = true;
+      const inter = $('interstitial');
+      inter.textContent = gInter();
+      inter.classList.add('on');
+      const delay = reduce ? 60 : 950;
+      setTimeout(function(){
+        inter.classList.remove('on');
+        busy = false;
+        showQuestion();
+      }, delay);
+    } else {
+      session.endedAt = now();
+      finishSession();
+    }
+  }
+
+  $('send-btn').addEventListener('click', submitAnswer);
+  ta.addEventListener('keydown', function(e){
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); submitAnswer(); }
+  });
+  $('oath-btn').addEventListener('click', newSession);
+  $('again-btn').addEventListener('click', newSession);
+
+  /* ------------------------------------------------------------ */
+  /* transcript rendering                                           */
+  /* ------------------------------------------------------------ */
+  function el(tag, cls, text){
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function initialGloss(a){
+    const d = fmt(a.initial), m = { d: d };
+    if (a.initial < 600)   return sub(gInitInstant(), m);
+    if (a.initial < 2000)  return sub(gInitShort(), m);
+    if (a.initial < 5000)  return sub(gInitMed(), m);
+    if (a.initial < 12000) return sub(gInitLong(), m);
+    return sub(gInitVlong(), m);
+  }
+  function midGloss(p){
+    const m = { d: fmt(p.dur) };
+    if (p.dur < 1600) return sub(gMid1(), m);
+    if (p.dur < 3000) return sub(gMid2(), m);
+    if (p.dur < 7000) return sub(gMid3(), m);
+    return sub(gMid4(), m);
+  }
+  function delGloss(c){
+    const m = { n: c.n };
+    if (c.n <= 3)  return sub(gDelS(), m);
+    if (c.n <= 12) return sub(gDelW(), m);
+    return sub(gDelB(), m);
+  }
+  function trailGloss(a){
+    const m = { d: fmt(a.trailing) };
+    if (a.trailing < 700)  return sub(gTr0(), m);
+    if (a.trailing < 2500) return sub(gTr1(), m);
+    if (a.trailing < 6000) return sub(gTr2(), m);
+    return sub(gTr3(), m);
+  }
+
+  function renderExhibit(a, i){
+    const ex = el('div', 'exhibit');
+    const label = el('div', 'ex-label');
+    label.appendChild(el('span', '', 'Exhibit ' + 'ABC'[i] + ' — question ' + COUNTS[i]));
+    const struck = a.strikes.reduce((s,c)=>s+c.n, 0);
+    label.appendChild(el('span', '',
+      a.wordLens.length + ' words (disregarded) · pauses kept ' + a.pauses.length + ' · struck ' + struck));
+    ex.appendChild(label);
+    ex.appendChild(el('div', 'ex-q', '“' + a.q + '”'));
+
+    const body = el('div', 'ex-body');
+
+    if (!a.wordLens.length){
+      body.appendChild(el('span', 'annot-line',
+        a.total < 3000 ? gEmptyQ() : sub(gEmpty(), { d: fmt(a.total) })));
+      ex.appendChild(body);
+      return ex;
+    }
+
+    /* opening annotation: the silence before the first key */
+    body.appendChild(el('span', 'annot-line', initialGloss(a)));
+    if (a.pasted) body.appendChild(el('span', 'annot-line struck', gPaste()));
+
+    /* choose annotations: up to 4 longest pauses, up to 3 largest strikes */
+    const nW = a.wordLens.length;
+    const pauses = a.pauses.slice().sort((x,y)=>y.dur-x.dur).slice(0,4);
+    const strikes = a.strikes.slice().sort((x,y)=>y.n-x.n).slice(0,3);
+    const inline = [];  // {anchor, node}
+    pauses.forEach(function(p){
+      const anchor = Math.max(0, Math.min(p.word, nW));
+      const wordRef = p.mid
+        ? 'inside the ' + ordinal(Math.max(1, Math.min(p.word, nW))) + ' word'
+        : 'before the ' + ordinal(Math.max(1, Math.min(p.word + 1, nW))) + ' word';
+      inline.push({ anchor: anchor,
+        node: el('span', 'annot', '[ ' + fmt(p.dur) + 's, ' + wordRef + ' — ' + midGloss(p) + ' ]') });
+    });
+    strikes.forEach(function(c){
+      const anchor = Math.max(0, Math.min(c.word + 1, nW));
+      inline.push({ anchor: anchor,
+        node: el('span', 'annot struck', '[ ' + delGloss(c) + ' ]') });
+    });
+    inline.sort((x,y)=>x.anchor-y.anchor);
+
+    /* redaction bars with annotations woven in */
+    let k = 0;
+    for (let w = 0; w <= nW; w++){
+      while (k < inline.length && inline[k].anchor === w){
+        body.appendChild(inline[k].node); k++;
+      }
+      if (w === nW) break;
+      const bar = el('span', 'bar');
+      bar.style.width = (Math.max(a.wordLens[w], 1) * 0.58).toFixed(2) + 'em';
+      bar.style.opacity = (0.75 + Math.random() * 0.25).toFixed(2);
+      body.appendChild(bar);
+    }
+    while (k < inline.length){ body.appendChild(inline[k].node); k++; }
+
+    /* fluency + trailing */
+    if (!a.pauses.length && !a.strikes.length && nW >= 4 && !a.pasted){
+      body.appendChild(el('span', 'annot-line', gFluent()));
+    }
+    body.appendChild(el('span', 'annot-line', trailGloss(a)));
+
+    ex.appendChild(body);
+    ex.appendChild(el('div', 'ex-stat',
+      'time in question: ' + fmt(a.total) + 's · time in words: less than you think'));
+    return ex;
+  }
+
+  /* ------------------------------------------------------------ */
+  /* the stenographer's note                                        */
+  /* ------------------------------------------------------------ */
+  function buildNote(answers){
+    const parts = [];
+    parts.push(gOpen());
+
+    /* longest silence across everything */
+    let best = null;
+    answers.forEach(function(a, i){
+      const consider = [];
+      if (a.typed) consider.push({ d: a.initial, kind: 'initial' });
+      a.pauses.forEach(p => consider.push({ d: p.dur, kind: 'mid' }));
+      if (a.typed && a.trailing > 0) consider.push({ d: a.trailing, kind: 'trail' });
+      if (!a.typed) consider.push({ d: a.total, kind: 'empty' });
+      consider.forEach(function(c){
+        if (!best || c.d > best.d) best = { d: c.d, kind: c.kind, qi: i, q: a.q };
+      });
+    });
+
+    if (!best || best.d < PAUSE_MS){
+      parts.push(sub(gNoSil(), { d: best ? fmt(best.d) : '0.0' }));
+    } else {
+      let line = 'Your longest silence tonight ran ' + fmt(best.d) + ' seconds, and it belongs to Question ' +
+        COUNTS[best.qi] + ' — “' + best.q + '”';
+      if (best.kind === 'initial') line += LONGEST_KIND_INITIAL;
+      else if (best.kind === 'trail') line += LONGEST_KIND_TRAIL;
+      else if (best.kind === 'empty') line += ' — to which you answered nothing at all, which answers it.';
+      line += ' ' + (best.qi === 0 ? gLq1() : best.qi === 1 ? gLq2() : gLq3());
+      parts.push(line);
+    }
+
+    /* arc of hesitation */
+    const totals = answers.map(a => a.initial + a.pauses.reduce((s,p)=>s+p.dur, 0));
+    const t1 = totals[0], t2 = totals[1], t3 = totals[2];
+    if (t3 > t1 * 1.5 + 500 && t3 >= t2) parts.push(gGrew());
+    else if (t1 > t3 * 1.5 + 500 && t1 >= t2) parts.push(gShrank());
+    else if (t2 > t1 + 400 && t2 > t3 + 400) parts.push(gSpike());
+    else parts.push(gSteady());
+
+    /* strikes */
+    const struck = answers.reduce((s,a)=>s + a.strikes.reduce((x,c)=>x+c.n,0), 0);
+    if (struck === 0) parts.push(gS0());
+    else if (struck < 25) parts.push(sub(gS1(), { n: struck }));
+    else parts.push(sub(gS2(), { n: struck }));
+
+    /* drawer */
+    const totalPause = totals.reduce((a,b)=>a+b, 0);
+    const emptyCount = answers.filter(a => !a.wordLens.length).length;
+    let drawer;
+    if (emptyCount >= 2) drawer = gDrE();
+    else if (struck >= 25 && struck * 120 > totalPause) drawer = gDrD();
+    else if (totalPause > 14000) drawer = gDrP();
+    else if (totalPause < 3500 && struck < 6) drawer = gDrF();
+    else drawer = gDrM();
+
+    return { parts: parts, drawer: drawer, signoff: gSign() };
+  }
+
+  function finishSession(){
+    $('session').style.display = 'none';
+    $('record').style.display = 'block';
+    if (penTimer){ clearInterval(penTimer); penTimer = null; }
+
+    const exWrap = $('exhibits');
+    exWrap.textContent = '';
+    const exhibits = session.answers.map(renderExhibit);
+    exhibits.forEach(ex => exWrap.appendChild(ex));
+
+    const note = buildNote(session.answers);
+    const nb = $('note-body');
+    nb.textContent = '';
+    note.parts.forEach(function(p){
+      const par = document.createElement('p');
+      par.textContent = p;
+      nb.appendChild(par);
+    });
+    $('stamp').textContent = note.drawer;
+    $('signoff').textContent = note.signoff;
+
+    const np = $('note-panel');
+    np.classList.remove('in');
+    exhibits.forEach(ex => ex.classList.remove('in'));
+    if (reduce){
+      exhibits.forEach(ex => ex.classList.add('in'));
+      np.classList.add('in');
+    } else {
+      exhibits.forEach(function(ex, i){
+        setTimeout(function(){ ex.classList.add('in'); }, 200 + i * 550);
+      });
+      setTimeout(function(){ np.classList.add('in'); }, 200 + exhibits.length * 550 + 300);
+    }
+    $('record').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }
+})();
+</script>
+</body>
+</html>

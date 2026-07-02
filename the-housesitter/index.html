@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Housesitter · Prízrak</title>
+<style>
+  :root{
+    --ink:#06090e; --ink-1:#090d13; --ink-2:#0d121a; --slate:#0b1018;
+    --bone:#e3e7ea; --bone-dim:#a9b2ba; --ash:#79828c; --ash-2:#525a63; --ash-3:#333941;
+    --rule:rgba(227,231,234,.08); --rule-2:rgba(227,231,234,.16);
+    --chalk:#a9bacb;
+    --lamp:#f0b26a;               /* the one light left on */
+    --lamp-glow:rgba(240,178,106,.5);
+    --dawn:#9fb6c9;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; line-height:1.5; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  /* street-dark + one distant lamp */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(50% 38% at 50% 30%, rgba(240,178,106,.05), transparent 70%),
+      radial-gradient(120% 90% at 50% 120%, rgba(10,14,20,.9), transparent 60%),
+      var(--ink);
+  }
+  /* film grain */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:6; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .porchlight{
+    position:fixed; left:50%; top:34%; width:min(120vw,900px); height:min(120vw,900px);
+    transform:translate(-50%,-50%); z-index:-1; pointer-events:none;
+    background:radial-gradient(circle at 50% 50%, rgba(240,178,106,.045), rgba(240,178,106,.015) 42%, transparent 68%);
+    animation:porch 8s ease-in-out infinite alternate;
+  }
+  @keyframes porch{ from{opacity:.7} to{opacity:1} }
+  ::selection{ background:rgba(240,178,106,.25); color:#fff; }
+
+  .wrap{ max-width:840px; margin:0 auto; padding:42px 18px 80px; min-height:100vh; display:flex; flex-direction:column; }
+  @media (min-width:640px){ .wrap{ padding:54px 28px 90px; } }
+
+  header{ text-align:center; }
+  .kicker{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.26em; font-size:10px; color:var(--ash-2); }
+  h1{
+    font-family:var(--serif); font-weight:700; font-size:clamp(1.9rem,6.4vw,3rem);
+    line-height:1.03; letter-spacing:-.01em; margin:12px 0 0;
+    text-shadow:0 0 30px rgba(240,178,106,.15);
+  }
+  h1 .em{ color:var(--lamp); font-style:italic; font-weight:500; }
+  .sub{
+    margin:16px auto 0; font-style:italic; font-size:14px; color:var(--bone-dim);
+    max-width:37rem; line-height:1.7;
+  }
+  .divider{ height:1px; max-width:36rem; margin:26px auto 22px; background:linear-gradient(90deg,transparent,var(--rule-2),transparent); }
+
+  .readout{
+    position:fixed; top:16px; right:18px; text-align:right; pointer-events:none; z-index:4;
+    font-family:var(--mono); font-size:9px; letter-spacing:.14em; color:var(--ash-3); line-height:1.8;
+    -webkit-user-select:none; user-select:none;
+  }
+  .readout .v{ color:var(--bone-dim); }
+  @media (max-width:640px){ .readout{ display:none; } }
+
+  /* ---- plan table ---- */
+  .plan-head{
+    display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+    max-width:760px; margin:0 auto 8px; width:100%;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ash-2);
+  }
+  #clock{ color:var(--lamp); text-shadow:0 0 14px var(--lamp-glow); font-size:11px; letter-spacing:.22em; }
+  .board{
+    position:relative; max-width:760px; margin:0 auto; width:100%;
+    border:1px solid var(--rule); border-radius:6px; background:var(--slate);
+    box-shadow:0 30px 60px -40px rgba(0,0,0,.9), inset 0 0 80px rgba(0,0,0,.5);
+    overflow:hidden;
+  }
+  canvas#plan{ display:block; width:100%; height:auto; touch-action:none; cursor:crosshair; }
+  canvas#plan.night{ cursor:default; }
+  #namer{
+    position:absolute; display:none; z-index:3; transform:translate(-50%,-50%);
+    background:rgba(9,13,19,.92); border:none; border-bottom:1px solid var(--rule-2); outline:none;
+    color:var(--bone); font-family:var(--serif); font-style:italic; font-size:15px; text-align:center;
+    padding:5px 8px 6px; width:170px; max-width:44vw; caret-color:var(--lamp); border-radius:3px;
+  }
+  #namer:focus{ border-bottom-color:var(--lamp); box-shadow:0 10px 26px -18px var(--lamp-glow); }
+  #namer::placeholder{ color:var(--ash-3); }
+
+  .hint{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; color:var(--ash-2);
+    text-align:center; margin-top:14px; line-height:2; min-height:2.4em;
+  }
+  .hint .k{ color:var(--bone-dim); }
+
+  .controls{ text-align:center; margin-top:18px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  button.ghost{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.22em; text-transform:uppercase;
+    background:transparent; color:var(--bone-dim); border:1px solid var(--rule-2); border-radius:3px;
+    padding:11px 20px 10px; cursor:pointer; transition:color .25s,border-color .25s,box-shadow .25s,opacity .25s;
+  }
+  button.ghost:hover:not(:disabled){ color:var(--lamp); border-color:var(--lamp); box-shadow:0 0 24px -8px var(--lamp-glow); }
+  button.ghost:disabled{ opacity:.32; cursor:default; }
+  button.ghost.primary{ color:var(--lamp); border-color:rgba(240,178,106,.5); }
+  button.ghost.primary:disabled{ color:var(--bone-dim); border-color:var(--rule-2); }
+  button.linky{
+    background:none; border:none; cursor:pointer; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--ash-2); padding:11px 4px 10px;
+    text-decoration:underline; text-underline-offset:4px; text-decoration-color:var(--ash-3);
+    transition:color .25s;
+  }
+  button.linky:hover{ color:var(--bone-dim); }
+  .fine{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.1em; color:var(--ash-3);
+    text-align:center; margin-top:20px;
+  }
+
+  /* ---- the report ---- */
+  #report{ max-width:640px; margin:34px auto 0; width:100%; display:none; }
+  .report-head{
+    font-family:var(--mono); font-size:10px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--ash); text-align:center; margin-bottom:4px;
+  }
+  .report-sub{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.14em; color:var(--ash-3);
+    text-align:center; margin-bottom:18px;
+  }
+  .row{
+    display:flex; gap:16px; padding:11px 2px 12px; border-bottom:1px solid var(--rule);
+    opacity:0; transform:translateY(6px); animation:landing .7s ease forwards;
+  }
+  @keyframes landing{ to{ opacity:1; transform:none; } }
+  .row .t{
+    font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--ash-2);
+    padding-top:4px; min-width:44px; text-align:right; flex:none;
+  }
+  .row.hour3 .t{ color:var(--lamp); text-shadow:0 0 12px var(--lamp-glow); }
+  .row .txt{ font-size:14.5px; line-height:1.7; color:var(--bone-dim); font-style:italic; }
+  .row.hour3 .txt{ color:var(--bone); }
+  .row.dawn .txt{ color:var(--dawn); }
+  .row.dawn .t{ color:var(--dawn); }
+  .signoff{
+    font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--ash-2); text-align:center; margin-top:22px; opacity:0; animation:landing .9s ease .4s forwards;
+  }
+  .after{ text-align:center; margin-top:26px; display:none; gap:14px; justify-content:center; flex-wrap:wrap; }
+
+  footer{
+    margin-top:auto; padding-top:56px; text-align:center;
+    font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--ash-3);
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .porchlight{ animation:none; }
+    .row{ animation-duration:.01s; }
+    .signoff{ animation-duration:.01s; animation-delay:0s; }
+  }
+</style>
+</head>
+<body>
+<div class="porchlight" aria-hidden="true"></div>
+<div class="readout" aria-hidden="true">
+  <div>SITTER ON DUTY · <span class="v">P.</span></div>
+  <div>NIGHTS KEPT · <span class="v" id="nightsKept">0</span></div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">Prízrak — overnight care for former addresses</div>
+    <h1>The <span class="em">Housesitter</span></h1>
+    <p class="sub">For the houses you can no longer enter — sold, demolished, left on the far side
+      of a border or a decade. Draw the floor plan from memory; wrong is fine, memory is the only
+      surviving architect. I'll stay the night. In the morning you'll know how it went.</p>
+    <div class="divider"></div>
+  </header>
+
+  <div class="plan-head">
+    <span id="planLabel">the plan · <span id="roomCount">0 rooms</span></span>
+    <span id="clock"></span>
+  </div>
+
+  <div class="board">
+    <canvas id="plan" width="760" height="470" aria-label="floor plan drawing surface"></canvas>
+    <input id="namer" type="text" maxlength="26" autocomplete="off" spellcheck="false" aria-label="name this room">
+  </div>
+
+  <p class="hint" id="hint"><span class="k">drag</span> to draw a room · <span class="k">click</span> a room to rename · <span class="k">×</span> to remove it</p>
+
+  <div class="controls" id="drawControls">
+    <button class="ghost primary" id="stayBtn" disabled>I'll stay the night</button>
+    <button class="linky" id="borrowBtn">no house? borrow mine</button>
+    <button class="linky" id="clearBtn">clear the plan</button>
+  </div>
+
+  <p class="fine" id="fine">no plan is stored or sent anywhere. it exists while the tab does — like the original.</p>
+
+  <section id="report" aria-live="polite">
+    <div class="report-head">morning report</div>
+    <div class="report-sub" id="reportSub"></div>
+    <div id="log"></div>
+    <div class="signoff" id="signoff" style="display:none">— p., housesitter · paid in full, as always, in nothing</div>
+    <div class="after" id="afterControls">
+      <button class="ghost primary" id="againBtn">another night</button>
+      <button class="ghost" id="redrawBtn">redraw the house</button>
+    </div>
+  </section>
+
+  <footer>prízrak · every plan you draw is load-bearing</footer>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ============================== canvas ============================== */
+  const W = 760, H = 470, GRID = 10, MINSZ = 46;
+  const cv = document.getElementById('plan');
+  const ctx = cv.getContext('2d');
+  let DPR = 1;
+  function fitCanvas(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    render();
+  }
+  window.addEventListener('resize', fitCanvas);
+
+  function evPos(e){
+    const r = cv.getBoundingClientRect();
+    return { x:(e.clientX - r.left) * (W / r.width), y:(e.clientY - r.top) * (H / r.height) };
+  }
+  function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+  /* ============================== state ============================== */
+  let rooms = [];           // {id,x,y,w,h,name,type,seed}
+  let nextId = 1;
+  let mode = 'draw';        // draw | night | dawn
+  let drag = null;          // {x0,y0,x1,y1}
+  let hoverRoom = null, hoverX = false;
+  let namingRoom = null, namingIsNew = false;
+  let nightsKept = 0;
+
+  const $ = id => document.getElementById(id);
+  const namer = $('namer'), hint = $('hint'), clockEl = $('clock');
+
+  /* ============================== room typing ============================== */
+  const TYPES = [
+    ['kitchen',   /kitchen|galley|cocina|kuchy/],
+    ['bathroom',  /bath|toilet|washroom|restroom|shower|\bwc\b|lavat/],
+    ['bedroom',   /bed\s?room|\bbed\b|master|boudoir/],
+    ['living',    /living|lounge|sitting|family room|\bden\b|\btv\b|front room|parlou?r|salon/],
+    ['dining',    /dining|dinner/],
+    ['hall',      /hall|corridor|landing|entry|entrance|foyer|vestibule|passage|mud\s?room/],
+    ['study',     /study|office|library|desk/],
+    ['attic',     /attic|loft|garret/],
+    ['basement',  /basement|cellar|crawl/],
+    ['garage',    /garage|carport|shed|workshop/],
+    ['porch',     /porch|veranda|balcon|patio|terrace|stoop|deck|conservator|sun\s?room/],
+    ['nursery',   /nursery|\bkid|child|playroom|baby/],
+    ['laundry',   /laundry|utility|boiler/],
+    ['closet',    /closet|wardrobe|pantry|larder|cupboard|storage|box room/],
+    ['stairs',    /stair|steps/],
+    ['personal',  /['’]s\s|['’]s$|\bmy\b|\bmom|\bmum|mother|\bdad\b|father|grand|nana|gran\b|granny|papa|sister|brother|uncle|aunt/]
+  ];
+  function classify(name){
+    const n = (name||'').toLowerCase();
+    for (const [t,re] of TYPES) if (re.test(n)) return t;
+    return 'generic';
+  }
+
+  /* ============================== writing pools ============================== */
+  const P = {
+  kitchen: [
+    r=>`checked ${r}. the fridge still hums in the same flat key. i didn't open it; some lights are private.`,
+    r=>`the tap in ${r} dripped twice, then thought better of it.`,
+    r=>`sat in ${r} with nothing switched on. the chairs still know how to face each other.`,
+    r=>`${r} smells faintly of every dinner at once. i cracked the window an inch, then felt bad and shut it.`,
+    r=>`found the drawer in ${r} that never opened right. it still doesn't. i left it winning.`,
+    r=>`boiled water in ${r} for no reason anyone could bill. the kettle performed for company. it's been a while.`,
+    r=>`the clock in ${r} is stopped at ten past something. right twice a day. i left it its record.`,
+    r=>`wiped one ring off the counter in ${r} and left the other. it looked load-bearing.`,
+    r=>`the linoleum in ${r} keeps the cold in the same two places. checked both in socks, for accuracy.`
+  ],
+  bathroom: [
+    r=>`ran the hot tap in ${r} until the mirror gave up on my reflection. old trick. still works.`,
+    r=>`the light in ${r} caught on the second flick, not the first. i was glad something so specific survived.`,
+    r=>`the pipes in ${r} cleared their throat at length. i let them finish. everyone deserves an audience once a night.`,
+    r=>`${r} is the coldest room, as is traditional. the tiles hold the exact temperature of getting up early.`,
+    r=>`checked under the sink in ${r}. the bucket for the leak is there — dry, hopeful, employed.`,
+    r=>`${r} mirror still holds everyone it ever held, in order. i stood slightly to the side, out of the queue.`
+  ],
+  bedroom: [
+    r=>`looked in on ${r}. the bed is made the way beds are made in memory: perfectly, once, forever.`,
+    r=>`the door of ${r} drifts open on its own. i let it. a door should keep its habits.`,
+    r=>`stood in ${r} and listened. a house holds its breath best in the rooms where people slept.`,
+    r=>`the window in ${r} still fogs in one corner, low and to the left, like always.`,
+    r=>`didn't sit on the bed in ${r}. that felt like a rule, so i followed it.`,
+    r=>`${r} has kept its dark warm. some rooms let their dark go cold. not this one.`,
+    r=>`a floorboard in ${r} announced me — same board, same note. i said sorry out of habit.`
+  ],
+  living: [
+    r=>`sat in ${r} in the blue light of a television that isn't there anymore. the walls remember the flicker; they did it for me a while.`,
+    r=>`the sofa in ${r} still has its sides. i took the wrong one, out of respect.`,
+    r=>`${r} holds evening better than any room in the house. i let it hold this one.`,
+    r=>`somebody's laughter is still in the corners of ${r}, down at the level dust settles. i didn't sweep.`,
+    r=>`the curtains in ${r} do their small breathing when the heating clicks. no heating tonight. they breathed anyway.`,
+    r=>`found the draught in ${r} — under the window, ankle-height, loyal.`
+  ],
+  dining: [
+    r=>`the table in ${r} seats everyone it ever seated, simultaneously, in the dark. i set no places. they're set.`,
+    r=>`chairs in ${r}: pushed in, except one. i pushed it in, then pulled it back out. it was more honest that way.`,
+    r=>`${r} keeps its sundays somewhere in the sideboard. around midnight i heard the cutlery settle, or agree.`,
+    r=>`stood where the head of the table would be in ${r}. no opinions on who sat there. professional neutrality.`
+  ],
+  hall: [
+    r=>`walked ${r} end to end. four steps. it was longer when it existed, and longer still now.`,
+    r=>`${r} worked all night at its one job: holding the rooms at the correct distance from one another.`,
+    r=>`hung my coat in ${r} so the house would know it had a guest, not an intruder.`,
+    r=>`the light in ${r} is the one you leave on. i left it on.`,
+    r=>`stood in ${r} where the phone used to ring. it rang once, decades off. some sounds never finish landing.`
+  ],
+  study: [
+    r=>`${r} smells like paper deciding to become dust. slow work. going well.`,
+    r=>`the lamp in ${r} throws the same yellow circle: the size of one person's evening, exactly.`,
+    r=>`read nothing in ${r}. some shelves are diaries with better posture.`,
+    r=>`the chair in ${r} still swivels toward the door when you stand up. i checked. it does.`
+  ],
+  attic: [
+    r=>`went up to ${r} with the good torch. the boxes are keeping their vows: sealed, labeled in a hand you'd know.`,
+    r=>`${r} ticks as it cools, counting something down, or up. hard to say which from inside it.`,
+    r=>`there's a draught in ${r} that comes from no window. i logged it as a draught. between us: it's a draught.`
+  ],
+  basement: [
+    r=>`checked ${r}. it is exactly as deep as remembered, which is deeper than it ever was.`,
+    r=>`${r} stores cold the way other rooms store furniture. did an inventory: complete.`,
+    r=>`something in ${r} drips once an hour, on the hour. punctual house.`
+  ],
+  garage: [
+    r=>`${r} still smells of oil and unfinished projects. both are load-bearing smells.`,
+    r=>`the jars of screws in ${r} have not resolved their differences. i sorted nothing. it isn't mine to sort.`,
+    r=>`${r} door tried its old trick with the runners. i know the lift-and-shove. we understood each other.`
+  ],
+  porch: [
+    r=>`stood out on ${r} a while. the street has changed its cars but kept its dogs, or their descendants.`,
+    r=>`the boards of ${r} hold the day's heat until about midnight. after that it's every plank for itself.`,
+    r=>`from ${r} you can see one lit window across the way. someone else's sitter, maybe. we don't wave. we nod.`
+  ],
+  nursery: [
+    r=>`${r} is the quietest room, the way a held bell is the loudest thing in a house.`,
+    r=>`the glow stars on the ceiling of ${r} still hold a faint charge. from what light, i couldn't tell you.`,
+    r=>`stepped over nothing in ${r}, carefully. old floors remember where the toys were.`
+  ],
+  laundry: [
+    r=>`the machine in ${r} is gone, but its patch of floor still leans into a spin cycle now and then.`,
+    r=>`${r} keeps its smell of clean better than most promises get kept.`
+  ],
+  closet: [
+    r=>`opened ${r} briefly, so it wouldn't feel skipped. darkness inside, folded neatly.`,
+    r=>`${r} exhales mothballs and a decade. i shut it gently, like closing a book on a pressed flower.`
+  ],
+  stairs: [
+    r=>`took ${r} at the true tempo: quick, third one skipped. the third one still braces for it.`,
+    r=>`sat on ${r} awhile — the seat of all long phone calls and at least half the arguments.`
+  ],
+  personal: [
+    r=>`spent a while in ${r}. touched nothing. the room did all the remembering; i just held the light for it.`,
+    r=>`the door of ${r} opens with the sound of asking permission. i asked. it let me in.`,
+    r=>`the air in ${r} is a held breath in a familiar chest. i tiptoed. there is no one to wake. tiptoed anyway.`,
+    r=>`left the light on in ${r} a full five minutes, in case anyone anywhere was looking for that exact window.`,
+    r=>`dusted nothing in ${r}. dust is the room's own handwriting, and it isn't finished with the sentence.`
+  ],
+  generic: [
+    r=>`checked ${r}. all quiet. the quiet is the furniture now, and it's fully furnished.`,
+    r=>`${r} still gets the streetlight at its old angle, printing the same window onto the same floor.`,
+    r=>`a moth found me in ${r}. one of us was surprised.`,
+    r=>`${r} creaked once as i left — a room clearing its throat to say something, then not saying it.`,
+    r=>`paced out ${r} without meaning to. memory had it one pace bigger. memory gets the square footage it needs.`,
+    r=>`dust lies in ${r} in drifts, like fallen light. i wrote nothing in it. it was tempting.`,
+    r=>`the radiator in ${r} clicked down through its cooling scales — a piano practicing without hands.`,
+    r=>`stood in the middle of ${r} and turned slowly all the way around, the way you do when leaving somewhere. or arriving.`,
+    r=>`the wallpaper in ${r} keeps its brighter rectangles where the pictures hung. an exhibition of older wall. admission free.`,
+    r=>`${r} smells like it always did. i couldn't name the smell, but it could name you.`,
+    r=>`something settled in ${r} — a beam, a bone of the house, easing itself down for the night.`,
+    r=>`the light switch in ${r} is exactly where a hand expects it. my hand knew. it isn't even my hand that learned.`,
+    r=>`sat on the floor of ${r} for a while. floors were always the honest furniture.`,
+    r=>`the window in ${r} rattles at exactly one kind of wind. that wind came by near midnight, briefly, like an old neighbor.`,
+    r=>`nothing to report in ${r} — which took twenty minutes to be sure of, done properly.`,
+    r=>`the corner of ${r} where the coats got piled at parties is still warm, in some accounting.`,
+    r=>`${r} held its dark like still water. i went in up to the knees, then all the way.`
+  ],
+  arrival: [
+    (n)=>`let myself in the old way. the key is the shape of remembering it. the house took a moment to place me, then did.`,
+    (n)=>`let myself in through the front door you drew. it stuck exactly where you remembered it sticking. good draftsmanship.`,
+    (n)=>`arrived just before full dark. the house was waiting where you left it — nowhere, and exactly here.`,
+    (n)=>`the key was under the memory of the mat. i locked the door behind me, so the night would know where it stood.`,
+    (n)=>`walked the whole plan once with the lights off, to learn it the house's way first.`,
+    (n)=>`came in quietly. a house that isn't there anymore startles easily.`,
+    (n)=>`first round done. counted the rooms: all ${n} present. none of them asked where you were, but every door was angled toward the question.`,
+    (n)=>`shoes off at the threshold. some houses insist, even from memory. this is one.`
+  ],
+  pair: [
+    (a,b)=>`light still travels from ${a} to ${b} under the doors — the old trade route. i followed it with the torch off.`,
+    (a,b)=>`stood where you can see ${a} from ${b}. whoever built this stood there once and decided it was fine. it was.`,
+    (a,b)=>`the draught runs from ${a} to ${b}, same as ever. i left them to their long conversation.`,
+    (a,b)=>`carried a cup from ${a} to ${b}, for the ceremony of it. the floor played every footstep's sound in the right order.`,
+    (a,b)=>`${a} and ${b} disagree by one degree, and always have. i measured. it's a house, not an argument i can settle.`
+  ],
+  smallhours: [
+    `every room brightened at once, for less than a second. the house checking its pockets. everything's there.`,
+    `the phone rang once. there is no phone. i let it go to wherever it goes.`,
+    `footsteps overhead, unbothered, familiar. logged as the house's own. some nights it likes to walk itself.`,
+    `the front door tested its own lock, politely. habit, not visitor. i said goodnight to it anyway.`,
+    `for a while the house was the size it is in your dreams, which is bigger. i sat still until it fit itself again.`,
+    `someone laughed two rooms away, in a year i couldn't pin down. a good laugh. it's in the walls' savings now.`,
+    `this is the hour when the house forgets it's gone. i keep this hour very carefully. it's most of why you hire me.`,
+    `a smell of toast, from no toaster. the house does small kindnesses at this hour. i accepted a slice. it was excellent.`,
+    `all the doors agreed on silence at the same moment. unanimous votes are rare in a house. noted with respect.`,
+    `heard my own name, in the voice a kettle makes. declined to answer. rule one of the profession.`,
+    `the windows all faced the same direction for a minute: out. i checked what they were watching. just the dark, doing fine.`
+  ],
+  dawn: [
+    `first light arrived and went room to room — my relief shift, an older firm than mine. i locked up and left the key where you know.`,
+    `morning found the house exactly where you left it: standing in you. same time tomorrow, if you want.`,
+    `dawn took the house back the way the tide takes a sandbar — no argument, no hurry. everything held all night. it always holds.`,
+    `turned off the last light, out of respect for the electric bill of memory. the house dimmed back into plan. all well.`,
+    `signed the book, put my chair back where i found it — nowhere — and let the walls go. they go easily. they come back the same way.`,
+    `the birds started: the ones outside these windows and the ones outside yours, same shift. house safe. night kept. you can sleep now; it's morning there.`,
+    `left everything as found, which is to say: exactly as remembered. that's the standard of the trade, and this house makes it easy.`
+  ]};
+
+  /* anti-repeat decks */
+  const decks = {};
+  function draw(pool){
+    let d = decks[pool];
+    const src = P[pool];
+    if (!d || d.i >= d.order.length){
+      const order = src.map((_,i)=>i);
+      for (let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+      if (d && src.length>1 && order[0]===d.last){ [order[0],order[1]]=[order[1],order[0]]; }
+      d = decks[pool] = { order, i:0, last:d?d.last:-1 };
+    }
+    const idx = d.order[d.i++]; d.last = idx;
+    return src[idx];
+  }
+
+  /* ============================== plan geometry ============================== */
+  function doorsList(){
+    const doors = [];
+    for (let i=0;i<rooms.length;i++) for (let j=i+1;j<rooms.length;j++){
+      const a=rooms[i], b=rooms[j];
+      // vertical shared edge
+      let pairs = [[a.x+a.w, b.x, a, b],[b.x+b.w, a.x, b, a]];
+      for (const [e1,e2] of pairs){
+        if (Math.abs(e1-e2) <= 6){
+          const y0=Math.max(a.y,b.y), y1=Math.min(a.y+a.h,b.y+b.h);
+          if (y1-y0 >= 34) doors.push({o:'v', x:(e1+e2)/2, c:(y0+y1)/2, gap:22});
+        }
+      }
+      pairs = [[a.y+a.h, b.y],[b.y+b.h, a.y]];
+      for (const [e1,e2] of pairs){
+        if (Math.abs(e1-e2) <= 6){
+          const x0=Math.max(a.x,b.x), x1=Math.min(a.x+a.w,b.x+b.w);
+          if (x1-x0 >= 34) doors.push({o:'h', y:(e1+e2)/2, c:(x0+x1)/2, gap:22});
+        }
+      }
+    }
+    // front door on the bottom-most room
+    if (rooms.length){
+      let fr = rooms[0];
+      for (const r of rooms) if (r.y+r.h > fr.y+fr.h) fr = r;
+      doors.push({o:'h', y:fr.y+fr.h, c:fr.x+fr.w/2, gap:26, front:true});
+    }
+    return doors;
+  }
+
+  function chalkLine(x1,y1,x2,y2,rng,alpha){
+    const len = Math.hypot(x2-x1,y2-y1); if (len < 2) return;
+    const n = Math.max(2, Math.round(len/26));
+    ctx.beginPath(); ctx.moveTo(x1,y1);
+    for (let k=1;k<n;k++){
+      const t=k/n, px=x1+(x2-x1)*t, py=y1+(y2-y1)*t;
+      const off=(rng()-0.5)*1.7, nx=-(y2-y1)/len, ny=(x2-x1)/len;
+      ctx.lineTo(px+nx*off, py+ny*off);
+    }
+    ctx.lineTo(x2,y2);
+    ctx.strokeStyle = `rgba(169,186,203,${alpha})`;
+    ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = `rgba(169,186,203,${alpha*0.22})`;
+    ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  function wallSegments(from,to,gaps){
+    // gaps: array of [c,gap] centers along the axis; returns [ [s,e], ... ]
+    const cuts = gaps.map(([c,g])=>[Math.max(from,c-g/2), Math.min(to,c+g/2)]).filter(g=>g[1]>g[0]).sort((p,q)=>p[0]-q[0]);
+    const segs=[]; let cur=from;
+    for (const [s,e] of cuts){ if (s>cur) segs.push([cur,s]); cur=Math.max(cur,e); }
+    if (cur<to) segs.push([cur,to]);
+    return segs;
+  }
+
+  function drawRoomWalls(r, doors, alpha){
+    const rng = mulberry32(r.seed);
+    const edges = [
+      {o:'h', y:r.y,      from:r.x, to:r.x+r.w},
+      {o:'h', y:r.y+r.h,  from:r.x, to:r.x+r.w},
+      {o:'v', x:r.x,      from:r.y, to:r.y+r.h},
+      {o:'v', x:r.x+r.w,  from:r.y, to:r.y+r.h}
+    ];
+    for (const e of edges){
+      const gaps=[];
+      for (const d of doors){
+        if (d.o!==e.o) continue;
+        if (e.o==='h' && Math.abs(d.y-e.y)<=4 && d.c>e.from+6 && d.c<e.to-6) gaps.push([d.c,d.gap]);
+        if (e.o==='v' && Math.abs(d.x-e.x)<=4 && d.c>e.from+6 && d.c<e.to-6) gaps.push([d.c,d.gap]);
+      }
+      for (const [s,t] of wallSegments(e.from,e.to,gaps)){
+        if (e.o==='h') chalkLine(s,e.y,t,e.y,rng,alpha); else chalkLine(e.x,s,e.x,t,rng,alpha);
+      }
+    }
+  }
+
+  function fitLabel(r){
+    let size = 13.5;
+    ctx.font = `italic ${size}px Georgia, 'Times New Roman', serif`;
+    let name = r.name || '';
+    while (size > 9 && ctx.measureText(name).width > r.w - 14){
+      size -= 0.5; ctx.font = `italic ${size}px Georgia, 'Times New Roman', serif`;
+    }
+    while (name.length > 2 && ctx.measureText(name).width > r.w - 12){ name = name.slice(0,-2); }
+    if (name !== r.name) name += '…';
+    return {name, size};
+  }
+
+  const LIGHT_COLORS = {
+    living:[150,185,255], bathroom:[210,222,238], nursery:[255,205,150],
+    basement:[190,200,180], attic:[230,205,160]
+  };
+  function lightColor(type){ return LIGHT_COLORS[type] || [240,178,106]; }
+
+  /* night rendering state */
+  let night = null; // {events, idx, lightRoom, lightAmt, sitter:{x,y,fx,fy,tx,ty,t0}, allPulse, dawnAmt}
+
+  function render(now){
+    ctx.clearRect(0,0,W,H);
+    // slate wash + vignette
+    const vg = ctx.createRadialGradient(W/2,H/2,80,W/2,H/2,W*0.72);
+    vg.addColorStop(0,'rgba(255,255,255,0.014)'); vg.addColorStop(1,'rgba(0,0,0,0.32)');
+    ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
+
+    const isNight = (mode==='night'||mode==='dawn');
+    const wallAlpha = isNight ? 0.5 : 0.82;
+    const doors = doorsList();
+
+    // room fills + hover
+    for (const r of rooms){
+      ctx.fillStyle = 'rgba(255,255,255,0.012)';
+      ctx.fillRect(r.x,r.y,r.w,r.h);
+      if (!isNight && hoverRoom===r){
+        ctx.fillStyle='rgba(169,186,203,0.045)';
+        ctx.fillRect(r.x,r.y,r.w,r.h);
+      }
+    }
+
+    // night lights (under walls)
+    if (night){
+      for (const r of rooms){
+        let amt = 0;
+        if (night.lightRoom===r.id) amt = night.lightAmt;
+        if (night.allPulse>0) amt = Math.max(amt, night.allPulse*0.5);
+        if (amt<=0.004) continue;
+        const type = r.type, col = lightColor(type);
+        let a = amt;
+        if (type==='living' && !reduce) a *= 0.78 + 0.22*Math.abs(Math.sin((now||0)/95) * Math.sin((now||0)/41));
+        const cx=r.x+r.w/2, cy=r.y+r.h/2, rad=Math.max(r.w,r.h)*0.75;
+        const g=ctx.createRadialGradient(cx,cy,4,cx,cy,rad);
+        g.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},${0.30*a})`);
+        g.addColorStop(0.6,`rgba(${col[0]},${col[1]},${col[2]},${0.12*a})`);
+        g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.save(); ctx.beginPath(); ctx.rect(r.x,r.y,r.w,r.h); ctx.clip();
+        ctx.fillStyle=g; ctx.fillRect(r.x-4,r.y-4,r.w+8,r.h+8); ctx.restore();
+        // spill under doors
+        ctx.fillStyle=`rgba(${col[0]},${col[1]},${col[2]},${0.10*a})`;
+        for (const d of doors){
+          if (d.front) continue;
+          if (d.o==='v' && Math.abs(d.x-(r.x+r.w))<5 && d.c>r.y&&d.c<r.y+r.h) ctx.fillRect(d.x-1,d.c-d.gap/2,6,d.gap);
+          if (d.o==='v' && Math.abs(d.x-r.x)<5 && d.c>r.y&&d.c<r.y+r.h) ctx.fillRect(d.x-5,d.c-d.gap/2,6,d.gap);
+          if (d.o==='h' && Math.abs(d.y-(r.y+r.h))<5 && d.c>r.x&&d.c<r.x+r.w) ctx.fillRect(d.c-d.gap/2,d.y-1,d.gap,6);
+          if (d.o==='h' && Math.abs(d.y-r.y)<5 && d.c>r.x&&d.c<r.x+r.w) ctx.fillRect(d.c-d.gap/2,d.y-5,d.gap,6);
+        }
+      }
+    }
+
+    // walls
+    for (const r of rooms) drawRoomWalls(r, doors, wallAlpha);
+
+    // door swing marks
+    ctx.strokeStyle = `rgba(169,186,203,${isNight?0.14:0.25})`;
+    ctx.lineWidth = 1;
+    for (const d of doors){
+      ctx.beginPath();
+      if (d.o==='v') ctx.arc(d.x, d.c-d.gap/2, d.gap*0.85, Math.PI*0.5, Math.PI*0.28, true);
+      else ctx.arc(d.c-d.gap/2, d.y, d.gap*0.85, 0, -Math.PI*0.22, true);
+      ctx.stroke();
+      if (d.front){
+        ctx.fillStyle='rgba(169,186,203,0.4)';
+        ctx.beginPath(); ctx.arc(d.c+d.gap/2-3, d.y, 1.6, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // labels
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for (const r of rooms){
+      if (namingRoom===r) continue;
+      const {name,size} = fitLabel(r);
+      ctx.font = `italic ${size}px Georgia, 'Times New Roman', serif`;
+      ctx.fillStyle = isNight ? 'rgba(205,216,228,0.42)' : 'rgba(205,216,228,0.72)';
+      ctx.fillText(name, r.x+r.w/2, r.y+r.h/2);
+    }
+
+    // delete × on hover
+    if (!isNight && hoverRoom && !drag){
+      const r=hoverRoom, x=r.x+r.w-11, y=r.y+11;
+      ctx.strokeStyle = hoverX ? 'rgba(240,178,106,0.95)' : 'rgba(169,186,203,0.5)';
+      ctx.lineWidth=1.3;
+      ctx.beginPath(); ctx.moveTo(x-3.5,y-3.5); ctx.lineTo(x+3.5,y+3.5);
+      ctx.moveTo(x+3.5,y-3.5); ctx.lineTo(x-3.5,y+3.5); ctx.stroke();
+    }
+
+    // live drag rect
+    if (drag){
+      const {x,y,w,h} = normRect(drag);
+      ctx.setLineDash([5,4]);
+      ctx.strokeStyle='rgba(240,178,106,0.65)'; ctx.lineWidth=1.2;
+      ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+    }
+
+    // sitter dot
+    if (night && night.sitter.vis>0.01){
+      const s=night.sitter;
+      ctx.save();
+      const g=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,16);
+      g.addColorStop(0,`rgba(240,178,106,${0.5*s.vis})`); g.addColorStop(1,'rgba(240,178,106,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(s.x,s.y,16,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=`rgba(255,226,180,${0.9*s.vis})`;
+      ctx.beginPath(); ctx.arc(s.x,s.y,2.1,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    // dawn wash
+    if (night && night.dawnAmt>0){
+      const a = night.dawnAmt;
+      const g = ctx.createLinearGradient(0,0,W,H*0.4);
+      g.addColorStop(0,`rgba(159,182,201,${0.10*a})`);
+      g.addColorStop(1,`rgba(159,182,201,${0.02*a})`);
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    }
+
+    // empty-state whisper
+    if (!rooms.length && !drag && mode==='draw'){
+      ctx.font = 'italic 14px Georgia, serif';
+      ctx.fillStyle = 'rgba(121,130,140,0.55)';
+      ctx.fillText('start anywhere. the kitchen is traditional.', W/2, H/2);
+    }
+  }
+
+  function normRect(d){
+    return { x:Math.min(d.x0,d.x1), y:Math.min(d.y0,d.y1), w:Math.abs(d.x1-d.x0), h:Math.abs(d.y1-d.y0) };
+  }
+  function roomAt(p){
+    for (let i=rooms.length-1;i>=0;i--){ const r=rooms[i];
+      if (p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h) return r; }
+    return null;
+  }
+  function overX(p,r){ return r && Math.abs(p.x-(r.x+r.w-11))<=8 && Math.abs(p.y-(r.y+11))<=8; }
+
+  /* ============================== drawing interactions ============================== */
+  let downAt=null, downRoom=null;
+  cv.addEventListener('pointerdown', e=>{
+    if (mode!=='draw' || namingRoom) { if(namingRoom) commitName(); return; }
+    const p=evPos(e); downAt=p; downRoom=roomAt(p);
+    if (downRoom && overX(p,downRoom)){
+      rooms = rooms.filter(r=>r!==downRoom);
+      downRoom=null; downAt=null; hoverRoom=null; updateCounts(); render();
+      return;
+    }
+    if (!downRoom){
+      drag={x0:p.x,y0:p.y,x1:p.x,y1:p.y};
+      cv.setPointerCapture(e.pointerId);
+    }
+  });
+  cv.addEventListener('pointermove', e=>{
+    const p=evPos(e);
+    if (drag){
+      drag.x1=Math.max(4,Math.min(W-4,p.x)); drag.y1=Math.max(4,Math.min(H-4,p.y));
+      render(); return;
+    }
+    if (mode==='draw'){
+      const r=roomAt(p);
+      const changed = (r!==hoverRoom) || (overX(p,r)!==hoverX);
+      hoverRoom=r; hoverX=overX(p,r);
+      cv.style.cursor = r ? (hoverX?'pointer':'text') : 'crosshair';
+      if (changed) render();
+    }
+  });
+  cv.addEventListener('pointerup', e=>{
+    if (mode!=='draw') return;
+    const p=evPos(e);
+    if (drag){
+      const r=normRect(drag); drag=null;
+      const moved = Math.hypot(p.x-downAt.x, p.y-downAt.y);
+      if (r.w>=MINSZ && r.h>=MINSZ){
+        const nr = {
+          id:nextId++,
+          x:Math.round(r.x/GRID)*GRID, y:Math.round(r.y/GRID)*GRID,
+          w:Math.max(MINSZ,Math.round(r.w/GRID)*GRID), h:Math.max(MINSZ,Math.round(r.h/GRID)*GRID),
+          name:'', type:'generic', seed:(Math.random()*1e9)|0
+        };
+        nr.x=Math.min(nr.x,W-nr.w-4); nr.y=Math.min(nr.y,H-nr.h-4);
+        rooms.push(nr); updateCounts(); openNamer(nr,true);
+      } else if (moved<6 && downRoom){
+        openNamer(downRoom,false);
+      }
+      render();
+    } else if (downRoom && downAt && Math.hypot(p.x-downAt.x,p.y-downAt.y)<6){
+      openNamer(downRoom,false);
+    }
+    downAt=null; downRoom=null;
+  });
+  cv.addEventListener('pointerleave', ()=>{ if(hoverRoom){hoverRoom=null;hoverX=false;render();} });
+  window.addEventListener('keydown', e=>{
+    if (e.key==='Escape' && drag){ drag=null; render(); }
+  });
+
+  const SUGGESTIONS = ['the kitchen','the hall','her room','the back bedroom','the good room','my room','the bathroom','the landing','dad’s study','the front room'];
+  let sugI = Math.floor(Math.random()*SUGGESTIONS.length);
+  function openNamer(room,isNew){
+    namingRoom=room; namingIsNew=isNew;
+    const rect=cv.getBoundingClientRect(), sx=rect.width/W, sy=rect.height/H;
+    namer.style.left=(room.x+room.w/2)*sx+'px';
+    namer.style.top=(room.y+room.h/2)*sy+'px';
+    namer.style.width=Math.min(200, Math.max(110, room.w*sx-16))+'px';
+    namer.value=room.name||'';
+    namer.placeholder=SUGGESTIONS[(sugI++)%SUGGESTIONS.length];
+    namer.style.display='block';
+    render();
+    requestAnimationFrame(()=>{ namer.focus(); namer.select(); });
+  }
+  function commitName(){
+    if (!namingRoom) return;
+    const v=namer.value.trim();
+    if (v){ namingRoom.name=v; }
+    else if (namingIsNew){ namingRoom.name='a room'; }
+    namingRoom.type=classify(namingRoom.name);
+    namer.style.display='none'; namingRoom=null; updateCounts(); render();
+  }
+  namer.addEventListener('keydown', e=>{
+    if (e.key==='Enter'){ e.preventDefault(); commitName(); }
+    if (e.key==='Escape'){
+      e.preventDefault();
+      if (namingIsNew && !namer.value.trim()){ rooms=rooms.filter(r=>r!==namingRoom); }
+      namer.style.display='none'; namingRoom=null; updateCounts(); render();
+    }
+  });
+  namer.addEventListener('blur', ()=>{ if(namingRoom) commitName(); });
+
+  function updateCounts(){
+    const n=rooms.length;
+    $('roomCount').textContent = n===1 ? '1 room' : n+' rooms';
+    $('stayBtn').disabled = n<2 || mode!=='draw';
+  }
+
+  /* ============================== borrowed houses ============================== */
+  const BORROWED = [
+    [ ['the kitchen',60,250,190,160],['the hall',250,250,110,160],['the front room',360,230,220,180],
+      ['the back bedroom',60,80,190,170],['my room',250,80,180,170],['the bathroom',430,80,120,150] ],
+    [ ['the kitchen',420,260,220,150],['the hall',300,120,120,290],['the good room',80,120,220,180],
+      ['gran’s room',420,90,180,170],['the landing',80,300,220,110],['the box room',600,90,90,170] ],
+    [ ['the front room',100,220,230,190],['the kitchen',330,290,180,120],['the stairs',330,220,180,70],
+      ['mum’s room',330,70,180,150],['my room',510,70,160,150],['the bathroom',510,220,160,120],
+      ['the cellar',100,110,150,110] ]
+  ];
+  $('borrowBtn').addEventListener('click', ()=>{
+    if (mode!=='draw') return;
+    const plan = BORROWED[Math.floor(Math.random()*BORROWED.length)];
+    rooms = plan.map(([name,x,y,w,h])=>({ id:nextId++, x,y,w,h, name, type:classify(name), seed:(Math.random()*1e9)|0 }));
+    updateCounts(); render();
+    setHint('a real house, this. i sat it for years. treat it as yours tonight.');
+  });
+  $('clearBtn').addEventListener('click', ()=>{
+    if (mode!=='draw') return;
+    rooms=[]; updateCounts(); render();
+    setHint('<span class="k">drag</span> to draw a room · <span class="k">click</span> a room to rename · <span class="k">×</span> to remove it', true);
+  });
+  function setHint(text, isHTML){
+    if (isHTML) hint.innerHTML=text; else hint.textContent=text;
+  }
+
+  /* ============================== the night ============================== */
+  function art(name){
+    const n=(name||'').trim();
+    if (!n) return 'the room';
+    if (/^(the|a|an|my|our|your|his|her|their|its|this|that)\b/i.test(n)) return n;
+    if (/^[^\s]+[’']s?\b/.test(n) && /[’']/.test(n.split(/\s/)[0])) return n;
+    return 'the '+n;
+  }
+  function two(n){ return (n<10?'0':'')+n; }
+  function fmtTime(min){ // minutes since 00:00, may exceed 1440
+    const m=((Math.round(min)%1440)+1440)%1440;
+    return two(Math.floor(m/60))+':'+two(m%60);
+  }
+  function jitter(a,b){ return a + Math.random()*(b-a); }
+
+  function buildNight(){
+    const evts=[];
+    const nRooms=rooms.length;
+    evts.push({ t:jitter(21*60+46, 21*60+59), kind:'arrival', text:draw('arrival')(nRooms) });
+
+    const order=rooms.slice();
+    for (let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+    const visits=order.slice(0,7);
+    const t0=22*60+8, t1=26*60+35; // 22:08 → 02:35
+    visits.forEach((r,i)=>{
+      const base=t0+(t1-t0)*(i+0.5)/visits.length;
+      const pool = P[r.type] ? r.type : 'generic';
+      // rooms sometimes get a generic line instead, for texture
+      const usePool = (pool!=='generic' && Math.random()<0.25) ? 'generic' : pool;
+      evts.push({ t:base+jitter(-14,14), kind:'visit', room:r.id, text:draw(usePool)(art(r.name)) });
+    });
+
+    if (nRooms>=2 && Math.random()<0.85){
+      const a=order[0], b=order[1%order.length];
+      evts.push({ t:jitter(24*60+40, 25*60+50), kind:'pair', room:b.id, text:draw('pair')(art(a.name),art(b.name)) });
+    }
+    evts.push({ t:jitter(27*60+2, 27*60+44), kind:'small', text:draw('smallhours') });
+    if (visits.length<5 && order.length){
+      const r=order[Math.floor(Math.random()*order.length)];
+      evts.push({ t:jitter(28*60+10, 29*60+5), kind:'visit', room:r.id, text:draw('generic')(art(r.name)) });
+    }
+    evts.push({ t:jitter(29*60+54, 30*60+14), kind:'dawn', text:draw('dawn') });
+    evts.sort((a,b)=>a.t-b.t);
+    return evts;
+  }
+
+  const EVENT_MS = 4600;
+  let rafId=null, nightStart=0;
+
+  function houseCenter(){
+    if (!rooms.length) return {x:W/2,y:H/2};
+    const hall=rooms.find(r=>r.type==='hall');
+    if (hall) return {x:hall.x+hall.w/2, y:hall.y+hall.h/2};
+    let x=0,y=0; for(const r of rooms){x+=r.x+r.w/2;y+=r.y+r.h/2;}
+    return {x:x/rooms.length, y:y/rooms.length};
+  }
+  function roomCenter(id){
+    const r=rooms.find(r=>r.id===id);
+    return r ? {x:r.x+r.w/2,y:r.y+r.h/2} : houseCenter();
+  }
+
+  function startNight(){
+    if (rooms.length<2 || mode!=='draw') return;
+    if (namingRoom) commitName();
+    mode='night'; cv.classList.add('night');
+    hoverRoom=null; drag=null;
+    $('stayBtn').disabled=true;
+    $('drawControls').style.display='none';
+    $('fine').style.display='none';
+    $('report').style.display='block';
+    $('log').textContent='';
+    $('signoff').style.display='none';
+    $('afterControls').style.display='none';
+    const houseN = rooms.length;
+    $('reportSub').textContent = `one night · ${houseN} rooms · nothing charged, nothing owed`;
+    setHint('the sitter is inside. you can watch, or look away — the report writes itself either way.');
+
+    night = {
+      events: buildNight(), idx:-1,
+      lightRoom:null, lightT0:0, lightAmt:0,
+      allPulse:0,
+      sitter:Object.assign({vis:0, fx:0, fy:0, tx:0, ty:0, t0:0}, houseCenter()),
+      dawnAmt:0, done:false
+    };
+    const hc=houseCenter();
+    night.sitter.x=hc.x; night.sitter.y=hc.y;
+    night.sitter.fx=hc.x; night.sitter.fy=hc.y; night.sitter.tx=hc.x; night.sitter.ty=hc.y;
+
+    if (reduce){ finishInstant(); return; }
+    nightStart=performance.now();
+    const stay=$('stayBtn');
+    stay.textContent='skip to morning'; stay.disabled=false; stay.style.display='';
+    $('drawControls').style.display='flex';
+    $('borrowBtn').style.display='none'; $('clearBtn').style.display='none';
+    rafId=requestAnimationFrame(tick);
+  }
+
+  function appendRow(ev){
+    const row=document.createElement('div');
+    row.className='row'+(ev.kind==='small'?' hour3':'')+(ev.kind==='dawn'?' dawn':'');
+    const t=document.createElement('span'); t.className='t'; t.textContent=fmtTime(ev.t);
+    const x=document.createElement('span'); x.className='txt'; x.textContent=ev.text;
+    row.appendChild(t); row.appendChild(x);
+    $('log').appendChild(row);
+  }
+
+  function fireEvent(i, now){
+    const ev=night.events[i];
+    appendRow(ev);
+    if (ev.kind==='visit'||ev.kind==='pair'){
+      night.lightRoom=ev.room; night.lightT0=now;
+      const c=roomCenter(ev.room);
+      night.sitter.fx=night.sitter.x; night.sitter.fy=night.sitter.y;
+      night.sitter.tx=c.x; night.sitter.ty=c.y; night.sitter.t0=now;
+    } else {
+      night.lightRoom=null;
+      const c=houseCenter();
+      night.sitter.fx=night.sitter.x; night.sitter.fy=night.sitter.y;
+      night.sitter.tx=c.x; night.sitter.ty=c.y; night.sitter.t0=now;
+      if (ev.kind==='small') night.pulseT0=now;
+      if (ev.kind==='dawn') night.dawnT0=now;
+    }
+  }
+
+  function easeInOut(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+
+  function tick(now){
+    const el=now-nightStart;
+    const N=night.events.length;
+    const idx=Math.min(N-1, Math.floor(el/EVENT_MS));
+    while (night.idx<idx){ night.idx++; fireEvent(night.idx, now); }
+
+    // clock: interpolate between event times
+    const ev=night.events[night.idx], nxt=night.events[night.idx+1];
+    let tmin;
+    if (night.idx<0){ tmin=21*60+40; }
+    else if (nxt){
+      const p=Math.min(1,(el-night.idx*EVENT_MS)/EVENT_MS);
+      tmin=ev.t+(nxt.t-ev.t)*p;
+    } else tmin=ev.t;
+    clockEl.textContent=fmtTime(tmin);
+
+    // light envelope
+    if (night.lightRoom!=null){
+      const a=Math.min(1,(now-night.lightT0)/700);
+      night.lightAmt=a;
+    } else night.lightAmt=Math.max(0,night.lightAmt-0.03);
+
+    // small-hours pulse
+    if (night.pulseT0){
+      const p=(now-night.pulseT0)/1400;
+      night.allPulse = p<1 ? Math.sin(Math.min(1,p)*Math.PI)*0.8 : 0;
+      if (p>=1) night.pulseT0=0;
+    }
+
+    // sitter
+    const s=night.sitter;
+    s.vis=Math.min(1,s.vis+0.02);
+    const mt=Math.min(1,(now-s.t0)/1500);
+    const k=easeInOut(mt);
+    s.x=s.fx+(s.tx-s.fx)*k; s.y=s.fy+(s.ty-s.fy)*k;
+    s.y+=Math.sin(now/900)*0.6;
+
+    // dawn
+    if (night.dawnT0){
+      night.dawnAmt=Math.min(1,(now-night.dawnT0)/2600);
+      s.vis=Math.max(0,1-(now-night.dawnT0)/2000);
+    }
+
+    render(now);
+
+    if (night.idx>=N-1 && (!night.dawnT0 || now-night.dawnT0>2800)){
+      endNight(); return;
+    }
+    rafId=requestAnimationFrame(tick);
+  }
+
+  function skipToMorning(){
+    if (!night || mode!=='night') return;
+    if (rafId){ cancelAnimationFrame(rafId); rafId=null; }
+    for (let i=night.idx+1;i<night.events.length;i++) appendRow(night.events[i]);
+    night.idx=night.events.length-1;
+    finishState();
+  }
+  function finishInstant(){
+    for (const ev of night.events) appendRow(ev);
+    night.idx=night.events.length-1;
+    finishState();
+  }
+  function finishState(){
+    night.lightRoom=null; night.lightAmt=0; night.allPulse=0;
+    night.sitter.vis=0; night.dawnAmt=1; night.done=true;
+    clockEl.textContent=fmtTime(night.events[night.events.length-1].t);
+    render();
+    endNight();
+  }
+  function endNight(){
+    if (rafId){ cancelAnimationFrame(rafId); rafId=null; }
+    mode='dawn';
+    if (night && !night.done){ night.dawnAmt=1; night.sitter.vis=0; night.done=true; render(); }
+    nightsKept++; $('nightsKept').textContent=String(nightsKept);
+    $('drawControls').style.display='none';
+    $('signoff').style.display='block';
+    $('afterControls').style.display='flex';
+    setHint('the house is back in your keeping. it travels well. it weighs what a drawing weighs.');
+    const stay=$('stayBtn'); stay.textContent='I’ll stay the night';
+  }
+
+  $('stayBtn').addEventListener('click', ()=>{
+    if (mode==='draw') startNight();
+    else if (mode==='night') skipToMorning();
+  });
+  $('againBtn').addEventListener('click', ()=>{
+    if (mode!=='dawn') return;
+    mode='draw'; night=null; cv.classList.remove('night');
+    clockEl.textContent='';
+    $('report').style.display='none';
+    startNight();
+  });
+  $('redrawBtn').addEventListener('click', ()=>{
+    mode='draw'; night=null; cv.classList.remove('night');
+    clockEl.textContent='';
+    $('report').style.display='none';
+    $('drawControls').style.display='flex';
+    $('borrowBtn').style.display=''; $('clearBtn').style.display='';
+    $('fine').style.display='';
+    updateCounts();
+    setHint('<span class="k">drag</span> to draw a room · <span class="k">click</span> a room to rename · <span class="k">×</span> to remove it', true);
+    render();
+  });
+
+  /* ============================== boot ============================== */
+  updateCounts();
+  fitCanvas();
+})();
+</script>
+</body>
+</html>
