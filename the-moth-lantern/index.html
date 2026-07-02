@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Moth Lantern · Prízrak</title>
+<style>
+  :root{
+    --ink:#04050a; --ink-1:#070810; --ink-2:#0b0d16; --ink-3:#111420;
+    --bone:#e8ddc8; --bone-dim:#b3a488; --ash:#7d715c; --ash-2:#4e463a; --ash-3:#302b24;
+    --rule:rgba(232,215,180,.08); --rule-2:rgba(232,215,180,.16);
+    --ember:#ffc46b; --ember-glow:#ff9d3c;
+    --vio:#b79cff;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased;
+    position:fixed; inset:0;
+  }
+  /* faint grain over everything */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:6; pointer-events:none; opacity:.04; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  #night{ position:fixed; inset:0; z-index:1; display:block; cursor:grab; touch-action:none; }
+  #night.dragging{ cursor:grabbing; }
+
+  .frame{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+
+  header{
+    position:absolute; top:0; left:0; right:0; padding:26px 26px 0; text-align:center;
+    -webkit-user-select:none; user-select:none;
+  }
+  .kicker{
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:.26em;
+    font-size:9.5px; color:var(--ash-2);
+  }
+  h1{
+    font-family:var(--serif); font-weight:700; font-size:clamp(1.6rem,5.2vw,2.7rem);
+    line-height:1.04; letter-spacing:.005em; margin:9px 0 0; color:var(--bone);
+    text-shadow:0 0 26px rgba(255,157,60,.25);
+  }
+  h1 .em{ color:var(--ember); font-style:italic; font-weight:500; }
+  .sub{
+    margin:11px auto 0; font-style:italic; font-size:13px; color:var(--bone-dim);
+    max-width:31rem; line-height:1.6; opacity:.8;
+  }
+  ::selection{ background:rgba(255,196,107,.25); color:#fff; }
+
+  .whisper{
+    position:absolute; top:26px; left:26px; pointer-events:none; text-align:left;
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+    color:var(--ember); text-shadow:0 0 14px rgba(255,157,60,.45);
+    opacity:.75; transition:opacity .8s ease; max-width:220px; line-height:1.7;
+    -webkit-user-select:none; user-select:none;
+  }
+  .readout{
+    position:absolute; top:26px; right:26px; text-align:right; pointer-events:none;
+    font-family:var(--mono); font-size:9px; letter-spacing:.14em; color:var(--ash-3);
+    -webkit-user-select:none; user-select:none; line-height:1.7;
+  }
+  .readout .v{ color:var(--bone-dim); }
+
+  .hint{
+    position:absolute; left:0; right:0; bottom:82px; text-align:center; pointer-events:none;
+    font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--ash-2);
+    -webkit-user-select:none; user-select:none; transition:opacity .9s ease;
+  }
+
+  .dock{
+    position:absolute; left:50%; bottom:22px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center;
+    padding:11px 16px; border-radius:12px; pointer-events:auto;
+    background:rgba(10,9,14,.55); backdrop-filter:blur(9px);
+    border:1px solid var(--rule-2);
+    box-shadow:0 18px 50px -26px rgba(0,0,0,.9), inset 0 0 0 1px rgba(232,215,180,.03);
+    max-width:calc(100vw - 24px);
+  }
+  .ctl{ display:flex; align-items:center; gap:9px; }
+  .ctl label{
+    font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.16em;
+    color:var(--ash); white-space:nowrap;
+  }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:96px; height:2px;
+    background:var(--rule-2); border-radius:2px; cursor:pointer; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:12px; height:12px; border-radius:50%;
+    background:var(--ember); box-shadow:0 0 10px rgba(255,157,60,.7); transition:transform .12s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{ transform:scale(1.2); }
+  input[type=range]::-moz-range-thumb{
+    width:12px; height:12px; border:none; border-radius:50%;
+    background:var(--ember); box-shadow:0 0 10px rgba(255,157,60,.7); cursor:pointer;
+  }
+  .btn{
+    font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.16em;
+    padding:9px 14px; background:rgba(16,13,10,.7); border:1px solid var(--rule-2);
+    border-radius:7px; color:var(--bone-dim); cursor:pointer;
+    transition:border-color .18s, color .18s, background .18s, transform .1s;
+    display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+  }
+  .btn:hover{ border-color:var(--ember); color:var(--bone); background:rgba(28,22,14,.8); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.done{ border-color:var(--ember); color:var(--ember); }
+  .div{ width:1px; height:22px; background:var(--rule-2); }
+
+  .toast{
+    position:fixed; left:50%; bottom:92px; transform:translateX(-50%) translateY(14px);
+    background:var(--ink-3); border:1px solid var(--rule-2); color:var(--bone);
+    font-family:var(--mono); font-size:10.5px; padding:10px 15px; border-radius:8px;
+    opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:9;
+    box-shadow:0 12px 34px -12px rgba(0,0,0,.85); letter-spacing:.05em; max-width:88vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (max-width:600px){
+    input[type=range]{ width:70px; }
+    .sub{ display:none; }
+    .whisper{ display:none; }
+    .dock{ gap:11px; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .whisper,.hint{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="night" aria-label="A single lantern in a great dark, orbited by a generative swarm of moths. Drag the lantern; dim or brighten the flame."></canvas>
+
+  <div class="frame">
+    <header>
+      <div class="kicker">Prízrak — an instrument of light</div>
+      <h1>The Moth <span class="em">Lantern</span></h1>
+      <p class="sub">One flame against a great dark, and every small wing that cannot help loving it. Carry the light — the whole weather of wings will follow.</p>
+    </header>
+
+    <div class="whisper" id="whisper">the flame keeps its own weather</div>
+
+    <div class="readout">
+      <div>wings&nbsp;&nbsp;&nbsp; <span class="v" id="r-w">0</span></div>
+      <div>at rest&nbsp; <span class="v" id="r-r">0</span></div>
+      <div>lost&nbsp;&nbsp;&nbsp;&nbsp; <span class="v" id="r-l">0</span></div>
+    </div>
+
+    <div class="hint" id="hint">drag the lantern · dim the flame and the dark takes them</div>
+
+    <div class="dock">
+      <div class="ctl">
+        <label for="flame">flame</label>
+        <input id="flame" type="range" min="0" max="100" value="62" aria-label="flame — brightness of the lantern">
+      </div>
+      <div class="ctl">
+        <label for="swarm">swarm</label>
+        <input id="swarm" type="range" min="40" max="220" value="140" aria-label="swarm — how many moths">
+      </div>
+      <div class="div"></div>
+      <button class="btn" id="new-btn" type="button">✶ new night</button>
+      <button class="btn" id="save-btn" type="button">⤓ keep frame</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+(function(){
+  const TAU = Math.PI * 2;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const canvas = document.getElementById('night');
+  const ctx = canvas.getContext('2d', { alpha:false });
+
+  /* ------------------------------------------------------------------ */
+  /* sizing — DPR-aware, buffer-capped                                   */
+  /* ------------------------------------------------------------------ */
+  let W = 0, H = 0, DPR = 1;
+  let trail = null, trailCtx = null;
+
+  function computeSize(){
+    W = Math.max(320, window.innerWidth);
+    H = Math.max(320, window.innerHeight);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    // cap total device pixels so buffers never get huge
+    const MAXPX = 4.4e6;
+    if (W * H * DPR * DPR > MAXPX) DPR = Math.max(1, Math.sqrt(MAXPX / (W * H)));
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    trail = document.createElement('canvas');
+    trail.width = canvas.width;
+    trail.height = canvas.height;
+    trailCtx = trail.getContext('2d');
+    trailCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* helpers                                                             */
+  /* ------------------------------------------------------------------ */
+  const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+  const angDiff = a => Math.atan2(Math.sin(a), Math.cos(a));
+
+  /* ------------------------------------------------------------------ */
+  /* state                                                               */
+  /* ------------------------------------------------------------------ */
+  const GLASS = 23;                       // lantern glass radius, css px
+  const params = { flame:62, swarm:140 };
+
+  const lantern = { x:0, y:0, vx:0, vy:0, tilt:0, grabbed:false, gdx:0, gdy:0 };
+  const pointer = { x:-1, y:-1, active:false, moved:false };
+
+  const ORBIT = 0, STUN = 1, REST = 2, LOST = 3;
+  let moths = [];
+  let nameless = null;                    // the one that is not a moth
+  let dust = [];
+  let ripples = [];                       // pointer gust feedback
+  let flamePhase = [Math.random()*TAU, Math.random()*TAU, Math.random()*TAU];
+  let simT = Math.random() * 100;         // desynchronise every run
+  let raf = 0, lastT = 0, visible = true;
+
+  function brightness(){ return params.flame / 100; }
+  function glowRadius(){
+    const b = brightness();
+    if (b <= 0.01) return 0;
+    return 55 + b * (Math.min(W, H) * 0.55 + 130);
+  }
+  function flick(t){
+    // candle flicker: layered incommensurate sines, 0.72 .. 1
+    return 0.72 + 0.28 * (0.5 + 0.5 * (
+      Math.sin(t*11.3 + flamePhase[0]) * 0.55 +
+      Math.sin(t*5.7  + flamePhase[1]) * 0.30 +
+      Math.sin(t*19.1 + flamePhase[2]) * 0.15));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* population                                                          */
+  /* ------------------------------------------------------------------ */
+  function baseMoth(){
+    return {
+      x:0, y:0, px:0, py:0,
+      heading: Math.random()*TAU,
+      baseSpeed: 68 + Math.random()*95,
+      speed: 80,
+      phi0: 1.06 + Math.random()*0.36,       // transverse angle 61°–81° (spiral capture)
+      side: Math.random() < 0.5 ? -1 : 1,
+      turn: 3.1 + Math.random()*3.5,
+      wf: 0.6 + Math.random()*1.8,
+      wp: Math.random()*TAU,
+      wing: Math.random()*TAU,
+      size: 1.9 + Math.random()*1.9,
+      shade: Math.random(),
+      state: ORBIT, t: 0,
+      vx:0, vy:0, spin:0, restAng:0,
+      relR: Math.pow(Math.random(), 0.65),   // used by the reduced-motion still
+      relA: Math.random()*TAU
+    };
+  }
+  function edgePlace(m){
+    const side = (Math.random()*4) | 0;
+    const t = Math.random();
+    if (side === 0){ m.x = t*W;  m.y = 24; }
+    else if (side === 1){ m.x = t*W; m.y = H-24; }
+    else if (side === 2){ m.x = 24;  m.y = t*H; }
+    else { m.x = W-24; m.y = t*H; }
+    m.state = LOST;
+  }
+  function makeMoth(mode){
+    const m = baseMoth();
+    const cap = glowRadius();
+    if (mode === 'edge' || cap <= 0){
+      edgePlace(m);
+    } else {
+      const r = GLASS*2.2 + m.relR * Math.max(40, cap*0.92 - GLASS*2.2);
+      const a = m.relA;
+      m.x = lantern.x + Math.cos(a)*r;
+      m.y = lantern.y + Math.sin(a)*r;
+      m.heading = a + m.side * Math.PI/2;
+    }
+    m.px = m.x; m.py = m.y;
+    return m;
+  }
+  function makeNameless(){
+    return {
+      x: W * (0.15 + Math.random()*0.7), y: H * 0.85,
+      heading: -Math.PI/2, wing: Math.random()*TAU,
+      a: Math.random()*TAU, a0: Math.random()*TAU,
+      dir: Math.random() < 0.5 ? -1 : 1,
+      freeze: 0, size: 3.1
+    };
+  }
+  function buildSwarm(){
+    moths = [];
+    for (let i = 0; i < params.swarm; i++){
+      moths.push(makeMoth(Math.random() < 0.14 ? 'edge' : 'ring'));
+    }
+    nameless = makeNameless();
+    dust = [];
+    const nd = 46;
+    for (let i = 0; i < nd; i++){
+      dust.push({
+        x: Math.random()*W, y: Math.random()*H,
+        vx: (Math.random()-0.5)*7, vy: (Math.random()-0.5)*7 - 2,
+        r: 0.5 + Math.random()*1.1, tw: Math.random()*TAU
+      });
+    }
+    flamePhase = [Math.random()*TAU, Math.random()*TAU, Math.random()*TAU];
+  }
+  function adjustPopulation(target){
+    while (moths.length < target) moths.push(makeMoth('edge'));
+    while (moths.length > target) moths.splice((Math.random()*moths.length)|0, 1);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* simulation                                                          */
+  /* ------------------------------------------------------------------ */
+  function stepLantern(dt){
+    const px = lantern.x, py = lantern.y;
+    if (lantern.grabbed && pointer.active){
+      const tx = clamp(pointer.x + lantern.gdx, GLASS+8, W-GLASS-8);
+      const ty = clamp(pointer.y + lantern.gdy, GLASS*2.4, H-GLASS-10);
+      const k = 1 - Math.exp(-dt*14);
+      lantern.x += (tx - lantern.x)*k;
+      lantern.y += (ty - lantern.y)*k;
+    }
+    lantern.vx = (lantern.x - px) / Math.max(dt, 0.001);
+    lantern.vy = (lantern.y - py) / Math.max(dt, 0.001);
+    const tt = clamp(-lantern.vx*0.0011, -0.5, 0.5);
+    lantern.tilt += (tt - lantern.tilt) * (1 - Math.exp(-dt*6));
+  }
+
+  function updateMoth(m, dt, cap){
+    m.px = m.x; m.py = m.y;
+    const dx = lantern.x - m.x, dy = lantern.y - m.y;
+    const d = Math.hypot(dx, dy) || 0.0001;
+    const toL = Math.atan2(dy, dx);
+
+    if (m.state === ORBIT && (cap <= 0 || d > cap*1.25)){
+      m.state = LOST;
+    }
+
+    switch (m.state){
+      case ORBIT: {
+        // transverse-orientation phototaxis: hold a fixed angle to the light.
+        // far out the angle is < 90° (logarithmic spiral inward); close in it
+        // relaxes toward ~95° so they orbit tight, overshoot, and graze the glass.
+        const near = clamp(d / Math.max(cap*0.9, 1), 0, 1);   // 0 close .. 1 far
+        const phi = Math.PI*0.53 + (m.phi0 - Math.PI*0.53) * near;
+        let desired = toL + m.side * phi;
+        desired += Math.sin(simT * m.wf + m.wp) * 0.55;
+        const maxT = m.turn * dt;
+        m.heading += clamp(angDiff(desired - m.heading), -maxT, maxT);
+        m.speed = m.baseSpeed * (0.7 + (1 - near) * 0.85);    // frenzy near flame
+        m.x += Math.cos(m.heading) * m.speed * dt;
+        m.y += Math.sin(m.heading) * m.speed * dt;
+        m.wing += dt * (15 + m.speed * 0.13);
+        if (Math.random() < 0.0015) m.side *= -1;             // figure-eight flips
+        // glass collision -> stunned
+        const ddx = lantern.x - m.x, ddy = lantern.y - m.y;
+        if (Math.hypot(ddx, ddy) < GLASS + m.size){
+          m.state = STUN;
+          m.t = 0.35 + Math.random()*0.75;
+          const away = Math.atan2(-ddy, -ddx) + (Math.random()-0.5)*1.2;
+          const kick = 120 + Math.random()*180;
+          m.vx = Math.cos(away)*kick;
+          m.vy = Math.sin(away)*kick - 30;
+          m.spin = (Math.random()-0.5)*26;
+        }
+        break;
+      }
+      case STUN: {
+        m.t -= dt;
+        const damp = Math.exp(-dt*2.6);
+        m.vx *= damp;
+        m.vy = m.vy*damp + 150*dt;                            // flutter-fall
+        m.x += m.vx*dt; m.y += m.vy*dt;
+        m.heading += m.spin*dt;
+        m.spin *= Math.exp(-dt*1.6);
+        m.wing += dt*42;                                      // panicked wingbeat
+        const ddx = m.x - lantern.x, ddy = m.y - lantern.y;
+        const dd = Math.hypot(ddx, ddy) || 0.001;
+        if (dd < GLASS + m.size*0.6){                         // never inside the glass
+          m.x = lantern.x + ddx/dd*(GLASS + m.size*0.6);
+          m.y = lantern.y + ddy/dd*(GLASS + m.size*0.6);
+        }
+        if (m.t <= 0){
+          if (dd < GLASS*3.4 && Math.random() < 0.5 && params.flame > 10){
+            m.state = REST;                                   // land on the rim
+            m.restAng = Math.atan2(ddy, ddx);
+            m.t = 2.5 + Math.random()*6.5;
+          } else {
+            m.state = ORBIT;
+            m.heading = Math.atan2(ddy, ddx) + m.side*1.3;
+          }
+        }
+        break;
+      }
+      case REST: {
+        m.t -= dt;
+        m.wing += dt*2.3;                                     // slow-fanning wings
+        m.x = lantern.x + Math.cos(m.restAng)*(GLASS + m.size*0.8);
+        m.y = lantern.y + Math.sin(m.restAng)*(GLASS + m.size*0.8);
+        m.heading = m.restAng;
+        const lsp = Math.hypot(lantern.vx, lantern.vy);
+        if (m.t <= 0 || lsp > 300 || params.flame < 8){       // done, shaken, or dark
+          m.state = ORBIT;
+          m.heading = m.restAng + m.side*1.1;
+          m.x += Math.cos(m.heading)*4;
+          m.y += Math.sin(m.heading)*4;
+          m.speed = m.baseSpeed;
+        }
+        break;
+      }
+      case LOST: {
+        // moonless wander, plus a pull toward the flame when it burns
+        m.heading += Math.sin(simT * m.wf + m.wp) * 1.7 * dt;
+        const b = brightness();
+        if (cap > 0 && b > 0.05){
+          m.heading += clamp(angDiff(toL - m.heading), -1, 1) * b * 1.6 * dt;
+        }
+        const mg = 30;                                        // soft containment
+        if (m.x < mg || m.x > W-mg || m.y < mg || m.y > H-mg){
+          const toC = Math.atan2(H/2 - m.y, W/2 - m.x);
+          m.heading += angDiff(toC - m.heading) * 2.2 * dt;
+        }
+        m.speed = m.baseSpeed * 0.45;
+        m.x += Math.cos(m.heading) * m.speed * dt;
+        m.y += Math.sin(m.heading) * m.speed * dt;
+        m.wing += dt * (9 + m.speed * 0.1);
+        if (cap > 0 && d < cap*0.92) m.state = ORBIT;         // recaptured
+        break;
+      }
+    }
+  }
+
+  function stepNameless(dt){
+    const n = nameless;
+    n.wing += dt * 6.5;                                       // slow, constant — wrong
+    if (n.freeze > 0){
+      n.freeze -= dt;                                         // it hangs mid-air sometimes
+      return;
+    }
+    if (Math.random() < 0.0035) n.freeze = 0.4 + Math.random()*0.9;
+
+    n.a += dt * n.dir * (0.55 + 0.2*Math.sin(simT*0.31 + n.a0));
+    const orb = 92 + 34*Math.sin(simT*0.23 + n.a0);
+    const tgt = (pointer.moved)
+      ? pointer
+      : { x: W*0.5 + Math.cos(simT*0.11)*W*0.28, y: H*0.5 + Math.sin(simT*0.16)*H*0.2 };
+    let tx = tgt.x + Math.cos(n.a)*orb;
+    let ty = tgt.y + Math.sin(n.a)*orb*0.78;
+    // it never touches the glass — never even comes near
+    const ldx = tx - lantern.x, ldy = ty - lantern.y;
+    const ld = Math.hypot(ldx, ldy) || 0.001;
+    const minL = GLASS + 120;
+    if (ld < minL){ tx = lantern.x + ldx/ld*minL; ty = lantern.y + ldy/ld*minL; }
+    tx = clamp(tx, 14, W-14); ty = clamp(ty, 14, H-14);
+    // critically-damped glide: no banking, no overshoot — uncanny smoothness
+    const k = 1 - Math.exp(-dt*2.3);
+    const nx = n.x + (tx - n.x)*k;
+    const ny = n.y + (ty - n.y)*k;
+    const mvx = nx - n.x, mvy = ny - n.y;
+    if (mvx*mvx + mvy*mvy > 0.02) n.heading = Math.atan2(mvy, mvx);  // snaps, no inertia
+    n.x = nx; n.y = ny;
+  }
+
+  function stepDust(dt){
+    for (const p of dust){
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      p.tw += dt;
+      if (p.x < -6) p.x = W+6; else if (p.x > W+6) p.x = -6;
+      if (p.y < -6) p.y = H+6; else if (p.y > H+6) p.y = -6;
+    }
+    for (let i = ripples.length-1; i >= 0; i--){
+      ripples[i].t += dt;
+      if (ripples[i].t > 0.55) ripples.splice(i, 1);
+    }
+  }
+
+  function gust(px, py){
+    ripples.push({ x:px, y:py, t:0 });
+    for (const m of moths){
+      if (m.state === REST) continue;
+      const dx = m.x - px, dy = m.y - py;
+      const d = Math.hypot(dx, dy);
+      if (d < 150){
+        m.heading = Math.atan2(dy, dx) + (Math.random()-0.5)*1.4;
+        m.x += (dx/(d||1)) * 6;
+        m.y += (dy/(d||1)) * 6;
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* rendering                                                           */
+  /* ------------------------------------------------------------------ */
+  function wingPath(c, s, spread){
+    const wx = s*3.1*spread;
+    c.beginPath();
+    c.moveTo(0, -s*0.85);
+    c.quadraticCurveTo( wx*0.85, -s*1.5,  wx, -s*0.2);
+    c.quadraticCurveTo( wx*0.55,  s*0.5,  0,  s*0.65);
+    c.moveTo(0, -s*0.85);
+    c.quadraticCurveTo(-wx*0.85, -s*1.5, -wx, -s*0.2);
+    c.quadraticCurveTo(-wx*0.55,  s*0.5,  0,  s*0.65);
+    c.closePath();
+  }
+
+  function drawMoth(m, lit){
+    const flap = Math.sin(m.wing);
+    const spread = 0.25 + 0.75*Math.abs(flap);
+    // mix dusk slate -> lamp-warm paper in RGB (no green detour)
+    const k = lit * (0.86 + m.shade*0.14);
+    const r = Math.round(62 + k*(255-62));
+    const g = Math.round(68 + k*(211-68));
+    const b = Math.round(86 + k*(142-86));
+    const al = 0.18 + lit*0.72;
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(m.heading + Math.PI/2);
+    const s = m.size;
+    if (lit > 0.4){                            // soft under-glow when near the flame
+      ctx.fillStyle = 'rgba(255,224,170,' + (lit*0.13).toFixed(3) + ')';
+      wingPath(ctx, s*1.55, spread);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + al.toFixed(3) + ')';
+    wingPath(ctx, s, spread);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(' + Math.round(r*0.5) + ',' + Math.round(g*0.46) + ',' + Math.round(b*0.44) + ',' + Math.min(1, al+0.15).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s*0.42, s*1.35, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawNameless(){
+    const n = nameless;
+    // violet halo — it carries its own dim light
+    const hr = 26;
+    const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, hr);
+    g.addColorStop(0, 'rgba(183,156,255,0.13)');
+    g.addColorStop(1, 'rgba(183,156,255,0)');
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = g;
+    ctx.fillRect(n.x-hr, n.y-hr, hr*2, hr*2);
+    ctx.restore();
+
+    const flap = Math.sin(n.wing);
+    const spread = 0.3 + 0.7*Math.abs(flap);
+    ctx.save();
+    ctx.translate(n.x, n.y);
+    ctx.rotate(n.heading + Math.PI/2);
+    const s = n.size;
+    ctx.fillStyle = 'rgba(183,156,255,0.16)';
+    wingPath(ctx, s*1.5, spread);
+    ctx.fill();
+    ctx.fillStyle = 'hsla(263,72%,74%,0.8)';
+    wingPath(ctx, s, spread);
+    ctx.fill();
+    ctx.fillStyle = 'hsla(263,50%,40%,0.9)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s*0.4, s*1.3, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawShadows(glow){
+    if (glow <= 0) return;
+    for (const m of moths){
+      if (m.state === REST) continue;
+      const dx = m.x - lantern.x, dy = m.y - lantern.y;
+      const d = Math.hypot(dx, dy) || 0.001;
+      const lit = 1 - d/glow;
+      if (lit <= 0.1) continue;
+      const ux = dx/d, uy = dy/d;
+      const len = 7 + lit*30;
+      const flapK = 0.55 + 0.45*Math.abs(Math.sin(m.wing));
+      ctx.save();
+      ctx.translate(m.x + ux*(5 + len*0.5), m.y + uy*(5 + len*0.5));
+      ctx.rotate(Math.atan2(uy, ux));
+      ctx.fillStyle = 'rgba(4,3,2,' + (lit*0.3).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, len*0.62, m.size*1.5*flapK, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawLantern(fl){
+    const b = brightness();
+    const gx = lantern.x, gy = lantern.y;
+    const glow = glowRadius() * (0.92 + 0.08*fl);
+
+    if (b > 0.01){
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      let g = ctx.createRadialGradient(gx, gy, 0, gx, gy, glow);
+      g.addColorStop(0,    'rgba(255,196,110,' + (0.30*b*fl).toFixed(3) + ')');
+      g.addColorStop(0.32, 'rgba(255,168,78,'  + (0.12*b*fl).toFixed(3) + ')');
+      g.addColorStop(1,    'rgba(255,150,60,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(gx-glow, gy-glow, glow*2, glow*2);
+      const core = GLASS*3.2;
+      g = ctx.createRadialGradient(gx, gy, 0, gx, gy, core);
+      g.addColorStop(0, 'rgba(255,226,170,' + (0.5*b*fl).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,200,120,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(gx-core, gy-core, core*2, core*2);
+      ctx.restore();
+    }
+
+    // the lantern body swings from a point above the glass
+    ctx.save();
+    ctx.translate(gx, gy - GLASS*2.1);
+    ctx.rotate(lantern.tilt);
+    ctx.translate(0, GLASS*2.1);
+
+    // hanging ring + cap
+    ctx.strokeStyle = 'rgba(160,132,96,0.55)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, -GLASS*1.72, 4.5, 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(52,40,28,0.92)';
+    ctx.beginPath();
+    ctx.moveTo(-9, -GLASS*1.02);
+    ctx.lineTo(9, -GLASS*1.02);
+    ctx.lineTo(5.5, -GLASS*1.38);
+    ctx.lineTo(-5.5, -GLASS*1.38);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(190,158,116,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // glass
+    const gg = ctx.createRadialGradient(0, 0, GLASS*0.15, 0, 0, GLASS);
+    gg.addColorStop(0, 'rgba(255,216,150,' + (0.16 + 0.5*b*fl).toFixed(3) + ')');
+    gg.addColorStop(0.72, 'rgba(120,82,42,' + (0.10 + 0.2*b).toFixed(3) + ')');
+    gg.addColorStop(1, 'rgba(28,20,14,0.55)');
+    ctx.fillStyle = gg;
+    ctx.beginPath();
+    ctx.arc(0, 0, GLASS, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(226,196,150,' + (0.35 + 0.3*b).toFixed(3) + ')';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    // glass highlight
+    ctx.strokeStyle = 'rgba(255,242,220,' + (0.14 + 0.22*b).toFixed(3) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, GLASS-3.5, -2.4, -1.3);
+    ctx.stroke();
+    // base
+    ctx.fillStyle = 'rgba(52,40,28,0.92)';
+    ctx.beginPath();
+    ctx.moveTo(-8, GLASS*1.0);
+    ctx.lineTo(8, GLASS*1.0);
+    ctx.lineTo(6, GLASS*0.82);
+    ctx.lineTo(-6, GLASS*0.82);
+    ctx.closePath();
+    ctx.fill();
+
+    // flame
+    if (b > 0.005){
+      const fh = (4.5 + b*15) * (0.78 + 0.28*fl);
+      const wob = Math.sin(simT*17 + flamePhase[0]) * 1.4 * b
+                + Math.sin(simT*29 + flamePhase[1]) * 0.7 * b;
+      ctx.globalCompositeOperation = 'lighter';
+      const fg = ctx.createLinearGradient(0, 6, 0, 6 - fh*1.8);
+      fg.addColorStop(0, 'rgba(255,140,40,0.85)');
+      fg.addColorStop(0.55, 'rgba(255,196,90,0.9)');
+      fg.addColorStop(1, 'rgba(255,240,200,0.16)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.moveTo(-fh*0.34, 6);
+      ctx.quadraticCurveTo(-fh*0.48, 6 - fh*0.9, wob*0.6, 6 - fh*1.75);
+      ctx.quadraticCurveTo(fh*0.48, 6 - fh*0.9, fh*0.34, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,248,225,' + (0.55*fl).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.ellipse(wob*0.25, 6 - fh*0.45, fh*0.16, fh*0.4, 0, 0, TAU);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    } else {
+      // a dying ember
+      ctx.fillStyle = 'rgba(255,110,50,' + (0.3 + 0.25*Math.sin(simT*3)).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(0, 5, 1.6, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawDust(glow, fl){
+    if (glow <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of dust){
+      const d = Math.hypot(p.x - lantern.x, p.y - lantern.y);
+      const lit = Math.max(0, 1 - d/(glow*0.8));
+      if (lit <= 0.02) continue;
+      const a = lit*lit * (0.28 + 0.22*Math.sin(p.tw*2.2)) * fl;
+      if (a <= 0.01) continue;
+      ctx.fillStyle = 'rgba(255,214,150,' + a.toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function writeTrails(glow){
+    // fade previous trails
+    trailCtx.save();
+    trailCtx.setTransform(1, 0, 0, 1, 0, 0);
+    trailCtx.globalCompositeOperation = 'destination-out';
+    trailCtx.fillStyle = 'rgba(0,0,0,0.16)';
+    trailCtx.fillRect(0, 0, trail.width, trail.height);
+    trailCtx.restore();
+    trailCtx.globalCompositeOperation = 'source-over';
+    if (glow <= 0) return;
+    trailCtx.lineCap = 'round';
+    for (const m of moths){
+      if (m.state === REST) continue;
+      const d = Math.hypot(m.x - lantern.x, m.y - lantern.y);
+      const lit = 1 - d/glow;
+      if (lit <= 0.06) continue;
+      trailCtx.strokeStyle = 'rgba(255,208,140,' + (lit*0.16).toFixed(3) + ')';
+      trailCtx.lineWidth = m.size*0.7;
+      trailCtx.beginPath();
+      trailCtx.moveTo(m.px, m.py);
+      trailCtx.lineTo(m.x, m.y);
+      trailCtx.stroke();
+    }
+  }
+
+  function drawScene(fl){
+    const glow = glowRadius() * (0.92 + 0.08*fl);
+
+    // the great dark
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#05060d');
+    bg.addColorStop(0.55, '#04050a');
+    bg.addColorStop(1, '#020306');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    drawDust(glow, fl);
+    drawShadows(glow);
+    drawLantern(fl);
+
+    // wing trails
+    if (!reduce){
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(trail, 0, 0);
+      ctx.restore();
+    }
+
+    // moths
+    for (const m of moths){
+      const d = Math.hypot(m.x - lantern.x, m.y - lantern.y);
+      const lit = glow > 0 ? clamp(1 - d/glow, 0, 1) : 0;
+      drawMoth(m, lit);
+    }
+
+    drawNameless();
+
+    // pointer gust ripples
+    for (const r of ripples){
+      const k = r.t / 0.55;
+      ctx.strokeStyle = 'rgba(232,215,180,' + ((1-k)*0.14).toFixed(3) + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, 12 + k*90, 0, TAU);
+      ctx.stroke();
+    }
+
+    // vignette — the dark presses in
+    const v = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.hypot(W,H)*0.62);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(1, 'rgba(0,0,0,0.5)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* whispers + readout                                                  */
+  /* ------------------------------------------------------------------ */
+  const whisperEl = document.getElementById('whisper');
+  const CAP_BRIGHT = ['a storm of wings, adoring', 'the glass rings with small collisions', 'they spiral in; they cannot help it'];
+  const CAP_MID    = ['the flame keeps its own weather', 'wings write circles around the light', 'the flame breathes; the swarm breathes back'];
+  const CAP_DIM    = ['the dark takes them back', 'an ember, and the wings forget', 'almost night now, even here'];
+  const CAP_REST   = ['some sleep against the warm glass'];
+  const CAP_HAUNT  = 'one of them has never touched the glass';
+  let lastWhisper = '';
+  function refreshWhisper(restCount){
+    let pool = CAP_MID;
+    if (params.flame < 18) pool = CAP_DIM;
+    else if (params.flame > 78) pool = CAP_BRIGHT;
+    else if (restCount >= 6) pool = CAP_REST;
+    let c = pool[(Math.random()*pool.length)|0];
+    if (Math.random() < 0.06) c = CAP_HAUNT;
+    if (c !== lastWhisper){
+      lastWhisper = c;
+      whisperEl.style.opacity = '0';
+      setTimeout(() => { whisperEl.textContent = c; whisperEl.style.opacity = '0.75'; }, reduce ? 0 : 350);
+    }
+  }
+  function updateReadout(){
+    let rest = 0, lost = 0;
+    for (const m of moths){
+      if (m.state === REST) rest++;
+      else if (m.state === LOST) lost++;
+    }
+    document.getElementById('r-w').textContent = moths.length;
+    document.getElementById('r-r').textContent = rest;
+    document.getElementById('r-l').textContent = lost;
+    return rest;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* main loop                                                           */
+  /* ------------------------------------------------------------------ */
+  let uiTimer = 0, capTimer = 0;
+  function frame(now){
+    raf = requestAnimationFrame(frame);
+    if (!lastT) lastT = now;
+    let dt = (now - lastT) / 1000;
+    lastT = now;
+    if (dt > 0.05) dt = 0.05;
+    if (dt <= 0) return;
+    simT += dt;
+
+    stepLantern(dt);
+    const cap = glowRadius();
+    for (const m of moths) updateMoth(m, dt, cap);
+    stepNameless(dt);
+    stepDust(dt);
+    writeTrails(cap);
+    drawScene(flick(simT));
+
+    uiTimer += dt; capTimer += dt;
+    if (uiTimer > 0.5){ uiTimer = 0; updateReadout(); }
+    if (capTimer > 3.5){ capTimer = 0; refreshWhisper(updateReadout()); }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* reduced motion — a composed still                                   */
+  /* ------------------------------------------------------------------ */
+  function layoutStill(){
+    const cap = Math.max(160, glowRadius());
+    for (let i = 0; i < moths.length; i++){
+      const m = moths[i];
+      if (m.state === LOST) continue;               // lost ones keep absolute posts
+      if (m.state === REST){
+        m.x = lantern.x + Math.cos(m.restAng)*(GLASS + m.size*0.8);
+        m.y = lantern.y + Math.sin(m.restAng)*(GLASS + m.size*0.8);
+        m.heading = m.restAng;
+        continue;
+      }
+      const r = GLASS*1.7 + m.relR * (cap*0.88 - GLASS*1.7);
+      m.x = lantern.x + Math.cos(m.relA)*r;
+      m.y = lantern.y + Math.sin(m.relA)*r;
+      m.heading = m.relA + m.side*(Math.PI/2 - 0.28); // tangent, tipped inward
+    }
+    // nameless: shy fixed distance from the lantern in the still
+    nameless.x = clamp(lantern.x + Math.cos(nameless.a0)* (GLASS+150), 20, W-20);
+    nameless.y = clamp(lantern.y + Math.sin(nameless.a0)* (GLASS+150), 20, H-20);
+    nameless.heading = nameless.a0 + Math.PI/2;
+  }
+  function composeStill(){
+    buildSwarm();
+    const dim = params.flame < 10;
+    for (const m of moths){
+      const roll = Math.random();
+      if (dim || roll < 0.12){ edgePlace(m); }
+      else if (roll < 0.2){ m.state = REST; m.restAng = Math.random()*TAU; }
+      else { m.state = ORBIT; }
+    }
+    renderStill();
+  }
+  function renderStill(){
+    layoutStill();
+    drawScene(0.9);
+    refreshWhisper(updateReadout());
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* pointer                                                             */
+  /* ------------------------------------------------------------------ */
+  function toCss(ev){
+    const rect = canvas.getBoundingClientRect();
+    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  }
+  let hintHidden = false;
+  function hideHint(){
+    if (hintHidden) return;
+    hintHidden = true;
+    document.getElementById('hint').style.opacity = '0';
+  }
+  let stillMoveT = 0;
+
+  canvas.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    const p = toCss(ev);
+    pointer.x = p.x; pointer.y = p.y; pointer.active = true; pointer.moved = true;
+    const d = Math.hypot(p.x - lantern.x, p.y - lantern.y);
+    if (d < GLASS*2.8){
+      lantern.grabbed = true;
+      lantern.gdx = lantern.x - p.x;
+      lantern.gdy = lantern.y - p.y;
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId);
+      hideHint();
+    } else {
+      gust(p.x, p.y);
+    }
+    if (reduce) renderStillLite();
+  });
+  canvas.addEventListener('pointermove', (ev) => {
+    const p = toCss(ev);
+    pointer.x = p.x; pointer.y = p.y; pointer.active = true; pointer.moved = true;
+    if (reduce){
+      if (lantern.grabbed){
+        lantern.x = clamp(p.x + lantern.gdx, GLASS+8, W-GLASS-8);
+        lantern.y = clamp(p.y + lantern.gdy, GLASS*2.4, H-GLASS-10);
+      }
+      const now = performance.now();
+      if (now - stillMoveT > 80){ stillMoveT = now; renderStillLite(); }
+    }
+  });
+  function endPointer(){
+    lantern.grabbed = false;
+    canvas.classList.remove('dragging');
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('pointerleave', () => { pointer.active = false; });
+
+  // still-mode redraw that keeps composition but follows the lantern/pointer
+  function renderStillLite(){
+    layoutStill();
+    drawScene(0.9);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* controls                                                            */
+  /* ------------------------------------------------------------------ */
+  const flameEl = document.getElementById('flame');
+  flameEl.value = params.flame;
+  flameEl.addEventListener('input', () => {
+    params.flame = parseInt(flameEl.value, 10);
+    if (reduce) renderStillLite();
+  });
+  const swarmEl = document.getElementById('swarm');
+  swarmEl.value = params.swarm;
+  swarmEl.addEventListener('input', () => {
+    params.swarm = parseInt(swarmEl.value, 10);
+    adjustPopulation(params.swarm);
+    if (reduce) renderStillLite();
+  });
+
+  let toastTimer = null;
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  document.getElementById('new-btn').addEventListener('click', () => {
+    if (reduce){ composeStill(); }
+    else {
+      buildSwarm();
+      trailCtx.clearRect(0, 0, W, H);
+    }
+    showToast('a new night, a new hunger for the light.');
+  });
+
+  document.getElementById('save-btn').addEventListener('click', (e) => {
+    try {
+      drawScene(reduce ? 0.9 : flick(simT));
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'moth-lantern-' + Date.now() + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      const b = e.currentTarget;
+      b.classList.add('done');
+      const o = b.textContent;
+      b.textContent = '⤓ kept';
+      setTimeout(() => { b.classList.remove('done'); b.textContent = o; }, 1600);
+    } catch (err){
+      showToast('the frame slipped into the dark. try again.');
+    }
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* visibility / resize                                                 */
+  /* ------------------------------------------------------------------ */
+  document.addEventListener('visibilitychange', () => {
+    visible = !document.hidden;
+    if (document.hidden){
+      if (raf){ cancelAnimationFrame(raf); raf = 0; }
+    } else if (!reduce && !raf){
+      lastT = 0;
+      raf = requestAnimationFrame(frame);
+    }
+  });
+
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const fx = lantern.x / W, fy = lantern.y / H;
+      computeSize();
+      lantern.x = clamp(fx * W, GLASS+8, W-GLASS-8);
+      lantern.y = clamp(fy * H, GLASS*2.4, H-GLASS-10);
+      for (const m of moths){
+        m.x = clamp(m.x, 4, W-4);
+        m.y = clamp(m.y, 4, H-4);
+        m.px = m.x; m.py = m.y;
+      }
+      if (reduce) renderStillLite();
+    }, 180);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* boot                                                                */
+  /* ------------------------------------------------------------------ */
+  computeSize();
+  lantern.x = W * 0.5;
+  lantern.y = H * 0.46;
+
+  if (reduce){
+    composeStill();
+  } else {
+    buildSwarm();
+    // let the storm find its shape before the first frame is seen
+    for (let i = 0; i < 90; i++){
+      simT += 1/60;
+      const cap = glowRadius();
+      for (const m of moths) updateMoth(m, 1/60, cap);
+      stepNameless(1/60);
+    }
+    updateReadout();
+    raf = requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>
