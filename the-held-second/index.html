@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Held Second · Prízrak</title>
+<style>
+  :root{
+    --ink:#080a0e; --ink-1:#0b0e14; --ink-2:#10141d; --ink-3:#161b27;
+    --bone:#e2dfd4; --parch:#cbc7b6; --ash:#8f8c7e; --ash-2:#666456; --ash-3:#413f36;
+    --rule:rgba(226,223,212,.08); --rule-2:rgba(226,223,212,.16);
+    --tide:#9fd0dc; --tide-dim:#54818f; --tide-glow:rgba(159,208,220,.18);
+    --gold:#c9a05a;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono','Cascadia Mono',Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--ink); color:var(--bone); font-family:var(--serif);
+    min-height:100vh; line-height:1.55; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+    display:flex; flex-direction:column;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(110% 70% at 50% -8%, rgba(159,208,220,.055), transparent 55%),
+      radial-gradient(85% 50% at 50% 116%, rgba(201,160,90,.035), transparent 60%),
+      var(--ink);
+    transition:opacity 1.2s ease;
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:6; pointer-events:none; opacity:.045; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  ::selection{ background:rgba(159,208,220,.22); color:#fff; }
+  ::-webkit-scrollbar{ width:10px; }
+  ::-webkit-scrollbar-thumb{ background:#1a1f2b; border-radius:8px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  .wrap{ max-width:780px; margin:0 auto; padding:38px 18px 40px; width:100%;
+    display:flex; flex-direction:column; flex:1; }
+  @media(min-width:700px){ .wrap{ padding:48px 28px 44px; } }
+
+  header{ text-align:center; margin-bottom:10px; }
+  .kicker{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.26em;
+    font-size:9.5px; color:var(--ash-2); }
+  h1{ font-weight:700; font-size:clamp(1.8rem,6vw,2.8rem); line-height:1.05;
+    margin:12px 0 0; letter-spacing:-.01em; text-shadow:0 0 30px var(--tide-glow); }
+  h1 .em{ color:var(--tide); font-style:italic; font-weight:500; }
+  .sub{ margin:14px auto 0; font-style:italic; font-size:13.5px; color:var(--ash);
+    max-width:38rem; line-height:1.66; }
+  .divider{ height:1px; max-width:34rem; margin:22px auto 0;
+    background:linear-gradient(90deg,transparent,var(--rule-2),transparent); }
+
+  /* ---- the stage: press-and-hold target ---- */
+  #stage{
+    position:relative; flex:1; display:flex; flex-direction:column; align-items:center;
+    user-select:none; -webkit-user-select:none; touch-action:none; cursor:pointer;
+    outline:none; border-radius:14px; padding:10px 4px 8px;
+  }
+  #stage:focus-visible{ box-shadow:0 0 0 1px var(--tide-dim); }
+
+  .clock-block{
+    text-align:center; margin-top:26px; position:sticky; top:0; z-index:3;
+    align-self:stretch; padding:16px 10px 14px;
+    background:linear-gradient(180deg, var(--ink) 72%, rgba(8,10,14,0));
+  }
+  #clock{
+    font-family:var(--mono); font-size:clamp(2.6rem,11vw,4.6rem); font-weight:400;
+    color:var(--bone); letter-spacing:.04em; line-height:1;
+    text-shadow:0 0 26px var(--tide-glow);
+    transition:color .8s ease, text-shadow .8s ease;
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  body.holding #clock{ color:var(--tide); text-shadow:0 0 44px rgba(159,208,220,.34); }
+  #clock .colon{ transition:opacity .2s; }
+  #clock .colon.dim{ opacity:.25; }
+
+  .width-line{
+    margin:14px auto 0; font-family:var(--mono); font-size:10px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--ash-2); min-height:15px;
+    transition:color .6s ease;
+  }
+  body.holding .width-line{ color:var(--tide-dim); }
+  .width-bar{
+    height:1px; margin:10px auto 0; width:0px; max-width:min(560px,86vw);
+    background:linear-gradient(90deg,transparent,var(--tide-dim),transparent);
+    transition:width .3s linear; opacity:.9;
+  }
+
+  .hint{
+    margin:20px auto 0; text-align:center; font-style:italic; font-size:13px;
+    color:var(--ash); max-width:30rem; line-height:1.6; transition:opacity .8s ease;
+  }
+  .hint .kbd{ font-family:var(--mono); font-style:normal; font-size:10px; color:var(--ash-2);
+    border:1px solid var(--rule-2); border-radius:4px; padding:1px 6px; letter-spacing:.08em; }
+  body.holding .hint{ opacity:0; }
+
+  /* ---- the pour of lines ---- */
+  #pour{
+    width:100%; max-width:560px; margin:26px auto 0; min-height:200px; flex:1;
+    display:flex; flex-direction:column; gap:13px; align-items:stretch;
+    padding-bottom:8px;
+  }
+  .drop{
+    font-size:14.5px; line-height:1.62; color:var(--parch);
+    opacity:0; transform:translateY(9px);
+    transition:opacity 1.1s ease, transform 1.4s cubic-bezier(.2,.7,.3,1), filter .7s ease, color 1.2s ease;
+    text-wrap:pretty;
+  }
+  .drop.on{ opacity:1; transform:none; }
+  .drop.old{ color:var(--ash); }
+  .drop.older{ color:var(--ash-2); }
+  .drop.t3{ color:var(--tide); font-style:italic; }
+  .drop.t3.old{ color:var(--tide-dim); }
+  .drop.rare{ color:var(--gold); font-style:italic; }
+  .drop.fall{ opacity:0; transform:translateY(26px); filter:blur(3px); }
+  .drop .lede{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--ash-3); display:block; margin-bottom:3px;
+  }
+
+  /* ---- obituary ---- */
+  #obit{
+    width:100%; max-width:560px; margin:24px auto 0; display:none;
+    border:1px solid var(--rule-2); border-radius:12px;
+    background:linear-gradient(180deg,var(--ink-1),var(--ink));
+    box-shadow:0 26px 60px -40px rgba(0,0,0,.95);
+    padding:20px 22px 18px; text-align:center; position:relative; overflow:hidden;
+    opacity:0; transition:opacity 1s ease;
+  }
+  #obit::before{ content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--tide-dim),transparent); opacity:.55; }
+  #obit.on{ display:block; }
+  #obit.show{ opacity:1; }
+  .obit-k{ font-family:var(--mono); font-size:8.5px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--ash-2); }
+  .obit-t{ font-family:var(--mono); font-size:1.5rem; color:var(--tide); margin:8px 0 2px;
+    letter-spacing:.12em; text-shadow:0 0 22px var(--tide-glow); }
+  .obit-line{ font-style:italic; font-size:14px; color:var(--parch); line-height:1.6;
+    max-width:30rem; margin:10px auto 0; text-wrap:pretty; }
+  .obit-stats{ margin-top:12px; font-family:var(--mono); font-size:9.5px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--ash-2); line-height:2; }
+
+  footer{
+    text-align:center; padding:14px 18px 26px; font-family:var(--mono);
+    font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ash-3);
+    line-height:2;
+  }
+  #ledger{ color:var(--ash-2); }
+  #ledger .warm{ color:var(--tide-dim); letter-spacing:.08em; }
+  #forget{ background:none; border:none; color:var(--ash-3); font-family:var(--mono);
+    font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer;
+    text-decoration:underline; text-underline-offset:3px; padding:2px 4px; }
+  #forget:hover{ color:var(--ash); }
+
+  @media (prefers-reduced-motion: reduce){
+    .drop{ transition:opacity .3s ease; transform:none; }
+    .drop.fall{ transform:none; filter:none; }
+    .width-bar{ transition:none; }
+    #clock, body.holding #clock{ transition:none; }
+    #obit{ transition:opacity .2s ease; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Prízrak · Offering № — · Horology, Palliative</div>
+    <h1>The <span class="em">Held</span> Second</h1>
+    <p class="sub">Every second that has ever happened died at the age of one second.
+      Tonight you may do something about that, for one of them. It will not change anything.
+      It will only mean that once, briefly, it mattered which second it was.</p>
+    <div class="divider"></div>
+  </header>
+
+  <div id="stage" tabindex="0" role="button"
+       aria-label="Press and hold to keep the current second from ending. Hold longer to see more of what it contains. Release to let it go.">
+    <div class="clock-block" aria-hidden="true">
+      <div id="clock"></div>
+      <div class="width-line" id="widthline">one second wide · standard</div>
+      <div class="width-bar" id="widthbar"></div>
+    </div>
+    <p class="hint">Press and hold — anywhere here — to keep a second from ending.
+      Hold longer and it gets wider. <span class="kbd">space</span> works too.</p>
+    <div id="pour" aria-live="polite"></div>
+    <div id="obit">
+      <div class="obit-k">Notice of Release</div>
+      <div class="obit-t" id="obit-time"></div>
+      <div class="obit-line" id="obit-line"></div>
+      <div class="obit-stats" id="obit-stats"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div id="ledger"></div>
+  <div><button id="forget" type="button">forget the ledger</button></div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- utilities ---------- */
+  function pad(n){ return (n<10?'0':'')+n; }
+  function nowHMS(d){ return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+  function Bag(items){ this.src = items.slice(); this.pool = []; }
+  Bag.prototype.next = function(){
+    if(!this.pool.length){
+      this.pool = this.src.slice();
+      for(var i=this.pool.length-1;i>0;i--){
+        var j = Math.floor(Math.random()*(i+1)), t=this.pool[i];
+        this.pool[i]=this.pool[j]; this.pool[j]=t;
+      }
+    }
+    return this.pool.pop();
+  };
+  function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+  /* ---------- pools ---------- */
+  var FACTS = new Bag([
+    "Light gets another 299,792 kilometres out of it. It does not say thank you.",
+    "Roughly four people are born inside it. About two people leave by the other door.",
+    "The Earth covers twenty-nine kilometres of its orbit and files it under nothing much.",
+    "Some forty bolts of lightning reach the ground, each convinced it is the point of the storm.",
+    "Your marrow issues around two million new red blood cells, none of whom were consulted.",
+    "The sun burns off four million tonnes of itself, as it has done for every second you have ever wasted.",
+    "Around ten billion human hearts contract, more or less together, entirely by accident.",
+    "The Moon drifts another 1.2 nanometres away from us. It has been leaving very slowly for a long time.",
+    "Sixteen million tonnes of rain falls, most of it on the sea, where nobody is keeping score.",
+    "Niagara lets go of about 2.8 million litres without a second thought, which is the only kind it has.",
+    "About a million of your own cells end themselves inside it, politely, so the rest of you can continue.",
+    "A hummingbird fits fifty full wingbeats into it and considers this unremarkable.",
+    "Roughly 3.4 million emails are sent, nearly all of them beginning with an apology for the delay.",
+    "Your heart, if it is an average heart, fits a little more than one beat into it. This one, it holds.",
+    "The oldest living tree gets one second older. Same raise as you.",
+    "The universe expands by more new room than anyone will ever get around to using.",
+    "Ninety-odd thousand questions are typed into search engines, a third of them some spelling of 'why'.",
+    "Two thousand or so meteors the size of regret strike the upper air and are converted into light.",
+    "The continents move a distance no one can feel, in directions no one voted on.",
+    "Somewhere between one and two people fall in love hard enough inside it to notice they have."
+  ]);
+
+  var CITIES = new Bag(["Gdańsk","Tampere","Oaxaca","Ulaanbaatar","Recife","Trieste","Sapporo",
+    "Windhoek","Bergen","Da Nang","Valparaíso","Reykjavík","Kolkata","Anchorage","Marseille",
+    "Brno","Cusco","Dakar","Wellington","Ljubljana","Tbilisi","Busan","Winnipeg","Kraków",
+    "Tangier","Hobart","Porto","Riga","Aomori","Kigali","Asunción","Galway","Duluth","Yerevan",
+    "Split","Bandung","Salta","Turku","Plovdiv","Iquitos","Thunder Bay","Haarlem","Trondheim",
+    "Matsuyama","Zanzibar City","Fez","Odesa","León"]);
+
+  var PEOPLE = new Bag(["a night nurse","a tram driver","a bread baker","a customs officer",
+    "someone's youngest uncle","a woman with a borrowed umbrella","a boy who should be asleep",
+    "a locksmith","an off-duty ferry captain","a translator of dead poets",
+    "a man rehearsing an apology","one of two twin sisters","a lighthouse keeper's granddaughter",
+    "a hotel dishwasher","an amateur astronomer","a widowed beekeeper",
+    "a girl memorizing a phone number","a retired goalkeeper","the last customer of the night",
+    "a taxi dispatcher","an organist with insomnia","a stonemason","a student of extinct languages",
+    "somebody's landlord","a night-shift radiologist","a street sweeper","a chess hustler",
+    "a florist counting the till","an usher in an empty cinema","a long-haul pilot's wife",
+    "a boy carrying soup very carefully","a watchmaker's apprentice",
+    "a woman who never learned to whistle","an electrician at the top of a ladder",
+    "a poet with a day job","a gravedigger on his break","a ferry ticket clerk",
+    "an old man feeding the wrong pigeons","a girl who has just lied to her mother",
+    "a dog groomer with a bad back"]);
+
+  var ACTS = new Bag(["a yawn she will finish without you",
+    "the third step of a staircase climbed nine thousand times before",
+    "a sneeze that has already committed","writing the word 'anyway'",
+    "deciding whether to answer the phone","a laugh that started out as something else",
+    "the exact middle of a kiss","parallel parking, badly",
+    "pouring the water just before the tea is ruined","forgetting a name, mid-introduction",
+    "a small lie of kindness","the downstroke of a signature","swallowing a pill dry",
+    "counting change in the dark","an apology, right at the hard part",
+    "threading a needle on the second try","hanging up first","the silence after asking",
+    "blowing on a spoon","waving at someone who was not waving at them",
+    "reading the last line again","pretending to be asleep","a promise, at the comma",
+    "putting the ring back in the drawer","understanding that the fish is not going to make it",
+    "smelling rain a full minute before it exists","losing an argument on purpose",
+    "the moment the lift doors choose","taking down a photograph",
+    "salting the soup a second time, having forgotten the first",
+    "typing and deleting the word 'love'","the top of a shrug",
+    "finding money in a winter coat","checking the locks a fourth time",
+    "the breath before singing","giving up on a crossword clue that will arrive at 3 a.m.",
+    "holding a door for nobody","recognizing a laugh from across the street",
+    "the second knock","untangling headphones that no longer connect to anything",
+    "practicing a signature for a name that is not hers yet","the middle syllable of goodbye"]);
+
+  var SCENE_FORMS = [
+    function(c,p,a){ return "In "+c+", "+p+" is halfway through "+a+"."; },
+    function(c,p,a){ return "In "+c+", "+p+" is suspended at "+a+", and for as long as you hold, stays there."; },
+    function(c,p,a){ return "Meanwhile, in "+c+": "+p+", caught at "+a+", frozen at the difficult part."; },
+    function(c,p,a){ return "In "+c+", "+p+" has just begun "+a+". It will be finished in a second you don't own."; },
+    function(c,p,a){ return "Nothing at all is happening in "+c+", except "+p+", and "+a+"."; },
+    function(c,p,a){ return "In "+c+", "+p+" will remember this exact second for no reason they will ever be able to name."; },
+    function(c,p,a){ return "This second also contains "+c+", where "+p+" is stopped at "+a+"."; }
+  ];
+  var sceneForm = new Bag([0,1,2,3,4,5,6]);
+
+  var NEAR = new Bag([
+    "Closer: in the wall to your left, a pipe ticks as it cools by a fraction of a degree.",
+    "Under your floor, the building shifts its weight like a sleeper deciding not to wake.",
+    "A spider two rooms away completes the strut she has been walking all evening.",
+    "The dust above your head hangs in the air, spending the second the way dust always does: entirely.",
+    "Your screen repaints itself sixty times and hopes you didn't notice.",
+    "Somewhere in your body a cell divides, and both halves believe they are the original.",
+    "In your kitchen, the refrigerator holds a note longer than any monk ever has.",
+    "Behind you — nothing. But the second checked.",
+    "The chair you are not sitting in creaks anyway.",
+    "The last thing you drank is, as of roughly now, part of you.",
+    "A moth outside a window you can't see chooses somebody's light over the moon's.",
+    "Your name is currently written in at least one place you have never been.",
+    "The air in this room has been in other rooms. It doesn't talk about them.",
+    "Something you own and haven't touched in a year moves one molecule closer to being forgotten.",
+    "Your shadow holds its breath with you.",
+    "In a drawer, a key you keep for a lock that no longer exists gets one second older.",
+    "The houseplant grows by a distance too small to have earned a name.",
+    "Below you, at some depth, water is moving through stone at the speed of patience.",
+    "Every mirror in the building is currently unwatched, and doing whatever it is mirrors do.",
+    "The elastic in something you love quietly gives up a little.",
+    "Inside your walls, a current runs that would, given any choice at all, rather be lightning.",
+    "Your heart does its one beat. It does not know it is being held.",
+    "A crumb under the stove enters its fourth month of being almost found.",
+    "In the next room, or the next flat, or the next town, someone else is also awake. That is all the second will say about it.",
+    "The window glass is not flowing. That's a myth. It is only standing very still, the way you are.",
+    "Something with six legs crosses a beam in the dark above you, unobserved, unhurried, unpaid.",
+    "The cold spot by the door is just the door. Probably the door.",
+    "A letter you never answered continues, at its own pace, to not mind."
+  ]);
+
+  var DEEP = new Bag([
+    "This second has now lasted longer than most seconds ever get to.",
+    "It is starting to look around.",
+    "Most seconds die at the standard age. This one is old now, by second standards. It has opinions.",
+    "Somewhere inside it, something has had time to change its mind.",
+    "The seconds on either side are pressing at the doors. You are the doors.",
+    "Nothing that happens while you hold counts against you. That is the rule. No one made it, but it is the rule.",
+    "It wants to know whether you are keeping it, or just haven't decided.",
+    "A minute is only sixty of these that nobody loved enough.",
+    "You could let go. It knows you could let go. Neither of you mentions it.",
+    "History is what all the other seconds did. This one has escaped, briefly, on your recognizance.",
+    "It has begun to fill with the things that only happen in held seconds: second thoughts, held breaths, the pause before the diagnosis.",
+    "It is wide enough now to lie down in.",
+    "Clocks everywhere have noted the discrepancy and agreed, as always, to say nothing.",
+    "It would like to be remembered as the second you held, rather than for anything that happened in it.",
+    "Careful. Things live in the wide seconds. Mostly harmless. Mostly the same things that live in you.",
+    "Whatever you were in the middle of before you pressed — the world is out there being it without you.",
+    "Letting go is not a betrayal. Every second you have ever lived, you left.",
+    "It isn't that time stopped. It's that you and this second stepped out of the queue together.",
+    "If you hold long enough, they say, you can hear the next second knocking. That is not the next second.",
+    "Everyone you have ever missed is exactly this reachable: one second, held open, wide enough to walk through. No one has ever walked through.",
+    "The second has nearly stopped filling. Soon it is just you and it. This was always where holding was going.",
+    "Somewhere in the wide part of it, a version of you did the other thing. The second is too polite to say how it went.",
+    "You are not stopping time. You are keeping one piece of it company. There is a difference, and the difference is the whole offering.",
+    "It has room now for everything you didn't do today. They are all in here, sitting quietly, not blaming you.",
+    "Old seconds get slow and honest. Ask it nothing you don't want answered.",
+    "Let go whenever you like. It was never going to be long enough. That was never a reason not to.",
+    "The clock face above you is lying on your behalf. It considers this an honor."
+  ]);
+
+  var RARE = "Someone else, somewhere, is holding this exact second open too. It can feel both of your thumbs. It will not say who.";
+
+  var EPITAPHS = [
+    function(t,n){ return "the second in which nothing finished."; },
+    function(t,n){ return "survived by the seconds on either side, who never speak of it."; },
+    function(t,n){ return "held, widened, and released in good condition."; },
+    function(t,n){ return "briefly the widest second in the world."; },
+    function(t,n){ return "it contained multitudes. You saw "+n+" of them."; },
+    function(t,n){ return "died of being let go, like all the others. But older."; },
+    function(t,n){ return "outlived its entire generation."; },
+    function(t,n){ return "for a moment there, it mattered which second it was."; },
+    function(t,n){ return "gone to wherever the held ones go, which is said to be wider."; },
+    function(t,n){ return "it asked to be remembered at this width."; },
+    function(t,n){ return "everything in it remains unfinished, which is one way to live forever."; },
+    function(t,n){ return "the other seconds have already closed over the gap. Seconds are like that."; }
+  ];
+  var epitaphBag = new Bag(EPITAPHS.map(function(_,i){ return i; }));
+
+  var SHORT_EPITAPHS = [
+    "barely wider than the rest. It noticed anyway.",
+    "held for less than itself. Still: held.",
+    "a small kindness, quickly withdrawn. It counts.",
+    "you touched it and thought better of it. It thinks of you."
+  ];
+
+  /* ---------- dom ---------- */
+  var stage = document.getElementById('stage');
+  var clockEl = document.getElementById('clock');
+  var widthLine = document.getElementById('widthline');
+  var widthBar = document.getElementById('widthbar');
+  var pour = document.getElementById('pour');
+  var obit = document.getElementById('obit');
+  var obitTime = document.getElementById('obit-time');
+  var obitLine = document.getElementById('obit-line');
+  var obitStats = document.getElementById('obit-stats');
+  var ledgerEl = document.getElementById('ledger');
+
+  /* ---------- clock ---------- */
+  var holding = false, heldLabel = '', holdStart = 0, lineCount = 0, rareShown = false;
+  var lineTimer = null, widthTimer = null, obitFadeT = null, obitShowT = null;
+
+  function renderClock(label, dimColon){
+    while(clockEl.firstChild) clockEl.removeChild(clockEl.firstChild);
+    for(var i=0;i<label.length;i++){
+      var ch = label[i];
+      if(ch===':'){
+        var s = document.createElement('span');
+        s.className = 'colon' + (dimColon ? ' dim' : '');
+        s.textContent = ':';
+        clockEl.appendChild(s);
+      } else {
+        clockEl.appendChild(document.createTextNode(ch));
+      }
+    }
+  }
+  function tick(){
+    if(holding) return;
+    var d = new Date();
+    renderClock(nowHMS(d), !reduced && d.getMilliseconds() >= 500);
+  }
+  setInterval(tick, 200);
+  tick();
+
+  /* ---------- ledger ---------- */
+  var LKEY = 'prizrak-held-second';
+  function loadLedger(){
+    try{
+      var raw = localStorage.getItem(LKEY);
+      if(raw){ var o = JSON.parse(raw);
+        return { n:+o.n||0, ms:+o.ms||0 }; }
+    }catch(e){}
+    return { n:0, ms:0 };
+  }
+  var ledger = loadLedger();
+  function saveLedger(){
+    try{ localStorage.setItem(LKEY, JSON.stringify(ledger)); }catch(e){}
+  }
+  function fmtDur(ms){
+    var s = ms/1000;
+    if(s < 60) return s.toFixed(1)+'s';
+    var m = Math.floor(s/60); var r = Math.round(s - m*60);
+    if(r===60){ m++; r=0; }
+    return m+'m '+pad(r)+'s';
+  }
+  function renderLedger(){
+    while(ledgerEl.firstChild) ledgerEl.removeChild(ledgerEl.firstChild);
+    if(ledger.n === 0){
+      ledgerEl.appendChild(document.createTextNode('No seconds widened yet. They die at a rate of one per second.'));
+      return;
+    }
+    var t1 = document.createTextNode('Seconds widened: '+ledger.n+' · width borrowed: ');
+    var w = document.createElement('span'); w.className='warm'; w.textContent = fmtDur(ledger.ms);
+    ledgerEl.appendChild(t1); ledgerEl.appendChild(w);
+    var t2 = document.createElement('div');
+    t2.textContent = 'You now run '+fmtDur(ledger.ms)+' behind everyone else. They haven’t noticed.';
+    ledgerEl.appendChild(t2);
+  }
+  renderLedger();
+  document.getElementById('forget').addEventListener('click', function(ev){
+    ev.stopPropagation();
+    ledger = { n:0, ms:0 }; saveLedger(); renderLedger();
+  });
+
+  /* ---------- line generation ---------- */
+  function makeScene(){
+    var f = SCENE_FORMS[sceneForm.next()];
+    return f(CITIES.next(), PEOPLE.next(), ACTS.next());
+  }
+  function nextLine(elapsedS){
+    // tiers, with a little bleed from the previous tier for texture
+    if(elapsedS < 5)  return { t:0, s:FACTS.next() };
+    if(elapsedS < 13) return Math.random()<0.25 ? { t:0, s:FACTS.next() } : { t:1, s:makeScene() };
+    if(elapsedS < 23) return Math.random()<0.22 ? { t:1, s:makeScene() } : { t:2, s:NEAR.next() };
+    if(!rareShown && Math.random() < 0.12){ rareShown = true; return { t:4, s:RARE }; }
+    return Math.random()<0.18 ? { t:2, s:NEAR.next() } : { t:3, s:DEEP.next() };
+  }
+  var LEDES = { 0:'in this second', 1:'meanwhile', 2:'nearer', 3:'the second, aging', 4:'unverified' };
+
+  function addDrop(){
+    if(!holding) return;
+    var elapsedS = (performance.now() - holdStart)/1000;
+    var item = nextLine(elapsedS);
+    lineCount++;
+    var d = document.createElement('div');
+    d.className = 'drop' + (item.t===3 ? ' t3' : '') + (item.t===4 ? ' rare' : '');
+    var lede = document.createElement('span');
+    lede.className = 'lede';
+    lede.textContent = LEDES[item.t] + ' · ' + heldLabel;
+    d.appendChild(lede);
+    d.appendChild(document.createTextNode(item.s));
+    pour.appendChild(d);
+    // age older lines
+    var drops = pour.children;
+    for(var i=0;i<drops.length;i++){
+      var age = drops.length - 1 - i;
+      drops[i].classList.toggle('old', age >= 2 && age < 5);
+      drops[i].classList.toggle('older', age >= 5);
+    }
+    while(pour.children.length > 14) pour.removeChild(pour.firstChild);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ d.classList.add('on'); }); });
+    d.scrollIntoView({ block:'nearest', behavior: reduced ? 'auto' : 'smooth' });
+    // schedule the next one; the pour slows as the second ages
+    var delay = 1500 + Math.min(1300, elapsedS*45) + Math.random()*350;
+    lineTimer = setTimeout(addDrop, delay);
+  }
+
+  function updateWidth(){
+    if(!holding) return;
+    var s = (performance.now() - holdStart)/1000;
+    widthLine.textContent = 'now ' + s.toFixed(1) + ' seconds wide · and widening';
+    var frac = 1 - Math.exp(-s/18);
+    widthBar.style.width = Math.round(frac * Math.min(560, window.innerWidth*0.86)) + 'px';
+    widthTimer = setTimeout(updateWidth, 100);
+  }
+
+  /* ---------- hold / release ---------- */
+  function beginHold(){
+    if(holding) return;
+    holding = true;
+    heldLabel = nowHMS(new Date());
+    holdStart = performance.now();
+    lineCount = 0; rareShown = false;
+    document.body.classList.add('holding');
+    renderClock(heldLabel, false);
+    if(obitFadeT){ clearTimeout(obitFadeT); obitFadeT = null; }
+    if(obitShowT){ clearTimeout(obitShowT); obitShowT = null; }
+    obit.classList.remove('show','on');
+    while(pour.firstChild) pour.removeChild(pour.firstChild);
+    if(!reduced) clockEl.style.letterSpacing = '.04em';
+    lineTimer = setTimeout(addDrop, 650);
+    updateWidth();
+    if(!reduced){
+      // the digits themselves widen, slowly
+      var widen = function(){
+        if(!holding) return;
+        var s = (performance.now() - holdStart)/1000;
+        clockEl.style.letterSpacing = (0.04 + Math.min(0.22, s*0.006)) + 'em';
+        setTimeout(widen, 300);
+      };
+      widen();
+    }
+  }
+
+  function endHold(){
+    if(!holding) return;
+    holding = false;
+    var heldMs = performance.now() - holdStart;
+    var label = heldLabel;
+    var seen = lineCount;
+    if(lineTimer){ clearTimeout(lineTimer); lineTimer = null; }
+    if(widthTimer){ clearTimeout(widthTimer); widthTimer = null; }
+    document.body.classList.remove('holding');
+    clockEl.style.letterSpacing = '';
+    widthLine.textContent = 'one second wide · standard';
+    widthBar.style.width = '0px';
+
+    // the pour falls away
+    var drops = Array.prototype.slice.call(pour.children);
+    if(reduced){
+      drops.forEach(function(d){ d.classList.add('fall'); });
+      setTimeout(function(){ while(pour.firstChild) pour.removeChild(pour.firstChild); }, 320);
+    } else {
+      drops.forEach(function(d,i){ setTimeout(function(){ d.classList.add('fall'); }, i*40); });
+      setTimeout(function(){ while(pour.firstChild) pour.removeChild(pour.firstChild); }, drops.length*40 + 900);
+    }
+
+    // clock catch-up skitter
+    if(!reduced){
+      var skitterEnd = performance.now() + 480;
+      (function skit(){
+        if(holding) return;
+        if(performance.now() >= skitterEnd){ tick(); return; }
+        var d = new Date();
+        var fake = pad(Math.floor(Math.random()*24))+':'+pad(Math.floor(Math.random()*60))+':'+pad(Math.floor(Math.random()*60));
+        renderClock(Math.random()<0.5 ? fake : nowHMS(d), false);
+        setTimeout(skit, 55);
+      })();
+    } else { tick(); }
+
+    // ledger
+    ledger.n++; ledger.ms += heldMs; saveLedger(); renderLedger();
+
+    // obituary
+    obitTime.textContent = label;
+    var ep;
+    if(heldMs < 1600){
+      ep = pick(SHORT_EPITAPHS);
+    } else {
+      ep = EPITAPHS[epitaphBag.next()](label, seen);
+    }
+    obitLine.textContent = '“' + ep + '”';
+    var statBits = 'held open for ' + fmtDur(heldMs);
+    if(seen > 0){
+      statBits += ' · ' + seen + ' of its several hundred trillion events surfaced';
+    } else {
+      statBits += ' · nothing had time to surface';
+    }
+    obitStats.textContent = statBits;
+    var wait = reduced ? 350 : Math.min(1200, drops.length*40 + 500);
+    obitShowT = setTimeout(function(){
+      if(holding) return;
+      obit.classList.add('on');
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ obit.classList.add('show'); }); });
+    }, wait);
+  }
+
+  /* ---------- input ---------- */
+  stage.addEventListener('pointerdown', function(ev){
+    if(ev.button !== undefined && ev.button !== 0) return;
+    ev.preventDefault();
+    try{ stage.setPointerCapture(ev.pointerId); }catch(e){}
+    beginHold();
+  });
+  stage.addEventListener('pointerup', function(){ endHold(); });
+  stage.addEventListener('pointercancel', function(){ endHold(); });
+  stage.addEventListener('contextmenu', function(ev){ if(holding) ev.preventDefault(); });
+  window.addEventListener('blur', function(){ endHold(); });
+  window.addEventListener('keydown', function(ev){
+    if(ev.repeat) return;
+    if(ev.code === 'Space' || ev.code === 'Enter'){
+      if(ev.target && (ev.target.tagName === 'BUTTON')) return;
+      ev.preventDefault();
+      beginHold();
+    }
+  });
+  window.addEventListener('keyup', function(ev){
+    if(ev.code === 'Space' || ev.code === 'Enter') endHold();
+  });
+})();
+</script>
+</body>
+</html>
