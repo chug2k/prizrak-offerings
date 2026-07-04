@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Gas Station Sommelier</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cellar:#120a08; --cellar-2:#1c110d; --cellar-3:#2a1812;
+    --cream:#f0e3cf; --parch:#dcc9aa; --ash:#9a8a76; --ash-2:#6b5e4e; --ash-3:#463c33;
+    --rule:rgba(240,227,207,.10); --rule-2:rgba(240,227,207,.20);
+    --wine:#7a1f2b; --wine-bright:#b8455a; --gold:#c9a44c; --gold-bright:#e8c870;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ background:var(--cellar); }
+  body{ color:var(--cream); font-family:'EB Garamond',Georgia,serif;
+    font-feature-settings:"liga" 1,"onum" 1; min-height:100vh; position:relative; overflow-x:hidden; }
+  body::before{ content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:radial-gradient(120% 70% at 50% -8%, rgba(201,164,76,.10), transparent 55%),
+               radial-gradient(90% 60% at 50% 120%, rgba(122,31,43,.16), transparent 60%),
+               var(--cellar); }
+  body::after{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .font-display{ font-family:'Cormorant Garamond',Georgia,serif; }
+  .font-mono{ font-family:'JetBrains Mono',ui-monospace,monospace; }
+  .gold{ color:var(--gold); } .gold-bright{ color:var(--gold-bright); }
+  .wine-c{ color:var(--wine-bright); }
+  ::selection{ background:rgba(201,164,76,.28); color:#fff; }
+  ::-webkit-scrollbar{ width:10px; } ::-webkit-scrollbar-thumb{ background:var(--cellar-3); border-radius:8px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  .kicker{ font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.24em; font-size:10px; color:var(--ash-2); }
+  .ornament{ text-align:center; color:var(--gold); letter-spacing:.4em; opacity:.5; font-size:13px; }
+  .card{
+    background:linear-gradient(180deg,var(--cellar-2),var(--cellar));
+    border:1px solid var(--rule); border-radius:4px; transition:border-color .25s,box-shadow .25s,transform .25s;
+  }
+  .card:hover{ border-color:var(--rule-2); box-shadow:0 0 50px -20px rgba(201,164,76,.3); }
+  .pick{ cursor:pointer; transition:transform .18s,border-color .18s,background .18s; }
+  .pick:hover{ transform:translateY(-2px); }
+  .pick.is-active{ border-color:var(--gold) !important; box-shadow:0 0 32px -10px rgba(201,164,76,.45); background:linear-gradient(180deg,var(--cellar-3),var(--cellar-2)); }
+  .pick.is-active .pick-star{ opacity:1; }
+  .pick-star{ opacity:0; transition:opacity .2s; }
+  .btn-pour{
+    font-family:'Cormorant Garamond',serif; font-style:italic; font-size:20px; font-weight:600;
+    color:var(--cellar); background:linear-gradient(180deg,var(--gold-bright),var(--gold));
+    border:0; border-radius:3px; padding:13px 34px; cursor:pointer; letter-spacing:.02em;
+    transition:transform .18s,box-shadow .18s,filter .18s; box-shadow:0 0 40px -12px rgba(201,164,76,.6);
+  }
+  .btn-pour:hover{ transform:translateY(-2px); box-shadow:0 0 56px -10px rgba(232,200,112,.7); filter:brightness(1.05); }
+  .btn-pour:active{ transform:translateY(0); }
+  .btn-pour:disabled{ filter:grayscale(.7) brightness(.7); cursor:not-allowed; transform:none; box-shadow:none; }
+  .tasting-row{ border-bottom:1px dotted var(--rule); padding:7px 0; display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
+  .tasting-row:last-child{ border-bottom:0; }
+  .tasting-label{ font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.14em; font-size:9.5px; color:var(--ash-2); white-space:nowrap; }
+  .tasting-val{ font-family:'EB Garamond',serif; font-style:italic; color:var(--cream); text-align:right; }
+  .reveal{ animation:fadeup .6s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeup{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:translateY(0);} }
+  .verdict-grade{ font-family:'Cormorant Garamond',serif; font-weight:700; line-height:1; }
+  .swirl{ display:inline-block; animation:swirl 8s linear infinite; }
+  @keyframes swirl{ from{ transform:rotate(0);} to{ transform:rotate(360deg);} }
+  .dot-gold{ display:inline-block; width:5px;height:5px;border-radius:50%; background:var(--gold); box-shadow:0 0 8px var(--gold); vertical-align:middle; margin:0 7px; }
+  @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } body::after{ display:none; } }
+</style>
+</head>
+<body>
+<div class="max-w-3xl mx-auto px-5 sm:px-8 py-10 sm:py-16">
+
+  <header class="text-center mb-10">
+    <div class="kicker mb-4">Connoisseur &middot; Curator &middot; Exit 14</div>
+    <h1 class="font-display" style="font-size:clamp(2.6rem,8vw,4.6rem);font-weight:600;line-height:.95;letter-spacing:-.01em">
+      The Gas Station <span class="gold-bright" style="font-style:italic;font-weight:500">Sommelier</span>
+    </h1>
+    <p class="ornament mt-4">&#10086; &middot; &#10086;</p>
+    <p class="mt-4 mx-auto" style="max-width:30rem;font-style:italic;font-size:16px;line-height:1.6;color:var(--parch)">
+      Every rotating rack hides a vintage. Every hot roller a terroir. Allow us to pair your convenience-store selections with the gravitas they have always quietly deserved.
+    </p>
+    <div class="kicker mt-5">Est. 2:47 AM &middot; The Illuminated Cooler</div>
+  </header>
+
+  <section id="select" class="mb-9">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="font-display gold" style="font-size:1.5rem;font-weight:500;font-style:italic">I. The Selection</h2>
+      <span class="kicker">choose your course</span>
+    </div>
+
+    <div class="mb-6">
+      <div class="kicker mb-3">The Snack &mdash; from the curated rack</div>
+      <div id="snackGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+    </div>
+
+    <div class="mb-7">
+      <div class="kicker mb-3">The Libation &mdash; from the chilled vault</div>
+      <div id="drinkGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+    </div>
+
+    <div class="text-center">
+      <button id="pourBtn" class="btn-pour" disabled>Compose the Tasting Flight &nbsp;&#10086;</button>
+      <p id="pourHint" class="kicker mt-3" style="opacity:.7">select one snack and one libation</p>
+    </div>
+  </section>
+
+  <section id="result" class="hidden"></section>
+
+  <section class="mt-12 text-center" style="border-top:1px solid var(--rule);padding-top:28px">
+    <div class="kicker mb-2">The Sommelier&rsquo;s Hand</div>
+    <p class="font-display" style="font-size:1.15rem;font-style:italic;color:var(--parch)">
+      <span class="swirl" style="color:var(--gold)">&#10086;</span> &nbsp; Today the house recommends <span id="houseSnack" class="gold"></span> alongside <span id="houseDrink" class="gold"></span>.
+    </p>
+    <p id="houseWhy" class="mt-1" style="font-style:italic;font-size:14px;color:var(--ash)"></p>
+    <button id="surpriseBtn" class="mt-4 font-display" style="font-style:italic;font-size:15px;color:var(--gold);background:none;border:1px solid var(--rule-2);border-radius:3px;padding:8px 20px;cursor:pointer;letter-spacing:.01em;transition:all .2s">A surprise pairing, if you please</button>
+  </section>
+
+  <footer class="mt-14 text-center" style="border-top:1px solid var(--rule);padding-top:22px">
+    <p class="font-display" style="font-style:italic;color:var(--ash-2);font-size:14px">&ldquo;One does not simply drink the Baja Blast. One <em>experiences</em> the Baja Blast.&rdquo;</p>
+    <p class="kicker mt-3">All vintages stored at 38&deg;F under fluorescent light &middot; no notes on the bill</p>
+  </footer>
+</div>
+
+<script>
+const SNACKS = [
+  { id:"slimjim",  name:"Slim Jim", icon:"\u{1F969}", sub:"Original \u00b7 cured meat stick", body:"a firm, almost geological density", notes:["smoky nitrite bloom","a whisper of mechanically separated poultry","a metallic finish reminiscent of pennies left in a glovebox"], terroir:"Pressed in a facility near the turnpike, Exit 9. The casing is touched by no human hand.", vintage:"Best consumed within 90 minutes of purchase, or upon the onset of regret." },
+  { id:"doritos-cr", name:"Cool Ranch Doritos", icon:"\u{1F7E2}", sub:"corn chip \u00b7 seasoned", body:"a delicate shatter, then a slow dissolution into powder", notes:["buttermilk powder and MSG in harmonious tension","a coolness that is not mint, not mint at all","fingers dyed an otherworldly green for hours hence"], terroir:"Corn grown where the soil knows the scent of diesel. The ranch dust arrives by a separate truck.", vintage:"Sealed bag: immortal. Opened bag: forty minutes before the stale sets in." },
+  { id:"doritos-nc", name:"Nacho Cheese Doritos", icon:"\u{1F7E0}", sub:"corn chip \u00b7 the classic", body:"a confident crunch that softens to a cheese-dust embrace", notes:["cheddar powder of indeterminate origin","a paprika warmth that builds","a saltiness that demands the next chip"], terroir:"The platonic ideal of the gas station corn chip. Born in the same factory as its rivals, crowned by accident.", vintage:"Peaks at 3 AM. Declines sharply once the bag passes the halfway fold." },
+  { id:"funyuns",   name:"Funyuns", icon:"\u{1F364}", sub:"onion-flavored rings", body:"a hollow architecture, a structural fragility", notes:["dehydrated onion essence, almost floral","a cornmeal ghost of the onion it never was","a crunch that leaves an echo"], terroir:"Shaped by the same machines that make packing peanuts. The resemblance is acknowledged and denied.", vintage:"Timeless. The ring does not age. It merely accumulates a softer sadness." },
+  { id:"cheetos-cr", name:"Crunchy Cheetos", icon:"\u{1F9E0}", sub:"cheese curls \u00b7 extruded", body:"a bright, aggressive snap followed by a savoury melt", notes:["cheese of a color found nowhere in nature","a heat that is not spice but simply flavor","the Cheeto dust, a pigment that outlasts the snack"], terroir:"Extruded at speed through a die that has never been photographed. The orange is proprietary.", vintage:"Eternally fresh. The Cheeto does not know decay. It knows only transfer." },
+  { id:"cheetos-puff", name:"Cheetos Puffs", icon:"\u2601\uFE0F", sub:"cheese curls \u00b7 puffed", body:"a cloud that collapses, a foam of cheese", notes:["an airy nothing that tastes of everything","a texture that confuses the jaw","the gentlest crime in the snack aisle"], terroir:"Inflated by a process the company calls puffing. The engineers call it something else.", vintage:"Best the moment the bag opens. Within ten minutes, the puff learns humility." },
+  { id:"combos",    name:"Combos", icon:"\u{1F369}", sub:"cracker/pretzel \u00b7 filled", body:"a dense tube with a hidden interior, a snack of secrets", notes:["the shell: salted, structural","the center: a paste of cheese or peanut butter, depending","a surprise in every cylinder"], terroir:"Filled by injection, like the smallest cannoli. The cracker variant is older; the pretzel, a modern indulgence.", vintage:"Shelf-stable across seasons. The filling matures not." },
+  { id:"beef-jerky", name:"Jack Link's Beef Jerky", icon:"\u{1F963}", sub:"dried beef \u00b7 the premium shelf", body:"a leather chew, a resistance that rewards patience", notes:["a sweet smoke, almost bourbon","a toughness that cleans the teeth","the most expensive item in the aisle, by weight"], terroir:"Dried by a method called kippering or something like it. The Sasquatch is a registered trademark.", vintage:"Improves not at all. But also does not decline. The jerky is the mountain of snacks." },
+  { id:"twinkie",   name:"Twinkie", icon:"\u{1F9C2}", sub:"cream-filled snack cake", body:"a sponge of impossible softness, a yielding", notes:["a cream that is not cream","a cake that is not cake","a shelf life measured in geological time"], terroir:"Baked in a continuous process that has not stopped since 1930. The recipe is the secret; the secret is the recipe.", vintage:"The Twinkie does not spoil. The Twinkie waits." },
+  { id:"poptart",   name:"Pop-Tart (Frosted Strawberry)", icon:"\u{1F349}", sub:"toaster pastry \u00b7 untoasted", body:"a pastry shell glazed in sugar, a reservoir of jam", notes:["a frosting that flakes upon contact","a filling that is more gel than fruit","best consumed cold, from the wrapper, as intended"], terroir:"Sealed in foil, two to a pack. The second Pop-Tart is a question only you can answer.", vintage:"The frosted variant is eternal. The unfrosted is a heresy." },
+  { id:"reeses",    name:"Reese's Cup", icon:"\u{1F95C}", sub:"peanut butter \u00b7 chocolate", body:"a layered disc, a balance of sweet and salt", notes:["a chocolate that is mostly wax","a peanut butter that is mostly sugar","together: an alchemy that transcends both"], terroir:"The cup shape is functional \u2014 it maximizes the chocolate-to-filling ratio dispute.", vintage:"Best at room temperature. Melted: tragic. Frozen: a different snack entirely." },
+  { id:"snickers",  name:"Snickers", icon:"\u{1F36B}", sub:"nougat \u00b7 caramel \u00b7 peanuts", body:"a dense, stratified bar of competing textures", notes:["a nougat of uncertain origin","a caramel that pulls at the fillings","peanuts, the only honest ingredient"], terroir:"Named after a horse. The horse is dead. The bar endures.", vintage:"You are not you when you are hungry. The bar remembers who you were." },
+  { id:"pringles",  name:"Pringles (Original)", icon:"\u{1F954}", sub:"potato crisp \u00b7 stacked", body:"a uniform curve, a designed crunch", notes:["a potato content of approximately 42%","a saddle shape engineered by Princeton mathematicians","a salt distribution of mathematical precision"], terroir:"The can is the product. The crisps are the proof.", vintage:"Once the seal breaks, the stack begins its long settling. The last crisp is the saddest." },
+  { id:"cheezits",  name:"Cheez-Its", icon:"\u{1F9C0}", sub:"baked snack crackers", body:"a baked square, a sharp snap", notes:["a cheese that has been baked into submission","a salt square pressed into the surface","a uniformity that borders on the authoritarian"], terroir:"Each cracker bears a single salt flake, placed by a machine that takes pride in its work.", vintage:"The box says cheese. The tongue agrees. The philosopher demurs." },
+  { id:"hot-cheetos", name:"Flamin' Hot Cheetos", icon:"\u{1F525}", sub:"cheese curls \u00b7 infernal", body:"a crunch that burns, a heat that lingers past reason", notes:["a red powder that stains skin, plastic, and reputation","a capsaicin that is not subtle","a snack that demands milk"], terroir:"Born, legend says, of a janitor's recipe. The heat is now manufactured at industrial scale.", vintage:"Do not look at your fingers. Do not touch your eyes. Do not look back." },
+  { id:"red-vines", name:"Red Vines", icon:"\u{1F534}", sub:"twisted candy \u00b7 red", body:"a chew that is also a tube, a structural licorice", notes:["a flavor that is red and nothing more specific","a plasticity that allows it to be used as a straw","a resilience that borders on the supernatural"], terroir:"Twisted, not extruded. The distinction matters to someone.", vintage:"The fresh vine is pliable. The stale vine is a weapon." },
+];
+
+const DRINKS = [
+  { id:"monster",  name:"Monster Energy", icon:"\u{1F7E2}", sub:"energy \u00b7 green claw", body:"a syrup that wakes the dead", notes:["a carbonation that bites the back of the throat","a sweetness with no discernible fruit origin","a taurine buzz that arrives, peaks, and abandons you"], terroir:"Canned by the lake, in a facility that hums. The claw reaches for something.", vintage:"Best ice cold. At room temperature, it becomes a medicine." },
+  { id:"redbull",  name:"Red Bull", icon:"\u{1F402}", sub:"energy \u00b7 the original", body:"a thin, sharp, almost medicinal fizz", notes:["a carbonation finer than champagne, it claims","a flavor described only as Red Bull flavor","wings, allegedly"], terroir:"Invented in Thailand, refined in Austria, consumed everywhere at 2 AM.", vintage:"The small can is correct. The large can is a cry for help." },
+  { id:"bajablast", name:"Mountain Dew Baja Blast", icon:"\u{1F30A}", sub:"citrus-charged \u00b7 teal", body:"a tropical effervescence, a wave", notes:["a teal that exists in no natural body of water","a lime that is not lime","a mist that lingers, described by fans as the blast"], terroir:"Born in a Taco Bell fountain, freed to the can. The origin story is half the myth.", vintage:"Once opened, drink swiftly. The blast does not keep." },
+  { id:"mtndew",   name:"Mountain Dew", icon:"\u{1F3D4}\uFE0F", sub:"citrus soda \u00b7 the hill", body:"a neon surge, a caffeinated yellow flood", notes:["a citrus that is to lemon what Pluto is to a planet","a sugar content that rewires the afternoon","a glow visible through the bottle"], terroir:"Invented in the hills of Tennessee as a whiskey mixer. It has forgotten its roots.", vintage:"Pours best at 4 AM during a final exam or a Skyrim session." },
+  { id:"coke",     name:"Coca-Cola", icon:"\u{1F964}", sub:"cola \u00b7 the classic", body:"a caramel burn, a familiar sting", notes:["a phosphoric acid bite that cleans pennies (do not test this)","a sweetness balanced by the bite","the most recognized flavor on the planet"], terroir:"The recipe is in a vault. The vault is in Atlanta. The flavor is everywhere.", vintage:"Best from a glass bottle, second from a can, last from the fountain." },
+  { id:"drpepper", name:"Dr Pepper", icon:"\u{1F9D5}", sub:"spiced cherry cola \u00b7 23 flavors", body:"a pruney, spiced complexity", notes:["a cherry that is also plum, also almond, also mystery","a spice rack collapsed into a single sip","the doctor has a PhD in ambiguity"], terroir:"Invented by a pharmacist in Waco, Texas. The 23 flavors are a closely guarded list.", vintage:"Served best over crushed ice at a small-town drive-in." },
+  { id:"arizona",  name:"Arizona Iced Tea", icon:"\u{1F352}", sub:"green tea \u00b7 99 cents", body:"a sweet, syrupy tea with a ginseng edge", notes:["a sweetness that approaches honey then keeps going","a ginseng note that adds a medicinal depth","a value proposition enforced by the can itself"], terroir:"Brewed in New York. The 99-cent price is printed on the can as a dare.", vintage:"The tall boy is the format. Pay a dollar, receive a cent. The ritual matters." },
+  { id:"celsius",  name:"Celsius", icon:"\u{1F321}\uFE0F", sub:"fitness energy \u00b7 the gym shelf", body:"a clean, almost medical fizz, a citrus bite", notes:["a flavor that announces its healthiness","a vitamin burn beneath the carbonation","a can that judges the snack you pair it with"], terroir:"Marketed to the active. Found between the protein bars and the regret.", vintage:"Best after a workout you did not do. The can does not need to know." },
+  { id:"bang",     name:"Bang Energy", icon:"\u{1F4A5}", sub:"energy \u00b7 the loud one", body:"a chemical intensity, a flavor of pure intent", notes:["a caffeine level that requires a warning label","a flavor name like Blue Razz or Rainbow Unicorn","a buzz that arrives as a shout"], terroir:"Manufactured in a facility that also makes the colors. All of the colors.", vintage:"Consumed by the young, the bold, and the soon-to-be-anxious." },
+  { id:"gatorade", name:"Gatorade (Lemon-Lime)", icon:"\u{1F34B}", sub:"sports drink \u00b7 the cooler", body:"a thin, salty-sweet electrolyte wash", notes:["a saltiness that is the point, not the flaw","a lemon-lime that is refreshingly vague","a hydration that is also a performance"], terroir:"Born on a Florida football field. The science is real; the color is theatrical.", vintage:"Best at the end of a sporting event you did not attend." },
+  { id:"cream-soda", name:"A&W Cream Soda", icon:"\u{1F366}", sub:"vanilla soda \u00b7 the gentler option", body:"a smooth, vanilla foam, a golden sweetness", notes:["a vanilla that is warm, almost butterscotch","a low carbonation, almost still","a nostalgia for a decade you did not live through"], terroir:"The root beer's softer cousin. Found in the back of the cooler, behind the populars.", vintage:"Best sipped, not gulped. The cream soda rewards patience." },
+  { id:"dpotlemonade", name:"Brisk Lemonade", icon:"\u{1F36B}", sub:"iced tea and lemonade \u00b7 the jug", body:"a tart, sugary Arnold Palmer variant", notes:["a lemon that puckers then sweetens","a tea note buried under sugar","a value format that signals commitment"], terroir:"Bottled by the gallon for those who thirst with conviction.", vintage:"The half-and-half is the balanced pour. The straight lemonade is a dare." },
+];
+
+const VERDICTS = {
+  heat_acid:   { grade:"C+", name:"A Provocation", body:"The heat of the snack collides with the acidity of the drink in a manner the house can only describe as eventful. Neither yields. The palate is a battlefield. Memorable, but the sommelier would not call it pleasant. Bring milk." },
+  heat_sweet:  { grade:"B",  name:"A Brave Contrast", body:"Fire meets sugar. The drink cools what the snack ignites, and the cycle renews. There is a logic here, primitive, ancient, the logic of a man who has been on the road too long. The sommelier respects it." },
+  cheese_citrus:{ grade:"A", name:"The Harmonic Pairing", body:"The fat of the cheese and the acid of the citrus achieve a balance that the sommelier did not expect to find at a gas station. This is, frankly, a real pairing. Do not overthink it. Enjoy." },
+  sweet_sweet:  { grade:"C", name:"The Sugar Spiral", body:"Both selections arrive sweet. The palate is overwhelmed. The sommelier foresees a crash within forty-five minutes. This is the pairing of a man who has given up on the afternoon. The house does not judge. The house observes." },
+  meat_caffeine:{ grade:"B+",name:"The Road Warrior", body:"Protein and caffeine, the fuel of the long-haul driver, the night-shift nurse, the student at the end of the semester. This pairing is functional. It is honest. It will keep you alive, which is, at this hour, the entire point." },
+  meat_tea:     { grade:"A-",name:"The Unexpected Gentility", body:"The cured meat and the sweet tea achieve an accidental sophistication. There is a Southern diner in this pairing, somewhere. The sommelier is quietly charmed." },
+  classic_classic:{ grade:"A",name:"The Platonic Ideal", body:"Two icons, together at last. Neither surprises the other. There is comfort in this, the comfort of the familiar, of the road well-traveled. The sommelier approves, with a small, knowing nod." },
+  default:      { grade:"B", name:"A Serviceable Pairing", body:"The selections do not fight, nor do they sing. They coexist, which is more than can be said for most pairings at 3 AM. The sommelier finds no fault and no revelation. Sometimes that is enough." },
+};
+
+const FLAVOR_MAP = {
+  "slimjim":"meat", "beef-jerky":"meat",
+  "doritos-cr":"cheese", "doritos-nc":"cheese", "cheetos-cr":"cheese", "cheetos-puff":"cheese", "hot-cheetos":"heat", "cheezits":"cheese",
+  "funyuns":"savory", "combos":"savory", "pringles":"savory",
+  "twinkie":"sweet", "poptart":"sweet", "reeses":"sweet", "snickers":"sweet", "red-vines":"sweet",
+};
+const DRINK_MAP = {
+  "monster":"caffeine", "redbull":"caffeine", "bang":"caffeine", "celsius":"caffeine",
+  "mtndew":"citrus", "bajablast":"citrus", "coke":"acid", "drpepper":"acid",
+  "arizona":"tea", "dpotlemonade":"tea",
+  "gatorade":"sweet", "cream-soda":"sweet",
+};
+
+function gradePairing(sId, dId){
+  const s = FLAVOR_MAP[sId] || "savory";
+  const d = DRINK_MAP[dId] || "acid";
+  const isCheeseSnack = (s==="cheese");
+  const isCitrusDrink = (d==="citrus");
+  const isAcidDrink = (d==="acid");
+  const isHeatSnack = (s==="heat");
+  const isSweetSnack = (s==="sweet");
+  const isSweetDrink = (d==="sweet");
+  const isMeat = (s==="meat");
+  const isCaffeine = (d==="caffeine");
+  const isTea = (d==="tea");
+  if(isHeatSnack && (isAcidDrink||isCitrusDrink)) return VERDICTS.heat_acid;
+  if(isHeatSnack && isSweetDrink) return VERDICTS.heat_sweet;
+  if(isHeatSnack && isTea) return VERDICTS.heat_sweet;
+  if(isCheeseSnack && isCitrusDrink) return VERDICTS.cheese_citrus;
+  if(isSweetSnack && isSweetDrink) return VERDICTS.sweet_sweet;
+  if(isMeat && isCaffeine) return VERDICTS.meat_caffeine;
+  if(isMeat && isTea) return VERDICTS.meat_tea;
+  if((sId==="doritos-nc"||sId==="doritos-cr") && dId==="mtndew") return VERDICTS.classic_classic;
+  if(sId==="reeses" && dId==="coke") return VERDICTS.classic_classic;
+  return VERDICTS.default;
+}
+
+const QUIPS = [
+  "The pairing suggests a long drive and a longer silence.",
+  "A bold choice. The sommelier would have chosen differently, but the sommelier is not you.",
+  "This flight pairs well with fluorescent lighting and a faint humming from the cooler.",
+  "There is a poetry here, if one squints.",
+  "The house recommends consuming this beside a vehicle you do not own.",
+  "An honest pairing for an honest hour.",
+  "The sommelier notes: this is better than it has any right to be.",
+  "Approach the pairing with an open mind and a closed car window.",
+  "A pairing that asks nothing of you and gives exactly that in return.",
+  "The sommelier detects notes of whatever was on special.",
+];
+
+const $ = s => document.querySelector(s);
+let selSnack=null, selDrink=null;
+
+function renderGrid(arr, containerId, kind){
+  const c = document.getElementById(containerId);
+  c.innerHTML = "";
+  arr.forEach(item=>{
+    const d = document.createElement("div");
+    d.className = "card pick p-3 text-center relative";
+    d.dataset.id = item.id;
+    d.innerHTML = '<div class="pick-star absolute top-1.5 right-2 gold-bright" style="font-size:10px">\u2726</div>' +
+      '<div style="font-size:26px;line-height:1">' + item.icon + '</div>' +
+      '<div class="font-display mt-1.5" style="font-size:14px;font-weight:600;color:var(--cream)">' + item.name + '</div>' +
+      '<div class="kicker mt-1" style="font-size:8.5px;letter-spacing:.12em">' + item.sub + '</div>';
+    d.addEventListener("click", ()=>{
+      if(kind==="snack"){ selSnack=item.id; document.querySelectorAll("#snackGrid .pick").forEach(p=>p.classList.remove("is-active")); }
+      else { selDrink=item.id; document.querySelectorAll("#drinkGrid .pick").forEach(p=>p.classList.remove("is-active")); }
+      d.classList.add("is-active");
+      checkReady();
+    });
+    c.appendChild(d);
+  });
+}
+
+function checkReady(){
+  const ready = selSnack && selDrink;
+  $("#pourBtn").disabled = !ready;
+  $("#pourHint").textContent = ready ? "the cellar awaits" : (selSnack ? "now, a libation" : (selDrink ? "now, a snack" : "select one snack and one libation"));
+}
+
+function gradeColor(g){
+  const letter = g.charAt(0);
+  if(letter==="A") return "#e8c870";
+  if(letter==="B") return "#c9a44c";
+  if(letter==="C") return "#b8455a";
+  return "#9a8a76";
+}
+
+function buildFlight(sId, dId){
+  const s = SNACKS.find(x=>x.id===sId);
+  const d = DRINKS.find(x=>x.id===dId);
+  const v = gradePairing(sId, dId);
+  const quip = QUIPS[Math.floor(Math.random()*QUIPS.length)];
+  return '<div class="reveal">' +
+    '<div class="flex items-baseline justify-between mb-4">' +
+      '<h2 class="font-display gold" style="font-size:1.5rem;font-weight:500;font-style:italic">II. The Tasting Flight</h2>' +
+      '<span class="kicker">' + s.name.split(" ")[0] + ' <span class="dot-gold"></span> ' + d.name.split(" ")[0] + '</span>' +
+    '</div>' +
+    '<div class="card p-6 sm:p-8">' +
+      '<div class="text-center pb-5" style="border-bottom:1px solid var(--rule)">' +
+        '<div class="kicker mb-2">the sommelier pronounces</div>' +
+        '<div class="font-display" style="font-size:2rem;font-weight:600;color:var(--gold-bright);line-height:1.05">' + v.name + '</div>' +
+        '<div class="flex items-center justify-center gap-3 mt-3">' +
+          '<span class="verdict-grade" style="font-size:2.6rem;color:' + gradeColor(v.grade) + '">' + v.grade + '</span>' +
+        '</div>' +
+        '<p class="mt-2 mx-auto" style="max-width:26rem;font-style:italic;font-size:15px;line-height:1.6;color:var(--parch)">' + v.body + '</p>' +
+      '</div>' +
+      '<div class="grid sm:grid-cols-2 gap-6 mt-6">' +
+        '<div>' +
+          '<div class="flex items-center gap-2 mb-3">' +
+            '<span style="font-size:24px">' + s.icon + '</span>' +
+            '<div><div class="font-display" style="font-size:1.15rem;font-weight:600;color:var(--cream)">' + s.name + '</div>' +
+            '<div class="kicker" style="font-size:8.5px">' + s.sub + '</div></div>' +
+          '</div>' +
+          '<div class="tasting-row"><span class="tasting-label">Body</span><span class="tasting-val">' + s.body + '</span></div>' +
+          '<div class="tasting-row"><span class="tasting-label">Tasting Notes</span></div>' +
+          '<div class="pl-1" style="font-size:13.5px;line-height:1.7;color:var(--parch);font-style:italic">' +
+            s.notes.map(n=>'\u2022 ' + n).join("<br>") +
+          '</div>' +
+          '<div class="tasting-row mt-1"><span class="tasting-label">Terroir</span><span class="tasting-val" style="max-width:16rem">' + s.terroir + '</span></div>' +
+          '<div class="tasting-row"><span class="tasting-label">Vintage</span><span class="tasting-val" style="max-width:16rem">' + s.vintage + '</span></div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="flex items-center gap-2 mb-3">' +
+            '<span style="font-size:24px">' + d.icon + '</span>' +
+            '<div><div class="font-display" style="font-size:1.15rem;font-weight:600;color:var(--cream)">' + d.name + '</div>' +
+            '<div class="kicker" style="font-size:8.5px">' + d.sub + '</div></div>' +
+          '</div>' +
+          '<div class="tasting-row"><span class="tasting-label">Body</span><span class="tasting-val">' + d.body + '</span></div>' +
+          '<div class="tasting-row"><span class="tasting-label">Tasting Notes</span></div>' +
+          '<div class="pl-1" style="font-size:13.5px;line-height:1.7;color:var(--parch);font-style:italic">' +
+            d.notes.map(n=>'\u2022 ' + n).join("<br>") +
+          '</div>' +
+          '<div class="tasting-row mt-1"><span class="tasting-label">Terroir</span><span class="tasting-val" style="max-width:16rem">' + d.terroir + '</span></div>' +
+          '<div class="tasting-row"><span class="tasting-label">Vintage</span><span class="tasting-val" style="max-width:16rem">' + d.vintage + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="mt-7 pt-5 text-center" style="border-top:1px solid var(--rule)">' +
+        '<div class="kicker mb-2">the sommelier\u2019s final note</div>' +
+        '<p class="font-display" style="font-size:1.2rem;font-style:italic;color:var(--gold)">\u201c' + quip + '\u201d</p>' +
+        '<p class="kicker mt-3">Total: $' + (4+Math.random()*7).toFixed(2) + ' \u00b7 paid in crumpled bills \u00b7 no receipt requested</p>' +
+      '</div>' +
+    '</div>' +
+    '<div class="text-center mt-6">' +
+      '<button id="againBtn" class="font-display" style="font-style:italic;font-size:15px;color:var(--gold);background:none;border:1px solid var(--rule-2);border-radius:3px;padding:8px 20px;cursor:pointer;transition:all .2s">Compose another flight</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function pour(){
+  if(!selSnack||!selDrink) return;
+  const r = $("#result");
+  r.classList.remove("hidden");
+  r.innerHTML = buildFlight(selSnack, selDrink);
+  $("#againBtn").addEventListener("click", ()=>{
+    r.classList.add("hidden");
+    r.innerHTML="";
+    $("#select").scrollIntoView({behavior:"smooth",block:"start"});
+  });
+  setTimeout(()=> r.scrollIntoView({behavior:"smooth",block:"start"}), 60);
+}
+
+function housePick(){
+  const s = SNACKS[Math.floor(Math.random()*SNACKS.length)];
+  const d = DRINKS[Math.floor(Math.random()*DRINKS.length)];
+  $("#houseSnack").textContent = s.name;
+  $("#houseDrink").textContent = d.name;
+  const v = gradePairing(s.id, d.id);
+  $("#houseWhy").textContent = v.name + " \u2014 " + v.body.split(".")[0] + ".";
+}
+
+renderGrid(SNACKS, "snackGrid", "snack");
+renderGrid(DRINKS, "drinkGrid", "drink");
+housePick();
+$("#pourBtn").addEventListener("click", pour);
+$("#surpriseBtn").addEventListener("click", ()=>{
+  selSnack = SNACKS[Math.floor(Math.random()*SNACKS.length)].id;
+  selDrink = DRINKS[Math.floor(Math.random()*DRINKS.length)].id;
+  document.querySelectorAll("#snackGrid .pick").forEach(p=>p.classList.toggle("is-active", p.dataset.id===selSnack));
+  document.querySelectorAll("#drinkGrid .pick").forEach(p=>p.classList.toggle("is-active", p.dataset.id===selDrink));
+  checkReady();
+  pour();
+});
+</script>
+</body>
+</html>
