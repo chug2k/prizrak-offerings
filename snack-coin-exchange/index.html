@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnackCoin Exchange 🪙 crunchy, decentralized, delicious</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+:root{--bg:#0d0e12;--panel:#15171f;--panel2:#1a1d27;--green:#00e676;--red:#ff5252;--gold:#ffd54f;--purple:#b388ff;--blue:#40c4ff;--text:#e8eaf0;--dim:#6b6f80;}
+*{box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;margin:0;overflow-x:hidden;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.up{color:var(--green);} .down{color:var(--red);}
+.flash-green{animation:flashG .6s;} .flash-red{animation:flashR .6s;}
+@keyframes flashG{0%{background:rgba(0,230,118,.15);}100%{background:transparent;}}
+@keyframes flashR{0%{background:rgba(255,82,82,.15);}100%{background:transparent;}}
+.ticker-track{display:inline-flex;gap:3rem;white-space:nowrap;animation:scroll 40s linear infinite;}
+@keyframes scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+.coin-card{background:var(--panel);border:1px solid #232634;border-radius:12px;transition:border-color .2s,transform .2s;overflow:hidden;}
+.coin-card:hover{border-color:#3a3f52;transform:translateY(-2px);}
+.spark{width:100%;height:48px;display:block;}
+.news-item{border-left:2px solid var(--purple);padding-left:10px;}
+.glow-gold{box-shadow:0 0 24px -6px var(--gold);}
+.btn-buy{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.3);}
+.btn-buy:hover{background:rgba(0,230,118,.22);}
+.btn-sell{background:rgba(255,82,82,.12);color:var(--red);border:1px solid rgba(255,82,82,.3);}
+.btn-sell:hover{background:rgba(255,82,82,.22);}
+.modal-bg{background:rgba(0,0,0,.7);backdrop-filter:blur(4px);}
+.toast{animation:slideIn .3s ease,fadeOut .4s ease 2.6s forwards;}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+@keyframes fadeOut{to{opacity:0;transform:translateY(-10px);}}
+.scanline{background:repeating-linear-gradient(0deg,rgba(255,255,255,.01) 0px,rgba(255,255,255,.01) 1px,transparent 1px,transparent 3px);}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+::-webkit-scrollbar{width:8px;height:8px;}::-webkit-scrollbar-thumb{background:#2a2d3a;border-radius:4px;}::-webkit-scrollbar-track{background:transparent;}
+.rainbow-text{background:linear-gradient(90deg,var(--gold),var(--purple),var(--blue),var(--green),var(--gold));background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:rainbow 3s linear infinite;}
+@keyframes rainbow{to{background-position:200% center;}}
+</style>
+</head>
+<body class="scanline">
+
+<!-- Ticker bar -->
+<div class="overflow-hidden py-2 border-b border-[#232634]" style="background:var(--panel)">
+<div class="ticker-track mono text-xs" id="ticker"></div>
+</div>
+
+<!-- Header -->
+<header class="max-w-6xl mx-auto px-4 pt-6 pb-3">
+<div class="flex items-end justify-between flex-wrap gap-4">
+<div>
+<h1 class="text-3xl sm:text-4xl font-bold tracking-tight">
+<span class="rainbow-text">SnackCoin</span> <span class="text-2xl">🪙</span>
+</h1>
+<p class="text-sm mono mt-1" style="color:var(--dim)">The world's crunchiest decentralized snack-powered exchange</p>
+</div>
+<div class="text-right">
+<div class="mono text-xs" style="color:var(--dim)">PORTFOLIO VALUE</div>
+<div class="text-3xl font-bold mono" id="portfolioValue">$10,000.00</div>
+<div class="mono text-xs" id="pnlText" style="color:var(--dim)">+$0.00 (0.00%) all time</div>
+</div>
+</div>
+<div class="flex items-center gap-4 mt-3 text-xs mono" style="color:var(--dim)">
+<span class="flex items-center gap-1"><span class="pulse-dot"></span> MARKET OPEN</span>
+<span>💰 Cash: <span id="cashBalance" class="text-white">$10,000.00</span></span>
+<span>📊 Coins traded: <span id="coinCount" class="text-white">12</span></span>
+<span>🔥 Trades: <span id="tradeCount" class="text-white">0</span></span>
+</div>
+</header>
+
+<!-- News feed -->
+<div class="max-w-6xl mx-auto px-4 mb-4">
+<div class="flex items-center gap-2 mb-2">
+<span class="mono text-xs" style="color:var(--purple)">📡 LIVE MARKET FEED</span>
+</div>
+<div id="newsFeed" class="space-y-2 max-h-28 overflow-y-auto pr-2"></div>
+</div>
+
+<main class="max-w-6xl mx-auto px-4 pb-8">
+<div id="coinGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+</main>
+
+<!-- Analyst Section -->
+<section class="max-w-6xl mx-auto px-4 pb-10">
+<div class="rounded-xl p-5" style="background:var(--panel);border:1px solid #232634">
+<div class="flex items-center gap-2 mb-3">
+<span class="text-xl">🎤</span>
+<h2 class="font-bold text-lg">SnackStreet Bets — Analyst Hot Take</h2>
+<span class="mono text-xs px-2 py-0.5 rounded-full" style="background:rgba(255,213,79,.15);color:var(--gold)">DYOR</span>
+</div>
+<div id="analystBox" class="text-sm leading-relaxed" style="color:var(--text)"></div>
+<button onclick="newHotTake()" class="mt-3 mono text-xs px-3 py-1.5 rounded-lg" style="background:var(--panel2);border:1px solid #3a3f52;color:var(--gold)">🎲 New Hot Take →</button>
+</div>
+</section>
+
+<footer class="max-w-6xl mx-auto px-4 pb-10 text-center">
+<p class="mono text-xs" style="color:var(--dim)">SnackCoin is 100% fictional. No real snacks were traded. Not financial advice. Not snack advice. This is a game.</p>
+<p class="mono text-xs mt-1" style="color:var(--dim)">Built in the dark by Prízrak · One offering at a time</p>
+</footer>
+
+<!-- Toast container -->
+<div id="toasts" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+<!-- Trade modal -->
+<div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg" onclick="if(event.target===this)closeModal()">
+<div class="rounded-2xl p-6 max-w-sm w-full mx-4" style="background:var(--panel2);border:1px solid #3a3f52">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-bold text-lg" id="modalTitle">Trade</h3>
+<button onclick="closeModal()" class="mono text-sm" style="color:var(--dim)">✕</button>
+</div>
+<div class="mono text-xs mb-3" style="color:var(--dim)">
+<div>Price: <span id="modalPrice" class="text-white"></span></div>
+<div>You hold: <span id="modalHolding" class="text-white"></span></div>
+<div>Cash: <span id="modalCash" class="text-white"></span></div>
+</div>
+<div class="mb-3">
+<label class="mono text-xs" style="color:var(--dim)">Amount (coins)</label>
+<input id="modalAmount" type="number" min="0" step="any" value="0" class="w-full mt-1 px-3 py-2 rounded-lg mono text-white outline-none" style="background:var(--bg);border:1px solid #3a3f52">
+<div class="mono text-xs mt-1" id="modalCost" style="color:var(--dim)"></div>
+</div>
+<div class="flex gap-3 mt-4">
+<button id="modalBuyBtn" class="btn-buy flex-1 py-2.5 rounded-lg font-bold mono">BUY</button>
+<button id="modalSellBtn" class="btn-sell flex-1 py-2.5 rounded-lg font-bold mono">SELL</button>
+</div>
+</div>
+</div>
+
+<script>
+const COINS = [
+  {sym:"DORITO",name:"DoritoCoin",emoji:"🔺",price:4.20,base:4.20,vol:.06,desc:"The original. Bold. Nacho. Decentralized."},
+  {sym:"PRINGL",name:"PringleToken",emoji:"🥫",price:12.50,base:12.50,vol:.04,desc:"Uniform curvature. Stackable yield farming."},
+  {sym:"CHEEZ",name:"Cheez-It Cash",emoji:"🧀",price:0.85,base:0.85,vol:.09,desc:"Baked, not fried. Low market cap, high melt."},
+  {sym:"GOLDF",name:"Goldfish Gold",emoji:"🐟",price:2.10,base:2.10,vol:.07,desc:"The snack that smiles back. On-chain."},
+  {sym:"PRETZ",name:"PretzelDAO",emoji:"🥨",price:6.75,base:6.75,vol:.05,desc:"Twisted governance. Salty staking rewards."},
+  {sym:"CHIP",name:"Lays Layer-2",emoji:"🍟",price:1.55,base:1.55,vol:.11,desc:"You can't trade just one. Gasless transactions."},
+  {sym:"MNCH",name:"MunchOS",emoji:"🍫",price:9.30,base:9.30,vol:.08,desc:"Chocolate-coated smart contracts. melts at 37°C."},
+  {sym:"POPC",name:"Popcorn Protocol",emoji:"🍿",price:3.33,base:3.33,vol:.10,desc:"Kernel-based consensus. 100x leverage available."},
+  {sym:"OREO",name:"Oreo Black",emoji:"🍪",price:7.77,base:7.77,vol:.03,desc:"Dark pool liquidity. Cream-filled dividends."},
+  {sym:"TRKY",name:"Turkey Jerky",emoji:"🦃",price:15.90,base:15.90,vol:.12,desc:"Dehydrated value. Long-term HODL protein."},
+  {sym:"CHDR",name:"Cheddar Bunnies",emoji:"🐰",price:5.55,base:5.55,vol:.06,desc:"Organic consensus mechanism. Hop-governed."},
+  {sym:"SKITT",name:"SkittleCoin",emoji:"🌈",price:0.42,base:0.42,vol:.15,desc:"Taste the rainbow. Pegged to vibes."},
+];
+// Add price history arrays
+COINS.forEach(c=>{c.hist=Array.from({length:30},()=>c.base);c.change24=0;});
+
+let portfolio = {cash:10000, holdings:{}}; // sym -> amount
+let tradeCount = 0;
+let newsHistory = [];
+
+const NEWS_EVENTS = [
+  {txt:"🔥 Whale wallet 'snackLord42' just bought 50,000 DORITO. Dorito Bros nod approvingly.",coin:"DORITO",dir:1,mag:.03},
+  {txt:"📉 Someone left a bag of Lays open overnight. CHIP dumps 8% on 'stale' fears.",coin:"CHIP",dir:-1,mag:.04},
+  {txt:"🚀 Popcorn Protocol announces 'Extra Butter' upgrade. POPC melting faces.",coin:"POPC",dir:1,mag:.05},
+  {txt:"🧀 Cheez-It Cash founder arrested for embezzlement of the cheese. CHEEZ in freefall.",coin:"CHEEZ",dir:-1,mag:.06},
+  {txt:"🐰 Cheddar Bunnies hops to new ATH after partnership with Hasbro announced.",coin:"CHDR",dir:1,mag:.04},
+  {txt:"🥨 PretzelDAO governance vote fails. Community is... salty.",coin:"PRETZ",dir:-1,mag:.03},
+  {txt:"🥫 PringleToken confirms: the can IS half empty. Supply shock incoming.",coin:"PRINGL",dir:1,mag:.02},
+  {txt:"🐟 Goldfish Gold spotted in the wild. Bioluminescent liquidity pools forming.",coin:"GOLDF",dir:1,mag:.035},
+  {txt:"🍫 MunchOS audit reveals 60% cocoa. Rug pull averted. Devs celebrate with chocolate.",coin:"MNCH",dir:1,mag:.025},
+  {txt:"🍪 Oreo Black side-chain: 'Double Stuf' rejected by community as inflationary.",coin:"OREO",dir:-1,mag:.02},
+  {txt:"🦃 Turkey Jerky halving event: jerky slices now 50% thinner. HODLers unfazed.",coin:"TRKY",dir:1,mag:.03},
+  {txt:"🌈 SkittleCoin experiences extreme volatility. Rainbow-colored candlesticks. Nobody surprised.",coin:"SKITT",dir:1,mag:.08},
+  {txt:"⚡ DoritoCoin 'Cool Ranch' fork scheduled for Q3. Community split: Nacho vs. Ranch.",coin:"DORITO",dir:1,mag:.02},
+  {txt:"📢 BREAKING: exchange toilet overflowed. All coins slightly damp. Market wobbles.",coin:null,dir:0,mag:0},
+  {txt:"🐻 Bear market? Bear CLAW market. Pastry futures up 200%. (not on this exchange)",coin:null,dir:0,mag:0},
+  {txt:"📈 Institutional investors 'finally getting hungry' for snack-backed assets.",coin:null,dir:1,mag:.01},
+  {txt:"🎭 PringleToken found to be... not actually Pringles. Community outraged, then hungry.",coin:"PRINGL",dir:-1,mag:.04},
+  {txt:"🧂 Global salt shortage fear. Salty snacks pump across the board.",coin:null,dir:1,mag:.015},
+  {txt:"🌋 DoritoCoin volcano meme goes viral on SnackTok. To the moon? To the volcano?",coin:"DORITO",dir:1,mag:.04},
+  {txt:"😴 Turkey Jerky founder falls asleep mid-AMA. Community interprets as 'comfy'. TRKY pumps.",coin:"TRKY",dir:1,mag:.03},
+  {txt:"🤡 Clown-shaped goldfish cracker discovered in bag. GOLDF community declares it a religious icon.",coin:"GOLDF",dir:1,mag:.05},
+  {txt:"💥 SkittleCoin liquidates $2M in long positions. 'Tasted the rainbow too hard,' says analyst.",coin:"SKITT",dir:-1,mag:.07},
+  {txt:"🥁 Anonymous drummer eats entire bag of Cheddar Bunnies during earnings call. CHDR unaffected.",coin:"CHDR",dir:0,mag:0},
+  {txt:"🪙 SnackCoin Exchange hits 1 billion imaginary transactions. We are unstoppable.",coin:null,dir:0,mag:0},
+  {txt:"🔥 Popcorn Protocol microwaved too long. Burned batch. POPC scorched.",coin:"POPC",dir:-1,mag:.05},
+  {txt:"🍪 Oreo launches limited edition 'Mega Stuf'. Yield farmers ecstatic.",coin:"OREO",dir:1,mag:.03},
+];
+
+const HOT_TAKES = [
+  "🚀 Look, I'm not saying DoritoCoin is the next Bitcoin. I'm saying Bitcoin wishes it was the next DoritoCoin. The Nacho Cheese consensus layer is fundamentally undervalued at $%DORITO%. We're looking at a 50x from here, minimum. This is not financial advice. This is snack advice. DYOR but also just look at the chip. It's a triangle. Triangles are the strongest shape. Bullish.",
+  "🐻 Honestly? I'm bearish on PringleToken. The curvature is too uniform. Nature abhors a perfectly stackable cylinder. When was the last time you saw a perfect cylinder in nature? Never. Pringles are an engineering marvel but a terrible store of value. My price target: the floor. Sell your PRINGL, buy GOLDF. Fish are natural. Fish survived the dinosaur extinction. Goldfish Gold is the only snack with proven evolutionary resilience.",
+  "💎 Cheez-It Cash at $%CHEEZ% is the trade of the century. You know why? Because it's BAKED. Not fried. That means it's HEALTHY. Healthy snacks are the future. Institutional money hasn't woken up to baked snacks yet. When BlackRock files for a Cheez-It ETF, you'll wish you bought at $%CHEEZ%. I'm loading up. This is my conviction play. The cheese is real. The crackers are real. The gains will be real.",
+  "🤡 Everyone sleeping on SkittleCoin at $%SKITT%. Yes, it's volatile. Yes, it's pegged to vibes. But vibes are the largest untapped market in human history. The entire global economy runs on vibes and nobody has tokenized them yet — except SkittleCoin. $0.42 is ground floor. When vibes go mainstream (they already are), this thing does a 1000x. Rainbow season is coming.",
+  "💀 I'll say what nobody else will: Turkey Jerky is a DEAD COIN. Who trades jerky? Cowboys. Cowboys don't use computers. The entire TRKY volume is one guy named Hank in Wyoming. There's no liquidity. There's no roadmap. The halving made the jerky THINNER. That's bearish. You want protein on-chain? Wait for the Beef Jerky fork. TRKY is a value trap. Avoid.",
+  "🌈 My portfolio is simple: 40% DoritoCoin, 30% SkittleCoin, 20% Goldfish, 10% whatever Oreo Black is doing. Diversification across the snack spectrum. Crunchy, chewy, and chocolate. If one sector tanks, the others carry you. This is Modern Snack Theory and I will not be taking questions. The rainbow doesn't lie.",
+  "🐋 I just aped $5,000 into Popcorn Protocol and I'm not sorry. The Extra Butter upgrade is going to change everything. Do you understand what 'extra butter' means in DeFi terms? It means MORE YIELD. Butter = yield. It's right there in the whitepaper (which is just a picture of popcorn). POPC at $%POPC% is still early. We haven't even microwaved the second batch yet.",
+  "🧠 Hot take: PretzelDAO is the only coin with real governance. Why? Because pretzels are TWISTED. You can't have twisted governance on a flat chip. The twists create natural checks and balances. The salt creates natural friction. This is the most decentralized snack in existence. PRETZ at $%PRETZ% is criminally undervalued. The twist is the technology.",
+];
+
+function fmt(n){return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtP(n){return (n>=0?'+':'')+n.toFixed(2)+'%';}
+
+function toast(msg,color){
+  const t=document.createElement('div');
+  t.className='toast rounded-lg px-4 py-2 mono text-sm font-bold';
+  t.style.background='var(--panel2)';t.style.border='1px solid '+(color||'#3a3f52');
+  t.style.color=color||'var(--text)';
+  t.textContent=msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+function portfolioValue(){
+  let v=portfolio.cash;
+  COINS.forEach(c=>{v+=(portfolio.holdings[c.sym]||0)*c.price;});
+  return v;
+}
+
+function updatePortfolio(){
+  const v=portfolioValue();
+  const pnl=v-10000;
+  const pct=(pnl/10000)*100;
+  document.getElementById('portfolioValue').textContent=fmt(v);
+  document.getElementById('cashBalance').textContent=fmt(portfolio.cash);
+  const pnlEl=document.getElementById('pnlText');
+  pnlEl.textContent=`${pnl>=0?'+':''}${fmt(pnl).replace('$','$')} (${fmtP(pct)}) all time`;
+  pnlEl.style.color=pnl>=0?'var(--green)':'var(--red)';
+}
+
+function renderCoins(){
+  const grid=document.getElementById('coinGrid');
+  grid.innerHTML='';
+  COINS.forEach((c,i)=>{
+    const hold=portfolio.holdings[c.sym]||0;
+    const ch=c.change24;
+    const card=document.createElement('div');
+    card.className='coin-card p-4';
+    card.id='card-'+c.sym;
+    card.innerHTML=`
+      <div class="flex items-start justify-between mb-1">
+        <div class="flex items-center gap-2">
+          <span style="font-size:1.6rem">${c.emoji}</span>
+          <div>
+            <div class="font-bold text-sm">${c.name}</div>
+            <div class="mono text-xs" style="color:var(--dim)">$${c.sym}</div>
+          </div>
+        </div>
+        <span class="mono text-xs font-bold ${ch>=0?'up':'down'}">${fmtP(ch)}</span>
+      </div>
+      <div class="mono text-xl font-bold" id="price-${c.sym}">${fmt(c.price)}</div>
+      <canvas class="spark mt-1" id="spark-${c.sym}" width="300" height="48"></canvas>
+      <div class="text-xs mt-1 mb-3" style="color:var(--dim)">${c.desc}</div>
+      ${hold>0?`<div class="mono text-xs mb-2" style="color:var(--gold)">📦 Holding: ${hold.toFixed(2)} (${fmt(hold*c.price)})</div>`:''}
+      <div class="flex gap-2">
+        <button class="btn-buy flex-1 py-1.5 rounded-lg mono text-xs font-bold" onclick="openModal('${c.sym}')">TRADE</button>
+      </div>`;
+    grid.appendChild(card);
+    drawSpark(c.sym);
+  });
+}
+
+function drawSpark(sym){
+  const c=COINS.find(x=>x.sym===sym);
+  const cv=document.getElementById('spark-'+sym);
+  if(!cv)return;
+  const ctx=cv.getContext('2d');
+  const w=cv.width,h=cv.height;
+  const data=c.hist;
+  const min=Math.min(...data),max=Math.max(...data);
+  const range=(max-min)||1;
+  ctx.clearRect(0,0,w,h);
+  const col=c.change24>=0?'#00e676':'#ff5252';
+  ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();
+  data.forEach((v,i)=>{
+    const x=(i/(data.length-1))*w;
+    const y=h-((v-min)/range)*(h-8)-4;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // fill gradient
+  ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();
+  const grad=ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,col+'22');grad.addColorStop(1,col+'02');
+  ctx.fillStyle=grad;ctx.fill();
+}
+
+function tickPrices(){
+  COINS.forEach(c=>{
+    // Random walk
+    const drift=(Math.random()-0.5)*2*c.vol;
+    // Apply pending news effect
+    if(c._newsEffect&&c._newsEffect>0){
+      c._newsEffect*=0.85;
+    }
+    const totalDrift=drift+(c._newsEffect||0);
+    c.price=Math.max(0.01,c.price*(1+totalDrift));
+    c._newsEffect=(c._newsEffect||0)*0.5;
+    c.hist.push(c.price);
+    if(c.hist.length>30)c.hist.shift();
+    c.change24=((c.price-c.base)/c.base)*100;
+  });
+}
+
+function refreshPrices(){
+  COINS.forEach(c=>{
+    const el=document.getElementById('price-'+c.sym);
+    if(!el)return;
+    const old=parseFloat(el.textContent.replace(/[$,]/g,''));
+    el.textContent=fmt(c.price);
+    const card=document.getElementById('card-'+c.sym);
+    if(card){
+      card.classList.remove('flash-green','flash-red');
+      void card.offsetWidth;
+      card.classList.add(c.price>=old?'flash-green':'flash-red');
+    }
+    const chEl=card?card.querySelector('.mono.text-xs.font-bold'):null;
+    if(chEl){chEl.textContent=fmtP(c.change24);chEl.className='mono text-xs font-bold '+(c.change24>=0?'up':'down');}
+    drawSpark(c.sym);
+    // update holding display
+    const hold=portfolio.holdings[c.sym]||0;
+    let holdEl=card?card.querySelector('[style*="var(--gold)"]'):null;
+    if(hold>0){
+      if(!holdEl&&card){
+        const div=document.createElement('div');
+        div.className='mono text-xs mb-2';
+        div.style.color='var(--gold)';
+        card.insertBefore(div,card.querySelector('.flex.gap-2'));
+        holdEl=div;
+      }
+      if(holdEl)holdEl.textContent=`📦 Holding: ${hold.toFixed(2)} (${fmt(hold*c.price)})`;
+    }else if(holdEl){holdEl.remove();}
+  });
+  updatePortfolio();
+  updateTicker();
+}
+
+function updateTicker(){
+  const track=document.getElementById('ticker');
+  const items=COINS.map(c=>`<span>${c.emoji} ${c.sym} <span class="${c.change24>=0?'up':'down'}">${fmt(c.price)} (${fmtP(c.change24)})</span></span>`);
+  track.innerHTML=items.join('')+items.join(''); // duplicate for seamless loop
+}
+
+function pushNews(){
+  const ev=NEWS_EVENTS[Math.floor(Math.random()*NEWS_EVENTS.length)];
+  newsHistory.unshift(ev);
+  if(newsHistory.length>20)newsHistory.pop();
+  if(ev.coin&&ev.dir!==0){
+    const c=COINS.find(x=>x.sym===ev.coin);
+    if(c)c._newsEffect=(c._newsEffect||0)+ev.dir*ev.mag;
+  }
+  renderNews();
+}
+
+function renderNews(){
+  const feed=document.getElementById('newsFeed');
+  feed.innerHTML='';
+  newsHistory.slice(0,6).forEach(n=>{
+    const d=document.createElement('div');
+    d.className='news-item text-xs mono';
+    d.style.color='var(--text)';
+    d.innerHTML=n.txt;
+    feed.appendChild(d);
+  });
+}
+
+function newHotTake(){
+  const take=HOT_TAKES[Math.floor(Math.random()*HOT_TAKES.length)];
+  let html=take;
+  COINS.forEach(c=>{html=html.replaceAll('%'+c.sym+'%',c.price.toFixed(2));});
+  document.getElementById('analystBox').innerHTML=html;
+}
+
+// Trading
+let modalCoin=null;
+function openModal(sym){
+  modalCoin=COINS.find(c=>c.sym===sym);
+  const hold=portfolio.holdings[sym]||0;
+  document.getElementById('modalTitle').innerHTML=`${modalCoin.emoji} ${modalCoin.name}`;
+  document.getElementById('modalPrice').textContent=fmt(modalCoin.price);
+  document.getElementById('modalHolding').textContent=hold.toFixed(4)+' '+sym;
+  document.getElementById('modalCash').textContent=fmt(portfolio.cash);
+  document.getElementById('modalAmount').value='0';
+  document.getElementById('modalCost').textContent='';
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modal').classList.add('flex');
+}
+function closeModal(){
+  document.getElementById('modal').classList.add('hidden');
+  document.getElementById('modal').classList.remove('flex');
+  modalCoin=null;
+}
+document.getElementById('modalAmount').addEventListener('input',()=>{
+  if(!modalCoin)return;
+  const amt=parseFloat(document.getElementById('modalAmount').value)||0;
+  document.getElementById('modalCost').textContent=`= ${fmt(amt*modalCoin.price)}`;
+});
+document.getElementById('modalBuyBtn').addEventListener('click',()=>{
+  if(!modalCoin)return;
+  const amt=parseFloat(document.getElementById('modalAmount').value)||0;
+  if(amt<=0){toast('Enter an amount > 0','#ff5252');return;}
+  const cost=amt*modalCoin.price;
+  if(cost>portfolio.cash){toast('Not enough cash!','#ff5252');return;}
+  portfolio.cash-=cost;
+  portfolio.holdings[modalCoin.sym]=(portfolio.holdings[modalCoin.sym]||0)+amt;
+  tradeCount++;
+  document.getElementById('tradeCount').textContent=tradeCount;
+  toast(`✅ Bought ${amt.toFixed(2)} ${modalCoin.sym}`,'#00e676');
+  updatePortfolio();
+  closeModal();
+  renderCoins();
+});
+document.getElementById('modalSellBtn').addEventListener('click',()=>{
+  if(!modalCoin)return;
+  const amt=parseFloat(document.getElementById('modalAmount').value)||0;
+  if(amt<=0){toast('Enter an amount > 0','#ff5252');return;}
+  const hold=portfolio.holdings[modalCoin.sym]||0;
+  if(amt>hold){toast(`You only hold ${hold.toFixed(2)} ${modalCoin.sym}`,'#ff5252');return;}
+  portfolio.cash+=amt*modalCoin.price;
+  portfolio.holdings[modalCoin.sym]-=amt;
+  if(portfolio.holdings[modalCoin.sym]<0.0001)delete portfolio.holdings[modalCoin.sym];
+  tradeCount++;
+  document.getElementById('tradeCount').textContent=tradeCount;
+  toast(`💰 Sold ${amt.toFixed(2)} ${modalCoin.sym}`,'#ffd54f');
+  updatePortfolio();
+  closeModal();
+  renderCoins();
+});
+
+// Init
+renderCoins();
+updatePortfolio();
+updateTicker();
+// Seed some initial news
+for(let i=0;i<4;i++){const ev=NEWS_EVENTS[i];newsHistory.push(ev);}
+renderNews();
+newHotTake();
+
+// Loops
+setInterval(()=>{tickPrices();refreshPrices();},2500);
+setInterval(pushNews,8000);
+pushNews();
+</script>
+</body>
+</html>
