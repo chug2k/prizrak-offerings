@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Fridge Weather Service</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky:#0b1622; --sky2:#0f2030; --sky3:#142b3e;
+    --ice:#7fd8e8; --ice2:#4ea8bd; --frost:#d6f0f5;
+    --amber:#e8b96a; --warm:#d97a4a; --warm2:#a8502f;
+    --moss:#7fae6b; --grape:#9b7fb8; --pink:#d98fb0;
+    --bone:#e8f1f4; --ash:#8ba0ac; --ash2:#5f7785; --ash3:#3e525e;
+    --line:rgba(127,216,232,.10); --line2:rgba(127,216,232,.22);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--sky);color:var(--bone);font-family:'Space Grotesk',system-ui,sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:"";position:fixed;inset:0;z-index:-3;pointer-events:none;
+    background:radial-gradient(120% 70% at 30% -8%,rgba(127,216,232,.08),transparent 55%),
+               radial-gradient(100% 60% at 80% 110%,rgba(155,127,184,.08),transparent 55%),var(--sky);}
+  body::after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;opacity:.05;mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+  .display{font-family:'Fraunces',Georgia,serif;}
+  .kicker{font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.24em;font-size:10px;color:var(--ash2);}
+  ::selection{background:rgba(127,216,232,.25);color:#fff;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#1c3447;border-radius:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  .ico{display:inline-block;vertical-align:middle;}
+  .fridge-shell{position:relative;width:100%;max-width:420px;margin:0 auto;border-radius:14px;
+    background:linear-gradient(180deg,#e6edf0,#cdd9df);padding:9px;
+    box-shadow:0 30px 80px -24px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.18) inset,0 2px 0 rgba(255,255,255,.5) inset;}
+  .fridge-door-h{position:absolute;right:-13px;top:42%;width:14px;height:58px;border-radius:2px;background:linear-gradient(90deg,#a9b8c0,#cdd9df);box-shadow:0 0 0 1px rgba(0,0,0,.12);}
+  .fridge-interior{border-radius:9px;overflow:hidden;background:#1d2e3a;display:flex;flex-direction:column;}
+  .zone{position:relative;cursor:pointer;transition:filter .2s,transform .18s;border-bottom:1px solid rgba(255,255,255,.05);}
+  .zone:last-child{border-bottom:0;}
+  .zone:hover{filter:brightness(1.18);transform:scale(1.012);z-index:2;}
+  .zone.sel{box-shadow:inset 0 0 0 2px var(--ice),inset 0 0 30px rgba(127,216,232,.12);}
+  .zone-temp{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;color:rgba(255,255,255,.9);text-shadow:0 1px 3px rgba(0,0,0,.5);}
+  .zone-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);}
+  .zone-cond{font-size:11px;color:rgba(255,255,255,.7);font-weight:500;}
+  .drawer-handle{height:5px;background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(0,0,0,.22));border-radius:1px;width:62%;margin:2px auto;opacity:.6;}
+  .shelf-line{height:2px;background:rgba(255,255,255,.07);}
+  .gauges .bar{height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;}
+  .gauges .fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.2,.7,.2,1);}
+  @keyframes pulse{0%,100%{opacity:.55;}50%{opacity:1;}}
+  .pulse{animation:pulse 2.2s ease-in-out infinite;}
+  @keyframes rise{from{opacity:0;transform:translateY(9px);}to{opacity:1;transform:translateY(0);}}
+  .rise{animation:rise .4s cubic-bezier(.2,.7,.2,1) both;}
+  @keyframes drift{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .drift{animation:drift .35s ease both;}
+  .alert-banner{background:linear-gradient(90deg,rgba(217,122,74,.18),rgba(217,122,74,.06));border:1px solid rgba(217,122,74,.4);border-radius:6px;}
+  .advisory-pill{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:2px 8px;display:inline-block;}
+  .refresh-btn{font-family:'IBM Plex Mono',monospace;font-weight:600;text-transform:uppercase;letter-spacing:.14em;font-size:11px;
+    background:linear-gradient(180deg,var(--ice2),#3a8ba0);color:#08161f;border:0;border-radius:7px;padding:11px 18px;cursor:pointer;
+    transition:transform .12s,box-shadow .2s,filter .2s;box-shadow:0 6px 22px -8px rgba(127,216,232,.6);}
+  .refresh-btn:hover{filter:brightness(1.08);box-shadow:0 10px 30px -10px rgba(127,216,232,.7);}
+  .refresh-btn:active{transform:scale(.97);}
+  .forecast-day{border:1px solid var(--line);border-radius:7px;background:linear-gradient(180deg,var(--sky2),var(--sky));transition:transform .2s,border-color .2s;}
+  .forecast-day:hover{transform:translateY(-2px);border-color:var(--line2);}
+  .ticker{overflow:hidden;white-space:nowrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .ticker-track{display:inline-block;padding-left:100%;animation:tk 38s linear infinite;}
+  @keyframes tk{0%{transform:translateX(0);}100%{transform:translateX(-100%);}}
+  .ticker:hover .ticker-track{animation-play-state:paused;}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}body::after{display:none;}}
+</style>
+</head>
+<body>
+<div class="max-w-3xl mx-auto px-5 sm:px-7 py-9 sm:py-12">
+
+  <header class="mb-8">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="inline-block w-2 h-2 rounded-full pulse" style="background:var(--ice);box-shadow:0 0 10px var(--ice);"></span>
+      <span class="kicker">Station K-O-L-D &middot; Broadcasting Live from Shelf 2</span>
+    </div>
+    <h1 class="display" style="font-size:clamp(2.2rem,7vw,3.6rem);font-weight:800;line-height:.95;letter-spacing:-.02em">
+      The <span style="color:var(--ice);font-style:italic;font-weight:600">Fridge</span><br class="sm:hidden"> Weather Service
+    </h1>
+    <p class="mt-3" style="max-width:32rem;font-size:14px;line-height:1.6;color:var(--ash)">
+      Hyperlocal meteorology for the microclimates <em>inside</em> your refrigerator. Conditions change every time the door opens. We cannot help that.
+    </p>
+    <div class="mt-4 mono" id="broadcastTime" style="font-size:11px;letter-spacing:.1em;color:var(--ash2)"></div>
+  </header>
+
+  <div class="grid md:grid-cols-2 gap-7 items-start">
+    <div>
+      <div class="kicker mb-3">Tap a sector for the full report</div>
+      <div class="fridge-shell">
+        <div class="fridge-door-h"></div>
+        <div class="fridge-interior" id="fridge"></div>
+      </div>
+      <p class="mono mt-3 text-center" style="font-size:9.5px;letter-spacing:.1em;color:var(--ash3)">MODEL V-3411 &middot; ENERGY RATING: SOMEWHAT</p>
+    </div>
+    <div id="report" class="min-h-[200px]"></div>
+  </div>
+
+  <div id="alertsWrap" class="mt-9"></div>
+
+  <div class="mt-9">
+    <div class="kicker mb-3">Extended Outlook &mdash; The Next Three Door-Openings</div>
+    <div id="forecast" class="grid grid-cols-3 gap-3"></div>
+  </div>
+
+  <div class="ticker mt-10 py-2" style="background:var(--sky2)">
+    <div class="ticker-track mono" id="ticker" style="font-size:11px;letter-spacing:.06em;color:var(--ash)"></div>
+  </div>
+
+  <div class="flex items-center justify-between mt-8 flex-wrap gap-4">
+    <button id="refresh" class="refresh-btn">Re-Open The Door</button>
+    <div class="mono" style="font-size:9.5px;letter-spacing:.1em;color:var(--ash3);text-align:right;line-height:1.5">
+      FORECASTS ARE PROCEDURALLY GENERATED<br>AND HAVE NO NUTRITIONAL VALUE
+    </div>
+  </div>
+
+  <footer class="mt-12 pt-6" style="border-top:1px solid var(--line)">
+    <p class="mono" style="font-size:9.5px;letter-spacing:.1em;color:var(--ash3)">
+      The Fridge Weather Service &middot; An offering by Pr&iacute;zrak &middot; Built while the compressor hummed
+    </p>
+  </footer>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.5 3.6L12 11.5 5.5 7.9 12 4.3ZM5 9.6l6 3.3v7.4l-6-3.3V9.6Zm14 0v7.4l-6 3.3v-7.4l6-3.3Z"/></symbol>
+    <symbol id="i-milk" viewBox="0 0 24 24"><path fill="currentColor" d="M9 2v2l-1 2v2h8V6l-1-2V2H9Zm0 8v12h6V10H9Z"/></symbol>
+    <symbol id="i-carrot" viewBox="0 0 24 24"><path fill="currentColor" d="M14 2c-1 0-2 1-2 2 0 .5.2 1 .5 1.4L4 16c-.6.6-.6 1.5 0 2l2 2c.5.5 1.4.5 2 0L17.6 11.5c.4.3.9.5 1.4.5 1 0 2-1 2-2 0-.8-.5-1.5-1.2-1.8C20 7.3 19 6 19 6s1.3.2 2-.5c.7-.7.7-1.8 0-2.5s-1.8-.7-2.5 0c-.7.7-.5 2-.5 2s-1.3-.4-2.4-1.2C15.3 3.3 14.7 2 14 2Z"/></symbol>
+    <symbol id="i-cheese" viewBox="0 0 24 24"><path fill="currentColor" d="M2 18h20L12 4 2 18Zm5-1a1.2 1.2 0 1 1 0-2.4A1.2 1.2 0 0 1 7 17Zm4-2.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm3-2.8a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6Z"/></symbol>
+    <symbol id="i-cup" viewBox="0 0 24 24"><path fill="currentColor" d="M6 3h12l-1 4h1a3 3 0 0 1 0 6h-1.2A4 4 0 0 1 13 16h-2a4 4 0 0 1-3.8-3H6.2L6 17h12l-.5 3H6.5L6 3Z"/></symbol>
+    <symbol id="i-vortex" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 3a9 9 0 1 0 0 18 6 6 0 1 0 0-12 3 3 0 1 0 0 6"/></symbol>
+    <symbol id="i-snowflake" viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v20M2 12h20M4.2 4.2l15.6 15.6M19.8 4.2 4.2 19.8"/><path d="M12 5l2-2M12 5l-2-2M12 19l2 2M12 19l-2 2M5 12l-2 2M5 12l-2-2M19 12l2 2M19 12l2-2"/></g></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l1.8 5.6L19 9.5l-4.2 3 1.2 6.5L12 15.5 7.9 19l1.2-6.5L5 9.5l5.2-1.9L12 2Z"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C8 7 6 10 6 14a6 6 0 0 0 12 0c0-4-2-7-6-12Z"/></symbol>
+    <symbol id="i-fog" viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"><path d="M4 8h16M3 12h14M5 16h16M6 20h12"/></g></symbol>
+    <symbol id="i-frost" viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 6h16M3 12h18M4 18h16M7 9l-2 3 2 3M17 9l2 3-2 3"/></g></symbol>
+    <symbol id="i-wind" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h9a2.5 2.5 0 1 1-2.5 2.5"/></symbol>
+    <symbol id="i-cold" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2 2M16.4 16.4l2 2M18.4 5.6l-2 2M7.6 16.4l-2 2"/></g></symbol>
+    <symbol id="i-thermo" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a3 3 0 0 0-3 3v9.2A5 5 0 1 0 15 14.2V5a3 3 0 0 0-3-3Zm0 2a1 1 0 0 1 1 1v9.8l.4.3a3 3 0 1 1-2.8 0l.4-.3V5a1 1 0 0 1 1-1Z"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path fill="currentColor" d="M4 20C4 11 11 4 20 4c0 9-7 16-16 16Zm3-2c5-1 9-5 10-10-5 1-9 5-10 10Z"/></symbol>
+    <symbol id="i-jar" viewBox="0 0 24 24"><path fill="currentColor" d="M7 3v2h10V3H7Zm0 3c-1 0-2 1-2 2v11c0 1 1 2 2 2h10c1 0 2-1 2-2V8c0-1-1-2-2-2H7Zm1 5h8v2H8v-2Z"/></symbol>
+    <symbol id="i-storm" viewBox="0 0 24 24"><path fill="currentColor" d="M13 2 6 13h4l-2 9 8-12h-4l1-8Z"/></symbol>
+    <symbol id="i-balloon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-4 12.7c.3.3.5.6.5 1l.5 4.3h6l.5-4.3c0-.4.2-.7.5-1A7 7 0 0 0 12 2Z"/></symbol>
+    <symbol id="i-suncloud" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.2" fill="currentColor"/><path fill="currentColor" d="M10 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6 1.4A3.5 3.5 0 0 1 18 18H10Z"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 1 21h22L12 2Zm-1 7h2v6h-2V9Zm0 8h2v2h-2v-2Z"/></symbol>
+    <symbol id="i-siren" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c-4 0-7 3-7 7v6h14V9c0-4-3-7-7-7ZM3 17h18v3H3v-3Z"/></symbol>
+    <symbol id="i-calm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="15" cy="10" r="1.2" fill="currentColor"/><path d="M8.5 15a4 4 0 0 0 7 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<script>
+const ic = (id, sz) => '<svg class="ico" width="'+sz+'" height="'+sz+'" style="color:'+ (window._cur||'inherit') +'"><use href="#i-'+id+'"/></svg>';
+
+const RND = (a)=>a[Math.floor(Math.random()*a.length)];
+const RI = (lo,hi)=>Math.floor(Math.random()*(hi-lo+1))+lo;
+const RIdec = (lo,hi,d=1)=>(Math.random()*(hi-lo)+lo).toFixed(d);
+
+const ZONES = [
+  { id:'top',    name:'Top Shelf',      zicon:'cube',  tempBase:[3.5,5.5], hue:'var(--ice2)' },
+  { id:'mid',    name:'Middle Shelf',   zicon:'milk',  tempBase:[2,4],     hue:'var(--moss)' },
+  { id:'crisp',  name:'Crisper Drawer', zicon:'carrot',tempBase:[1,3],     hue:'var(--moss)' },
+  { id:'cheese', name:'Cheese Drawer',  zicon:'cheese',tempBase:[3,5],     hue:'var(--amber)' },
+  { id:'door',   name:'Door Shelf',     zicon:'cup',   tempBase:[6,9],     hue:'var(--warm)' },
+  { id:'corner', name:'The Back Corner',zicon:'vortex',tempBase:[0,1.5],   hue:'var(--grape)' },
+  { id:'freezer',name:'Freezer',        zicon:'snowflake',tempBase:[-21,-16], hue:'var(--frost)' },
+];
+
+const CONDITIONS = [
+  {n:'Clear & Crisp',          icon:'sparkle', sev:0, color:'var(--ice)',  note:'Visibility good to the back wall. The leftovers are behaving.'},
+  {n:'Light Condensation',     icon:'drop',    sev:1, color:'var(--ice)',  note:'Droplets forming on the underside of the cling film. Normal monsoon behaviour.'},
+  {n:'Tupperware Fog',         icon:'fog',     sev:1, color:'var(--ash)',  note:'Opaque windows on all containers older than four days. Contents unknown.'},
+  {n:'Patchy Frost',           icon:'frost',   sev:1, color:'var(--frost)',note:'A dusting along the rear wall. Aesthetic. Threatening. Mostly aesthetic.'},
+  {n:'Smell Front',            icon:'wind',    sev:2, color:'var(--warm)', note:'A warm ridge of questionable origin is advancing from the cheese drawer.'},
+  {n:'Odour Inversion',        icon:'fog',     sev:2, color:'var(--grape)',note:'Cold air has trapped a layer of aged dairy near the floor. Do not bend down suddenly.'},
+  {n:'Deep Chill Advisory',    icon:'cold',    sev:2, color:'var(--frost)',note:'Temperatures have dropped below the operational comfort of a cucumber.'},
+  {n:'Unseasonable Warmth',    icon:'thermo',  sev:3, color:'var(--warm)', note:'The door was opened too often. A heatwave is developing near the milk.'},
+  {n:'Freezer-Burn Warning',   icon:'frost',   sev:3, color:'var(--frost)',note:'Ice crystals are forming on items that are not, strictly, supposed to be archaeological.'},
+  {n:'Lettuce Wilt Watch',     icon:'leaf',    sev:2, color:'var(--moss)', note:'Crisper humidity is climbing. The romaine is losing its will.'},
+  {n:'Jar Migration',          icon:'jar',     sev:1, color:'var(--amber)',note:'A half-empty jam jar is drifting slowly toward the back. No one will find it until spring.'},
+  {n:'Leftover Atmospheric Event',icon:'storm',sev:3, color:'var(--warm2)',note:'A container of unknown age has achieved its own microclimate. Treat as sovereign territory.'},
+  {n:'Bag Pressure High',      icon:'balloon', sev:1, color:'var(--pink)', note:'A sealed bag of something is inflated and taut. It wants to be free.'},
+  {n:'Clearing Trend',         icon:'suncloud',sev:0, color:'var(--bone)', note:'Conditions improving. The compressor has intervened.'},
+];
+
+const PERIODS = ['Morning Rush','Afternoon Graze','Midnight Raid'];
+
+const HEADLINES = [
+  'The crisper is in a humidity crisis and refuses to discuss it.',
+  'A smell front is stalled over the middle shelf. No movement expected.',
+  'Freezer conditions: stable, judgmental, deeply cold.',
+  'The door shelf is experiencing unseasonable warmth due to repeated human interference.',
+  'Patchy frost along the back wall is -- according to the pickles -- "for atmosphere."',
+  'A leftover atmospheric event has been downgraded. The container is still sovereign.',
+  'Cheese drawer: foggy, content, unbothered, moist.',
+  'Tupperware fog has reduced visibility inside Container 7 to zero. Contents: pending.',
+  'The back corner has not seen daylight since February and prefers it that way.',
+  'Lettuce wilt watch continues. The romaine remains philosophical.',
+];
+
+const DETAILS = {
+  wind:['Air circulation from the vents is gentle but persistent, producing a mild "dairy drift" from upper to lower shelves.',
+        'Still air. Nothing is moving. The jar of olives knows this and is unnerved.',
+        'A cold current from the freezer vent is spilling downhill into the crisper. The carrots feel it first.',
+        'Brisk internal circulation. Loose bag ties are flapping. Minor.',
+        'The airflow has reversed and is now carrying pickle-scented air upward. Unprecedented. Disconcerting.'],
+  humidity:['Relative humidity is holding at a swamp-like level that the lettuce describes as "actually fine."',
+            'Dry. The cling film is clinging out of obligation rather than need.',
+            'Humidity is climbing steadily. A single grape is sweating.',
+            'Arid and unforgiving. The uncovered cheese is developing what experts call "character."',
+            'Near saturation. Everything is damp. Morale is damp.'],
+  outlook:['Conditions expected to hold until the next door-opening, at which point everything will destabilise for 7-12 seconds.',
+           'Stable, provided no one introduces a warm casserole or leaves the door ajar while deciding.',
+           'A cooling trend is forecast overnight as the compressor undertakes its scheduled emotional labour.',
+           'Warming expected around 6pm when someone holds the door open staring blankly for too long.',
+           'No change anticipated. The pickles have stabilised the region through sheer density of brine.'],
+};
+
+const FORECAST_COND = [
+  {icon:'sparkle',n:'Clear'},{icon:'drop',n:'Condensation'},{icon:'fog',n:'Fog'},{icon:'frost',n:'Frost'},
+  {icon:'thermo',n:'Warm Spell'},{icon:'cold',n:'Deep Chill'},{icon:'jar',n:'Jar Drift'},{icon:'leaf',n:'Wilt Risk'},
+];
+
+const ADVISORIES = {
+  0:['No active advisories. The fridge is at peace. This is suspicious.'],
+  1:['A FROST ADVISORY is in effect for the back wall.','A FOG ADVISORY covers all unmarked containers.'],
+  2:['A SMELL FRONT WARNING is active. Close the door firmly.','A HUMIDITY WARNING has been issued for the crisper drawer.'],
+  3:['A SEVERE LEFTOVER WARNING is in effect. Do not open unmarked containers.','An EXCESSIVE OPENING WARNING is active. The fridge is losing patience.'],
+};
+
+let state = null;
+let selected = 'mid';
+
+function iconHtml(id, color, sz){
+  return '<svg width="'+sz+'" height="'+sz+'" style="display:inline-block;vertical-align:middle;color:'+color+'"><use href="#i-'+id+'"/></svg>';
+}
+
+function genZone(z){
+  const cond = RND(CONDITIONS);
+  const temp = (Math.random()*(z.tempBase[1]-z.tempBase[0])+z.tempBase[0]).toFixed(1);
+  return { ...z, cond, temp, humid:RI(35,99), odor:RI(0,100), pressure:RIdec(0.9,1.4,2),
+    wind:RND(DETAILS.wind), humidityDetail:RND(DETAILS.humidity), outlook:RND(DETAILS.outlook) };
+}
+
+function genState(){
+  const zones = ZONES.map(genZone);
+  if(!zones.some(z=>z.cond.sev>=2)){
+    const z = zones[RI(0,zones.length-1)];
+    z.cond = RND(CONDITIONS.filter(c=>c.sev>=2));
+  }
+  return { zones, headline: RND(HEADLINES) };
+}
+
+function sevColor(sev){ return ['var(--ice)','var(--ice)','var(--amber)','var(--warm)'][sev]||'var(--ice)'; }
+
+function renderFridge(){
+  const el = document.getElementById('fridge');
+  el.innerHTML = '';
+  state.zones.forEach(z=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'zone' + (z.id===selected?' sel':'');
+    const h = z.id==='door' ? 46 : z.id==='corner' ? 38 : z.id==='freezer' ? 70 : 52;
+    wrap.style.cssText = 'height:'+h+'px;display:flex;align-items:center;justify-content:space-between;padding:0 13px;background:linear-gradient(180deg,'+z.hue+'22,'+z.hue+'08)';
+    wrap.innerHTML =
+      '<div style="display:flex;align-items:center;gap:9px;min-width:0">'+
+        iconHtml(z.zicon,'rgba(255,255,255,.85)',20)+
+        '<div style="min-width:0"><div class="zone-label">'+z.name+'</div>'+
+        '<div class="zone-cond" style="color:'+z.cond.color+'">'+iconHtml(z.cond.icon,z.cond.color,13)+' '+z.cond.n+'</div></div></div>'+
+      '<div class="zone-temp">'+z.temp+'&deg;C</div>';
+    if(z.id==='crisp'||z.id==='cheese'||z.id==='freezer'){
+      wrap.style.position='relative';
+      const handle=document.createElement('div');handle.className='drawer-handle';handle.style.cssText='position:absolute;bottom:3px;left:0;right:0';
+      wrap.appendChild(handle);
+    }
+    wrap.addEventListener('click',()=>{ selected=z.id; renderFridge(); renderReport(); });
+    el.appendChild(wrap);
+    if(z.id==='mid'||z.id==='cheese'||z.id==='corner'){
+      const ln=document.createElement('div');ln.className='shelf-line';el.appendChild(ln);
+    }
+  });
+}
+
+function gauge(label,val,unit,color){
+  return '<div><div class="flex items-center justify-between mb-1"><span class="kicker">'+label+'</span>'+
+    '<span class="mono" style="font-size:11px;color:var(--ash)">'+val+unit+'</span></div>'+
+    '<div class="bar"><div class="fill" style="width:'+val+'%;background:linear-gradient(90deg,'+color+'55,'+color+')"></div></div></div>';
+}
+
+function renderReport(){
+  const z = state.zones.find(x=>x.id===selected);
+  const sev = z.cond.sev;
+  const sevName = sev===0?'ALL CLEAR':sev===1?'ADVISORY':sev===2?'WARNING':'SEVERE';
+  document.getElementById('report').innerHTML =
+    '<div class="rise"><div class="kicker mb-2">Sector Report</div>'+
+    '<div class="flex items-baseline gap-3 flex-wrap">'+
+      '<h2 class="display" style="font-size:1.7rem;font-weight:800;line-height:1">'+z.name+'</h2>'+
+      '<span class="advisory-pill" style="background:'+sevColor(sev)+'22;color:'+sevColor(sev)+';border:1px solid '+sevColor(sev)+'55">'+sevName+'</span></div>'+
+    '<div class="flex items-center gap-2 mt-3">'+iconHtml(z.cond.icon,z.cond.color,26)+
+      '<div><div style="font-size:15px;font-weight:600;color:'+z.cond.color+'">'+z.cond.n+'</div>'+
+      '<div style="font-size:12.5px;color:var(--ash);line-height:1.4">'+z.cond.note+'</div></div></div>'+
+    '<div class="flex items-end gap-1 mt-4">'+
+      '<span class="display" style="font-size:3rem;font-weight:800;line-height:.9;letter-spacing:-.02em">'+z.temp+'</span>'+
+      '<span class="mono" style="font-size:14px;color:var(--ash2);padding-bottom:7px">&deg;C &nbsp;|&nbsp; feels like '+(parseFloat(z.temp)-1.2).toFixed(1)+'&deg;</span></div>'+
+    '<div class="gauges mt-5 space-y-3">'+
+      gauge('Humidity', z.humid, '%', 'var(--ice)')+
+      gauge('Odour Pressure', z.odor, '%', 'var(--warm)')+
+      gauge('Brine Saturation', RI(10,95), '%', 'var(--moss)')+
+    '</div>'+
+    '<div class="mono mt-3" style="font-size:11px;color:var(--ash2)">Atmospheric pressure: '+z.pressure+' atm (kPa, refrigerator) &middot; Wind: '+RND(['calm','dairy drift 2-4','cold spill 3-5','brisk 5-8'])+'</div>'+
+    '<div class="mt-5 space-y-2.5 drift" style="animation-delay:.08s">'+
+      '<p style="font-size:13px;line-height:1.55;color:var(--bone)">'+z.wind+'</p>'+
+      '<p style="font-size:13px;line-height:1.55;color:var(--ash)">'+z.humidityDetail+'</p>'+
+      '<p style="font-size:13px;line-height:1.55;color:var(--ash)"><span class="kicker" style="display:block;margin-bottom:3px">Outlook</span>'+z.outlook+'</p></div></div>';
+}
+
+function renderAlerts(){
+  const maxSev = Math.max(...state.zones.map(z=>z.cond.sev));
+  const msgs = ADVISORIES[maxSev]||ADVISORIES[0];
+  const el = document.getElementById('alertsWrap');
+  if(maxSev===0){
+    el.innerHTML = '<div class="kicker mb-2">Severe Weather Desk</div>'+
+      '<div class="flex items-center gap-3 p-4 rounded-md" style="background:rgba(127,216,232,.06);border:1px solid var(--line)">'+
+      iconHtml('calm','var(--ice)',22)+'<p style="font-size:13px;color:var(--ash)">'+msgs[0]+'</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="kicker mb-2">Severe Weather Desk</div>'+
+    msgs.map((m,i)=>'<div class="alert-banner p-3 mb-2 flex items-start gap-3 rise" style="animation-delay:'+(i*0.06)+'s">'+
+      iconHtml(maxSev>=3?'siren':'alert','var(--warm)',17)+
+      '<p class="mono" style="font-size:11.5px;letter-spacing:.04em;color:var(--bone);line-height:1.5">'+m+'</p></div>').join('');
+}
+
+function renderForecast(){
+  document.getElementById('forecast').innerHTML = PERIODS.map((p,i)=>{
+    const c = RND(FORECAST_COND);
+    const z = state.zones[RI(0,state.zones.length-1)];
+    const t = (parseFloat(z.tempBase[0])+Math.random()*(z.tempBase[1]-z.tempBase[0])).toFixed(1);
+    return '<div class="forecast-day p-4 rise" style="animation-delay:'+(i*0.07)+'s">'+
+      '<div class="kicker mb-2">'+p+'</div>'+iconHtml(c.icon,'var(--bone)',28)+
+      '<div style="font-size:13px;font-weight:600;color:var(--bone);margin-top:6px;margin-bottom:2px">'+c.n+'</div>'+
+      '<div class="mono" style="font-size:11px;color:var(--ash2)">'+t+'&deg;C</div>'+
+      '<div class="mono" style="font-size:9px;color:var(--ash3);margin-top:5px;letter-spacing:.05em">'+z.name+'</div></div>';
+  }).join('');
+}
+
+function renderTicker(){
+  const bits = [];
+  state.zones.forEach(z=>{ bits.push(z.name+': '+z.cond.n+' '+z.temp+'\u00B0C'); });
+  bits.push(state.headline);
+  document.getElementById('ticker').innerHTML =
+    '/// LIVE ///&nbsp;&nbsp;' + bits.join('&nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;') + '&nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;/// LIVE ///';
+}
+
+function tick(){
+  state = genState();
+  renderFridge(); renderReport(); renderAlerts(); renderForecast(); renderTicker();
+  const now = new Date();
+  document.getElementById('broadcastTime').innerHTML =
+    'LAST READING: ' + now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) +
+    ' &middot; DOOR CYCLES TODAY: ' + RI(8,73) +
+    ' &middot; COMPRESSOR STATUS: ' + RND(['HUMMING','RESTING','JUDGING YOU','OVERWORKED']);
+}
+
+document.getElementById('refresh').addEventListener('click',tick);
+tick();
+</script>
+</body>
+</html>
